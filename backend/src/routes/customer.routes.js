@@ -1,0 +1,12 @@
+import { Router } from 'express';
+import * as ctrl from '../controllers/customer.controller.js';
+import { authenticate, authorize } from '../middleware/auth.middleware.js';
+const router = Router();
+router.use(authenticate);
+router.get('/', ctrl.getAll);
+router.get('/search/phone', ctrl.searchByPhone);
+router.get('/:id', ctrl.getOne);
+router.post('/', authorize('ADMIN', 'DOKAN'), ctrl.create);
+router.put('/:id', authorize('ADMIN', 'DOKAN'), ctrl.update);
+router.delete('/:id', authorize('ADMIN'), ctrl.remove);
+export default router;

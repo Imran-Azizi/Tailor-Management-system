@@ -1,0 +1,11 @@
+import { Router } from 'express';
+import * as ctrl from '../controllers/design.controller.js';
+import { authenticate, authorize } from '../middleware/auth.middleware.js';
+const router = Router();
+router.use(authenticate);
+router.get('/', ctrl.getAllDesigns);
+router.get('/:model', ctrl.getAll);
+router.post('/:model', authorize('ADMIN'), ctrl.create);
+router.put('/:model/:id', authorize('ADMIN'), ctrl.update);
+router.delete('/:model/:id', authorize('ADMIN'), ctrl.remove);
+export default router;

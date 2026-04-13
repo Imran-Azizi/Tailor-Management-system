@@ -1,0 +1,14 @@
+import { Router } from 'express';
+import * as ctrl from '../controllers/order.controller.js';
+import { authenticate, authorize } from '../middleware/auth.middleware.js';
+const router = Router();
+router.use(authenticate);
+router.get('/', ctrl.getAll);
+router.get('/:id', ctrl.getOne);
+router.post('/', authorize('ADMIN', 'DOKAN'), ctrl.create);
+router.put('/:id', authorize('ADMIN', 'DOKAN'), ctrl.update);
+router.patch('/:id/complete', authorize('ADMIN', 'DOKAN', 'QICHIKAR', 'DOKHT'), ctrl.markComplete);
+router.patch('/:id/progress', ctrl.markInProgress);
+router.patch('/:id/assign', authorize('ADMIN'), ctrl.assign);
+router.delete('/:id', authorize('ADMIN'), ctrl.remove);
+export default router;

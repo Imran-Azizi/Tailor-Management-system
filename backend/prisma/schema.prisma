@@ -1,0 +1,342 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth & Users ─────────────────────────────────────────────────────────────
+
+enum AccountType {
+  ADMIN
+  DOKAN
+  DOKHT
+  QICHIKAR
+}
+
+model User {
+  id           String      @id @default(uuid())
+  name         String
+  phoneNumber  String      @unique
+  email        String?     @unique
+  accountType  AccountType
+  password     String
+  isActive     Boolean     @default(true)
+  refreshToken String?
+
+  assignedOrders      Order[]            @relation("AssignedOrders")
+  assignedByOrders    Order[]            @relation("AssignedByOrders")
+  notifications       UserNotification[]
+  transactions        Transaction[]      @relation("UserTransactions")
+  createdTransactions Transaction[]      @relation("CreatedTransactions")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([phoneNumber])
+  @@index([accountType])
+  @@index([email])
+}
+
+model UserNotification {
+  id      String @id @default(uuid())
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId String?
+  message String
+  type    String  @default("ASSIGNMENT")
+  isRead  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([isRead])
+}
+
+// ─── Customers ────────────────────────────────────────────────────────────────
+
+model Customer {
+  id          String   @id @default(uuid())
+  firstName   String
+  phoneNumber String   @unique
+  billNumber  Int      @unique
+  orders      Order[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([phoneNumber])
+}
+
+model Order {
+  id              String         @id @default(uuid())
+  customerId      String
+  orderName       String?
+  type            OrderType
+  totalPrice      Float
+  discount        Float          @default(0)
+  paidAmount      Float
+  remaining       Float
+  quantity        Int            @default(1)
+  isEmergency     Boolean        @default(false)
+  emergencyExpiry DateTime?
+  isCompleted     Boolean        @default(false)
+  inProgress      Boolean        @default(false)
+
+  // Assignment fields
+  assignedToId   String?
+  assignedById   String?
+  assignedAt     DateTime?
+  assignmentNote String?
+  assignedTo     User?          @relation("AssignedOrders", fields: [assignedToId], references: [id])
+  assignedBy     User?          @relation("AssignedByOrders", fields: [assignedById], references: [id])
+
+  customer      Customer       @relation(fields: [customerId], references: [id])
+  boxId         Int?
+  box           Box?           @relation(fields: [boxId], references: [id])
+  outfit        Outfit?
+  waskat        Waskat?
+  korty         Korty?
+  yakhanQaq     YakhanQaq?
+  notifications Notification[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([customerId])
+  @@index([type])
+  @@index([isCompleted])
+  @@index([isEmergency])
+  @@index([assignedToId])
+}
+
+enum OrderType {
+  OUTFIT
+  WASKAT
+  KORTY
+  YAKHANQAQ
+}
+
+model Outfit {
+  id      String @id @default(uuid())
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  height   Float
+  shoulder Float
+  sleeve   Float
+  neck     Float
+  chest    Float
+  armpit   Float
+  waist    Float
+  skirt    Float
+  tenban   Float
+  pantLeg  Float
+  arm      Float
+  calf     Float
+
+  neckStyle           String?
+  sleeveStyle         String?
+  sleeveSize          String?
+  skirtStyle          String?
+  frontPocket         Boolean @default(false)
+  sidePocket          Boolean @default(false)
+  underPocket         Boolean @default(false)
+  outfitDesign        String?
+  outfitStyle         String?
+  buttonStyle         String?
+  pantStyle           String?
+  additionalStyleInfo String?
+}
+
+model Waskat {
+  id      String @id @default(uuid())
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  height   Float
+  shoulder Float
+  neck     Float
+  chest    Float
+  waist    Float
+  sorain   Float
+
+  neckStyle     String?
+  shoulderState String?
+  waskatStyle   String?
+}
+
+model Korty {
+  id      String @id @default(uuid())
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  height           Float
+  arm              Float
+  shoulder         Float
+  neck             Float
+  sleeve           Float
+  patlonHeight     Float
+  kamerPatlon      Float
+  doroBaghlePatlon Float
+  waist            Float
+  sorainPatlon     Float
+  sorain           Float
+  patPatlon        Float
+  pachaPatlon      Float
+
+  style String?
+}
+
+model YakhanQaq {
+  id      String @id @default(uuid())
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  height   Float
+  sleeve   Float
+  shoulder Float
+  neck     Float
+  armpit   Float
+  sorain   Float
+  chest    Float
+
+  neckStyle       String?
+  sleeveStyle     String?
+  sleeveSize      String?
+  skirtStyle      String?
+  frontPocket     Boolean @default(false)
+  yakhanQaqDesign String?
+  buttonStyle     String?
+  pantStyle       String?
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  orderId   String
+  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  message   String
+  isRead    Boolean   @default(false)
+  nextAlert DateTime
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([orderId])
+  @@index([isRead])
+}
+
+model Box {
+  id        Int       @id @default(autoincrement())
+  boxName   String
+  boxType   OrderType
+  capacity  Int
+  orders    Order[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Yakhan {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Astin {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ShoulderState {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model NeckOutfit {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model NeckWaskat {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Daman {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model JibRow {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model JibBaghle {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model JibTenban {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PatyShip {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ButtonShip {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TenbanShip {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Transactions ─────────────────────────────────────────────────────────────
+
+model Transaction {
+  id              String      @id @default(uuid())
+  accountType     AccountType
+  userId          String
+  user            User        @relation("UserTransactions", fields: [userId], references: [id])
+  amount          Float
+  transactionDate DateTime
+  note            String?
+  createdById     String
+  createdBy       User        @relation("CreatedTransactions", fields: [createdById], references: [id])
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([accountType])
+  @@index([createdById])
+}
