@@ -1,43 +1,42 @@
-import { useState, useMemo, useRef } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import {
-  LuClipboardList,
-  LuPlay,
-  LuPause,
-  LuSquareCheck,
   LuBell,
   LuCheck,
-  LuUser,
-  LuPhone,
-  LuHash,
-  LuClock,
-  LuX,
+  LuCircleAlert,
+  LuClipboardList,
+  LuCircleDollarSign,
   LuEye,
-  LuCalendar,
-  LuPrinter,
+  LuHash,
+  LuPhone,
+  LuPlay,
+  LuSearch,
+  LuSquareCheck,
+  LuUser,
 } from "react-icons/lu";
 import api from "../lib/api.js";
+import { parseNumberLocale } from "../lib/normalize.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
+import { getOrderTypeLabel } from "../lib/orderType.js";
+import { formatUserNotificationMessage } from "../lib/notifications.js";
+import { formatDateTimeLocale } from "../lib/locale.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { NotificationText } from "../components/ui/index.jsx";
 
-// ── Role config ────────────────────────────────────────────────────────────────
 const ROLE_CONFIG = {
   DOKHT: {
     color: "#DB2777",
     colorBg: "#DB277714",
     colorBd: "#DB277730",
     label: "Dokht",
-    emoji: "🪡",
-    greeting: "Welcome back",
   },
   QICHIKAR: {
     color: "#D97706",
     colorBg: "#D9770614",
     colorBd: "#D9770630",
     label: "Qichikar",
-    emoji: "✂️",
-    greeting: "Welcome back",
   },
 };
 
@@ -69,7 +68,8 @@ const NUM_LABELS = {
   patPatlon: "Pat Patlon",
   pachaPatlon: "Pacha",
 };
-const STY_LABELS = {
+
+const STYLE_LABELS = {
   neckStyle: "Neck Style",
   sleeveStyle: "Sleeve Style",
   sleeveSize: "Sleeve Size",
@@ -84,394 +84,273 @@ const STY_LABELS = {
   yakhanQaqDesign: "Design",
   additionalStyleInfo: "Notes",
 };
+
 const BOOL_LABELS = {
   frontPocket: "Front Pocket",
   sidePocket: "Side Pocket",
   underPocket: "Under Pocket",
 };
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
-function getStatus(order) {
-  if (order.isCompleted) return "completed";
-  if (order.inProgress) return "inProgress";
-  return "assigned";
-}
-function statusColor(s) {
-  if (s === "completed") return "#16a34a";
-  if (s === "inProgress") return "#2563EB";
-  return "#D97706";
-}
-function statusLabel(s) {
-  if (s === "completed") return "Completed";
-  if (s === "inProgress") return "In Progress";
-  return "Assigned";
-}
-function fmt$(v) {
-  return `$${Number(v || 0).toLocaleString()}`;
-}
-function fmtDate(d) {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-function formatKey(k) {
-  return k
-    .replace(/([A-Z])/g, " $1")
-    .replace(/^./, (s) => s.toUpperCase())
-    .trim();
+function getMeasure(order) {
+  return (
+    order?.outfit || order?.waskat || order?.korty || order?.yakhanQaq || {}
+  );
 }
 
-// ── Print handler ──────────────────────────────────────────────────────────────
-function buildPrintHTML(order, isWorker = false) {
-  const m =
-    order.outfit || order.waskat || order.korty || order.yakhanQaq || {};
-  const nums = Object.entries(NUM_LABELS)
-    .filter(([k]) => m[k] != null)
-    .map(
-      ([k, lbl]) =>
-        `<div class="meas"><span>${lbl}</span><strong>${m[k]}</strong></div>`,
-    )
-    .join("");
-  const styles = Object.entries(STY_LABELS)
-    .filter(([k]) => m[k])
-    .map(([k, lbl]) => `<div class="sty">${lbl}: <b>${m[k]}</b></div>`)
-    .join("");
-  const bools = Object.entries(BOOL_LABELS)
-    .filter(([k]) => m[k] === true)
-    .map(([, lbl]) => `<div class="bool">✓ ${lbl}</div>`)
-    .join("");
-
-  const assnLine = order.assignedBy
-    ? `<p><b>Assigned by:</b> ${order.assignedBy.name} on ${fmtDate(order.assignedAt)}</p>`
-    : "";
-  const noteLine = order.assignmentNote
-    ? `<p><b>Note:</b> ${order.assignmentNote}</p>`
-    : "";
-
-  return `<!DOCTYPE html><html><head><meta charset="utf-8">
-<title>Order – Bill #${order.customer?.billNumber}</title>
-<style>
-  body{font-family:Arial,sans-serif;margin:24px;color:#111;font-size:13px}
-  h1{font-size:20px;margin:0 0 4px}
-  h2{font-size:14px;margin:18px 0 8px;border-bottom:1px solid #ccc;padding-bottom:4px;text-transform:uppercase;letter-spacing:.05em}
-  .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;border-bottom:2px solid #111;padding-bottom:12px}
-  .badge{display:inline-block;padding:2px 10px;border-radius:99px;font-size:11px;font-weight:700;background:#f3f4f6;border:1px solid #d1d5db;margin-right:6px}
-  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;margin-bottom:12px}
-  .info-grid p{margin:0;line-height:1.6}
-  .meas-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
-  .meas{border:1px solid #e5e7eb;border-radius:6px;padding:6px 8px;display:flex;flex-direction:column;align-items:center}
-  .meas span{font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em}
-  .meas strong{font-size:16px;font-weight:800;margin-top:2px}
-  .sty-grid{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
-  .sty,.bool{font-size:12px;padding:3px 10px;border-radius:20px;background:#f3f4f6;border:1px solid #e5e7eb}
-  .bool{background:#f0fdf4;border-color:#bbf7d0;color:#15803d}
-  .pay-row{display:flex;justify-content:space-between;border-bottom:1px solid #f3f4f6;padding:4px 0}
-  @media print{body{margin:12px}}
-</style></head><body>
-<div class="top">
-  <div>
-    <h1>${order.customer?.firstName || "—"}</h1>
-    <div>
-      <span class="badge">${order.type}</span>
-      ${order.isEmergency ? '<span class="badge" style="background:#fee2e2;border-color:#fca5a5;color:#b91c1c">⚡ Emergency</span>' : ""}
-      <span class="badge" style="${order.isCompleted ? "background:#f0fdf4;border-color:#bbf7d0;color:#15803d" : ""}">${order.isCompleted ? "Completed" : order.inProgress ? "In Progress" : "Assigned"}</span>
-    </div>
-  </div>
-  <div style="text-align:right">
-    <div style="font-size:11px;color:#6b7280">Bill Number</div>
-    <div style="font-size:28px;font-weight:900">#${order.customer?.billNumber}</div>
-    <div style="font-size:11px;color:#6b7280">${new Date().toLocaleDateString()}</div>
-  </div>
-</div>
-
-<h2>Customer Information</h2>
-<div class="info-grid">
-  <p><b>Name:</b> ${order.customer?.firstName || "—"}</p>
-  <p><b>Bill #:</b> ${order.customer?.billNumber || "—"}</p>
-  <p><b>Phone:</b> ${order.customer?.phoneNumber || "—"}</p>
-  <p><b>Order Type:</b> ${order.type}</p>
-  ${order.quantity > 1 ? `<p><b>Quantity:</b> ${order.quantity} pieces</p>` : ""}
-</div>
-
-${!isWorker ? `<h2>Payment Summary</h2>
-<div style="max-width:320px">
-  <div class="pay-row"><span>Total Price</span><b>${fmt$(order.totalPrice)}</b></div>
-  <div class="pay-row"><span>Discount</span><b>-${fmt$(order.discount)}</b></div>
-  <div class="pay-row"><span>Paid</span><b>${fmt$(order.paidAmount)}</b></div>
-  <div class="pay-row"><span>Remaining</span><b style="color:${Number(order.remaining) > 0 ? "#b91c1c" : "#15803d"}">${fmt$(order.remaining)}</b></div>
-</div>` : ""}
-
-${assnLine || noteLine ? `<h2>Assignment Info</h2><div class="info-grid">${assnLine}${noteLine}</div>` : ""}
-
-${nums ? `<h2>Measurements</h2><div class="meas-grid">${nums}</div>` : ""}
-
-${styles || bools ? `<h2>Style Information</h2><div class="sty-grid">${styles}${bools}</div>` : ""}
-
-</body></html>`;
-}
-
-function printOrder(order, isWorker = false) {
-  const win = window.open("", "_blank", "width=850,height=700");
-  if (!win) {
-    toast.error("Allow popups to print");
-    return;
+function getRoleKeys(accountType) {
+  if (accountType === "QICHIKAR") {
+    return {
+      assignedToId: "qichikarAssignedToId",
+      receivedById: "qichikarReceivedById",
+      receivedAt: "qichikarReceivedAt",
+      inProgress: "qichikarInProgress",
+    };
   }
-  win.document.write(buildPrintHTML(order, isWorker));
-  win.document.close();
-  win.onload = () => {
-    win.focus();
-    win.print();
+  if (accountType === "DOKHT") {
+    return {
+      assignedToId: "dokhtAssignedToId",
+      receivedById: "dokhtReceivedById",
+      receivedAt: "dokhtReceivedAt",
+      inProgress: "dokhtInProgress",
+    };
+  }
+  return null;
+}
+
+function getRoleOrderState(order, accountType) {
+  const keys = getRoleKeys(accountType);
+  const assignedFallback =
+    order?.assignedTo?.accountType === accountType ? order?.assignedToId : null;
+  const receivedFallback =
+    order?.receivedBy?.accountType === accountType ? order?.receivedById : null;
+
+  return {
+    assignedToId: keys
+      ? (order?.[keys.assignedToId] ?? assignedFallback)
+      : order?.assignedToId,
+    receivedById: keys
+      ? (order?.[keys.receivedById] ?? receivedFallback)
+      : order?.receivedById,
+    receivedAt: keys
+      ? (order?.[keys.receivedAt] ?? order?.receivedAt)
+      : order?.receivedAt,
+    inProgress: Boolean(
+      keys
+        ? (order?.[keys.inProgress] ?? order?.inProgress)
+        : order?.inProgress,
+    ),
   };
 }
 
-// ── Sub-components ─────────────────────────────────────────────────────────────
-function StatCard({ icon, label, value, color, bg, border }) {
-  return (
-    <div
-      style={{
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
-        borderRadius: 12,
-        padding: "18px 20px",
-        display: "flex",
-        alignItems: "center",
-        gap: 14,
-      }}
-    >
-      <div
-        style={{
-          width: 46,
-          height: 46,
-          borderRadius: 11,
-          background: bg,
-          border: `1px solid ${border}`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-        }}
-      >
-        {icon}
-      </div>
-      <div>
-        <p
-          style={{
-            fontSize: 11,
-            color: "var(--text3)",
-            fontWeight: 600,
-            textTransform: "uppercase",
-            letterSpacing: ".05em",
-            marginBottom: 4,
-          }}
-        >
-          {label}
-        </p>
-        <p
-          style={{
-            fontSize: 28,
-            fontWeight: 800,
-            color: "var(--text1)",
-            lineHeight: 1,
-          }}
-        >
-          {value}
-        </p>
-      </div>
-    </div>
-  );
+function isWorkerCompletedForRole(order, accountType) {
+  if (order?.isCompleted) return true;
+  if (accountType === "QICHIKAR") {
+    return Boolean(order?.qichikarCompletedAt || order?.dokhtCompletedAt);
+  }
+  if (accountType === "DOKHT") {
+    return Boolean(order?.dokhtCompletedAt);
+  }
+  return Boolean(order?.dokhtCompletedAt || order?.qichikarCompletedAt);
 }
 
-function MeasurementsGrid({ order }) {
-  const m = order.outfit || order.waskat || order.korty || order.yakhanQaq;
-  if (!m)
-    return (
-      <p style={{ fontSize: 13, color: "var(--text3)", padding: "8px 0" }}>
-        No measurements recorded.
-      </p>
-    );
-
-  const nums = Object.entries(NUM_LABELS)
-    .filter(([k]) => m[k] != null)
-    .map(([k, lbl]) => ({ k, lbl, v: m[k] }));
-  const stys = Object.entries(STY_LABELS)
-    .filter(([k]) => m[k])
-    .map(([k, lbl]) => ({ k, lbl, v: m[k] }));
-  const bools = Object.entries(BOOL_LABELS)
-    .filter(([k]) => m[k] === true)
-    .map(([k, lbl]) => ({ k, lbl }));
-
-  return (
-    <div>
-      {nums.length > 0 && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(88px, 1fr))",
-            gap: "8px 10px",
-            marginBottom: 14,
-          }}
-        >
-          {nums.map(({ k, lbl, v }) => (
-            <div
-              key={k}
-              style={{
-                background: "var(--surface)",
-                border: "1px solid var(--border)",
-                borderRadius: 8,
-                padding: "7px 8px",
-                textAlign: "center",
-              }}
-            >
-              <p
-                style={{
-                  fontSize: 10,
-                  color: "var(--text3)",
-                  marginBottom: 3,
-                  textTransform: "uppercase",
-                  letterSpacing: ".04em",
-                }}
-              >
-                {lbl}
-              </p>
-              <p
-                style={{ fontSize: 17, fontWeight: 800, color: "var(--text1)" }}
-              >
-                {v}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-      {(stys.length > 0 || bools.length > 0) && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
-          {stys.map(({ k, lbl, v }) => (
-            <div
-              key={k}
-              style={{
-                fontSize: 12,
-                padding: "4px 11px",
-                background: "var(--surface)",
-                border: "1px solid var(--border)",
-                borderRadius: 20,
-                color: "var(--text2)",
-              }}
-            >
-              <span style={{ color: "var(--text3)", fontSize: 11 }}>
-                {lbl}:{" "}
-              </span>
-              {v}
-            </div>
-          ))}
-          {bools.map(({ k, lbl }) => (
-            <div
-              key={k}
-              style={{
-                fontSize: 12,
-                padding: "4px 11px",
-                background: "#16a34a12",
-                border: "1px solid #16a34a30",
-                borderRadius: 20,
-                color: "#16a34a",
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-              }}
-            >
-              <LuCheck size={11} />
-              {lbl}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+function getStatus(order, accountType) {
+  if (isWorkerCompletedForRole(order, accountType)) return "completed";
+  if (getRoleOrderState(order, accountType).inProgress) return "inProgress";
+  return "assigned";
 }
 
-function InfoCard({ title, children }) {
-  return (
-    <div
-      style={{
-        background: "var(--surface2)",
-        border: "1px solid var(--border)",
-        borderRadius: 10,
-        padding: 14,
-      }}
-    >
-      <p
-        style={{
-          fontSize: 10,
-          fontWeight: 700,
-          color: "var(--text3)",
-          textTransform: "uppercase",
-          letterSpacing: ".07em",
-          marginBottom: 10,
-        }}
-      >
-        {title}
-      </p>
-      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-        {children}
-      </div>
-    </div>
-  );
-}
-function InfoRow({ icon, label, bold }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-      <span style={{ color: "var(--text3)", flexShrink: 0 }}>{icon}</span>
-      <span
-        style={{
-          fontSize: 13,
-          color: bold ? "var(--text1)" : "var(--text2)",
-          fontWeight: bold ? 700 : 400,
-        }}
-      >
-        {label}
-      </span>
-    </div>
-  );
-}
-function PayRow({ label, value, color }) {
-  return (
-    <div
-      style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}
-    >
-      <span style={{ color: "var(--text3)" }}>{label}</span>
-      <span style={{ fontWeight: 700, color: color || "var(--text1)" }}>
-        {value}
-      </span>
-    </div>
-  );
+function statusColor(status) {
+  if (status === "completed") return "#DC2626";
+  if (status === "inProgress") return "#2563EB";
+  return "#D97706";
 }
 
-// ── Order Detail Modal ─────────────────────────────────────────────────────────
-function OrderDetailModal({
-  order,
-  roleColor,
-  onClose,
-  onProgress,
-  onComplete,
-  progressPending,
-  completePending,
-  isWorker,
-}) {
-  const status = getStatus(order);
-  const sc = statusColor(status);
-  const canComplete =
-    !order.isCompleted &&
-    order.inProgress &&
-    (isWorker || Number(order.remaining || 0) === 0);
-  const typeColor = TYPE_COLORS[order.type] || "#888";
+function statusLabel(status, t) {
+  if (status === "completed") {
+    return t("workerPanel.statusCompleted", "Completed");
+  }
+  if (status === "inProgress") {
+    return t("workerPanel.statusInProgress", "In Progress");
+  }
+  return t("workerPanel.statusAssigned", "Assigned");
+}
+
+function fmtDate(value) {
+  if (!value) return "-";
+  return new Date(value).toLocaleDateString();
+}
+
+function getRolePaymentState(order, accountType) {
+  if (accountType === "DOKHT") {
+    return {
+      status: order?.dokhtPaymentStatus ?? order?.workerPaymentStatus,
+      amount: order?.dokhtPaymentAmount ?? order?.workerPaymentAmount ?? 0,
+      paidAt: order?.dokhtPaidAt ?? order?.workerPaidAt,
+    };
+  }
+  if (accountType === "QICHIKAR") {
+    return {
+      status: order?.qichikarPaymentStatus ?? order?.workerPaymentStatus,
+      amount: order?.qichikarPaymentAmount ?? order?.workerPaymentAmount ?? 0,
+      paidAt: order?.qichikarPaidAt ?? order?.workerPaidAt,
+    };
+  }
+  return {
+    status: order?.workerPaymentStatus,
+    amount: order?.workerPaymentAmount ?? 0,
+    paidAt: order?.workerPaidAt,
+  };
+}
+
+function getVisibleSearchOrders(searchResult, userId, accountType) {
+  if (!Array.isArray(searchResult?.orders)) return [];
+
+  return searchResult.orders.filter((order) => {
+    const roleState = getRoleOrderState(order, accountType);
+
+    // Prevent same-role workers from seeing an order claimed/assigned by another worker.
+    if (roleState.assignedToId && roleState.assignedToId !== userId) {
+      return false;
+    }
+    if (roleState.receivedById && roleState.receivedById !== userId) {
+      return false;
+    }
+
+    // Dokht can only see after Qichikar completion.
+    if (accountType === "DOKHT" && !order?.qichikarCompletedAt) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+function ConfirmActionModal({ config, pending, onClose, onConfirm }) {
+  if (!config) return null;
 
   return (
     <div
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(0,0,0,.52)",
+        background: "rgba(0,0,0,.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+        padding: 16,
+      }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        className="card"
+        style={{
+          width: "100%",
+          maxWidth: 520,
+          padding: 18,
+          borderRadius: 12,
+          border: "1px solid var(--border)",
+          background: "var(--surface)",
+        }}
+      >
+        <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>
+          {config.title}
+        </h3>
+        <p
+          style={{ margin: "10px 0 14px", color: "var(--text2)", fontSize: 13 }}
+        >
+          {config.message}
+        </p>
+        {config.preview && (
+          <div
+            style={{
+              border: "1px solid var(--border)",
+              background: "var(--surface2)",
+              borderRadius: 8,
+              padding: 10,
+              display: "grid",
+              gap: 6,
+              fontSize: 13,
+            }}
+          >
+            {config.preview}
+          </div>
+        )}
+        <div
+          style={{
+            marginTop: 16,
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 8,
+          }}
+        >
+          <button
+            className="btn btn-outline"
+            onClick={onClose}
+            disabled={pending}
+          >
+            {config.cancelLabel}
+          </button>
+          <button
+            className="btn btn-gold"
+            onClick={onConfirm}
+            disabled={pending}
+          >
+            {pending ? config.pendingLabel : config.confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OrderDetailsModal({ order, language, t, onClose }) {
+  if (!order) return null;
+  const payment = getRolePaymentState(order, order?.assignedTo?.accountType);
+  const measure = getMeasure(order);
+  const paidToWorker = payment.status === "PAID_TO_WORKER";
+  const priceValue = paidToWorker ? Number(payment.amount || 0) : 0;
+  const measurementRows = Object.entries(NUM_LABELS).filter(
+    ([key]) => measure[key] != null,
+  );
+  const styleRows = Object.entries(STYLE_LABELS).filter(
+    ([key]) => measure[key],
+  );
+  const booleanRows = Object.entries(BOOL_LABELS).filter(
+    ([key]) => measure[key] === true,
+  );
+
+  const tableWrapStyle = {
+    border: "1px solid var(--border)",
+    borderRadius: 10,
+    overflow: "hidden",
+    background: "var(--surface)",
+  };
+
+  const thStyle = {
+    fontSize: 11,
+    color: "var(--text3)",
+    textTransform: "uppercase",
+    letterSpacing: ".04em",
+    textAlign: "left",
+    padding: "9px 10px",
+    background: "var(--surface2)",
+    borderBottom: "1px solid var(--border)",
+  };
+
+  const tdStyle = {
+    fontSize: 13,
+    color: "var(--text1)",
+    padding: "9px 10px",
+    borderBottom: "1px solid var(--border)",
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,.5)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -482,828 +361,213 @@ function OrderDetailModal({
     >
       <div
         style={{
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-          borderRadius: 16,
           width: "100%",
-          maxWidth: 700,
-          maxHeight: "92vh",
-          display: "flex",
-          flexDirection: "column",
-          boxShadow: "var(--sh-lg)",
-        }}
-      >
-        {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            padding: "20px 24px 16px",
-            borderBottom: "1px solid var(--border)",
-          }}
-        >
-          <div>
-            <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 7 }}>
-              {order.customer?.firstName}
-              <span
-                style={{
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: "var(--text3)",
-                  marginLeft: 9,
-                }}
-              >
-                Bill #{order.customer?.billNumber}
-              </span>
-            </h2>
-            <div
-              style={{
-                display: "flex",
-                gap: 7,
-                flexWrap: "wrap",
-                alignItems: "center",
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  padding: "2px 9px",
-                  borderRadius: 99,
-                  background: typeColor + "18",
-                  color: typeColor,
-                  border: `1px solid ${typeColor}30`,
-                }}
-              >
-                {order.type}
-              </span>
-              {order.isEmergency && (
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    padding: "2px 9px",
-                    borderRadius: 99,
-                    background: "#DC262618",
-                    color: "#DC2626",
-                    border: "1px solid #DC262630",
-                  }}
-                >
-                  ⚡ Emergency
-                </span>
-              )}
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  padding: "2px 9px",
-                  borderRadius: 99,
-                  background: sc + "18",
-                  color: sc,
-                  border: `1px solid ${sc}30`,
-                }}
-              >
-                {statusLabel(status)}
-              </span>
-              {order.quantity > 1 && (
-                <span style={{ fontSize: 11, color: "var(--text3)" }}>
-                  ×{order.quantity} pcs
-                </span>
-              )}
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: "var(--text3)",
-              padding: 4,
-            }}
-          >
-            <LuX size={18} />
-          </button>
-        </div>
-
-        {/* Scrollable body */}
-        <div
-          style={{
-            overflowY: "auto",
-            padding: "20px 24px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 16,
-          }}
-        >
-          <div
-            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}
-          >
-            <InfoCard title="Customer Info">
-              <InfoRow
-                icon={<LuUser size={12} />}
-                label={order.customer?.firstName}
-                bold
-              />
-              {order.customer?.phoneNumber && (
-                <InfoRow
-                  icon={<LuPhone size={12} />}
-                  label={order.customer.phoneNumber}
-                />
-              )}
-              <InfoRow
-                icon={<LuHash size={12} />}
-                label={`Bill #${order.customer?.billNumber}`}
-              />
-            </InfoCard>
-            {!isWorker && (
-              <InfoCard title="Payment Info">
-                <PayRow label="Total" value={fmt$(order.totalPrice)} />
-                <PayRow
-                  label="Discount"
-                  value={`-${fmt$(order.discount)}`}
-                  color="#D97706"
-                />
-                <PayRow label="Paid" value={fmt$(order.paidAmount)} />
-                <PayRow
-                  label="Remaining"
-                  value={fmt$(order.remaining)}
-                  color={Number(order.remaining) > 0 ? "#DC2626" : "#16a34a"}
-                />
-              </InfoCard>
-            )}
-          </div>
-
-          {order.assignedBy && (
-            <InfoCard title="Assignment Info">
-              <InfoRow
-                icon={<LuUser size={12} />}
-                label={`Assigned by ${order.assignedBy.name}`}
-              />
-              {order.assignedAt && (
-                <InfoRow
-                  icon={<LuClock size={12} />}
-                  label={fmtDate(order.assignedAt)}
-                />
-              )}
-              {order.assignmentNote && (
-                <div
-                  style={{
-                    background: "var(--surface)",
-                    border: `1px solid ${roleColor}30`,
-                    borderLeft: `3px solid ${roleColor}`,
-                    borderRadius: 7,
-                    padding: "8px 11px",
-                    marginTop: 4,
-                    fontSize: 13,
-                    color: "var(--text2)",
-                    fontStyle: "italic",
-                  }}
-                >
-                  "{order.assignmentNote}"
-                </div>
-              )}
-            </InfoCard>
-          )}
-
-          <div>
-            <p
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: "var(--text3)",
-                textTransform: "uppercase",
-                letterSpacing: ".07em",
-                marginBottom: 12,
-              }}
-            >
-              Measurements
-            </p>
-            <MeasurementsGrid order={order} />
-          </div>
-        </div>
-
-        {/* Footer actions */}
-        <div
-          style={{
-            padding: "14px 24px",
-            borderTop: "1px solid var(--border)",
-            display: "flex",
-            gap: 8,
-            flexWrap: "wrap",
-          }}
-        >
-          {/* Print */}
-          <button
-            onClick={() => printOrder(order, isWorker)}
-            style={{
-              ...footerBtnBase,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 6,
-            }}
-          >
-            <LuPrinter size={13} /> Print
-          </button>
-
-          <button onClick={onClose} style={footerBtnBase}>
-            Close
-          </button>
-
-          {!order.isCompleted && (
-            <button
-              onClick={!order.inProgress || !isWorker ? onProgress : undefined}
-              disabled={progressPending || (isWorker && order.inProgress)}
-              style={{
-                ...footerBtnBase,
-                flex: 1.4,
-                background: order.inProgress ? "#EFF6FF" : roleColor + "15",
-                color: order.inProgress ? "#2563EB" : roleColor,
-                border: `1px solid ${order.inProgress ? "#BFDBFE" : roleColor + "40"}`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 6,
-              }}
-            >
-              {order.inProgress ? (
-                isWorker ? (
-                  "In Progress"
-                ) : (
-                  <>
-                    <LuPause size={13} /> Stop Working
-                  </>
-                )
-              ) : (
-                <>
-                  <LuPlay size={13} /> Start Working
-                </>
-              )}
-            </button>
-          )}
-
-          {order.isCompleted ? (
-            <div
-              style={{
-                ...footerBtnBase,
-                flex: 1.4,
-                background: "#f0fdf4",
-                color: "#16a34a",
-                border: "1px solid #bbf7d0",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 6,
-                cursor: "default",
-              }}
-            >
-              <LuSquareCheck size={13} /> Completed
-            </div>
-          ) : canComplete && (
-            <button
-              onClick={onComplete}
-              disabled={completePending}
-              style={{
-                ...footerBtnBase,
-                flex: 1.4,
-                background: "#16a34a",
-                color: "#fff",
-                border: "none",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 6,
-              }}
-            >
-              <LuSquareCheck size={13} /> Complete
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Order card ─────────────────────────────────────────────────────────────────
-function OrderCard({
-  order,
-  roleColor,
-  onViewDetails,
-  onProgress,
-  onComplete,
-  progressPending,
-  completePending,
-  isWorker,
-}) {
-  const status = getStatus(order);
-  const sc = statusColor(status);
-  const typeColor = TYPE_COLORS[order.type] || "#888";
-  const canComplete =
-    !order.isCompleted &&
-    order.inProgress &&
-    (isWorker || Number(order.remaining || 0) === 0);
-
-  return (
-    <div
-      style={{
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
-        borderRadius: 12,
-        padding: "16px 18px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 11,
-      }}
-    >
-      {/* Type + status */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 7,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              padding: "3px 9px",
-              borderRadius: 99,
-              background: typeColor + "18",
-              color: typeColor,
-              border: `1px solid ${typeColor}30`,
-            }}
-          >
-            {order.type}
-          </span>
-          {order.isEmergency && (
-            <span
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                padding: "2px 7px",
-                borderRadius: 99,
-                background: "#DC262614",
-                color: "#DC2626",
-                border: "1px solid #DC262628",
-                display: "flex",
-                alignItems: "center",
-                gap: 3,
-              }}
-            >
-              <LuBell size={9} /> Emergency
-            </span>
-          )}
-        </div>
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            padding: "3px 9px",
-            borderRadius: 99,
-            background: sc + "18",
-            color: sc,
-            border: `1px solid ${sc}30`,
-          }}
-        >
-          {statusLabel(status)}
-        </span>
-      </div>
-
-      {/* Customer */}
-      <div>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-          <p style={{ fontSize: 15, fontWeight: 800, color: "var(--text1)" }}>
-            {order.customer?.firstName}
-          </p>
-          <span style={{ fontSize: 12, color: "var(--text3)" }}>
-            Bill #{order.customer?.billNumber}
-          </span>
-        </div>
-        {order.orderName && (
-          <p
-            style={{
-              fontSize: 12,
-              color: "var(--text3)",
-              fontStyle: "italic",
-              marginTop: 1,
-            }}
-          >
-            "{order.orderName}"
-          </p>
-        )}
-      </div>
-
-      {!isWorker && (
-        <div
-          style={{ display: "flex", gap: 14, fontSize: 12, flexWrap: "wrap" }}
-        >
-          <span>
-            <span style={{ color: "var(--text3)" }}>Total: </span>
-            <strong style={{ color: "var(--text1)" }}>
-              {fmt$(order.totalPrice)}
-            </strong>
-          </span>
-          {Number(order.discount) > 0 && (
-            <span>
-              <span style={{ color: "var(--text3)" }}>Disc: </span>
-              <strong style={{ color: "#D97706" }}>
-                -{fmt$(order.discount)}
-              </strong>
-            </span>
-          )}
-          <span>
-            <span style={{ color: "var(--text3)" }}>Remaining: </span>
-            <strong
-              style={{
-                color: Number(order.remaining) > 0 ? "#DC2626" : "#16a34a",
-              }}
-            >
-              {fmt$(order.remaining)}
-            </strong>
-          </span>
-        </div>
-      )}
-
-      {/* Assignment meta */}
-      {order.assignedBy && (
-        <div
-          style={{
-            fontSize: 12,
-            color: "var(--text3)",
-            display: "flex",
-            alignItems: "center",
-            gap: 5,
-          }}
-        >
-          <LuCalendar size={11} />
-          <span>
-            Assigned by{" "}
-            <strong style={{ color: "var(--text2)" }}>
-              {order.assignedBy.name}
-            </strong>{" "}
-            · {fmtDate(order.assignedAt)}
-          </span>
-        </div>
-      )}
-      {order.assignmentNote && (
-        <div
-          style={{
-            fontSize: 12,
-            color: "var(--text2)",
-            padding: "7px 11px",
-            background: "var(--surface2)",
-            borderRadius: 7,
-            borderLeft: `3px solid ${roleColor}`,
-            fontStyle: "italic",
-          }}
-        >
-          {order.assignmentNote}
-        </div>
-      )}
-
-      {/* Actions */}
-      <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginTop: 2 }}>
-        <button
-          onClick={() => printOrder(order, isWorker)}
-          style={{
-            ...cardBtnBase,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 4,
-          }}
-        >
-          <LuPrinter size={11} /> Print
-        </button>
-        <button
-          onClick={() => onViewDetails(order)}
-          style={{
-            flex: 1,
-            ...cardBtnBase,
-            color: "var(--text2)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 5,
-          }}
-        >
-          <LuEye size={12} /> Details
-        </button>
-        {!order.isCompleted && (
-          <button
-            onClick={() =>
-              !order.inProgress || !isWorker ? onProgress(order) : undefined
-            }
-            disabled={progressPending || (isWorker && order.inProgress)}
-            style={{
-              flex: 1,
-              ...cardBtnBase,
-              background: order.inProgress ? "#EFF6FF" : roleColor + "12",
-              color: order.inProgress ? "#2563EB" : roleColor,
-              border: `1px solid ${order.inProgress ? "#BFDBFE" : roleColor + "35"}`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 5,
-            }}
-          >
-            {order.inProgress ? (
-              isWorker ? (
-                "In Progress"
-              ) : (
-                <>
-                  <LuPause size={12} /> Stop
-                </>
-              )
-            ) : (
-              <>
-                <LuPlay size={12} /> Start Work
-              </>
-            )}
-          </button>
-        )}
-        {order.isCompleted ? (
-          <div
-            style={{
-              flex: 1,
-              ...cardBtnBase,
-              background: "#f0fdf4",
-              color: "#16a34a",
-              border: "1px solid #bbf7d0",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 5,
-              cursor: "default",
-            }}
-          >
-            <LuSquareCheck size={12} /> Completed
-          </div>
-        ) : canComplete && (
-          <button
-            onClick={() => onComplete(order)}
-            disabled={completePending}
-            style={{
-              flex: 1,
-              ...cardBtnBase,
-              background: "#16a34a",
-              color: "#fff",
-              border: "none",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 5,
-            }}
-          >
-            <LuSquareCheck size={12} /> Complete
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Simple confirmation modal shown before completing an order
-function ConfirmModal({ order, workerName, onCancel, onConfirm, pending }) {
-  if (!order) return null;
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1200,
-        padding: 16,
-      }}
-      onClick={(e) => e.target === e.currentTarget && onCancel()}
-    >
-      <div
-        style={{
+          maxWidth: 760,
+          maxHeight: "90vh",
+          overflowY: "auto",
           background: "var(--surface)",
           border: "1px solid var(--border)",
           borderRadius: 12,
-          padding: 22,
-          width: "100%",
-          maxWidth: 440,
-          boxShadow: "var(--sh-lg)",
+          padding: 18,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-          <div
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 9,
-              background: "#16a34a14",
-              border: "1px solid #16a34a30",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-            }}
-          >
-            <LuSquareCheck size={18} style={{ color: "#16a34a" }} />
+        <div
+          style={{ display: "flex", justifyContent: "space-between", gap: 10 }}
+        >
+          <div>
+            <h3 style={{ margin: 0, fontSize: 19, fontWeight: 800 }}>
+              {order.customer?.firstName || "-"}
+            </h3>
+            <p
+              style={{ margin: "6px 0 0", fontSize: 13, color: "var(--text3)" }}
+            >
+              #{order.customer?.billNumber || "-"} -{" "}
+              {getOrderTypeLabel(order.type, language)}
+            </p>
           </div>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>
-            Confirm Completion
-          </h3>
+          <button className="btn btn-outline btn-sm" onClick={onClose}>
+            Close
+          </button>
         </div>
 
-        <p style={{ fontSize: 13, color: "var(--text2)", marginBottom: 14 }}>
-          The following notification will be sent to Admin upon confirmation:
-        </p>
-
-        <div
-          style={{
-            background: "var(--surface2)",
-            border: "1px solid var(--border)",
-            borderLeft: "3px solid #16a34a",
-            borderRadius: 8,
-            padding: "12px 14px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 7,
-            marginBottom: 18,
-          }}
-        >
-          <div style={{ display: "flex", gap: 6, fontSize: 13 }}>
-            <span style={{ color: "var(--text3)", minWidth: 90 }}>Worker:</span>
-            <strong style={{ color: "var(--text1)" }}>{workerName}</strong>
-          </div>
-          <div style={{ display: "flex", gap: 6, fontSize: 13 }}>
-            <span style={{ color: "var(--text3)", minWidth: 90 }}>Customer:</span>
-            <strong style={{ color: "var(--text1)" }}>{order.customer?.firstName}</strong>
-          </div>
-          <div style={{ display: "flex", gap: 6, fontSize: 13 }}>
-            <span style={{ color: "var(--text3)", minWidth: 90 }}>Bill #:</span>
-            <strong style={{ color: "var(--text1)" }}>{order.customer?.billNumber}</strong>
-          </div>
-          <div style={{ display: "flex", gap: 6, fontSize: 13 }}>
-            <span style={{ color: "var(--text3)", minWidth: 90 }}>Order Type:</span>
-            <strong style={{ color: "var(--text1)" }}>{order.type}</strong>
-          </div>
-          <div
-            style={{
-              marginTop: 4,
-              paddingTop: 8,
-              borderTop: "1px solid var(--border)",
-              fontSize: 13,
-              color: "#16a34a",
-              fontWeight: 600,
-            }}
-          >
-            This order has been completed successfully
+        <div style={{ marginTop: 16 }}>
+          <div style={tableWrapStyle}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th style={thStyle}>{t("workerPanel.price", "Price")}</th>
+                  <th style={thStyle}>
+                    {t("workerPanel.updatedOn", "Updated")}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style={{ ...tdStyle, borderBottom: "none" }}>
+                    ${priceValue.toLocaleString()}
+                  </td>
+                  <td style={{ ...tdStyle, borderBottom: "none" }}>
+                    {fmtDate(payment.paidAt || order.updatedAt)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            gap: 8,
-          }}
-        >
-          <button
-            onClick={onCancel}
+        <div style={{ marginTop: 14 }}>
+          <p
             style={{
-              padding: "8px 16px",
-              background: "none",
-              border: "1px solid var(--border)",
-              borderRadius: 8,
-              fontSize: 13,
-              cursor: "pointer",
-              color: "var(--text2)",
+              fontSize: 12,
+              fontWeight: 700,
+              color: "var(--text3)",
+              marginBottom: 8,
             }}
           >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={pending}
+            {t("createOrder.measurements", "Measurements")}
+          </p>
+          <div style={tableWrapStyle}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th style={thStyle}>{t("common.field", "Field")}</th>
+                  <th style={thStyle}>{t("common.value", "Value")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {measurementRows.length ? (
+                  measurementRows.map(([key, label], index) => (
+                    <tr key={key}>
+                      <td style={tdStyle}>{label}</td>
+                      <td
+                        style={{
+                          ...tdStyle,
+                          borderBottom:
+                            index === measurementRows.length - 1
+                              ? "none"
+                              : tdStyle.borderBottom,
+                        }}
+                      >
+                        {measure[key]}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td
+                      style={{ ...tdStyle, borderBottom: "none" }}
+                      colSpan={2}
+                    >
+                      -
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 14 }}>
+          <p
             style={{
-              padding: "8px 16px",
-              background: "#16a34a",
-              color: "#fff",
-              border: "none",
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: pending ? "not-allowed" : "pointer",
-              opacity: pending ? 0.7 : 1,
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
+              fontSize: 12,
+              fontWeight: 700,
+              color: "var(--text3)",
+              marginBottom: 8,
             }}
           >
-            {pending ? (
-              "Processing..."
-            ) : (
-              <>
-                <LuSquareCheck size={13} /> Confirm
-              </>
-            )}
-          </button>
+            {t("createOrder.styleOptions", "Styling Details")}
+          </p>
+          <div style={tableWrapStyle}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th style={thStyle}>{t("common.field", "Field")}</th>
+                  <th style={thStyle}>{t("common.value", "Value")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...styleRows, ...booleanRows].length ? (
+                  [...styleRows, ...booleanRows].map(
+                    ([key, label], index, arr) => (
+                      <tr key={key}>
+                        <td style={tdStyle}>{label}</td>
+                        <td
+                          style={{
+                            ...tdStyle,
+                            borderBottom:
+                              index === arr.length - 1
+                                ? "none"
+                                : tdStyle.borderBottom,
+                          }}
+                        >
+                          {measure[key] === true
+                            ? t("common.yes", "Yes")
+                            : measure[key]}
+                        </td>
+                      </tr>
+                    ),
+                  )
+                ) : (
+                  <tr>
+                    <td
+                      style={{ ...tdStyle, borderBottom: "none" }}
+                      colSpan={2}
+                    >
+                      -
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// ── Main WorkerPanel ───────────────────────────────────────────────────────────
 export default function WorkerPanel() {
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const qc = useQueryClient();
-
-  const [activeTab, setActiveTab] = useState("all");
-  const [selectedId, setSelectedId] = useState(null);
-  const [notifsExpanded, setNotifsExpanded] = useState(true);
-
+  const language = i18n.resolvedLanguage || i18n.language || "en";
   const cfg = ROLE_CONFIG[user?.accountType] || ROLE_CONFIG.QICHIKAR;
 
-  const isWorker = ["QICHIKAR", "DOKHT"].includes(user?.accountType);
+  const [activeTab, setActiveTab] = useState("all");
+  const [billSearch, setBillSearch] = useState("");
+  const [searchResult, setSearchResult] = useState(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [hasSearchAttempt, setHasSearchAttempt] = useState(false);
+  const [detailOrder, setDetailOrder] = useState(null);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [optimisticInProgressIds, setOptimisticInProgressIds] = useState([]);
+  const [optimisticCompletedIds, setOptimisticCompletedIds] = useState([]);
 
-  // ── Data queries ───────────────────────────────────────────────────
-  const { data: rawOrders, isLoading: ordersLoading } = useQuery({
+  const { data: orderPayload, isLoading } = useQuery({
     queryKey: ["worker-panel-orders"],
     queryFn: () =>
       api.get("/orders", { params: { limit: 200 } }).then((r) => r.data),
-    refetchInterval: 30_000,
+    refetchInterval: 30000,
   });
-  // Service returns { data: [...], total, page, limit }
-  const orders = Array.isArray(rawOrders) ? rawOrders : rawOrders?.data || [];
+
+  const orders = Array.isArray(orderPayload)
+    ? orderPayload
+    : orderPayload?.data || [];
 
   const { data: allNotifs = [] } = useQuery({
     queryKey: ["worker-panel-notifs"],
     queryFn: () => api.get("/users/me/notifications").then((r) => r.data),
-    refetchInterval: 30_000,
+    refetchInterval: 30000,
   });
+
+  const { data: workerMoneySummary } = useQuery({
+    queryKey: ["worker-panel-transaction-summary"],
+    queryFn: () => api.get("/transactions/me/summary").then((r) => r.data),
+    refetchInterval: 30000,
+  });
+
   const unreadNotifs = allNotifs.filter((n) => !n.isRead);
-
-  // ── Stats ──────────────────────────────────────────────────────────
-  const stats = useMemo(
-    () => ({
-      total: orders.length,
-      assigned: orders.filter((o) => !o.inProgress && !o.isCompleted).length,
-      inProgress: orders.filter((o) => o.inProgress && !o.isCompleted).length,
-      completed: orders.filter((o) => o.isCompleted).length,
-    }),
-    [orders],
-  );
-
-  // ── Tab filter ─────────────────────────────────────────────────────
-  const filteredOrders = useMemo(() => {
-    if (activeTab === "assigned")
-      return orders.filter((o) => !o.inProgress && !o.isCompleted);
-    if (activeTab === "inProgress")
-      return orders.filter((o) => o.inProgress && !o.isCompleted);
-    if (activeTab === "completed") return orders.filter((o) => o.isCompleted);
-    return orders;
-  }, [orders, activeTab]);
-
-  // Derive selected order from live data so modal status auto-updates
-  const selectedOrder = selectedId
-    ? orders.find((o) => o.id === selectedId)
-    : null;
-
-  const [confirmOrderId, setConfirmOrderId] = useState(null);
-  const confirmOrder = confirmOrderId
-    ? orders.find((o) => o.id === confirmOrderId)
-    : null;
-
-  // ── Mutations ──────────────────────────────────────────────────────
-  const progressMut = useMutation({
-    mutationFn: (id) => api.patch(`/orders/${id}/progress`).then((r) => r.data),
-    onSuccess: (updated) => {
-      qc.invalidateQueries({ queryKey: ["worker-panel-orders"] });
-      // if the order is now in progress, show In Progress tab
-      if (updated?.inProgress) setActiveTab("inProgress");
-      toast.success("Status updated — Admin notified");
-    },
-    onError: (err) =>
-      toast.error(getApiErrorMessage(err, "Failed to update status")),
-  });
-
-  const completeMut = useMutation({
-    mutationFn: (id) => api.patch(`/orders/${id}/complete`).then((r) => r.data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["worker-panel-orders"] });
-      toast.success("Order completed — Admin notified");
-      setSelectedId(null);
-      setConfirmOrderId(null);
-      setActiveTab("completed");
-    },
-    onError: (err) =>
-      toast.error(getApiErrorMessage(err, "Failed to complete order")),
-  });
 
   const readAllMut = useMutation({
     mutationFn: () => api.patch("/users/me/notifications/read-all"),
@@ -1323,329 +587,975 @@ export default function WorkerPanel() {
     },
   });
 
-  // ── Date string ────────────────────────────────────────────────────
-  const today = new Date().toLocaleDateString(undefined, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
+  const receiveMut = useMutation({
+    mutationFn: (id) => api.patch(`/orders/${id}/receive`).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["worker-panel-orders"] });
+      setActiveTab("assigned");
+      toast.success(
+        t(
+          "workerPanel.orderReceivedAdminNotified",
+          "Order received - Admin notified",
+        ),
+      );
+      refreshSearchResult();
+      setConfirmAction(null);
+    },
+    onError: (error) => {
+      toast.error(
+        getApiErrorMessage(
+          error,
+          t("workerPanel.failedReceiveOrder", "Failed to receive order"),
+        ),
+      );
+    },
   });
 
-  const TABS = [
-    { key: "all", label: "All Orders", count: stats.total },
-    { key: "assigned", label: "Assigned", count: stats.assigned },
-    { key: "inProgress", label: "In Progress", count: stats.inProgress },
-    { key: "completed", label: "Completed", count: stats.completed },
+  const progressMut = useMutation({
+    mutationFn: (id) => api.patch(`/orders/${id}/progress`).then((r) => r.data),
+    onSuccess: (updated, id) => {
+      qc.invalidateQueries({ queryKey: ["worker-panel-orders"] });
+      toast.success(
+        t(
+          "workerPanel.statusUpdatedAdminNotified",
+          "Status updated - Admin notified",
+        ),
+      );
+      setOptimisticInProgressIds((prev) => prev.filter((item) => item !== id));
+      if (updated?.inProgress) setActiveTab("inProgress");
+      refreshSearchResult();
+      setConfirmAction(null);
+    },
+    onError: (error, id) => {
+      setOptimisticInProgressIds((prev) => prev.filter((item) => item !== id));
+      toast.error(
+        getApiErrorMessage(
+          error,
+          t("workerPanel.failedUpdateStatus", "Failed to update status"),
+        ),
+      );
+    },
+  });
+
+  const completeMut = useMutation({
+    mutationFn: (id) => api.patch(`/orders/${id}/complete`).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["worker-panel-orders"] });
+      toast.success(
+        t(
+          "workerPanel.orderCompletedAdminNotified",
+          "Order completed - Admin notified",
+        ),
+      );
+      setActiveTab("completed");
+      refreshSearchResult();
+      setConfirmAction(null);
+      setOptimisticCompletedIds([]);
+    },
+    onError: (error) => {
+      setOptimisticCompletedIds([]);
+      toast.error(
+        getApiErrorMessage(
+          error,
+          t("workerPanel.failedCompleteOrder", "Failed to complete order"),
+        ),
+      );
+    },
+  });
+
+  const stats = useMemo(() => {
+    const accountType = user?.accountType;
+    return {
+      all: orders.length,
+      assigned: orders.filter(
+        (order) =>
+          !isWorkerCompletedForRole(order, accountType) &&
+          !getRoleOrderState(order, accountType).inProgress,
+      ).length,
+      inProgress: orders.filter(
+        (order) =>
+          !isWorkerCompletedForRole(order, accountType) &&
+          getRoleOrderState(order, accountType).inProgress,
+      ).length,
+      completed: orders.filter((order) =>
+        isWorkerCompletedForRole(order, accountType),
+      ).length,
+    };
+  }, [orders, user?.accountType]);
+
+  const totalLoanAmount = Number(workerMoneySummary?.loanTotal || 0);
+  const totalCompletedPayments = Number(
+    workerMoneySummary?.totalCompletedPayments || 0,
+  );
+
+  const filteredOrders = useMemo(() => {
+    const accountType = user?.accountType;
+    if (activeTab === "assigned")
+      return orders.filter(
+        (order) =>
+          !isWorkerCompletedForRole(order, accountType) &&
+          !getRoleOrderState(order, accountType).inProgress &&
+          !optimisticInProgressIds.includes(order.id) &&
+          !optimisticCompletedIds.includes(order.id),
+      );
+    if (activeTab === "inProgress")
+      return orders.filter(
+        (order) =>
+          !isWorkerCompletedForRole(order, accountType) &&
+          (getRoleOrderState(order, accountType).inProgress ||
+            optimisticInProgressIds.includes(order.id)) &&
+          !optimisticCompletedIds.includes(order.id),
+      );
+    if (activeTab === "completed")
+      return orders.filter(
+        (order) =>
+          isWorkerCompletedForRole(order, accountType) ||
+          optimisticCompletedIds.includes(order.id),
+      );
+    return orders;
+  }, [
+    activeTab,
+    optimisticCompletedIds,
+    optimisticInProgressIds,
+    orders,
+    user?.accountType,
+  ]);
+
+  const canOrderBeReceived = (order) => {
+    if (isWorkerCompletedForRole(order, user?.accountType)) return false;
+
+    // Dokht can only receive an order after Qichikar has completed their part.
+    if (user?.accountType === "DOKHT" && !order?.qichikarCompletedAt) {
+      return false;
+    }
+
+    const roleState = getRoleOrderState(order, user?.accountType);
+
+    const receivedBySameRoleOtherUser =
+      roleState.receivedById && roleState.receivedById !== user?.id;
+
+    if (receivedBySameRoleOtherUser) {
+      return false;
+    }
+
+    if (!roleState.assignedToId || roleState.assignedToId === user?.id)
+      return true;
+
+    return false;
+  };
+
+  const getAssignmentBlockReason = (order) => {
+    // Dokht-specific: Qichikar must complete first.
+    if (user?.accountType === "DOKHT" && !order?.qichikarCompletedAt) {
+      return t(
+        "workerPanel.waitingForQichikar",
+        "Waiting for Qichikar (cutting) to complete first",
+      );
+    }
+
+    const roleState = getRoleOrderState(order, user?.accountType);
+
+    if (roleState.receivedById && roleState.receivedById !== user?.id) {
+      return t(
+        "workerPanel.sameRoleClaimConflict",
+        "this order already receive by someone else try another",
+      );
+    }
+    if (roleState.assignedToId && roleState.assignedToId !== user?.id) {
+      return t(
+        "workerPanel.sameRoleClaimConflict",
+        "this order already receive by someone else try another",
+      );
+    }
+    return null;
+  };
+
+  const tabs = [
+    {
+      key: "all",
+      label: t("workerPanel.allOrders", "All Orders"),
+      count: stats.all,
+    },
+    {
+      key: "assigned",
+      label: t("workerPanel.statusAssigned", "Assigned"),
+      count: stats.assigned,
+    },
+    {
+      key: "inProgress",
+      label: t("workerPanel.statusInProgress", "In Progress"),
+      count: stats.inProgress,
+    },
+    {
+      key: "completed",
+      label: t("workerPanel.statusCompleted", "Completed"),
+      count: stats.completed,
+    },
   ];
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {/* ── Welcome banner ─────────────────────────────────────────── */}
+  const refreshSearchResult = async () => {
+    if (!searchResult?.customer || !billSearch.trim()) return;
+    const parsed = parseNumberLocale(billSearch.trim());
+    if (!Number.isFinite(parsed) || parsed <= 0) return;
+    try {
+      const { data } = await api.get("/orders/lookup", {
+        params: { billNumber: Math.trunc(parsed) },
+      });
+      const visibleOrders = getVisibleSearchOrders(
+        data,
+        user?.id,
+        user?.accountType,
+      );
+      setSearchResult({ ...data, orders: visibleOrders });
+    } catch {
+      // keep previous search payload if refresh fails
+    }
+  };
+
+  const onSearch = async () => {
+    const parsed = parseNumberLocale(billSearch.trim());
+    setHasSearchAttempt(true);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      toast.error(
+        t("assignment.invalidBillNumber", "Enter a valid bill number."),
+      );
+      return;
+    }
+
+    setSearchLoading(true);
+    try {
+      const { data } = await api.get("/orders/lookup", {
+        params: { billNumber: Math.trunc(parsed) },
+      });
+      const visibleOrders = getVisibleSearchOrders(
+        data,
+        user?.id,
+        user?.accountType,
+      );
+      setSearchResult({ ...data, orders: visibleOrders });
+      toast.success(t("createOrder.customerFound", "Customer found"));
+    } catch (error) {
+      setSearchResult(null);
+      toast.error(
+        getApiErrorMessage(
+          error,
+          t("assignment.noOrdersFound", "No orders found for this bill."),
+        ),
+      );
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const openConfirm = (type, order) => {
+    setConfirmAction({ type, order });
+  };
+
+  const runAction = async () => {
+    if (!confirmAction) return;
+    if (confirmAction.type === "receive") {
+      receiveMut.mutate(confirmAction.order.id);
+      return;
+    }
+    if (confirmAction.type === "start") {
+      const { order } = confirmAction;
+      const receivedByCurrentUser =
+        getRoleOrderState(order, user?.accountType).receivedById === user?.id;
+      if (!receivedByCurrentUser && canOrderBeReceived(order)) {
+        try {
+          await receiveMut.mutateAsync(order.id);
+          setOptimisticInProgressIds((prev) =>
+            prev.includes(order.id) ? prev : [...prev, order.id],
+          );
+          await progressMut.mutateAsync(order.id);
+        } catch {
+          // errors are handled in mutation callbacks
+        }
+        return;
+      }
+      setOptimisticInProgressIds((prev) =>
+        prev.includes(order.id) ? prev : [...prev, order.id],
+      );
+      progressMut.mutate(order.id);
+      return;
+    }
+    if (confirmAction.type === "complete") {
+      setOptimisticCompletedIds([confirmAction.order.id]);
+      setActiveTab("completed");
+      completeMut.mutate(confirmAction.order.id);
+    }
+  };
+
+  const pendingAction =
+    receiveMut.isPending || progressMut.isPending || completeMut.isPending;
+
+  const confirmConfig = useMemo(() => {
+    if (!confirmAction?.order) return null;
+    const { order } = confirmAction;
+    if (confirmAction.type === "receive") {
+      return {
+        title: t("workerPanel.receiveOrder", "Receive Order"),
+        message: t(
+          "workerPanel.receiveOrderConfirmMsg",
+          "Receive this order to add it to your Assigned tab. Admin will be notified.",
+        ),
+        confirmLabel: t("workerPanel.receive", "Receive"),
+        pendingLabel: t("workerPanel.processing", "Processing..."),
+        cancelLabel: t("common.cancel", "Cancel"),
+      };
+    }
+    if (confirmAction.type === "start") {
+      const receivedByCurrentUser =
+        getRoleOrderState(order, user?.accountType).receivedById === user?.id;
+      return {
+        title: t("workerPanel.startWork", "Start Work"),
+        message: receivedByCurrentUser
+          ? t(
+              "workerPanel.workflowReceivedByYou",
+              "This order is in your active workflow.",
+            )
+          : t(
+              "workerPanel.searchOrderReceiveHint",
+              "Starting work will first receive this order and notify admin.",
+            ),
+        confirmLabel: t("workerPanel.startWork", "Start Work"),
+        pendingLabel: t("workerPanel.processing", "Processing..."),
+        cancelLabel: t("common.cancel", "Cancel"),
+      };
+    }
+    return {
+      title: t("workerPanel.confirmCompletion", "Confirm Completion"),
+      message: t(
+        "workerPanel.confirmNotifyAdmin",
+        "The following notification will be sent to Admin upon confirmation:",
+      ),
+      confirmLabel: t("workerPanel.confirm", "Confirm"),
+      pendingLabel: t("workerPanel.processing", "Processing..."),
+      cancelLabel: t("common.cancel", "Cancel"),
+      preview: (
+        <>
+          <div>
+            <b>{t("workerPanel.worker", "Worker")}:</b> {user?.name || "-"}
+          </div>
+          <div>
+            <b>{t("orders.billNumber", "Bill Number")}:</b>{" "}
+            {order.customer?.billNumber || "-"}
+          </div>
+          <div>
+            <b>{t("workerPanel.orderType", "Order Type")}:</b>{" "}
+            {getOrderTypeLabel(order.type, language)}
+          </div>
+          <div>
+            <b>{t("common.customer", "Customer")}:</b>{" "}
+            {order.customer?.firstName || "-"}
+          </div>
+          <div style={{ color: "#15803d", fontWeight: 700 }}>
+            {t(
+              "workerPanel.completedSuccess",
+              "This order has been completed successfully",
+            )}
+          </div>
+        </>
+      ),
+    };
+  }, [confirmAction, language, t, user?.name]);
+
+  const renderOrderCard = (order, source = "list") => {
+    const status = getStatus(order, user?.accountType);
+    const isCompleted =
+      isWorkerCompletedForRole(order, user?.accountType) ||
+      optimisticCompletedIds.includes(order.id);
+    const roleState = getRoleOrderState(order, user?.accountType);
+    const isInProgress =
+      roleState.inProgress || optimisticInProgressIds.includes(order.id);
+    const sColor = statusColor(status);
+    const receivedByCurrentUser = roleState.receivedById === user?.id;
+    const canReceive = canOrderBeReceived(order);
+    const canStart = !isCompleted && receivedByCurrentUser && !isInProgress;
+    const canComplete = !isCompleted && receivedByCurrentUser && isInProgress;
+    const typeColor = TYPE_COLORS[order.type] || cfg.color;
+    const payment = getRolePaymentState(order, user?.accountType);
+    const paidToWorker = payment.status === "PAID_TO_WORKER";
+
+    return (
       <div
-        style={{
-          background: `linear-gradient(135deg, ${cfg.color}18, ${cfg.color}06)`,
-          border: `1px solid ${cfg.colorBd}`,
-          borderRadius: 14,
-          padding: "22px 26px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 14,
-        }}
+        key={`${source}-${order.id}`}
+        className="card"
+        style={{ padding: 14, display: "grid", gap: 10 }}
       >
-        <div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 8,
+            flexWrap: "wrap",
+          }}
+        >
           <div
             style={{
               display: "flex",
+              gap: 6,
               alignItems: "center",
-              gap: 7,
-              marginBottom: 6,
+              flexWrap: "wrap",
             }}
           >
-            <LuCalendar size={13} style={{ color: cfg.color }} />
-            <span style={{ fontSize: 12, color: cfg.color, fontWeight: 600 }}>
-              {today}
+            <span
+              className="badge"
+              style={{
+                background: `${typeColor}18`,
+                color: typeColor,
+                border: `1px solid ${typeColor}40`,
+              }}
+            >
+              {getOrderTypeLabel(order.type, language)}
             </span>
+            {order.qichikarAssignedToId && (
+              <span
+                className="badge"
+                style={{
+                  background: "#FEF3C7",
+                  color: "#92400E",
+                  border: "1px solid #F59E0B55",
+                }}
+              >
+                {t("workerPanel.assignedQichikar", "Assigned to Qichikar")}
+              </span>
+            )}
+            {order.dokhtAssignedToId && (
+              <span
+                className="badge"
+                style={{
+                  background: "#FCE7F3",
+                  color: "#9D174D",
+                  border: "1px solid #EC489955",
+                }}
+              >
+                {t("workerPanel.assignedDokht", "Assigned to Dokht")}
+              </span>
+            )}
+            #{order.customer?.billNumber || "-"}{" "}
+            {order.customer?.phoneNumber
+              ? `- ${order.customer.phoneNumber}`
+              : ""}
           </div>
-          <h1
+          {order.orderName && (
+            <div style={{ fontSize: 12, color: "var(--text2)" }}>
+              {order.orderName}
+            </div>
+          )}
+        </div>
+
+        {receivedByCurrentUser && roleState.receivedAt ? (
+          <div style={{ fontSize: 12, color: "var(--text3)" }}>
+            {t("workerPanel.receivedOn", "Received on")}:{" "}
+            {fmtDate(roleState.receivedAt)}
+          </div>
+        ) : (
+          order.assignedBy && (
+            <div style={{ fontSize: 12, color: "var(--text3)" }}>
+              {t("workerPanel.assignedBy", "Assigned by")}:{" "}
+              {order.assignedBy.name} {t("workerPanel.on", "on")}{" "}
+              {fmtDate(order.assignedAt)}
+            </div>
+          )
+        )}
+
+        <div style={{ fontSize: 12, color: "var(--text2)" }}>
+          {t("workerPanel.price", "Price")}: $
+          {paidToWorker ? Number(payment.amount || 0).toLocaleString() : "0"}
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(2,minmax(0,1fr))",
+            gap: 8,
+          }}
+        >
+          <button
+            className="btn btn-outline btn-sm"
+            onClick={() => setDetailOrder(order)}
+            style={{ gridColumn: "1 / -1" }}
+          >
+            <LuEye size={13} /> {t("workerPanel.view", "View")}
+          </button>
+
+          <button
+            className="btn btn-outline btn-sm"
+            style={{ gridColumn: "1 / -1" }}
+            onClick={() => {
+              if (isCompleted) return;
+              openConfirm("start", order);
+            }}
+            disabled={
+              isCompleted ||
+              pendingAction ||
+              (receivedByCurrentUser ? !canStart : !canReceive)
+            }
+            title={
+              !receivedByCurrentUser && !canReceive
+                ? t(
+                    "workerPanel.receivedByLabel",
+                    "Order already received by {{name}}",
+                    {
+                      name:
+                        order.receivedBy?.name ||
+                        t("workerPanel.anotherWorker", "another worker"),
+                    },
+                  )
+                : ""
+            }
+          >
+            {!receivedByCurrentUser && canReceive ? (
+              <LuCheck size={13} />
+            ) : (
+              <LuPlay size={13} />
+            )}
+            {!receivedByCurrentUser && canReceive
+              ? t("workerPanel.startWork", "Start Work")
+              : t("workerPanel.startWork", "Start Work")}
+          </button>
+
+          <button
+            className="btn btn-sm"
+            style={
+              isCompleted
+                ? {
+                    gridColumn: "1 / -1",
+                    background: "#DC2626",
+                    color: "#fff",
+                    border: "1px solid #B91C1C",
+                    cursor: "not-allowed",
+                    opacity: 0.95,
+                  }
+                : { gridColumn: "1 / -1" }
+            }
+            onClick={() => {
+              if (isCompleted) return;
+              openConfirm("complete", order);
+            }}
+            disabled={isCompleted || !canComplete || pendingAction}
+            title={
+              isCompleted
+                ? t("workerPanel.statusCompleted", "Completed")
+                : undefined
+            }
+          >
+            <LuSquareCheck size={13} />{" "}
+            {isCompleted
+              ? t("workerPanel.statusCompleted", "Completed")
+              : t("workerPanel.complete", "Complete")}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSearchResultCard = (order) => {
+    const receivedByCurrentUser =
+      getRoleOrderState(order, user?.accountType).receivedById === user?.id;
+    const canReceive = canOrderBeReceived(order);
+
+    return (
+      <div
+        key={`search-compact-${order.id}`}
+        className="card"
+        style={{ padding: 12, display: "grid", gap: 10 }}
+      >
+        <div style={{ display: "grid", gap: 4 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text1)" }}>
+            {t("common.customer", "Customer")}:{" "}
+            {order.customer?.firstName || "-"}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text2)" }}>
+            {t("orders.billNumber", "Bill Number")}: #
+            {order.customer?.billNumber || "-"}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text2)" }}>
+            {t("workerPanel.orderType", "Order Type")}:{" "}
+            {getOrderTypeLabel(order.type, language)}
+          </div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {order.qichikarAssignedToId && (
+              <span
+                className="badge"
+                style={{
+                  background: "#FEF3C7",
+                  color: "#92400E",
+                  border: "1px solid #F59E0B55",
+                }}
+              >
+                {t("workerPanel.assignedQichikar", "Assigned to Qichikar")}
+              </span>
+            )}
+            {order.dokhtAssignedToId && (
+              <span
+                className="badge"
+                style={{
+                  background: "#FCE7F3",
+                  color: "#9D174D",
+                  border: "1px solid #EC489955",
+                }}
+              >
+                {t("workerPanel.assignedDokht", "Assigned to Dokht")}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {receivedByCurrentUser ? (
+          <div
             style={{
-              fontSize: 22,
-              fontWeight: 800,
-              color: "var(--text1)",
-              marginBottom: 6,
+              fontSize: 12,
+              color: "#166534",
+              background: "#DCFCE7",
+              border: "1px solid #86EFAC",
+              borderRadius: 8,
+              padding: "8px 10px",
+              fontWeight: 600,
             }}
           >
-            {cfg.greeting}, {user?.name}!
-          </h1>
-          <p style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.5 }}>
-            {stats.assigned > 0 ? (
-              <>
-                You have{" "}
-                <strong style={{ color: cfg.color }}>{stats.assigned}</strong>{" "}
-                new {stats.assigned === 1 ? "assignment" : "assignments"}
-                {stats.inProgress > 0 ? (
-                  <>
-                    {" "}
-                    and{" "}
-                    <strong style={{ color: "#2563EB" }}>
-                      {stats.inProgress}
-                    </strong>{" "}
-                    in progress
-                  </>
-                ) : (
-                  ""
-                )}
-                .
-              </>
-            ) : stats.inProgress > 0 ? (
-              <>
-                You have{" "}
-                <strong style={{ color: "#2563EB" }}>{stats.inProgress}</strong>{" "}
-                order{stats.inProgress === 1 ? "" : "s"} in progress.
-              </>
-            ) : (
-              "All caught up — no pending assignments."
+            {t(
+              "workerPanel.searchOrderReceivedHint",
+              "This order is already in your panel.",
             )}
-          </p>
-        </div>
-        <div style={{ textAlign: "center" }}>
-          <span style={{ fontSize: 40, display: "block", marginBottom: 6 }}>
-            {cfg.emoji}
-          </span>
-          <span
+          </div>
+        ) : canReceive ? (
+          <button
+            className="btn btn-gold btn-sm"
+            style={{ width: "100%" }}
+            onClick={() => openConfirm("receive", order)}
+            disabled={pendingAction}
+          >
+            <LuCheck size={13} />{" "}
+            {t("workerPanel.receiveOrder", "Receive Order")}
+          </button>
+        ) : (
+          <div
             style={{
-              fontSize: 11,
-              fontWeight: 700,
-              padding: "3px 12px",
-              borderRadius: 99,
-              background: cfg.colorBg,
+              fontSize: 12,
+              color: "#92400E",
+              background: "#FEF3C7",
+              border: "1px solid #FCD34D",
+              borderRadius: 8,
+              padding: "8px 10px",
+            }}
+          >
+            {getAssignmentBlockReason(order) ??
+              t(
+                "workerPanel.cannotReceiveOrder",
+                "You cannot receive this order.",
+              )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ display: "grid", gap: 18 }}>
+      <div className="card" style={{ padding: 18 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <h1
+              style={{
+                margin: 0,
+                fontSize: 22,
+                fontWeight: 800,
+                color: "var(--text1)",
+              }}
+            >
+              {t("workerPanel.greeting", "Welcome")} {user?.name || ""}
+            </h1>
+            <p
+              style={{ margin: "7px 0 0", color: "var(--text3)", fontSize: 13 }}
+            >
+              {cfg.label} - {t("workerPanel.allOrders", "All Orders")}:{" "}
+              {stats.all}
+            </p>
+          </div>
+          <span
+            className="badge"
+            style={{
+              alignSelf: "start",
+              background: `${cfg.color}14`,
               color: cfg.color,
-              border: `1px solid ${cfg.colorBd}`,
+              border: `1px solid ${cfg.color}30`,
             }}
           >
             {cfg.label}
           </span>
         </div>
-      </div>
 
-      {/* ── Stats row ──────────────────────────────────────────────── */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(155px, 1fr))",
-          gap: 14,
-        }}
-      >
-        <StatCard
-          icon={<LuClipboardList size={22} style={{ color: cfg.color }} />}
-          label="Total Assigned"
-          value={stats.total}
-          color={cfg.color}
-          bg={cfg.colorBg}
-          border={cfg.colorBd}
-        />
-        <StatCard
-          icon={<LuBell size={22} style={{ color: "#D97706" }} />}
-          label="Assigned"
-          value={stats.assigned}
-          color="#D97706"
-          bg="#D9770614"
-          border="#D9770630"
-        />
-        <StatCard
-          icon={<LuClock size={22} style={{ color: "#2563EB" }} />}
-          label="In Progress"
-          value={stats.inProgress}
-          color="#2563EB"
-          bg="#2563EB14"
-          border="#2563EB30"
-        />
-        <StatCard
-          icon={<LuSquareCheck size={22} style={{ color: "#16a34a" }} />}
-          label="Completed"
-          value={stats.completed}
-          color="#16a34a"
-          bg="#16a34a14"
-          border="#16a34a30"
-        />
-      </div>
-
-      {/* ── Notifications panel ────────────────────────────────────── */}
-      {unreadNotifs.length > 0 && (
         <div
           style={{
-            background: "var(--surface)",
-            border: `1px solid ${cfg.colorBd}`,
-            borderRadius: 12,
-            overflow: "hidden",
+            marginTop: 14,
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+            gap: 10,
           }}
         >
           <div
             style={{
-              padding: "13px 18px",
-              borderBottom: notifsExpanded ? "1px solid var(--border)" : "none",
-              background: cfg.colorBg,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              cursor: "pointer",
+              border: "1px solid var(--border)",
+              background: "var(--surface2)",
+              borderRadius: 10,
+              padding: "10px 12px",
+              display: "grid",
+              gap: 4,
             }}
-            onClick={() => setNotifsExpanded((e) => !e)}
+          >
+            <div
+              style={{ fontSize: 12, color: "var(--text3)", fontWeight: 600 }}
+            >
+              {t(
+                "workerPanel.totalCompletedPayments",
+                "Total Money from Completed Orders",
+              )}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                color: "#2563EB",
+                fontWeight: 800,
+                fontSize: 20,
+              }}
+            >
+              <LuCircleDollarSign size={18} />$
+              {totalCompletedPayments.toLocaleString()}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text3)" }}>
+              {t(
+                "workerPanel.totalCompletedPaymentsHint",
+                "Paid from completed worker orders by admin",
+              )}
+            </div>
+          </div>
+
+          <div
+            style={{
+              border: "1px solid var(--border)",
+              background: "var(--surface2)",
+              borderRadius: 10,
+              padding: "10px 12px",
+              display: "grid",
+              gap: 4,
+            }}
+          >
+            <div
+              style={{ fontSize: 12, color: "var(--text3)", fontWeight: 600 }}
+            >
+              {t("workerPanel.loanTotal", "Loan Total")}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                color: "#B45309",
+                fontWeight: 800,
+                fontSize: 20,
+              }}
+            >
+              <LuCircleDollarSign size={18} />$
+              {totalLoanAmount.toLocaleString()}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text3)" }}>
+              {t(
+                "workerPanel.loanTotalHint",
+                "Total LOAN transactions from Make Transaction",
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: 16 }}>
+        <div
+          style={{ display: "grid", gap: 10, gridTemplateColumns: "1fr auto" }}
+        >
+          <div>
+            <label className="lbl">
+              {t("orders.billNumber", "Bill Number")}
+            </label>
+            <div style={{ position: "relative" }}>
+              <LuSearch
+                size={14}
+                style={{
+                  position: "absolute",
+                  left: 10,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "var(--text3)",
+                }}
+              />
+              <input
+                className="inp"
+                style={{ paddingLeft: 32 }}
+                value={billSearch}
+                onChange={(e) => setBillSearch(e.target.value)}
+                placeholder={t(
+                  "workerPanel.searchBillPlaceholder",
+                  "Search by bill number",
+                )}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") onSearch();
+                }}
+              />
+            </div>
+          </div>
+          <button
+            className="btn btn-gold"
+            style={{ alignSelf: "end", minWidth: 110 }}
+            onClick={onSearch}
+            disabled={searchLoading}
+          >
+            <LuSearch size={14} />{" "}
+            {searchLoading
+              ? t("common.loading", "Loading...")
+              : t("common.search", "Search")}
+          </button>
+        </div>
+
+        {searchResult?.orders?.length ? (
+          <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
+            {searchResult.orders.map((order) => renderSearchResultCard(order))}
+          </div>
+        ) : hasSearchAttempt ? (
+          <div style={{ marginTop: 12, fontSize: 12, color: "var(--text3)" }}>
+            {t(
+              "workerPanel.noOrderFoundByBill",
+              "No order found for this bill number.",
+            )}
+          </div>
+        ) : null}
+      </div>
+
+      {unreadNotifs.length > 0 && (
+        <div className="card" style={{ padding: 0 }}>
+          <div
+            style={{
+              padding: "12px 14px",
+              borderBottom: "1px solid var(--border)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 8,
+            }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <LuBell size={15} style={{ color: cfg.color }} />
+              <strong style={{ fontSize: 14 }}>
+                {t("workerPanel.newAssignments", "New Assignments")}
+              </strong>
               <span
-                style={{ fontSize: 14, fontWeight: 700, color: "var(--text1)" }}
-              >
-                New Assignments
-              </span>
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  padding: "1px 8px",
-                  borderRadius: 99,
-                  background: cfg.color,
-                  color: "#fff",
-                }}
+                className="badge"
+                style={{ background: cfg.color, color: "#fff" }}
               >
                 {unreadNotifs.length}
               </span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  readAllMut.mutate();
-                }}
-                disabled={readAllMut.isPending}
-                style={{
-                  fontSize: 12,
-                  color: cfg.color,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  background: "none",
-                  border: "none",
-                }}
-              >
-                Mark all read
-              </button>
-              <span
-                style={{ fontSize: 16, color: "var(--text3)", lineHeight: 1 }}
-              >
-                {notifsExpanded ? "−" : "+"}
-              </span>
-            </div>
+            <button
+              className="btn btn-outline btn-sm"
+              onClick={() => readAllMut.mutate()}
+            >
+              {t("workerPanel.markAllRead", "Mark all read")}
+            </button>
           </div>
-          {notifsExpanded && (
-            <div style={{ maxHeight: 260, overflowY: "auto" }}>
-              {unreadNotifs.map((n) => (
-                <div
-                  key={n.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: 10,
-                    padding: "12px 18px",
-                    borderBottom: "1px solid var(--border)",
-                  }}
-                >
-                  <LuBell
-                    size={13}
-                    style={{ color: cfg.color, flexShrink: 0, marginTop: 2 }}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p
-                      style={{
-                        fontSize: 13,
-                        color: "var(--text1)",
-                        lineHeight: 1.45,
-                      }}
-                    >
-                      {n.message}
-                    </p>
-                    <p
-                      style={{
-                        fontSize: 11,
-                        color: "var(--text3)",
-                        marginTop: 3,
-                      }}
-                    >
-                      {new Date(n.createdAt).toLocaleString()}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => readOneMut.mutate(n.id)}
+          <div style={{ maxHeight: 250, overflowY: "auto" }}>
+            {unreadNotifs.map((item) => (
+              <div
+                key={item.id}
+                style={{
+                  padding: "10px 14px",
+                  borderBottom: "1px solid var(--border)",
+                  display: "flex",
+                  gap: 8,
+                }}
+              >
+                <LuCircleAlert
+                  size={14}
+                  style={{ color: cfg.color, marginTop: 2, flexShrink: 0 }}
+                />
+                <div style={{ flex: 1 }}>
+                  <NotificationText
+                    language={language}
                     style={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      color: "var(--text3)",
-                      padding: "3px 4px",
-                      borderRadius: 4,
-                      flexShrink: 0,
+                      fontSize: 13,
+                      color: "var(--text1)",
+                      lineHeight: 1.45,
                     }}
                   >
-                    <LuCheck size={13} />
-                  </button>
+                    {formatUserNotificationMessage(item, t, language)}
+                  </NotificationText>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "var(--text3)",
+                      marginTop: 3,
+                    }}
+                  >
+                    {formatDateTimeLocale(item.createdAt, language)}
+                  </div>
                 </div>
-              ))}
-            </div>
-          )}
+                <button
+                  className="btn btn-outline btn-sm"
+                  onClick={() => readOneMut.mutate(item.id)}
+                >
+                  <LuCheck size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* ── Orders section ─────────────────────────────────────────── */}
-      <div
-        style={{
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-          borderRadius: 12,
-          overflow: "hidden",
-        }}
-      >
-        {/* Tabs */}
+      <div className="card" style={{ padding: 0 }}>
         <div
           style={{
-            borderBottom: "1px solid var(--border)",
-            padding: "0 18px",
             display: "flex",
             gap: 2,
             overflowX: "auto",
+            borderBottom: "1px solid var(--border)",
+            padding: "0 12px",
           }}
         >
-          {TABS.map((tab) => {
+          {tabs.map((tab) => {
             const active = activeTab === tab.key;
             return (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
                 style={{
-                  padding: "13px 14px",
-                  background: "none",
                   border: "none",
+                  background: "none",
+                  padding: "12px 13px",
                   cursor: "pointer",
-                  fontSize: 13,
-                  fontWeight: active ? 700 : 500,
                   color: active ? cfg.color : "var(--text3)",
                   borderBottom: active
                     ? `2px solid ${cfg.color}`
                     : "2px solid transparent",
+                  fontWeight: active ? 700 : 500,
                   display: "flex",
+                  gap: 6,
                   alignItems: "center",
-                  gap: 7,
                   whiteSpace: "nowrap",
-                  transition: "color .15s",
                 }}
               >
                 {tab.label}
                 <span
+                  className="badge"
                   style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    padding: "1px 7px",
-                    borderRadius: 99,
-                    background: active ? cfg.colorBg : "var(--surface2)",
+                    background: active ? `${cfg.color}14` : "var(--surface2)",
                     color: active ? cfg.color : "var(--text3)",
                   }}
                 >
@@ -1656,116 +1566,63 @@ export default function WorkerPanel() {
           })}
         </div>
 
-        {/* Order grid */}
-        <div style={{ padding: 18 }}>
-          {ordersLoading ? (
+        <div style={{ padding: 14 }}>
+          {isLoading ? (
             <div
               style={{
+                padding: "30px 0",
                 textAlign: "center",
-                padding: "48px 0",
                 color: "var(--text3)",
-                fontSize: 13,
               }}
             >
-              <div
-                style={{
-                  width: 28,
-                  height: 28,
-                  border: "3px solid var(--border)",
-                  borderTopColor: cfg.color,
-                  borderRadius: "50%",
-                  animation: "spin .7s linear infinite",
-                  margin: "0 auto 10px",
-                }}
-              />
-              Loading orders...
-              <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+              {t("workerPanel.loadingOrders", "Loading orders...")}
             </div>
-          ) : filteredOrders.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "48px 0" }}>
-              <LuClipboardList
-                size={36}
-                style={{ color: "var(--text3)", marginBottom: 12 }}
-              />
-              <p
-                style={{ fontSize: 14, color: "var(--text3)", fontWeight: 500 }}
-              >
-                {activeTab === "all"
-                  ? "No orders assigned yet."
-                  : "No orders in this category."}
-              </p>
+          ) : null}
+
+          {!isLoading && filteredOrders.length === 0 ? (
+            <div
+              style={{
+                padding: "40px 0",
+                textAlign: "center",
+                color: "var(--text3)",
+              }}
+            >
+              <LuClipboardList size={36} style={{ marginBottom: 8 }} />
+              <div>
+                {t(
+                  "workerPanel.noOrdersInCategory",
+                  "No orders in this category.",
+                )}
+              </div>
             </div>
-          ) : (
+          ) : null}
+
+          {!isLoading && filteredOrders.length > 0 ? (
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-                gap: 14,
+                gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))",
+                gap: 12,
               }}
             >
-              {filteredOrders.map((order) => (
-                <OrderCard
-                  key={order.id}
-                  order={order}
-                  roleColor={cfg.color}
-                  onViewDetails={(o) => setSelectedId(o.id)}
-                  onProgress={(o) => progressMut.mutate(o.id)}
-                  onComplete={(o) => setConfirmOrderId(o.id)}
-                  isWorker={isWorker}
-                  progressPending={progressMut.isPending}
-                  completePending={completeMut.isPending}
-                />
-              ))}
+              {filteredOrders.map((order) => renderOrderCard(order))}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
 
-      {/* Detail modal */}
-      {selectedOrder && (
-        <OrderDetailModal
-          order={selectedOrder}
-          roleColor={cfg.color}
-          onClose={() => setSelectedId(null)}
-          onProgress={() => progressMut.mutate(selectedOrder.id)}
-          onComplete={() => setConfirmOrderId(selectedOrder.id)}
-          isWorker={isWorker}
-          progressPending={progressMut.isPending}
-          completePending={completeMut.isPending}
-        />
-      )}
-
-      {confirmOrder && (
-        <ConfirmModal
-          order={confirmOrder}
-          workerName={user?.name}
-          onCancel={() => setConfirmOrderId(null)}
-          onConfirm={() => completeMut.mutate(confirmOrder.id)}
-          pending={completeMut.isPending}
-        />
-      )}
+      <OrderDetailsModal
+        order={detailOrder}
+        language={language}
+        t={t}
+        onClose={() => setDetailOrder(null)}
+      />
+      <ConfirmActionModal
+        config={confirmConfig}
+        pending={pendingAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={runAction}
+      />
     </div>
   );
 }
-
-// ── Style constants ────────────────────────────────────────────────────────────
-const footerBtnBase = {
-  flex: 1,
-  padding: "9px 0",
-  background: "var(--surface2)",
-  border: "1px solid var(--border)",
-  borderRadius: 8,
-  cursor: "pointer",
-  fontSize: 13,
-  color: "var(--text2)",
-  fontWeight: 500,
-};
-const cardBtnBase = {
-  padding: "8px 0",
-  background: "var(--surface2)",
-  border: "1px solid var(--border)",
-  borderRadius: 8,
-  cursor: "pointer",
-  fontSize: 12,
-  fontWeight: 500,
-};

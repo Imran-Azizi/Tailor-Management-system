@@ -11,7 +11,6 @@ export async function listUsers(req, res, next) {
         id: true,
         name: true,
         phoneNumber: true,
-        email: true,
         accountType: true,
         isActive: true,
         createdAt: true,
@@ -34,7 +33,6 @@ export async function getUser(req, res, next) {
         id: true,
         name: true,
         phoneNumber: true,
-        email: true,
         accountType: true,
         isActive: true,
         createdAt: true,
@@ -45,6 +43,7 @@ export async function getUser(req, res, next) {
             orderName: true,
             type: true,
             totalPrice: true,
+            assignmentPrice: true,
             remaining: true,
             isEmergency: true,
             assignedAt: true,
@@ -64,7 +63,7 @@ export async function getUser(req, res, next) {
 /** POST /api/users  (Admin only) */
 export async function createUser(req, res, next) {
   try {
-    const { name, phoneNumber, email, accountType, password } = req.body;
+    const { name, phoneNumber, accountType, password } = req.body;
 
     if (!name || !phoneNumber || !accountType) {
       return res.status(400).json({ error: 'name, phoneNumber and accountType are required.' });
@@ -72,10 +71,6 @@ export async function createUser(req, res, next) {
     if (!['ADMIN', 'DOKAN', 'DOKHT', 'QICHIKAR'].includes(accountType)) {
       return res.status(400).json({ error: 'Invalid accountType.' });
     }
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      return res.status(400).json({ error: 'Invalid email address.' });
-    }
-
     // Default password is the phone number if not explicitly provided
     const rawPassword = password || phoneNumber.trim();
     if (rawPassword.length < 6) {
@@ -86,11 +81,10 @@ export async function createUser(req, res, next) {
       data: {
         name: name.trim(),
         phoneNumber: phoneNumber.trim(),
-        email: email ? email.trim().toLowerCase() : null,
         accountType,
         password: hashed,
       },
-      select: { id: true, name: true, phoneNumber: true, email: true, accountType: true, isActive: true, createdAt: true },
+      select: { id: true, name: true, phoneNumber: true, accountType: true, isActive: true, createdAt: true },
     });
     res.status(201).json(user);
   } catch (err) {
@@ -101,17 +95,11 @@ export async function createUser(req, res, next) {
 /** PUT /api/users/:id  (Admin only) */
 export async function updateUser(req, res, next) {
   try {
-    const { name, phoneNumber, email, accountType, password, isActive } = req.body;
+    const { name, phoneNumber, accountType, password, isActive } = req.body;
 
     const data = {};
     if (name !== undefined) data.name = name.trim();
     if (phoneNumber !== undefined) data.phoneNumber = phoneNumber.trim();
-    if (email !== undefined) {
-      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-        return res.status(400).json({ error: 'Invalid email address.' });
-      }
-      data.email = email ? email.trim().toLowerCase() : null;
-    }
     if (accountType !== undefined) {
       if (!['ADMIN', 'DOKAN', 'DOKHT', 'QICHIKAR'].includes(accountType)) {
         return res.status(400).json({ error: 'Invalid accountType.' });
@@ -127,7 +115,7 @@ export async function updateUser(req, res, next) {
     const user = await prisma.user.update({
       where: { id: req.params.id },
       data,
-      select: { id: true, name: true, phoneNumber: true, email: true, accountType: true, isActive: true, createdAt: true },
+      select: { id: true, name: true, phoneNumber: true, accountType: true, isActive: true, createdAt: true },
     });
     res.json(user);
   } catch (err) {
@@ -154,7 +142,7 @@ export async function listAssignable(req, res, next) {
   try {
     const users = await prisma.user.findMany({
       where: { accountType: { in: ['QICHIKAR', 'DOKHT'] }, isActive: true },
-      select: { id: true, name: true, phoneNumber: true, email: true, accountType: true },
+      select: { id: true, name: true, phoneNumber: true, accountType: true },
       orderBy: { name: 'asc' },
     });
     res.json(users);

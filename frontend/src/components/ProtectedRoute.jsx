@@ -1,14 +1,16 @@
 import { Navigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const WORKER_ROLES = ['DOKHT', 'QICHIKAR'];
 
 function LoadingSpinner({ color = 'var(--primary)' }) {
+  const { t } = useTranslation();
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
       <div style={{ textAlign: 'center' }}>
         <div style={{ width: 32, height: 32, border: '3px solid var(--border)', borderTopColor: color, borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 12px' }} />
-        <p style={{ fontSize: 13, color: 'var(--text3)' }}>Loading...</p>
+        <p style={{ fontSize: 13, color: 'var(--text3)' }}>{t('common.loading')}</p>
       </div>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>

@@ -22,6 +22,10 @@ const orderItemSchema = z.object({
   measurements: z.record(z.any()).optional(),
 });
 
+const orderBillItemSchema = orderItemSchema.extend({
+  id: optionalText,
+});
+
 export const createOrderSchema = z.object({
   customerInfo: z.object({
     customerId: optionalText,
@@ -40,4 +44,15 @@ export const updateOrderSchema = z.object({
   isEmergency: z.boolean().optional(),
   emergencyExpiry: z.string().optional().nullable(),
   boxId: z.number().int().optional().nullable(),
+});
+
+export const updateOrderBillSchema = z.object({
+  customerInfo: z.object({
+    customerId: optionalText,
+    firstName: optionalText,
+    phoneNumber: optionalText,
+  }),
+  orders: z
+    .array(orderBillItemSchema)
+    .min(1, 'At least one order item required'),
 });

@@ -5,20 +5,22 @@ import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   LuSearch,
-  LuFilter,
-  LuSquareCheck,
   LuTrash2,
   LuClipboardList,
   LuPhone,
   LuReceipt,
   LuBadgeDollarSign,
   LuUserCheck,
+  LuEllipsisVertical,
   LuX,
+  LuPencil,
 } from "react-icons/lu";
 import toast from "react-hot-toast";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { parseNumberLocale } from "../lib/normalize.js";
+import { formatCurrency } from "../lib/currency.js";
+import { getOrderTypeLabel } from "../lib/orderType.js";
 import {
   PageHeader,
   Spinner,
@@ -27,6 +29,7 @@ import {
   Card,
   EmptyState,
   Modal,
+  ConfirmDeleteModal,
 } from "../components/ui/index.jsx";
 import { OrderDocumentPack } from "../components/order/OrderDocumentPack.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -34,11 +37,14 @@ import { useAuth } from "../context/AuthContext.jsx";
 const ROLE_COLORS = { QICHIKAR: "#D97706", DOKHT: "#DB2777" };
 
 function AssignModal({ order, onClose, onAssigned }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [selectedUserId, setSelectedUserId] = useState(
     order.assignedToId || "",
   );
   const [note, setNote] = useState(order.assignmentNote || "");
+  const [price, setPrice] = useState(
+    order.assignmentPrice != null ? String(order.assignmentPrice) : "",
+  );
   const [saving, setSaving] = useState(false);
 
   const { data: workers = [] } = useQuery({
@@ -49,9 +55,20 @@ function AssignModal({ order, onClose, onAssigned }) {
   const handleAssign = async () => {
     setSaving(true);
     try {
+      let parsedPrice = null;
+      if (selectedUserId) {
+        parsedPrice = parseNumberLocale(price);
+        if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+          toast.error(t("assignment.invalidPrice"));
+          setSaving(false);
+          return;
+        }
+      }
+
       await api.patch(`/orders/${order.id}/assign`, {
         assignedToId: selectedUserId || null,
         assignmentNote: note || null,
+        assignmentPrice: selectedUserId ? parsedPrice : null,
       });
       toast.success(
         selectedUserId ? t("assignment.assigned") : t("assignment.unassigned"),
@@ -112,9 +129,9 @@ function AssignModal({ order, onClose, onAssigned }) {
             <LuX size={16} />
           </button>
         </div>
-        <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 16 }}>
-          <strong>{order.customer?.firstName}</strong> — Bill #
-          {order.customer?.billNumber} · {order.type}
+                <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 16 }}>
+          <strong>{order.customer?.firstName}</strong> - Bill #
+          {order.customer?.billNumber} | {getOrderTypeLabel(order.type, i18n.resolvedLanguage || i18n.language)}
         </div>
         <div style={{ marginBottom: 14 }}>
           <label
@@ -148,6 +165,35 @@ function AssignModal({ order, onClose, onAssigned }) {
               </option>
             ))}
           </select>
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <label
+            style={{
+              fontSize: 13,
+              fontWeight: 500,
+              color: "var(--text2)",
+              display: "block",
+              marginBottom: 5,
+            }}
+          >
+            {t("assignment.price")}
+          </label>
+          <input
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            placeholder={t("assignment.pricePlaceholder")}
+            inputMode="decimal"
+            style={{
+              width: "100%",
+              padding: "9px 12px",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              background: "var(--surface2)",
+              color: "var(--text1)",
+              fontSize: 14,
+              boxSizing: "border-box",
+            }}
+          />
         </div>
         <div style={{ marginBottom: 18 }}>
           <label
@@ -218,12 +264,16 @@ function AssignModal({ order, onClose, onAssigned }) {
 
 const TV = { OUTFIT: "gold", WASKAT: "teal", KORTY: "amber", YAKHANQAQ: "red" };
 
-function formatMoney(value) {
-  return `$${Number(value || 0).toLocaleString()}`;
+function formatMoney(value, language) {
+  return formatCurrency(value, language, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
 }
 
 function OrderViewModal({ orderId, open, onClose }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language;
   const { data, isLoading } = useQuery({
     queryKey: ["order-detail", orderId],
     queryFn: () => api.get(`/orders/${orderId}`).then((r) => r.data),
@@ -264,11 +314,10 @@ function OrderViewModal({ orderId, open, onClose }) {
                       marginBottom: 8,
                     }}
                   >
-                    <Badge v={TV[data.type] || "gold"}>{data.type}</Badge>
-                    <Badge v={data.isCompleted ? "green" : "amber"}>
-                      {data.isCompleted ? "Completed" : "Pending"}
+                    <Badge v={TV[data.type] || "gold"}>
+                      {getOrderTypeLabel(data.type, language)}
                     </Badge>
-                    {data.isEmergency && <Badge v="red">Emergency</Badge>}
+                    {data.isEmergency && <Badge v="red">{t("orders.emergencyBadge")}</Badge>}
                   </div>
                   <h3 style={{ fontSize: 24, fontWeight: 900 }}>
                     {data.customer?.firstName}
@@ -280,12 +329,12 @@ function OrderViewModal({ orderId, open, onClose }) {
                       marginTop: 4,
                     }}
                   >
-                    Created on {new Date(data.createdAt).toLocaleString()}
+                    {t("orders.createdOn", { date: new Date(data.createdAt).toLocaleString() })}
                   </p>
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontSize: 12, color: "var(--text3)" }}>
-                    Bill Number
+                    {t("orders.billNumber")}
                   </div>
                   <div
                     style={{
@@ -302,25 +351,25 @@ function OrderViewModal({ orderId, open, onClose }) {
 
             <div className="order-view-summary-card">
               <div className="order-view-summary-row">
-                <span>Phone</span>
+                <span>{t("common.phone")}</span>
                 <strong>{data.customer?.phoneNumber || "-"}</strong>
               </div>
               <div className="order-view-summary-row">
-                <span>Total</span>
-                <strong>{formatMoney(data.totalPrice)}</strong>
+                <span>{t("common.total")}</span>
+                <strong>{formatMoney(data.totalPrice, language)}</strong>
               </div>
               <div className="order-view-summary-row">
-                <span>Paid</span>
+                <span>{t("common.paid")}</span>
                 <strong style={{ color: "#15803D" }}>
-                  {formatMoney(data.paidAmount)}
+                  {formatMoney(data.paidAmount, language)}
                 </strong>
               </div>
               <div className="order-view-summary-row">
-                <span>Remaining</span>
+                <span>{t("common.remaining")}</span>
                 <strong
                   style={{ color: data.remaining > 0 ? "#DC2626" : "#15803D" }}
                 >
-                  {formatMoney(data.remaining)}
+                  {formatMoney(data.remaining, language)}
                 </strong>
               </div>
             </div>
@@ -337,7 +386,14 @@ function OrderViewModal({ orderId, open, onClose }) {
   );
 }
 
-function RowDropdown({ order, isAdmin, onAssign, onComplete, onDelete }) {
+function RowDropdown({
+  order,
+  isAdmin,
+  showAssign = false,
+  onAssign,
+  onEdit,
+  onDelete,
+}) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, right: 0 });
@@ -367,18 +423,21 @@ function RowDropdown({ order, isAdmin, onAssign, onComplete, onDelete }) {
   }, [open]);
 
   const items = [
-    isAdmin && !order.assignedToId && {
-      label: t("assignment.assign"),
-      icon: <LuUserCheck size={13} />,
-      onClick: onAssign,
+    isAdmin && {
+      label: t("common.edit"),
+      icon: <LuPencil size={13} />,
+      onClick: onEdit,
       cls: "",
     },
-    !order.isCompleted && {
-      label: t("common.complete"),
-      icon: <LuSquareCheck size={13} />,
-      onClick: onComplete,
-      cls: "success",
-    },
+    showAssign &&
+      isAdmin && {
+        label: order.assignedToId
+          ? t("assignment.assignOrder")
+          : t("assignment.assign"),
+        icon: <LuUserCheck size={13} />,
+        onClick: onAssign,
+        cls: "",
+      },
     isAdmin && {
       label: t("common.delete"),
       icon: <LuTrash2 size={13} />,
@@ -396,7 +455,7 @@ function RowDropdown({ order, isAdmin, onAssign, onComplete, onDelete }) {
         onClick={toggle}
         aria-label="Actions"
       >
-        <span style={{ fontSize: 15, lineHeight: 1 }}>⋮</span>
+        <LuEllipsisVertical size={15} />
       </button>
       {open &&
         createPortal(
@@ -426,17 +485,43 @@ function RowDropdown({ order, isAdmin, onAssign, onComplete, onDelete }) {
   );
 }
 
-export default function AllOrders({ filter }) {
-  const { t } = useTranslation();
+const ORDER_TYPE_FILTER_VALUES = ["ALL", "OUTFIT", "KORTY", "WASKAT", "YAKHANQAQ"];
+
+export default function AllOrders({ filter, mode = "orders" }) {
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language;
   const { isAdmin } = useAuth();
   const qc = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();
+  const canManageAssignments = mode === "assignment" && isAdmin;
+  const statusFilter =
+    filter === "pending"
+      ? "pending"
+      : filter === "completed"
+        ? "completed"
+        : "all";
   const [assignModal, setAssignModal] = useState(null);
+  const [deleteOrderTarget, setDeleteOrderTarget] = useState(null);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [searchFilter, setSearchFilter] = useState("");
-  const [type, setType] = useState("");
+  const [typeFilter, setTypeFilter] = useState("ALL");
+  const orderTypeFilterOptions = useMemo(
+    () =>
+      ORDER_TYPE_FILTER_VALUES.map((value) => ({
+        value,
+        label:
+          value === "ALL"
+            ? t("orders.allTypes")
+            : getOrderTypeLabel(value, language),
+      })),
+    [language, t],
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter]);
 
   useEffect(() => {
     const incomingSearch = location.state?.search;
@@ -450,16 +535,16 @@ export default function AllOrders({ filter }) {
   }, [location.pathname, location.state, navigate]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["orders", filter, page, searchFilter, type],
+    queryKey: ["orders", statusFilter, page, searchFilter, typeFilter],
     queryFn: () =>
       api
         .get("/orders", {
           params: {
-            status: filter,
+            status: statusFilter === "all" ? undefined : statusFilter,
             page,
             limit: 20,
             search: searchFilter,
-            type,
+            type: typeFilter === "ALL" ? undefined : typeFilter,
           },
         })
         .then((r) => r.data),
@@ -468,17 +553,11 @@ export default function AllOrders({ filter }) {
   const refreshOrders = () => {
     qc.invalidateQueries({ queryKey: ["orders"] });
     qc.invalidateQueries({ queryKey: ["order-detail"] });
+    qc.invalidateQueries({ queryKey: ["assignable-workers"] });
+    setTimeout(() => {
+      qc.refetchQueries({ queryKey: ["orders"] });
+    }, 100);
   };
-
-  const completeMut = useMutation({
-    mutationFn: (id) => api.patch(`/orders/${id}/complete`),
-    onSuccess: () => {
-      refreshOrders();
-      toast.success(t("orders.completedSuccess"));
-    },
-    onError: (error) =>
-      toast.error(getApiErrorMessage(error, t("orders.completeFailed"))),
-  });
 
   const deleteMut = useMutation({
     mutationFn: (id) => api.delete(`/orders/${id}`),
@@ -488,27 +567,6 @@ export default function AllOrders({ filter }) {
     },
     onError: (error) =>
       toast.error(getApiErrorMessage(error, t("orders.deleteFailed"))),
-  });
-
-  // Complete modal / payment flow state
-  const [completeModalOpen, setCompleteModalOpen] = useState(false);
-  const [selectedOrderForComplete, setSelectedOrderForComplete] =
-    useState(null);
-  const [payAmount, setPayAmount] = useState("");
-
-  const payMut = useMutation({
-    mutationFn: ({ id, payload }) => api.put(`/orders/${id}`, payload),
-    onSuccess: () => {
-      refreshOrders();
-      toast.success(t("orders.paymentRecorded") || "Payment recorded");
-    },
-    onError: (error) =>
-      toast.error(
-        getApiErrorMessage(
-          error,
-          t("orders.paymentFailed") || "Payment failed",
-        ),
-      ),
   });
 
   const totals = useMemo(() => {
@@ -525,117 +583,112 @@ export default function AllOrders({ filter }) {
   }, [data]);
 
   const title =
-    filter === "completed"
-      ? t("orders.titleCompleted")
-      : filter === "pending"
+    mode === "assignment"
+      ? t("assignment.assignOrder")
+      : statusFilter === "pending"
         ? t("orders.titlePending")
-        : t("orders.titleAll");
+        : statusFilter === "completed"
+          ? t("orders.titleCompleted")
+          : t("orders.titleAll");
+  const completedStatusLabel = t(
+    "common.completed",
+    t("sidebar.completed", "Completed"),
+  );
+
+  const orders = data?.data || [];
+  const totalPages = Math.max(1, Math.ceil((data?.total || 0) / 20));
+  const subtitle = data
+    ? t("ui.pageSummary", { page, pages: totalPages, total: data.total })
+    : "";
+
+  const billEmergencyMeta = useMemo(() => {
+    const firstOrderIdByBill = {};
+    const hasEmergencyByBill = {};
+
+    orders.forEach((order) => {
+      const bill = order?.customer?.billNumber;
+      if (bill === null || bill === undefined) return;
+      if (!firstOrderIdByBill[bill]) {
+        firstOrderIdByBill[bill] = order.id;
+      }
+      if (order.isEmergency) {
+        hasEmergencyByBill[bill] = true;
+      }
+    });
+
+    return { firstOrderIdByBill, hasEmergencyByBill };
+  }, [orders]);
 
   return (
     <div className="page">
-      <PageHeader
-        title={title}
-        subtitle={data ? `${data.total} orders` : ""}
-        action={
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <div
-              style={{
-                position: "relative",
-                display: "flex",
-                alignItems: "center",
+      <PageHeader title={title} subtitle={subtitle} />
+
+      <Card style={{ marginBottom: 16 }}>
+        <div className="all-orders-toolbar">
+          <div className="all-orders-search">
+            <LuSearch size={14} className="all-orders-search-icon" />
+            <input
+              className="inp all-orders-search-input"
+              aria-label={t("orders.searchCustomers")}
+              placeholder={t("orders.searchCustomers")}
+              value={search}
+              onChange={(e) => {
+                const value = e.target.value;
+                setSearch(value);
+                setSearchFilter(value);
+                setPage(1);
               }}
-            >
-              <LuSearch
-                size={13}
-                style={{
-                  position: "absolute",
-                  left: 11,
-                  color: "var(--text3)",
-                  pointerEvents: "none",
-                }}
-              />
-              <input
-                className="inp"
-                style={{ paddingLeft: 32, width: 190, height: 36 }}
-                placeholder={t("orders.searchCustomers")}
-                value={search}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setSearch(value);
-                  setSearchFilter(value);
-                  setPage(1);
-                }}
-              />
-            </div>
-            <div
-              style={{
-                position: "relative",
-                display: "flex",
-                alignItems: "center",
-              }}
-            >
-              <LuFilter
-                size={13}
-                style={{
-                  position: "absolute",
-                  left: 10,
-                  color: "var(--text3)",
-                  pointerEvents: "none",
-                }}
-              />
-              <select
-                className="inp"
-                style={{
-                  paddingLeft: 28,
-                  width: 140,
-                  height: 36,
-                  fontSize: 13,
-                }}
-                value={type}
-                onChange={(e) => {
-                  setType(e.target.value);
-                  setPage(1);
-                }}
-              >
-                <option value="">{t("orders.allTypes")}</option>
-                {["OUTFIT", "WASKAT", "KORTY", "YAKHANQAQ"].map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </div>
+            />
           </div>
-        }
-      />
+          <select
+            className="inp all-orders-type-select"
+            aria-label={t("orders.allTypes")}
+            value={typeFilter}
+            onChange={(e) => {
+              setTypeFilter(e.target.value);
+              setPage(1);
+            }}
+          >
+            {orderTypeFilterOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </Card>
 
       <div className="order-dashboard-strip">
-        <div className="order-dashboard-card">
-          <LuReceipt size={18} />
-          <div>
-            <div className="order-dashboard-label">
-              {t("orders.listedTotal")}
-            </div>
-            <strong>{formatMoney(totals.total)}</strong>
-          </div>
-        </div>
-        <div className="order-dashboard-card">
-          <LuBadgeDollarSign size={18} />
-          <div>
-            <div className="order-dashboard-label">{t("common.paid")}</div>
-            <strong style={{ color: "#15803D" }}>
-              {formatMoney(totals.paid)}
+        <div className="order-dashboard-card order-dashboard-card--total">
+          <span className="order-dashboard-icon">
+            <LuReceipt size={16} />
+          </span>
+          <div className="order-dashboard-copy">
+            <div className="order-dashboard-label">{t("orders.listedTotal")}</div>
+            <strong className="order-dashboard-value">
+              {formatMoney(totals.total, language)}
             </strong>
           </div>
         </div>
-        <div className="order-dashboard-card">
-          <LuPhone size={18} />
-          <div>
+        <div className="order-dashboard-card order-dashboard-card--paid">
+          <span className="order-dashboard-icon">
+            <LuBadgeDollarSign size={16} />
+          </span>
+          <div className="order-dashboard-copy">
+            <div className="order-dashboard-label">{t("common.paid")}</div>
+            <strong className="order-dashboard-value order-dashboard-value--paid">
+              {formatMoney(totals.paid, language)}
+            </strong>
+          </div>
+        </div>
+        <div className="order-dashboard-card order-dashboard-card--remaining">
+          <span className="order-dashboard-icon">
+            <LuPhone size={16} />
+          </span>
+          <div className="order-dashboard-copy">
             <div className="order-dashboard-label">{t("common.remaining")}</div>
-            <strong
-              style={{ color: totals.remaining > 0 ? "#DC2626" : "#15803D" }}
-            >
-              {formatMoney(totals.remaining)}
+            <strong className={`order-dashboard-value ${totals.remaining > 0 ? "order-dashboard-value--remaining" : "order-dashboard-value--paid"}`}>
+              {formatMoney(totals.remaining, language)}
             </strong>
           </div>
         </div>
@@ -646,8 +699,9 @@ export default function AllOrders({ filter }) {
           <Spinner />
         ) : (
           <>
-            <div className="tbl-wrap">
-              <table className="tbl">
+            <div className="all-orders-desktop">
+              <div className="tbl-wrap all-orders-table-wrap">
+              <table className="tbl all-orders-table">
                 <thead>
                   <tr>
                     {[
@@ -659,7 +713,6 @@ export default function AllOrders({ filter }) {
                       t("common.paid"),
                       t("common.remaining"),
                       t("common.status"),
-                      t("assignment.assignedTo"),
                       t("common.date"),
                       t("common.actions"),
                     ].map((h) => (
@@ -668,7 +721,7 @@ export default function AllOrders({ filter }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {!data?.data?.length ? (
+                  {!orders.length ? (
                     <tr>
                       <td colSpan={10}>
                         <EmptyState
@@ -678,131 +731,84 @@ export default function AllOrders({ filter }) {
                       </td>
                     </tr>
                   ) : (
-                    data.data.map((o) => {
-                      const blockedCompletion =
-                        !o.isCompleted && o.remaining > 0;
+                    orders.map((o) => {
+                      const billNumber = o?.customer?.billNumber;
+                      const showBillEmergencyBadge =
+                        billNumber !== null &&
+                        billNumber !== undefined &&
+                        billEmergencyMeta.hasEmergencyByBill[billNumber] &&
+                        billEmergencyMeta.firstOrderIdByBill[billNumber] === o.id;
                       return (
                         <tr key={o.id}>
                           <td>
-                            <span
-                              style={{
-                                fontFamily: "monospace",
-                                fontSize: 12,
-                                fontWeight: 600,
-                                color: "var(--primary)",
-                              }}
-                            >
-                              #{o.customer?.billNumber}
-                            </span>
+                            <span className="order-bill-chip">#{o.customer?.billNumber}</span>
                           </td>
                           <td>
-                            <div style={{ fontWeight: 600, fontSize: 13 }}>
+                            <div className="order-customer-name">
                               {o.customer?.firstName}
                             </div>
-                            <div
-                              style={{ fontSize: 11, color: "var(--text3)" }}
-                            >
+                            <div className="order-customer-phone">
                               {o.customer?.phoneNumber}
                             </div>
                           </td>
                           <td>
-                            <Badge v={TV[o.type] || "gold"}>{o.type}</Badge>
+                            <Badge v={TV[o.type] || "gold"}>
+                              {getOrderTypeLabel(o.type, language)}
+                            </Badge>
                           </td>
-                          <td style={{ fontWeight: 600 }}>
-                            {formatMoney(o.totalPrice)}
+                          <td className="order-money-cell order-money-cell--total">
+                            {formatMoney(o.totalPrice, language)}
                           </td>
-                          <td
-                            style={{ color: "var(--text3)", fontWeight: 600 }}
-                          >
-                            {formatMoney(o.discount)}
+                          <td className="order-money-cell order-money-cell--discount">
+                            {formatMoney(o.discount, language)}
                           </td>
-                          <td style={{ color: "#16A34A", fontWeight: 600 }}>
-                            {formatMoney(o.paidAmount)}
+                          <td className="order-money-cell order-money-cell--paid">
+                            {formatMoney(o.paidAmount, language)}
                           </td>
-                          <td
-                            style={{
-                              color:
-                                o.remaining > 0 ? "#DC2626" : "var(--text3)",
-                              fontWeight: o.remaining > 0 ? 600 : 400,
-                            }}
-                          >
+                          <td className={`order-money-cell ${o.remaining > 0 ? "order-money-cell--remaining" : "order-money-cell--settled"}`}>
                             {o.remaining > 0
-                              ? formatMoney(o.remaining)
+                              ? formatMoney(o.remaining, language)
                               : t("orders.paidInFull")}
                           </td>
                           <td>
-                            <div
-                              style={{
-                                display: "flex",
-                                gap: 4,
-                                flexWrap: "wrap",
-                              }}
-                            >
-                              {o.isEmergency && (
-                                <Badge v="red">
-                                  {t("createOrder.emergencyOrder")}
-                                </Badge>
+                            <div className="order-status-badges">
+                              {showBillEmergencyBadge && (
+                                <Badge v="red">{t("createOrder.emergencyOrder")}</Badge>
                               )}
-                              <Badge v={o.isCompleted ? "green" : "amber"}>
-                                {o.isCompleted
-                                  ? t("orders.done")
-                                  : t("orders.pending")}
+                              <Badge
+                                v={
+                                  statusFilter === "completed"
+                                    ? "red"
+                                    : o.remaining > 0
+                                      ? "amber"
+                                      : "green"
+                                }
+                              >
+                                {statusFilter === "completed"
+                                  ? completedStatusLabel
+                                  : o.remaining > 0
+                                    ? t("delivery.notFullyPaidBadge", "Not fully paid")
+                                    : t("delivery.fullyPaidBadge", "Fully paid")}
                               </Badge>
                             </div>
                           </td>
-                          <td>
-                            {o.assignedTo ? (
-                              <span
-                                style={{
-                                  fontSize: 12,
-                                  fontWeight: 600,
-                                  padding: "2px 8px",
-                                  borderRadius: 99,
-                                  background:
-                                    (ROLE_COLORS[o.assignedTo.accountType] ||
-                                      "#888") + "18",
-                                  color:
-                                    ROLE_COLORS[o.assignedTo.accountType] ||
-                                    "#888",
-                                }}
-                              >
-                                {o.assignedTo.name}
-                              </span>
-                            ) : (
-                              <span
-                                style={{ fontSize: 12, color: "var(--text3)" }}
-                              >
-                                —
-                              </span>
-                            )}
-                          </td>
-                          <td
-                            style={{
-                              fontSize: 11,
-                              color: "var(--text3)",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
+                          <td className="order-date-text">
                             {new Date(o.createdAt).toLocaleDateString()}
                           </td>
                           <td>
                             <RowDropdown
                               order={o}
                               isAdmin={isAdmin}
+                              showAssign={canManageAssignments}
                               onAssign={() => setAssignModal(o)}
-                              onComplete={() => {
-                                if ((o.remaining || 0) > 0) {
-                                  setSelectedOrderForComplete(o);
-                                  setPayAmount(String(o.remaining));
-                                  setCompleteModalOpen(true);
-                                } else {
-                                  completeMut.mutate(o.id);
-                                }
-                              }}
-                              onDelete={() => {
-                                if (confirm(t("common.delete") + "?"))
-                                  deleteMut.mutate(o.id);
-                              }}
+                              onEdit={() => navigate(`/orders/${o.id}/edit`)}
+                              onDelete={() =>
+                                setDeleteOrderTarget({
+                                  id: o.id,
+                                  customerName: o.customer?.firstName || "",
+                                  billNumber: o.customer?.billNumber,
+                                })
+                              }
                             />
                           </td>
                         </tr>
@@ -812,7 +818,116 @@ export default function AllOrders({ filter }) {
                 </tbody>
               </table>
             </div>
-            <div style={{ padding: "0 20px 16px" }}>
+            </div>
+
+            <div className="all-orders-mobile">
+              {!orders.length ? (
+                <EmptyState message={t("orders.noOrders")} Icon={LuClipboardList} />
+              ) : (
+                orders.map((o) => {
+                  const billNumber = o?.customer?.billNumber;
+                  const showBillEmergencyBadge =
+                    billNumber !== null &&
+                    billNumber !== undefined &&
+                    billEmergencyMeta.hasEmergencyByBill[billNumber] &&
+                    billEmergencyMeta.firstOrderIdByBill[billNumber] === o.id;
+
+                  return (
+                    <div key={o.id} className="order-mobile-card">
+                      <div className="order-mobile-head">
+                        <span className="order-mobile-bill">#{o.customer?.billNumber}</span>
+                        <RowDropdown
+                          order={o}
+                          isAdmin={isAdmin}
+                          showAssign={canManageAssignments}
+                          onAssign={() => setAssignModal(o)}
+                          onEdit={() => navigate(`/orders/${o.id}/edit`)}
+                          onDelete={() =>
+                            setDeleteOrderTarget({
+                              id: o.id,
+                              customerName: o.customer?.firstName || "",
+                              billNumber: o.customer?.billNumber,
+                            })
+                          }
+                        />
+                      </div>
+
+                      <div className="order-mobile-name">
+                        {o.customer?.firstName}
+                      </div>
+                      <div className="order-mobile-phone">
+                        {o.customer?.phoneNumber}
+                      </div>
+
+                      <div className="order-mobile-badges">
+                        <Badge v={TV[o.type] || "gold"}>
+                          {getOrderTypeLabel(o.type, language)}
+                        </Badge>
+                        {showBillEmergencyBadge && (
+                          <Badge v="red">{t("createOrder.emergencyOrder")}</Badge>
+                        )}
+                        <Badge
+                          v={
+                            statusFilter === "completed"
+                              ? "red"
+                              : o.remaining > 0
+                                ? "amber"
+                                : "green"
+                          }
+                        >
+                          {statusFilter === "completed"
+                            ? completedStatusLabel
+                            : o.remaining > 0
+                              ? t("delivery.notFullyPaidBadge", "Not fully paid")
+                              : t("delivery.fullyPaidBadge", "Fully paid")}
+                        </Badge>
+                      </div>
+
+                      <div className="order-mobile-metrics">
+                        <div className="order-mobile-metric">
+                          <div className="order-mobile-label">{t("common.total")}</div>
+                          <div className="order-mobile-value">
+                            {formatMoney(o.totalPrice, language)}
+                          </div>
+                        </div>
+                        <div className="order-mobile-metric">
+                          <div className="order-mobile-label">{t("createOrder.discount")}</div>
+                          <div className="order-mobile-value">
+                            {formatMoney(o.discount, language)}
+                          </div>
+                        </div>
+                        <div className="order-mobile-metric">
+                          <div className="order-mobile-label">{t("common.paid")}</div>
+                          <div className="order-mobile-value order-mobile-value--paid">
+                            {formatMoney(o.paidAmount, language)}
+                          </div>
+                        </div>
+                        <div className="order-mobile-metric">
+                          <div className="order-mobile-label">{t("common.remaining")}</div>
+                          <div
+                            className={`order-mobile-value${
+                              o.remaining > 0 ? " order-mobile-value--remaining" : ""
+                            }`}
+                          >
+                            {o.remaining > 0
+                              ? formatMoney(o.remaining, language)
+                              : t("orders.paidInFull")}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="order-mobile-foot">
+                        <span className="order-mobile-date">
+                          {new Date(o.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="all-orders-pagination-wrap">
               <Pagination
                 page={page}
                 total={data?.total || 0}
@@ -820,145 +935,49 @@ export default function AllOrders({ filter }) {
                 onChange={setPage}
               />
             </div>
-            <Modal
-              open={completeModalOpen}
-              onClose={() => {
-                setCompleteModalOpen(false);
-                setSelectedOrderForComplete(null);
-                setPayAmount("");
-              }}
-              title={t("orders.settleToComplete", {
-                defaultValue: "Settle Balance to Complete Order",
-              })}
-              maxW={600}
-            >
-              <div style={{ display: "grid", gap: 12 }}>
-                <div
-                  style={{
-                    background: "#FEF2F2",
-                    border: "1px solid #FECACA",
-                    borderLeft: "3px solid #DC2626",
-                    borderRadius: 8,
-                    padding: "10px 14px",
-                    fontSize: 13,
-                    color: "#DC2626",
-                    fontWeight: 500,
-                  }}
-                >
-                  {t("orders.blockedComplete", {
-                    defaultValue:
-                      "This order cannot be completed until the customer pays the remaining balance.",
-                  })}
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 13, color: "var(--text3)" }}>
-                    {t("common.remaining")}
-                  </div>
-                  <div style={{ fontWeight: 700, fontSize: 18, color: "#DC2626" }}>
-                    {formatMoney(selectedOrderForComplete?.remaining)}
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 6 }}>
-                    {t("orders.enterPaymentAmount", { defaultValue: "Enter payment amount" })}
-                  </div>
-                  <input
-                    className="inp"
-                    style={{ width: "100%" }}
-                    value={payAmount}
-                    onChange={(e) => setPayAmount(e.target.value)}
-                    placeholder={String(
-                      selectedOrderForComplete?.remaining || 0,
-                    )}
-                  />
-                </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 8,
-                    justifyContent: "flex-end",
-                  }}
-                >
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => {
-                      setCompleteModalOpen(false);
-                      setSelectedOrderForComplete(null);
-                      setPayAmount("");
-                    }}
-                  >
-                    {t("common.cancel")}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-gold"
-                    onClick={async () => {
-                      if (!selectedOrderForComplete) return;
-                      const amount = parseNumberLocale(payAmount);
-                      if (Number.isNaN(amount) || amount < 0) {
-                        toast.error(
-                          t("orders.invalidAmount") || "Invalid amount",
-                        );
-                        return;
-                      }
-
-                      const remaining = Number(
-                        selectedOrderForComplete.remaining || 0,
-                      );
-                      // require full remaining payment to proceed to completion
-                      if (Math.abs(amount - remaining) > 0.001) {
-                        toast.error(
-                          t("orders.blockedComplete") ||
-                            "This order cannot be completed until the customer pays the remaining balance.",
-                        );
-                        return;
-                      }
-
-                      const newPaid =
-                        (selectedOrderForComplete.paidAmount || 0) + amount;
-
-                      try {
-                        await payMut.mutateAsync({
-                          id: selectedOrderForComplete.id,
-                          payload: { paidAmount: newPaid },
-                        });
-                        await completeMut.mutateAsync(
-                          selectedOrderForComplete.id,
-                        );
-                        setCompleteModalOpen(false);
-                        setSelectedOrderForComplete(null);
-                        setPayAmount("");
-                      } catch (e) {
-                        // errors shown by mutations
-                      }
-                    }}
-                    disabled={payMut.isLoading || completeMut.isLoading}
-                  >
-                    {t("orders.payAndComplete", {
-                      defaultValue: "Pay & Complete",
-                    })}
-                  </button>
-                </div>
-              </div>
-            </Modal>
           </>
         )}
       </Card>
 
-      {assignModal && (
+      {canManageAssignments && assignModal && (
         <AssignModal
           order={assignModal}
           onClose={() => setAssignModal(null)}
-          onAssigned={() => {
-            qc.invalidateQueries({ queryKey: ["orders"] });
+          onAssigned={async () => {
+            await qc.cancelQueries({ queryKey: ["orders"] });
+            qc.invalidateQueries({ queryKey: ["orders"], stale: true });
             qc.invalidateQueries({ queryKey: ["order-detail"] });
+            qc.invalidateQueries({ queryKey: ["assignable-workers"] });
+            await new Promise(r => setTimeout(r, 50));
+            qc.refetchQueries({ queryKey: ["orders"], stale: true });
           }}
         />
       )}
+
+      <ConfirmDeleteModal
+        open={!!deleteOrderTarget}
+        onClose={() => setDeleteOrderTarget(null)}
+        onConfirm={() => {
+          if (!deleteOrderTarget) return;
+          deleteMut.mutate(deleteOrderTarget.id, {
+            onSettled: () => setDeleteOrderTarget(null),
+          });
+        }}
+        title={t("orders.deleteTitle", { defaultValue: t("common.delete") })}
+        message={t("orders.deleteConfirm", {
+          name: deleteOrderTarget?.customerName || "-",
+          billNumber: deleteOrderTarget?.billNumber ?? "-",
+          defaultValue:
+            "Delete this order permanently? This action cannot be undone.",
+        })}
+        itemName={
+          deleteOrderTarget
+            ? `#${deleteOrderTarget.billNumber ?? "-"} ${deleteOrderTarget.customerName || ""}`.trim()
+            : ""
+        }
+        isPending={deleteMut.isPending}
+      />
     </div>
   );
 }
+

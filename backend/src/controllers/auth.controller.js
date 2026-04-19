@@ -42,7 +42,6 @@ export async function login(req, res, next) {
         id: user.id,
         name: user.name,
         phoneNumber: user.phoneNumber,
-        email: user.email ?? null,
         accountType: user.accountType,
       },
     });
@@ -97,7 +96,6 @@ export async function me(req, res) {
     id: req.user.id,
     name: req.user.name,
     phoneNumber: req.user.phoneNumber,
-    email: req.user.email ?? null,
     accountType: req.user.accountType,
   });
 }

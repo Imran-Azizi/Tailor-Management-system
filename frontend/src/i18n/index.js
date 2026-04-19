@@ -1,5 +1,7 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
+import { LOCALE_PATCHES } from "./patches.js";
+import { applyDocumentLocale } from "../lib/locale.js";
 
 const resources = {
   en: {
@@ -66,6 +68,7 @@ const resources = {
         transactions: "Transactions",
         makeTransaction: "Make Transaction",
         allTransactions: "All Transactions",
+        completedFromWorkers: "Completed From Workers",
       },
       navbar: {
         searchPlaceholder: "Search orders, customers...",
@@ -107,7 +110,8 @@ const resources = {
         leaveBlank: "leave blank to keep",
         passwordRequired: "Password is required for new users.",
         passwordMin: "Min 6 characters",
-        defaultPasswordHint: "Default password will be set to the phone number.",
+        defaultPasswordHint:
+          "Default password will be set to the phone number.",
       },
       dadAndStud: {
         subtitle: "Customer transaction & payment ledger",
@@ -129,7 +133,7 @@ const resources = {
         assignOrder: "Assign Order",
         assignTo: "Assign To",
         unassign: "Unassign (remove assignment)",
-        note: "Note (optional)",
+        note: "Note",
         notePlaceholder: "e.g. Priority cut, finish by Friday",
         assign: "Assign",
         assigned: "Order assigned successfully.",
@@ -137,7 +141,19 @@ const resources = {
         failed: "Failed to assign order.",
         assignedTo: "Assigned To",
         assignedBy: "Assigned by",
+        assignedPrice: "Assigned Price",
+        assignedAt: "Assigned at",
+        price: "Price",
         all: "All",
+        invalidBillNumber: "Enter a valid bill number",
+        noOrdersFound: "No orders found for this bill",
+        searchFailed: "Search failed",
+        reportSubtitle:
+          "Search by bill number and track where each order is (Dokht or Qichikar)",
+        billSearchPlaceholder: "Search by bill number",
+        searchResult: "Search Result",
+        reportEmpty:
+          "Search by bill number to see where this order is currently assigned.",
       },
       myTasks: {
         title: "My Tasks",
@@ -342,6 +358,36 @@ const resources = {
         searchPlaceholder: "Search by user name...",
         createdBy: "Created By",
       },
+      delivery: {
+        notFullyPaidBadge: "Not fully paid",
+        fullyPaidBadge: "Paid",
+        orderLabel: "Order {{number}}",
+        orderHeader: "Order #",
+        remainingPayment: "Remaining",
+        subtitle: "Record customer payments and check order status",
+        searchTitle: "Search",
+        searchByBill: "Search by Bill Number",
+        searchByBillHint: "Enter the customer's bill number",
+        searchByPhone: "Search by Phone",
+        searchByPhoneHint: "Enter the customer's phone number",
+        billPlaceholder: "Enter bill number...",
+        phonePlaceholder: "Enter phone number...",
+        resultsTitle: "Results",
+        noResults: "No orders found",
+        invalidAmount: "Please enter a valid amount",
+        paymentGreaterThanRemaining: "Payment cannot exceed remaining balance",
+        paymentRecorded: "Payment recorded successfully",
+      },
+      workerPanel: {
+        statusCompleted: "Completed",
+        statusInProgress: "In Progress",
+        statusAssigned: "Assigned",
+        notAssigned: "Not assigned",
+        greeting: "Welcome",
+        dokhtLabel: "Dokht",
+        qichikarLabel: "Qichikar",
+        statusQichikarDone: "Qichikar Done",
+      },
     },
   },
   dari: {
@@ -408,6 +454,7 @@ const resources = {
         transactions: "تراکنش‌ها",
         makeTransaction: "ثبت تراکنش",
         allTransactions: "همه تراکنش‌ها",
+        completedFromWorkers: "تکمیل‌شده‌ها از کارگرها",
       },
       navbar: {
         searchPlaceholder: "جستجوی سفارش‌ها و مشتریان...",
@@ -479,7 +526,19 @@ const resources = {
         failed: "واگذاری سفارش ناموفق بود.",
         assignedTo: "واگذار شده به",
         assignedBy: "واگذار شده توسط",
+        assignedPrice: "قیمت واگذاری",
+        assignedAt: "زمان واگذاری",
+        price: "قیمت",
         all: "همه",
+        invalidBillNumber: "شماره بل معتبر وارد کنید",
+        noOrdersFound: "سفارشی برای این بل یافت نشد",
+        searchFailed: "جستجو ناموفق بود",
+        reportSubtitle:
+          "جستجو با شماره بل و ردیابی محل هر سفارش (دخت یا قیچی‌کار)",
+        billSearchPlaceholder: "جستجو با شماره بل",
+        searchResult: "نتیجه جستجو",
+        reportEmpty:
+          "با شماره بل جستجو کنید تا ببینید این سفارش در کجا قرار دارد.",
       },
       myTasks: {
         title: "وظایف من",
@@ -680,6 +739,27 @@ const resources = {
         searchPlaceholder: "جستجو بر اساس نام کاربر...",
         createdBy: "ثبت‌کننده",
       },
+      delivery: {
+        notFullyPaidBadge: "پرداخت کامل نشده",
+        fullyPaidBadge: "پرداخت شده",
+        orderLabel: "سفارش {{number}}",
+        orderHeader: "سفارش #",
+        remainingPayment: "باقی‌مانده",
+        subtitle: "ثبت پرداخت‌های مشتری و بررسی وضعیت سفارش",
+        searchTitle: "جستجو",
+        searchByBill: "جستجو با شماره بل",
+        searchByBillHint: "شماره بل مشتری را وارد کنید",
+        searchByPhone: "جستجو با شماره تماس",
+        searchByPhoneHint: "شماره تماس مشتری را وارد کنید",
+        billPlaceholder: "شماره بل را وارد کنید...",
+        phonePlaceholder: "شماره تماس را وارد کنید...",
+        resultsTitle: "نتایج",
+        noResults: "سفارشی یافت نشد",
+        invalidAmount: "مبلغ معتبر وارد کنید",
+        paymentGreaterThanRemaining:
+          "مبلغ پرداختی نمی‌تواند بیشتر از باقی‌مانده باشد",
+        paymentRecorded: "پرداخت با موفقیت ثبت شد.",
+      },
     },
   },
   pashto: {
@@ -703,7 +783,7 @@ const resources = {
         edit: "ایدیت",
         delete: "حذف",
         search: "لټون",
-        loading: "loading...",
+        loading: "بارول کیږي...",
         noData: "هیڅ معلومات ونه موندل شول",
         language: "ژبه",
         english: "انګلیسي",
@@ -731,7 +811,7 @@ const resources = {
         optional: "اختیاري",
       },
       sidebar: {
-        // overview: "لنډه کتنه",
+        overview: "لنډه کتنه",
         orders: "فرمایشونه",
         management: "مدیریت",
         completed: "بشپړ شوي",
@@ -746,6 +826,7 @@ const resources = {
         transactions: "لیږدونه",
         makeTransaction: "لیږد ثبت کړئ",
         allTransactions: "ټول لیږدونه",
+        completedFromWorkers: "د کارکوونکو بشپړ شوي فرمایشونه",
       },
       navbar: {
         searchPlaceholder: "فرمایشونه او پیرودونکي ولټوئ...",
@@ -801,7 +882,19 @@ const resources = {
         failed: "د فرمایش سپارل ناکام شول.",
         assignedTo: "چا ته سپارل شوی",
         assignedBy: "چا سپارلی",
+        assignedPrice: "د سپارنې بیه",
+        assignedAt: "د سپارنې وخت",
+        price: "بیه",
         all: "ټول",
+        invalidBillNumber: "سمه د بل شمېره ولیکئ",
+        noOrdersFound: "د دې بل لپاره فرمایش ونه موندل شو",
+        searchFailed: "لټون ناکام شو",
+        reportSubtitle:
+          "د بل شمېرې له مخې لټون وکړئ او د هر فرمایش ځای تعقیب کړئ (دخت یا قیچي‌کار)",
+        billSearchPlaceholder: "د بل شمېرې له مخې لټون",
+        searchResult: "د لټون پایله",
+        reportEmpty:
+          "د بل شمېرې له مخې لټون وکړئ چې وګورئ دا فرمایش اوس چېرته دی.",
       },
       myTasks: {
         title: "زما دندې",
@@ -905,19 +998,19 @@ const resources = {
           arm: "بازو",
           calf: "ساق",
           sorain: "سورین",
-          patlonHeight: "Patlon H.",
-          kamerPatlon: "Kamer P.",
-          doroBaghlePatlon: "Doro Baghle",
-          sorainPatlon: "Sorain P.",
-          patPatlon: "Pat P.",
-          pachaPatlon: "Pacha P.",
-          frontPocket: "Front Pocket",
-          sidePocket: "Side Pocket",
-          underPocket: "Under Pocket",
-          design: "Design",
-          button: "Button",
-          pant: "شیپ پتی",
-          style: "Style",
+          patlonHeight: "د پتلون قد",
+          kamerPatlon: "د پتلون کمر",
+          doroBaghlePatlon: "د بغل دور",
+          sorainPatlon: "د پتلون سورین",
+          patPatlon: "د پتلون پات",
+          pachaPatlon: "د پتلون پاچه",
+          frontPocket: "مخ جیب",
+          sidePocket: "غاړې جیب",
+          underPocket: "لاندې جیب",
+          design: "ډیزاین",
+          button: "تڼۍ",
+          pant: "د پتلون سټایل",
+          style: "سټایل",
         },
         addAnotherSet: "بل سېټ زیات کړئ",
         nameNewSet: "د نوي سېټ نوم ولیکئ",
@@ -1018,6 +1111,26 @@ const resources = {
         searchPlaceholder: "د کارونکي نوم له مخې پلټنه...",
         createdBy: "ثبت کوونکی",
       },
+      delivery: {
+        notFullyPaidBadge: "ټولی نه ورکړل شوی",
+        fullyPaidBadge: "ورکړل شوی",
+        orderLabel: "فرمایش {{number}}",
+        orderHeader: "فرمایش #",
+        remainingPayment: "پاتې پیسې",
+        subtitle: "د پیرودونکي تادیات ثبت کړئ او د فرمایش حالت وګورئ",
+        searchTitle: "لټون",
+        searchByBill: "د بل شمېره سره لټون",
+        searchByBillHint: "د مشتری د بل شمېره داخل کړئ",
+        searchByPhone: "د تلیفون شمیره سره لټون",
+        searchByPhoneHint: "د مشتری د تلیفون شمیره داخل کړئ",
+        billPlaceholder: "د بل شمیره داخل کړئ...",
+        phonePlaceholder: "د تلیفون شمیره داخل کړئ...",
+        resultsTitle: "نتیجې",
+        noResults: "هیڅ فرمایش ونه موندل شو",
+        invalidAmount: "مهرباني وکړئ سم مقدار ولیکئ",
+        paymentGreaterThanRemaining: "دادیه له پاتې اندازې زیاتې نه شي کېدای",
+        paymentRecorded: "تادیه بریالیتوب سره ثبت شوه.",
+      },
     },
   },
 };
@@ -1027,6 +1140,20 @@ i18n.use(initReactI18next).init({
   lng: localStorage.getItem("lang") || "en",
   fallbackLng: "en",
   interpolation: { escapeValue: false },
+});
+
+// Return correct text direction for current language.
+i18n.dir = (lng) => {
+  return "ltr";
+};
+
+for (const [lang, bundle] of Object.entries(LOCALE_PATCHES)) {
+  i18n.addResourceBundle(lang, "translation", bundle, true, true);
+}
+
+applyDocumentLocale(i18n.resolvedLanguage || i18n.language || "en");
+i18n.on("languageChanged", (lang) => {
+  applyDocumentLocale(lang);
 });
 
 export default i18n;

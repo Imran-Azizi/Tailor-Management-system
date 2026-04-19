@@ -14,6 +14,7 @@ import {
   LuPalette,
 } from "react-icons/lu";
 import api from "../../lib/api.js";
+import { getOrderTypeLabel } from "../../lib/orderType.js";
 
 const FIELDS = {
   OUTFIT: [
@@ -191,6 +192,14 @@ function getFieldKey(typeIdx, setIdx, field) {
   return `${typeIdx}-${setIdx}-${field}`;
 }
 
+function getOrderTypeDisplayName(type, language = "en") {
+  return getOrderTypeLabel(type, language) || type || "Item";
+}
+
+function buildDefaultItemName(type, sequence, language = "en") {
+  return `${getOrderTypeDisplayName(type, language)} ${sequence}`;
+}
+
 function useDesign(model) {
   return useQuery({
     queryKey: ["design", model],
@@ -208,7 +217,8 @@ function MeasureBlock({
   errors = {},
   setFieldError,
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language;
   const [open, setOpen] = useState(true);
   const fields = FIELDS[entry.type] || [];
   const styles = STYLES[entry.type] || [];
@@ -256,7 +266,7 @@ function MeasureBlock({
           }}
         >
           <span className="badge bg-gold" style={{ fontSize: 11 }}>
-            {entry.type}
+            {getOrderTypeLabel(entry.type, language)}
           </span>
           <span style={{ fontSize: 13, fontWeight: 600 }}>
             {entry.name || t("createOrder.measurements")}
@@ -440,18 +450,31 @@ export default function Step3Measurements({
   orderTypes = [],
   initial = {},
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language;
   const [data, setData] = useState(() => {
     const draft = {};
     orderTypes.forEach((entry, index) => {
-      const normalized = initial[index]
+      const source = initial[index]
         ? Array.isArray(initial[index])
           ? initial[index]
           : [initial[index]]
-        : [{}];
-      if (normalized[0] && !normalized[0].__name && entry.name) {
-        normalized[0] = { ...normalized[0], __name: entry.name };
-      }
+        : [];
+
+      const normalized = (source.length ? source : [{}]).map(
+        (setValue, setIndex) => {
+          const safeSet = setValue && typeof setValue === "object" ? setValue : {};
+          if (safeSet.__name?.trim()) return safeSet;
+          if (setIndex === 0 && entry.name?.trim()) {
+            return { ...safeSet, __name: entry.name.trim() };
+          }
+          return {
+            ...safeSet,
+            __name: buildDefaultItemName(entry.type, setIndex + 1, language),
+          };
+        },
+      );
+
       draft[index] = normalized;
     });
     return draft;
@@ -483,6 +506,24 @@ export default function Step3Measurements({
         (_, index) => index !== setIdx,
       );
       return { ...prev, [typeIdx]: nextSets.length > 0 ? nextSets : [{}] };
+    });
+  };
+
+  const addSet = (typeIdx) => {
+    setError("");
+    setData((prev) => {
+      const currentSets = prev[typeIdx] || [];
+      const sequence = currentSets.length + 1;
+      const fallbackType = orderTypes[typeIdx]?.type;
+      return {
+        ...prev,
+        [typeIdx]: [
+          ...currentSets,
+          {
+            __name: buildDefaultItemName(fallbackType, sequence, language),
+          },
+        ],
+      };
     });
   };
 
@@ -529,7 +570,7 @@ export default function Step3Measurements({
             entry.name?.trim() ||
             `Set ${setIdx + 1}`;
           const message = t("createOrder.completeMeasurements", {
-            type: entry.type,
+            type: getOrderTypeLabel(entry.type, language),
             label: setLabel,
           });
           setFieldErrors(nextFieldErrors);
@@ -578,7 +619,7 @@ export default function Step3Measurements({
                   }}
                 >
                   <span style={{ fontSize: 17, fontWeight: 800 }}>
-                    {entry.type}
+                    {getOrderTypeLabel(entry.type, language)}
                   </span>
                   {entry.name && (
                     <span className="badge bg-gold">{entry.name}</span>
@@ -619,7 +660,7 @@ export default function Step3Measurements({
                       name:
                         setValue.__name?.trim() ||
                         entry.name ||
-                        `Set ${setIdx + 1}`,
+                        buildDefaultItemName(entry.type, setIdx + 1, language),
                     }}
                     value={setValue}
                     errors={blockErrors}
@@ -634,6 +675,16 @@ export default function Step3Measurements({
                   />
                 );
               })}
+            </div>
+
+            <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => addSet(typeIdx)}
+              >
+                Add another
+              </button>
             </div>
           </section>
         ))}

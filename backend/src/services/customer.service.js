@@ -1,10 +1,99 @@
 import { prisma } from "../lib/prisma.js";
 import { normalizeText, normalizePhone } from "../lib/normalize.js";
 
-export const findByPhone = (phoneNumber) =>
-  prisma.customer.findUnique({
-    where: { phoneNumber: normalizePhone(phoneNumber) },
+const toPhoneDigits = (value) =>
+  (normalizePhone(value || "") || "").replace(/[^0-9]/g, "");
+
+const getPhoneSearchTokens = (digits) => {
+  const tokens = new Set();
+  if (!digits) return [];
+
+  const last10 = digits.length >= 10 ? digits.slice(-10) : "";
+  const last9 = digits.length >= 9 ? digits.slice(-9) : "";
+  const last7 = digits.length >= 7 ? digits.slice(-7) : "";
+
+  [digits, last10, last9, last7, last9 ? `0${last9}` : ""].forEach((token) => {
+    if (token && token.length >= 7) tokens.add(token);
   });
+
+  return Array.from(tokens);
+};
+
+const phoneMatchScore = (storedPhone, inputDigits) => {
+  const storedDigits = toPhoneDigits(storedPhone);
+  if (!storedDigits || !inputDigits) return 0;
+  if (storedDigits === inputDigits) return 100;
+  if (storedDigits.endsWith(inputDigits) || inputDigits.endsWith(storedDigits)) {
+    return 90;
+  }
+  if (
+    storedDigits.length >= 10 &&
+    inputDigits.length >= 10 &&
+    storedDigits.slice(-10) === inputDigits.slice(-10)
+  ) {
+    return 80;
+  }
+  if (
+    storedDigits.length >= 9 &&
+    inputDigits.length >= 9 &&
+    storedDigits.slice(-9) === inputDigits.slice(-9)
+  ) {
+    return 70;
+  }
+  if (
+    storedDigits.length >= 7 &&
+    inputDigits.length >= 7 &&
+    storedDigits.slice(-7) === inputDigits.slice(-7)
+  ) {
+    return 60;
+  }
+  return 0;
+};
+
+const pickBestPhoneMatch = (customers, inputDigits) => {
+  let best = null;
+  let bestScore = 0;
+  for (const customer of customers) {
+    const score = phoneMatchScore(customer.phoneNumber, inputDigits);
+    if (score > bestScore) {
+      best = customer;
+      bestScore = score;
+    }
+  }
+  return best;
+};
+
+export const findByPhone = async (phoneNumber) => {
+  if (!phoneNumber) return null;
+  const norm = normalizePhone(phoneNumber);
+  const inputDigits = toPhoneDigits(norm);
+  if (!inputDigits) return null;
+
+  // Try exact normalized match first
+  const exact = await prisma.customer.findUnique({
+    where: { phoneNumber: norm },
+  });
+  if (exact) return exact;
+
+  // Try database filtering by likely phone tokens first
+  const tokens = getPhoneSearchTokens(inputDigits);
+  if (tokens.length) {
+    const fuzzyCandidates = await prisma.customer.findMany({
+      where: { OR: tokens.map((token) => ({ phoneNumber: { contains: token } })) },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+    const bestFuzzy = pickBestPhoneMatch(fuzzyCandidates, inputDigits);
+    if (bestFuzzy) return bestFuzzy;
+  }
+
+  // Final fallback: compare normalized digits in memory for legacy mixed-format data
+  const recentCustomers = await prisma.customer.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 500,
+  });
+  return pickBestPhoneMatch(recentCustomers, inputDigits);
+};
 
 export const getAllCustomers = async ({
   search,
@@ -84,4 +173,29 @@ export const updateCustomer = (id, body) =>
     },
   });
 
-export const deleteCustomer = (id) => prisma.customer.delete({ where: { id } });
+export const deleteCustomer = async (id) =>
+  prisma.$transaction(async (tx) => {
+    const customer = await tx.customer.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!customer) {
+      throw Object.assign(new Error("Customer not found"), { status: 404 });
+    }
+
+    const customerOrders = await tx.order.findMany({
+      where: { customerId: id },
+      select: { id: true },
+    });
+    const orderIds = customerOrders.map((order) => order.id);
+
+    if (orderIds.length) {
+      await tx.userNotification.deleteMany({
+        where: { orderId: { in: orderIds } },
+      });
+      await tx.order.deleteMany({ where: { customerId: id } });
+    }
+
+    await tx.customer.delete({ where: { id } });
+  });

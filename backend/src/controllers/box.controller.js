@@ -42,7 +42,8 @@ export const remove = async (req, res, next) => {
 
 export const assignOrder = async (req, res, next) => {
   try {
-    const { orderId } = req.body;
-    res.json(await service.assignOrderToBox(orderId, req.params.id));
+    const { orderId, boxId } = req.body;
+    const targetBoxId = boxId === null ? null : req.params.id;
+    res.json(await service.assignOrderToBox(orderId, targetBoxId));
   } catch (e) { next(e); }
 };

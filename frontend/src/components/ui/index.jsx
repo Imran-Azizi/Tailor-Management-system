@@ -1,23 +1,25 @@
-import { LuInbox } from 'react-icons/lu';
+import { LuInbox, LuTriangleAlert, LuTrash2 } from 'react-icons/lu';
+import { useTranslation } from 'react-i18next';
+import { isRtlLanguage } from '../../lib/locale.js';
 
 export const PageHeader = ({ title, subtitle, action }) => (
   <div className="page-hd">
     <div><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>
-    {action && <div style={{ flexShrink:0 }}>{action}</div>}
+    {action && <div style={{ flexShrink: 0 }}>{action}</div>}
   </div>
 );
 
 export const StatCard = ({ label, value, sub, Icon, accent = '#2563EB' }) => (
   <div className="stat-card">
-    <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:10 }}>
-      <div style={{ flex:1, minWidth:0 }}>
-        <p style={{ fontSize:11.5, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:8 }}>{label}</p>
-        <p style={{ fontSize:24, fontWeight:700, color:accent, letterSpacing:'-.02em', lineHeight:1 }}>{value}</p>
-        {sub && <p style={{ fontSize:12, color:'var(--text3)', marginTop:6 }}>{sub}</p>}
+    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>{label}</p>
+        <p style={{ fontSize: 24, fontWeight: 700, color: accent, letterSpacing: '-.02em', lineHeight: 1 }}>{value}</p>
+        {sub && <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 6 }}>{sub}</p>}
       </div>
       {Icon && (
-        <div style={{ width:40, height:40, borderRadius:10, background:`${accent}18`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-          <Icon size={20} style={{ color:accent }} />
+        <div style={{ width: 40, height: 40, borderRadius: 10, background: `${accent}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Icon size={20} style={{ color: accent }} />
         </div>
       )}
     </div>
@@ -25,34 +27,100 @@ export const StatCard = ({ label, value, sub, Icon, accent = '#2563EB' }) => (
 );
 
 export const Spinner = () => (
-  <div style={{ display:'flex', alignItems:'center', justifyContent:'center', padding:'60px 0' }}>
-    <div style={{ width:28, height:28, border:'2.5px solid var(--border)', borderTopColor:'var(--primary)', borderRadius:'50%', animation:'spin .7s linear infinite' }} />
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 0' }}>
+    <div style={{ width: 28, height: 28, border: '2.5px solid var(--border)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
     <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
   </div>
 );
 
-export const EmptyState = ({ message = 'No data found', Icon: I = LuInbox }) => (
-  <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'52px 24px', gap:10, color:'var(--text3)' }}>
-    <I size={34} style={{ opacity:.4 }} />
-    <p style={{ fontSize:14 }}>{message}</p>
-  </div>
-);
+export const EmptyState = ({ message, Icon: I = LuInbox }) => {
+  const { t } = useTranslation();
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '52px 24px', gap: 10, color: 'var(--text3)' }}>
+      <I size={34} style={{ opacity: .4 }} />
+      <p style={{ fontSize: 14 }}>{message || t('common.noData')}</p>
+    </div>
+  );
+};
 
-const BV = { gold:'bg-gold', teal:'bg-teal', red:'bg-red', green:'bg-green', amber:'bg-amber', gray:'bg-gray' };
+export const NotificationText = ({ as: Tag = 'p', language = 'en', style, children, ...props }) => {
+  const rtl = isRtlLanguage(language);
+  return (
+    <Tag
+      {...props}
+      style={{
+        direction: rtl ? 'rtl' : 'ltr',
+        textAlign: rtl ? 'right' : 'left',
+        unicodeBidi: 'plaintext',
+        ...style,
+      }}
+    >
+      {children}
+    </Tag>
+  );
+};
+
+const BV = { gold: 'bg-gold', teal: 'bg-teal', red: 'bg-red', green: 'bg-green', amber: 'bg-amber', gray: 'bg-gray' };
 export const Badge = ({ children, v = 'gold' }) => <span className={`badge ${BV[v] || 'bg-gold'}`}>{children}</span>;
 
 export const Modal = ({ open, onClose, title, children, maxW = 480 }) => {
   if (!open) return null;
   return (
-    <div className="modal-bg" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="modal-bg" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-box" style={{ maxWidth: maxW }}>
         <div className="modal-hd">
           <h2>{title}</h2>
-          <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text3)', fontSize:22, lineHeight:1 }}>×</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: 22, lineHeight: 1 }}>×</button>
         </div>
         <div className="modal-body">{children}</div>
       </div>
     </div>
+  );
+};
+
+export const ConfirmDeleteModal = ({
+  open,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  itemName,
+  confirmLabel,
+  cancelLabel,
+  isPending = false,
+}) => {
+  const { t } = useTranslation();
+  const resolvedTitle = title || t('common.delete');
+  const resolvedMessage = message || t('common.deletePrompt', { defaultValue: 'Are you sure you want to delete this item? This action cannot be undone.' });
+  const resolvedConfirmLabel = confirmLabel || t('common.delete');
+  const resolvedCancelLabel = cancelLabel || t('common.cancel');
+
+  const handleClose = () => {
+    if (isPending) return;
+    onClose?.();
+  };
+
+  return (
+    <Modal open={open} onClose={handleClose} title={resolvedTitle} maxW={520}>
+      <div className="delete-confirm">
+        <div className="delete-confirm-icon">
+          <LuTriangleAlert size={20} />
+        </div>
+        <div className="delete-confirm-copy">
+          <p className="delete-confirm-message">{resolvedMessage}</p>
+          {itemName && <p className="delete-confirm-item">{itemName}</p>}
+        </div>
+        <div className="delete-confirm-actions">
+          <button type="button" className="btn btn-outline" onClick={handleClose} disabled={isPending}>
+            {resolvedCancelLabel}
+          </button>
+          <button type="button" className="btn btn-danger" onClick={onConfirm} disabled={isPending}>
+            <LuTrash2 size={14} />
+            {isPending ? t('common.loading') : resolvedConfirmLabel}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 };
 
@@ -72,35 +140,40 @@ export const Field = ({ label, error, children, required, hint }) => (
   <div>
     {label && <label className={`lbl${required ? ' lbl-r' : ''}`}>{label}</label>}
     {children}
-    {hint  && <p style={{ fontSize:12, color:'var(--text3)', marginTop:4 }}>{hint}</p>}
+    {hint && <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4 }}>{hint}</p>}
     {error && <p className="err-msg">{error}</p>}
   </div>
 );
 
 export const Pagination = ({ page, total, limit, onChange }) => {
+  const { t } = useTranslation();
   const pages = Math.ceil(total / limit);
   if (pages <= 1) return null;
+
   return (
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:16, paddingTop:16, borderTop:'1px solid var(--border)', flexWrap:'wrap', gap:10 }}>
-      <span style={{ fontSize:13, color:'var(--text3)' }}>Page {page} of {pages} · {total} total</span>
-      <div style={{ display:'flex', gap:8 }}>
-        <button onClick={() => onChange(page - 1)} disabled={page <= 1}  className="btn btn-outline btn-sm">← Prev</button>
-        <button onClick={() => onChange(page + 1)} disabled={page >= pages} className="btn btn-outline btn-sm">Next →</button>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)', flexWrap: 'wrap', gap: 10 }}>
+      <span style={{ fontSize: 13, color: 'var(--text3)' }}>
+        {t('ui.pageSummary', { page, pages, total })}
+      </span>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button onClick={() => onChange(page - 1)} disabled={page <= 1} className="btn btn-outline btn-sm">{t('ui.prev')}</button>
+        <button onClick={() => onChange(page + 1)} disabled={page >= pages} className="btn btn-outline btn-sm">{t('ui.next')}</button>
       </div>
     </div>
   );
 };
 
 export const ProgBar = ({ value, max }) => {
+  const { t } = useTranslation();
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
   const color = pct >= 90 ? '#DC2626' : pct >= 70 ? '#F59E0B' : '#16A34A';
   return (
     <div>
-      <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, color:'var(--text3)', marginBottom:5 }}>
-        <span>{value} / {max} orders</span>
-        <span style={{ fontWeight:600, color }}>{pct}%</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text3)', marginBottom: 5 }}>
+        <span>{t('ui.ordersFraction', { value, max })}</span>
+        <span style={{ fontWeight: 600, color }}>{pct}%</span>
       </div>
-      <div className="prog-track"><div className="prog-fill" style={{ width:`${pct}%`, background:color }} /></div>
+      <div className="prog-track"><div className="prog-fill" style={{ width: `${pct}%`, background: color }} /></div>
     </div>
   );
 };

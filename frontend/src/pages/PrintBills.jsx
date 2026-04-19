@@ -1,170 +1,331 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import api from "../lib/api.js";
 import toast from "react-hot-toast";
 import {
-  CustomerBill,
+  CustomerCombinedBill,
   TailorBill,
+  getBillLanguageSettings,
   getMeasurementsFromOrder,
+  getOrderTypeLabel,
   printElement,
 } from "../components/order/OrderDocumentPack.jsx";
 import {
   parseNumberLocale,
-  normalizePhone,
   normalizeText,
+  normalizePhone,
   toAsciiDigits,
 } from "../lib/normalize.js";
 
 export default function PrintBills() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const resolvedLanguage = i18n.resolvedLanguage || i18n.language;
+  const billSettings = getBillLanguageSettings(resolvedLanguage);
+  const billText = billSettings.text;
+  const currentLanguage = billSettings.langCode;
+  const isRtl = billSettings.isRtl;
+  const alignClass = isRtl ? "text-right" : "text-left";
+  const preselectCustomerId = location?.state?.preselectCustomerId;
+
   const [billNumber, setBillNumber] = useState("");
-  const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [name, setName] = useState("");
   const [customer, setCustomer] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const formatEnglishNumber = (value) =>
+    Number(value || 0).toLocaleString("en-US", {
+      maximumFractionDigits: 0,
+    });
+  const toEnglishDigits = (value) =>
+    value === null || value === undefined || value === ""
+      ? "-"
+      : toAsciiDigits(String(value));
+
+  const setSelectedCustomer = (full, { showToast = true } = {}) => {
+    if (!full || !Array.isArray(full.orders) || full.orders.length === 0) {
+      setCustomer(null);
+      setSelectedOrder(null);
+      if (showToast) {
+        toast.error(t("createOrder.customerNotFound"));
+      }
+      return false;
+    }
+
+    setCustomer(full);
+    setSelectedOrder((full && full.orders && full.orders[0]) || null);
+    setBillNumber(String(full?.billNumber || ""));
+    setPhone(full?.phoneNumber || "");
+    setName(full?.firstName || "");
+    if (showToast) {
+      toast.success(t("createOrder.customerFound"));
+    }
+    return true;
+  };
 
   const fetchCustomerDetails = async (id) => {
     const res = await api.get(`/customers/${id}`);
     return res.data;
   };
 
+  useEffect(() => {
+    if (!preselectCustomerId) return;
+
+    let ignore = false;
+    setLoading(true);
+
+    fetchCustomerDetails(preselectCustomerId)
+      .then((full) => {
+        if (ignore) return;
+        setSelectedCustomer(full, { showToast: false });
+      })
+      .catch((error) => {
+        if (ignore) return;
+        console.error("Auto-select customer failed", error);
+        toast.error(t("createOrder.customerLookupFailed") || "Search failed");
+      })
+      .finally(() => {
+        if (ignore) return;
+        setLoading(false);
+        navigate(location.pathname, { replace: true, state: null });
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [location.pathname, navigate, preselectCustomerId, t]);
+
   const handleSearch = async () => {
     setLoading(true);
     setCustomer(null);
     setSelectedOrder(null);
+
     try {
-      if (phone.trim()) {
-        const p = normalizePhone(phone.trim());
-        const res = await api.get("/customers/search/phone", {
-          params: { phone: p },
+      if (billNumber.trim()) {
+        const bn = parseNumberLocale(toAsciiDigits(billNumber.trim()));
+        if (!Number.isFinite(bn) || bn <= 0) {
+          toast.error(t("createOrder.customerNotFound"));
+          return;
+        }
+
+        const { data } = await api.get("/orders/lookup", {
+          params: { billNumber: Math.trunc(bn) },
         });
-        if (res.data) {
-          const full = await fetchCustomerDetails(res.data.customer.id);
-          setCustomer(full);
-          setSelectedOrder((full && full.orders && full.orders[0]) || null);
-          toast.success(t("createOrder.customerFound"));
-          setLoading(false);
+
+        if (data?.customer?.id) {
+          const full = await fetchCustomerDetails(data.customer.id);
+          setSelectedCustomer(full);
           return;
         }
         toast.error(t("createOrder.customerNotFound"));
-        setLoading(false);
         return;
       }
 
-      if (billNumber.trim()) {
-        const bn = parseNumberLocale(toAsciiDigits(billNumber.trim()));
-        const res = await api.get("/customers", { params: { limit: 1000 } });
-        const list = (res.data && res.data.data) || [];
-        const found = list.find((c) => Number(c.billNumber) === bn);
-        if (found) {
-          const full = await fetchCustomerDetails(found.id);
-          setCustomer(full);
-          setSelectedOrder((full && full.orders && full.orders[0]) || null);
-          toast.success(t("createOrder.customerFound"));
-          setLoading(false);
+      if (phone.trim()) {
+        const p = normalizePhone(phone.trim());
+        const { data } = await api.get("/orders/lookup", {
+          params: { phoneNumber: p },
+        });
+
+        if (data?.customer?.id) {
+          const full = await fetchCustomerDetails(data.customer.id);
+          setSelectedCustomer(full);
           return;
         }
         toast.error(t("createOrder.customerNotFound"));
-        setLoading(false);
         return;
       }
 
       if (name.trim()) {
-        const q = normalizeText(name.trim());
+        const normalizedName = normalizeText(name.trim());
         const res = await api.get("/customers", {
-          params: { search: q, limit: 50 },
+          params: { search: normalizedName, limit: 50 },
         });
         const list = (res.data && res.data.data) || [];
-        if (list.length) {
-          const full = await fetchCustomerDetails(list[0].id);
-          setCustomer(full);
-          setSelectedOrder((full && full.orders && full.orders[0]) || null);
-          toast.success(t("createOrder.customerFound"));
-          setLoading(false);
+        const customersWithOrders = list.filter(
+          (c) => Number(c?._count?.orders || 0) > 0,
+        );
+        const found =
+          customersWithOrders.find(
+            (c) =>
+              normalizeText(c.firstName || "") === normalizedName,
+          ) || customersWithOrders[0];
+        if (found) {
+          const full = await fetchCustomerDetails(found.id);
+          setSelectedCustomer(full);
           return;
         }
         toast.error(t("createOrder.customerNotFound"));
-        setLoading(false);
         return;
       }
 
       toast(
         t("orders.searchCustomers") ||
-          "Enter Bill Number, Customer Name or Phone Number to search",
+          "Enter Bill Number, Phone Number, or Name to search",
       );
-    } catch (e) {
-      console.error("Search failed", e);
-      toast.error(t("createOrder.customerLookupFailed") || "Search failed");
+    } catch (error) {
+      console.error("Search failed", error);
+      if (error?.response?.status === 404) {
+        toast.error(t("createOrder.customerNotFound"));
+      } else {
+        toast.error(t("createOrder.customerLookupFailed") || "Search failed");
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handlePrintCustomerBill = () => {
-    if (!selectedOrder) {
+    if (!customer || !(customer.orders || []).length) {
+      toast.error(t("orders.noOrders") || "No orders found for this customer.");
+      return;
+    }
+    try {
+      printElement("preview-customer", {
+        dir: billSettings.dir,
+        lang: billSettings.htmlLang,
+        title: t("orders.orderDocuments"),
+      });
+    } catch (error) {
+      console.error("Print failed", error);
+      toast.error(t("orders.printFailed") || "Print failed");
+    }
+  };
+
+  const handlePrintTailorBill = (order, previewId) => {
+    if (!order) {
       toast.error(
         t("createOrder.selectAtLeastOne") || "No order selected for print.",
       );
       return;
     }
-    try {
-      printElement("preview-customer");
-    } catch (e) {
-      console.error("Print failed", e);
-      toast.error(t("orders.printFailed") || "Print failed");
-    }
-  };
-
-  const handlePrintType = (type) => {
-    if (!customer || !customer.orders) return;
-    const order = customer.orders.find((o) => o.type === type);
-    if (!order) {
-      toast.error(
-        t("orders.noOrders") || "This customer does not have this order.",
-      );
-      return;
-    }
     setSelectedOrder(order);
     try {
-      printElement("preview-tailor");
-    } catch (e) {
-      console.error("Print failed", e);
+      printElement(previewId, {
+        dir: billSettings.dir,
+        lang: billSettings.htmlLang,
+        title: t("orders.orderDocuments"),
+      });
+    } catch (error) {
+      console.error("Print failed", error);
       toast.error(t("orders.printFailed") || "Print failed");
     }
   };
 
+  const getTailorPreviewId = (order, index) =>
+    `preview-tailor-${order?.id || `${order?.type || "order"}-${index}`}`;
+
+  const orders = customer?.orders || [];
+  const orderMeta = buildOrderItemMeta(orders, currentLanguage);
+  const isBillEmergency = orders.some((order) => order.isEmergency);
+  const emergencyTypes = Array.from(
+    new Set(
+      orders.map((order) => getOrderTypeLabel(order.type, currentLanguage)),
+    ),
+  );
+  const emergencyAnchorOrder = orders[0] || null;
+
   return (
-    <div className="page" style={{ maxWidth: 680, margin: "0 auto" }}>
+    <div
+      className="page"
+      lang={billSettings.htmlLang}
+      dir={billSettings.dir}
+      style={{
+        maxWidth: 760,
+        margin: "0 auto",
+        fontFamily: billSettings.fontFamily,
+      }}
+    >
       <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>
         {t("orders.printBills")}
       </h2>
       <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 20 }}>
         {t("orders.printPackCopy")}
       </p>
+      <div
+        style={{
+          marginBottom: 14,
+          display: "inline-flex",
+          gap: 8,
+          flexWrap: "wrap",
+        }}
+      >
+        {[
+          { code: "en", label: t("common.english") },
+          { code: "dari", label: t("common.dari") },
+          { code: "pashto", label: t("common.pashto") },
+        ].map((lang) => {
+          const isActive = currentLanguage === lang.code;
+          return (
+            <button
+              key={lang.code}
+              type="button"
+              className={`btn ${isActive ? "btn-gold" : "btn-outline"}`}
+              style={{ height: 34, padding: "0 12px", fontSize: 12 }}
+              onClick={() => {
+                i18n.changeLanguage(lang.code);
+                localStorage.setItem("lang", lang.code);
+              }}
+            >
+              {lang.label}
+            </button>
+          );
+        })}
+      </div>
 
       <div className="card" style={{ padding: 18 }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 18 }}>
-          {/* Search controls */}
           <div>
             <div className="form-row">
-              <input
-                aria-label={t("orders.billNumber")}
-                className="inp"
-                placeholder={t("orders.billNumber")}
-                value={billNumber}
-                onChange={(e) => setBillNumber(e.target.value)}
-              />
-              <input
-                aria-label={t("common.phone")}
-                className="inp"
-                placeholder={t("common.phone")}
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-              />
+              <div>
+                <label
+                  htmlFor="print-bills-bill-number"
+                  className="lbl"
+                  style={{ textAlign: isRtl ? "right" : "left" }}
+                >
+                  {t("orders.billNumber")}
+                </label>
+                <input
+                  id="print-bills-bill-number"
+                  aria-label={t("orders.billNumber")}
+                  className="inp"
+                  placeholder={t("orders.billNumber")}
+                  value={billNumber}
+                  onChange={(e) => setBillNumber(e.target.value)}
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="print-bills-phone"
+                  className="lbl"
+                  style={{ textAlign: isRtl ? "right" : "left" }}
+                >
+                  {t("common.phone")}
+                </label>
+                <input
+                  id="print-bills-phone"
+                  aria-label={t("common.phone")}
+                  className="inp"
+                  placeholder={t("common.phone")}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                />
+              </div>
             </div>
             <div style={{ marginTop: 10 }}>
+              <label
+                htmlFor="print-bills-first-name"
+                className="lbl"
+                style={{ textAlign: isRtl ? "right" : "left" }}
+              >
+                {t("createOrder.firstName")}
+              </label>
               <input
+                id="print-bills-first-name"
                 aria-label={t("createOrder.firstName")}
                 className="inp"
                 placeholder={t("createOrder.firstName")}
@@ -174,10 +335,7 @@ export default function PrintBills() {
             </div>
 
             <div style={{ marginTop: 12 }} className="vstack">
-              <div
-                className="form-row"
-                style={{ gridTemplateColumns: "1fr 1fr" }}
-              >
+              <div className="form-row" style={{ gridTemplateColumns: "1fr 1fr" }}>
                 <button
                   aria-label={t("common.search")}
                   type="button"
@@ -193,8 +351,8 @@ export default function PrintBills() {
                   className="btn btn-outline print-btn"
                   onClick={() => {
                     setBillNumber("");
-                    setName("");
                     setPhone("");
+                    setName("");
                     setCustomer(null);
                     setSelectedOrder(null);
                   }}
@@ -207,10 +365,7 @@ export default function PrintBills() {
             <div style={{ marginTop: 18 }}>
               {customer ? (
                 <div>
-                  <div
-                    className="info-box ib-gold"
-                    style={{ marginBottom: 12 }}
-                  >
+                  <div className="info-box ib-gold" style={{ marginBottom: 12 }}>
                     <div
                       style={{
                         display: "grid",
@@ -223,7 +378,7 @@ export default function PrintBills() {
                           {t("orders.billNumber")}
                         </div>
                         <div style={{ fontWeight: 700 }}>
-                          #{customer.billNumber}
+                          #{toEnglishDigits(customer.billNumber)}
                         </div>
                       </div>
                       <div>
@@ -231,15 +386,7 @@ export default function PrintBills() {
                           {t("orders.orderDocuments")}
                         </div>
                         <div style={{ fontWeight: 700 }}>
-                          {(customer.orders || []).length}
-                        </div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 10, color: "var(--text3)" }}>
-                          {t("common.customer")}
-                        </div>
-                        <div style={{ fontWeight: 700 }}>
-                          {customer.firstName || "—"}
+                          {formatEnglishNumber(orders.length)}
                         </div>
                       </div>
                       <div>
@@ -247,55 +394,110 @@ export default function PrintBills() {
                           {t("common.phone")}
                         </div>
                         <div style={{ fontWeight: 700 }}>
-                          {customer.phoneNumber || "—"}
+                          {toEnglishDigits(customer.phoneNumber)}
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Vertical stacked print buttons */}
+                  {isBillEmergency && (
+                    <div style={{ marginBottom: 14 }}>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 800,
+                          color: "#b91c1c",
+                          letterSpacing: ".06em",
+                          textTransform: "uppercase",
+                          marginBottom: 8,
+                        }}
+                      >
+                        {t("createOrder.emergencyOrder")}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (emergencyAnchorOrder) {
+                            setSelectedOrder(emergencyAnchorOrder);
+                          }
+                        }}
+                        className="btn btn-outline"
+                        style={{
+                          height: "auto",
+                          width: "100%",
+                          padding: "10px 12px",
+                          justifyContent: "flex-start",
+                          borderColor: "#ef4444",
+                          background: "#fff1f2",
+                        }}
+                      >
+                        <span
+                          className="badge bg-red"
+                          style={{ fontSize: 10, marginInlineEnd: 8 }}
+                        >
+                          {t("createOrder.emergencyShort")}
+                        </span>
+                        <span style={{ fontWeight: 700, fontSize: 12 }}>
+                          {emergencyTypes.join(", ")}
+                        </span>
+                      </button>
+                    </div>
+                  )}
+
                   <div className="vstack">
                     <button
-                      aria-label={t("orders.printBill")}
+                      aria-label={billText.printBillForCustomer}
                       className="btn btn-gold print-btn"
-                      disabled={!customer || !selectedOrder}
+                      disabled={!customer || orders.length === 0}
                       onClick={handlePrintCustomerBill}
                     >
-                      {`${t("orders.printBill")} —  بل مشتری`}
+                      {billText.printBillForCustomer}
                     </button>
-                    {/* <button
-                      aria-label={t("orders.printTailorCopy")}
-                      className="btn btn-gold print-btn"
-                      disabled={!customer}
-                      onClick={() => handlePrintType("OUTFIT")}
-                    >
-                      {t("orders.printTailorCopy")}
-                    </button> */}
-                    <button
-                      aria-label="Print Outfit"
-                      className="btn btn-gold print-btn"
-                      disabled={!customer}
-                      onClick={() => handlePrintType("OUTFIT")}
-                    >{`${t("orders.printBill")} — پیراهن تنبان`}</button>
-                    <button
-                      aria-label="Print Waskat"
-                      className="btn btn-gold print-btn"
-                      disabled={!customer}
-                      onClick={() => handlePrintType("WASKAT")}
-                    >{`${t("orders.printBill")} — واسکت`}</button>
-                    <button
-                      aria-label="Print Korty"
-                      className="btn btn-gold print-btn"
-                      disabled={!customer}
-                      onClick={() => handlePrintType("KORTY")}
-                    >{`${t("orders.printBill")} — کورتی`}</button>
-                    <button
-                      aria-label="Print YakhanQaq"
-                      className="btn btn-gold print-btn"
-                      disabled={!customer}
-                      onClick={() => handlePrintType("YAKHANQAQ")}
-                    >{`${t("orders.printBill")} — یخن قاق`}</button>
                   </div>
+
+                  {orders.length > 0 && (
+                    <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+                      {orderMeta.map((meta) => {
+                        const { order, index, itemLabel } = meta;
+                        const isSelected = selectedOrder?.id === order.id;
+                        return (
+                          <div
+                            key={order.id || `${order.type}-${index}`}
+                            className={`rounded-xl border px-3 py-3 shadow-sm transition ${
+                              isSelected
+                                ? "border-blue-500 bg-blue-50/70"
+                                : "border-slate-200 bg-white"
+                            }`}
+                          >
+                            <div className={`flex flex-wrap items-center justify-between gap-3 ${alignClass}`}>
+                              <div className={`flex flex-wrap items-center gap-2 ${isRtl ? "flex-row-reverse" : "flex-row"}`}>
+                                <span className="badge bg-gold" style={{ fontSize: 11 }}>
+                                  {itemLabel}
+                                </span>
+                                {order.orderName ? (
+                                  <span className="text-xs font-semibold text-slate-700">
+                                    {order.orderName}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <button
+                                type="button"
+                                className="btn btn-outline btn-sm"
+                                onClick={() =>
+                                  handlePrintTailorBill(
+                                    order,
+                                    getTailorPreviewId(order, index),
+                                  )
+                                }
+                              >
+                                {`${t("createOrder.printBill")} ${itemLabel}`}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div style={{ marginTop: 14, color: "var(--text3)" }}>
@@ -307,23 +509,53 @@ export default function PrintBills() {
         </div>
       </div>
 
-      {/* Hidden print targets */}
       <div style={{ display: "none" }}>
-        {customer && selectedOrder && (
+        {customer && orders.length > 0 && (
           <div>
             <div id="preview-customer">
-              <CustomerBill customer={customer} order={selectedOrder} />
+              <CustomerCombinedBill customer={customer} orders={orders} />
             </div>
-            <div id="preview-tailor">
-              <TailorBill
-                customer={customer}
-                order={selectedOrder}
-                measurements={getMeasurementsFromOrder(selectedOrder)}
-              />
-            </div>
+            {orderMeta.map(({ order, index, itemLabel }) => (
+              <div
+                key={order.id || `${order.type}-${index}`}
+                id={getTailorPreviewId(order, index)}
+              >
+                <TailorBill
+                  customer={customer}
+                  order={order}
+                  measurements={getMeasurementsFromOrder(order)}
+                  itemLabel={itemLabel}
+                />
+              </div>
+            ))}
           </div>
         )}
       </div>
     </div>
   );
+}
+
+function buildOrderItemMeta(orders = [], language) {
+  const typeCounts = {};
+  const totalByType = (orders || []).reduce((acc, order) => {
+    const typeKey = order?.type || "ITEM";
+    acc[typeKey] = (acc[typeKey] || 0) + 1;
+    return acc;
+  }, {});
+
+  return (orders || []).map((order, index) => {
+    const typeKey = order?.type || "ITEM";
+    typeCounts[typeKey] = (typeCounts[typeKey] || 0) + 1;
+    const typeLabel = getOrderTypeLabel(typeKey, language);
+    const itemNumber = typeCounts[typeKey];
+    const showItemNumber = (totalByType[typeKey] || 0) > 1;
+
+    return {
+      order,
+      index,
+      typeLabel,
+      itemNumber,
+      itemLabel: showItemNumber ? `${typeLabel} ${itemNumber}` : typeLabel,
+    };
+  });
 }

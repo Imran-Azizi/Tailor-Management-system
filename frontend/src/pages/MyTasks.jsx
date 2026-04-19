@@ -21,8 +21,16 @@ import {
 
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
+import { getOrderTypeLabel } from "../lib/orderType.js";
+import { formatUserNotificationMessage } from "../lib/notifications.js";
+import { formatDateTimeLocale } from "../lib/locale.js";
 import { useAuth } from "../context/AuthContext.jsx";
-import { Badge, Spinner, EmptyState } from "../components/ui/index.jsx";
+import {
+  Badge,
+  Spinner,
+  EmptyState,
+  NotificationText,
+} from "../components/ui/index.jsx";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const TYPE_V = {
@@ -222,7 +230,8 @@ function OrderDetailModal({
   progressPending,
   completePending,
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language;
   const status = getStatus(order);
   const sc = statusColor(status);
 
@@ -278,7 +287,9 @@ function OrderDetailModal({
               </span>
             </h2>
             <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
-              <Badge v={TYPE_V[order.type] || "gold"}>{order.type}</Badge>
+              <Badge v={TYPE_V[order.type] || "gold"}>
+                {getOrderTypeLabel(order.type, language)}
+              </Badge>
               {order.isEmergency && <Badge v="red">⚡ Emergency</Badge>}
               {order.orderName && (
                 <span
@@ -423,7 +434,9 @@ function OrderDetailModal({
                     fontSize: 12,
                   }}
                 >
-                  <span style={{ color: "var(--text3)" }}>Total</span>
+                  <span style={{ color: "var(--text3)" }}>
+                    {t("myTasks.totalShort")}
+                  </span>
                   <span style={{ fontWeight: 700 }}>
                     {fmt$(order.totalPrice)}
                   </span>
@@ -436,7 +449,9 @@ function OrderDetailModal({
                       fontSize: 12,
                     }}
                   >
-                    <span style={{ color: "var(--text3)" }}>Discount</span>
+                    <span style={{ color: "var(--text3)" }}>
+                      {t("myTasks.discountShort")}
+                    </span>
                     <span style={{ color: "#16a34a" }}>
                       − {fmt$(order.discount)}
                     </span>
@@ -449,7 +464,9 @@ function OrderDetailModal({
                     fontSize: 12,
                   }}
                 >
-                  <span style={{ color: "var(--text3)" }}>Paid</span>
+                  <span style={{ color: "var(--text3)" }}>
+                    {t("myTasks.paidShort")}
+                  </span>
                   <span style={{ color: "#16a34a", fontWeight: 600 }}>
                     {fmt$(order.paidAmount)}
                   </span>
@@ -468,14 +485,18 @@ function OrderDetailModal({
                     fontSize: 13,
                   }}
                 >
-                  <span style={{ fontWeight: 600 }}>Remaining</span>
+                  <span style={{ fontWeight: 600 }}>
+                    {t("myTasks.remainingShort")}
+                  </span>
                   <span
                     style={{
                       fontWeight: 800,
                       color: order.remaining > 0 ? "#DC2626" : "#16a34a",
                     }}
                   >
-                    {order.remaining > 0 ? fmt$(order.remaining) : "✓ Paid"}
+                    {order.remaining > 0
+                      ? fmt$(order.remaining)
+                      : `✓ ${t("myTasks.paidDone")}`}
                   </span>
                 </div>
               </div>
@@ -688,7 +709,8 @@ function OrderCard({
   progressPending,
   completePending,
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language;
   const status = getStatus(order);
   const sc = statusColor(status);
 
@@ -754,7 +776,9 @@ function OrderCard({
             >
               #{order.customer?.billNumber}
             </span>
-            <Badge v={TYPE_V[order.type] || "gold"}>{order.type}</Badge>
+            <Badge v={TYPE_V[order.type] || "gold"}>
+              {getOrderTypeLabel(order.type, language)}
+            </Badge>
             {order.isEmergency && <Badge v="red">⚡ Emergency</Badge>}
             <span
               style={{
@@ -941,9 +965,10 @@ function OrderCard({
 
 // ── Main Dashboard ─────────────────────────────────────────────────────────────
 export default function MyTasks() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const qc = useQueryClient();
+  const language = i18n.resolvedLanguage || i18n.language || "en";
 
   const [activeTab, setActiveTab] = useState("all");
   const [viewOrder, setViewOrder] = useState(null);
@@ -1259,15 +1284,16 @@ export default function MyTasks() {
                   style={{ color: "#2563EB", flexShrink: 0, marginTop: 3 }}
                 />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p
+                  <NotificationText
+                    language={language}
                     style={{
                       fontSize: 12,
                       color: "var(--text1)",
                       lineHeight: 1.45,
                     }}
                   >
-                    {n.message}
-                  </p>
+                    {formatUserNotificationMessage(n, t, language)}
+                  </NotificationText>
                   <p
                     style={{
                       fontSize: 11,
@@ -1275,7 +1301,7 @@ export default function MyTasks() {
                       marginTop: 2,
                     }}
                   >
-                    {fmtDate(n.createdAt)}
+                    {formatDateTimeLocale(n.createdAt, language)}
                   </p>
                 </div>
                 <button

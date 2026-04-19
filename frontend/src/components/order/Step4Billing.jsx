@@ -1,48 +1,95 @@
 import { useMemo, useState } from "react";
-import { parseNumberLocale, toAsciiDigits } from "../../lib/normalize.js";
+import { parseNumberLocale } from "../../lib/normalize.js";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
+import { formatCurrency } from "../../lib/currency.js";
+import { getOrderTypeLabel } from "../../lib/orderType.js";
 
 const DEFAULT_BILLING = {
-  totalPrice: "", // treated as price-per-item; actual total = totalPrice × quantity
+  totalPrice: "", // treated as price-per-item; actual total = totalPrice * quantity
   discount: "",
   paidAmount: "",
   quantity: "1",
 };
 
-function normalizeInitial(orderTypes, initial) {
+function toWholeAmount(value) {
+  const n = Number(value || 0);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.round(n));
+}
+
+function formatWholeAmount(value) {
+  return toWholeAmount(value).toLocaleString("en-US");
+}
+
+function sanitizeWholeInput(raw = "") {
+  return String(raw).replace(
+    /[^\d\u0660-\u0669\u06F0-\u06F9\uFF10-\uFF19]/g,
+    "",
+  );
+}
+
+function getDisplayLabel(entry, index, language = "en") {
+  if (entry?.displayName?.trim()) return entry.displayName.trim();
+  if (entry?.name?.trim()) return entry.name.trim();
+  const orderType = getOrderTypeLabel(entry?.type, language);
+  const sequence = Number(entry?.sequence || 0) || index + 1;
+  return `${orderType} ${sequence}`;
+}
+
+function buildBillingEntries(orderTypes = [], orderItems = [], language = "en") {
+  if (Array.isArray(orderItems) && orderItems.length > 0) {
+    return orderItems.map((item, index) => ({
+      ...item,
+      sequence: Number(item?.sequence || 0) || index + 1,
+      billingKey: String(item?.billingKey ?? item?.key ?? index),
+      displayName: getDisplayLabel(item, index, language),
+    }));
+  }
+
+  return (orderTypes || []).map((entry, index) => ({
+    ...entry,
+    sequence: index + 1,
+    billingKey: String(index),
+    displayName: getDisplayLabel(entry, index, language),
+  }));
+}
+
+function normalizeInitial(entries, initial) {
   const source = initial || {};
   const normalized = {};
-  orderTypes.forEach((_, index) => {
-    normalized[index] = {
+  entries.forEach((entry, index) => {
+    const sourceEntry = source[entry.billingKey] || source[index] || {};
+    normalized[entry.billingKey] = {
       ...DEFAULT_BILLING,
-      ...(source[index] || {}),
-      quantity: String(source[index]?.quantity ?? "1"),
+      ...sourceEntry,
+      totalPrice: String(toWholeAmount(sourceEntry?.totalPrice)),
+      discount: String(toWholeAmount(sourceEntry?.discount)),
+      paidAmount: String(toWholeAmount(sourceEntry?.paidAmount)),
+      quantity: String(sourceEntry?.quantity ?? "1"),
     };
   });
   return normalized;
 }
 
-function BillingCard({ entry, value, onChange, index }) {
-  const { t } = useTranslation();
-  const pricePerItem = parseNumberLocale(value.totalPrice) || 0;
+function BillingCard({ entry, value, onChange, billingKey }) {
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language;
+  const pricePerItem = toWholeAmount(parseNumberLocale(value.totalPrice));
   const qtyRaw = parseNumberLocale(value.quantity);
   const quantity = Number.isFinite(qtyRaw)
     ? Math.max(1, Math.floor(qtyRaw))
     : 1;
-  const discount = parseNumberLocale(value.discount) || 0;
-  const paidAmount = parseNumberLocale(value.paidAmount) || 0;
+  const discount = toWholeAmount(parseNumberLocale(value.discount));
+  const paidAmount = toWholeAmount(parseNumberLocale(value.paidAmount));
 
   const computedTotal = pricePerItem * quantity;
   const remaining = Math.max(0, computedTotal - discount - paidAmount);
 
   const setField = (key, next) =>
-    onChange(index, {
+    onChange(billingKey, {
       ...value,
-      [key]:
-        key === "quantity"
-          ? next.replace(/[^\d\u0660-\u0669\u06F0-\u06F9\uFF10-\uFF19]/g, "")
-          : next,
+      [key]: sanitizeWholeInput(next),
     });
 
   const labelStyle = {
@@ -65,7 +112,6 @@ function BillingCard({ entry, value, onChange, index }) {
         background: "var(--surface2)",
       }}
     >
-      {/* Card header */}
       <div
         style={{
           display: "flex",
@@ -76,10 +122,10 @@ function BillingCard({ entry, value, onChange, index }) {
         }}
       >
         <span className="badge bg-gold" style={{ fontSize: 11 }}>
-          {entry.type}
+          {getOrderTypeLabel(entry.type, language)}
         </span>
-        {entry.name && (
-          <span style={{ fontSize: 13, fontWeight: 600 }}>{entry.name}</span>
+        {entry.displayName && (
+          <span style={{ fontSize: 13, fontWeight: 600 }}>{entry.displayName}</span>
         )}
         {entry.isEmergency && (
           <span className="badge bg-red" style={{ fontSize: 10 }}>
@@ -88,7 +134,6 @@ function BillingCard({ entry, value, onChange, index }) {
         )}
       </div>
 
-      {/* Inputs: row 1 — Price per Item + Quantity */}
       <div
         style={{
           display: "grid",
@@ -103,10 +148,10 @@ function BillingCard({ entry, value, onChange, index }) {
           </label>
           <input
             className="inp"
-            inputMode="decimal"
+            inputMode="numeric"
             value={value.totalPrice}
             onChange={(e) => setField("totalPrice", e.target.value)}
-            placeholder="0.00"
+            placeholder="0"
             style={inputStyle}
           />
         </div>
@@ -125,7 +170,6 @@ function BillingCard({ entry, value, onChange, index }) {
         </div>
       </div>
 
-      {/* Computed total display */}
       <div
         style={{
           display: "flex",
@@ -142,18 +186,18 @@ function BillingCard({ entry, value, onChange, index }) {
           {t("createOrder.totalPrice")}&nbsp;
           {quantity > 1 && (
             <span style={{ color: "var(--text3)", fontWeight: 400 }}>
-              ({quantity} × ${pricePerItem.toFixed(2)})
+              ({formatWholeAmount(quantity)} x{" "}
+              {formatCurrency(pricePerItem, language)})
             </span>
           )}
         </span>
         <span
           style={{ fontSize: 16, fontWeight: 800, color: "var(--primary)" }}
         >
-          ${computedTotal.toFixed(2)}
+          {formatCurrency(computedTotal, language)}
         </span>
       </div>
 
-      {/* Inputs: row 2 — Discount + Paid Amount */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <div>
           <label className="lbl" style={labelStyle}>
@@ -161,10 +205,10 @@ function BillingCard({ entry, value, onChange, index }) {
           </label>
           <input
             className="inp"
-            inputMode="decimal"
+            inputMode="numeric"
             value={value.discount}
             onChange={(e) => setField("discount", e.target.value)}
-            placeholder="0.00"
+            placeholder="0"
             style={inputStyle}
           />
         </div>
@@ -174,16 +218,15 @@ function BillingCard({ entry, value, onChange, index }) {
           </label>
           <input
             className="inp"
-            inputMode="decimal"
+            inputMode="numeric"
             value={value.paidAmount}
             onChange={(e) => setField("paidAmount", e.target.value)}
-            placeholder="0.00"
+            placeholder="0"
             style={inputStyle}
           />
         </div>
       </div>
 
-      {/* Live remaining indicator (only when there's data) */}
       {computedTotal > 0 && (
         <div
           style={{
@@ -196,9 +239,9 @@ function BillingCard({ entry, value, onChange, index }) {
         >
           {discount > 0 && (
             <span style={{ color: "var(--text3)" }}>
-              {t("createOrder.afterDiscount")}{" "}
+              {t("createOrder.afterDiscount")} {" "}
               <strong style={{ color: "var(--text1)" }}>
-                ${(computedTotal - discount).toFixed(2)}
+                {formatCurrency(computedTotal - discount, language)}
               </strong>
             </span>
           )}
@@ -209,7 +252,7 @@ function BillingCard({ entry, value, onChange, index }) {
             }}
           >
             {remaining > 0
-              ? `${t("common.remaining")}: $${remaining.toFixed(2)}`
+              ? `${t("common.remaining")}: ${formatCurrency(remaining, language)}`
               : t("createOrder.fullyPaid")}
           </span>
         </div>
@@ -222,27 +265,33 @@ export default function Step4Billing({
   onNext,
   onBack,
   orderTypes = [],
+  orderItems = [],
   initial = {},
   loading = false,
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language;
+  const billingEntries = useMemo(
+    () => buildBillingEntries(orderTypes, orderItems, language),
+    [orderItems, orderTypes, language],
+  );
   const [billing, setBilling] = useState(() =>
-    normalizeInitial(orderTypes, initial),
+    normalizeInitial(billingEntries, initial),
   );
   const [error, setError] = useState("");
 
   const totals = useMemo(() => {
-    return orderTypes.reduce(
-      (acc, _, index) => {
-        const item = billing[index] || DEFAULT_BILLING;
-        const pricePerItem = parseNumberLocale(item.totalPrice) || 0;
+    return billingEntries.reduce(
+      (acc, entry) => {
+        const item = billing[entry.billingKey] || DEFAULT_BILLING;
+        const pricePerItem = toWholeAmount(parseNumberLocale(item.totalPrice));
         const qtyRaw = parseNumberLocale(item.quantity);
         const qty = Number.isFinite(qtyRaw)
           ? Math.max(1, Math.floor(qtyRaw))
           : 1;
         const total = pricePerItem * qty;
-        const discount = parseNumberLocale(item.discount) || 0;
-        const paidAmount = parseNumberLocale(item.paidAmount) || 0;
+        const discount = toWholeAmount(parseNumberLocale(item.discount));
+        const paidAmount = toWholeAmount(parseNumberLocale(item.paidAmount));
 
         acc.total += total;
         acc.discount += discount;
@@ -251,29 +300,31 @@ export default function Step4Billing({
       },
       { total: 0, discount: 0, paid: 0 },
     );
-  }, [billing, orderTypes]);
+  }, [billing, billingEntries]);
 
   const remaining = Math.max(0, totals.total - totals.discount - totals.paid);
 
-  const updateBilling = (index, nextValue) => {
+  const updateBilling = (billingKey, nextValue) => {
     setError("");
-    setBilling((current) => ({ ...current, [index]: nextValue }));
+    setBilling((current) => ({ ...current, [billingKey]: nextValue }));
   };
 
   const validateAndContinue = () => {
-    for (let index = 0; index < orderTypes.length; index += 1) {
-      const item = billing[index] || DEFAULT_BILLING;
-      const pricePerItem = parseNumberLocale(item.totalPrice);
+    const normalizedBilling = {};
+
+    for (let index = 0; index < billingEntries.length; index += 1) {
+      const entry = billingEntries[index];
+      const item = billing[entry.billingKey] || DEFAULT_BILLING;
+      const rawPrice = parseNumberLocale(item.totalPrice);
+      const pricePerItem = toWholeAmount(rawPrice);
       const qtyRaw = parseNumberLocale(item.quantity);
       const qty = Number.isFinite(qtyRaw) ? Math.max(1, Math.floor(qtyRaw)) : 1;
-      const totalPrice = (isNaN(pricePerItem) ? 0 : pricePerItem) * qty;
-      const discount = parseFloat(item.discount || "0") || 0;
-      const paidAmount = parseNumberLocale(item.paidAmount || "0") || 0;
-      const label = orderTypes[index]?.name?.trim()
-        ? `${orderTypes[index].type} (${orderTypes[index].name.trim()})`
-        : orderTypes[index]?.type || `Item ${index + 1}`;
+      const totalPrice = pricePerItem * qty;
+      const discount = toWholeAmount(parseNumberLocale(item.discount || "0"));
+      const paidAmount = toWholeAmount(parseNumberLocale(item.paidAmount || "0"));
+      const label = entry.displayName || `${getOrderTypeLabel(entry.type, language)} ${index + 1}`;
 
-      if (isNaN(pricePerItem) || pricePerItem <= 0) {
+      if (Number.isNaN(rawPrice) || pricePerItem <= 0) {
         const message = t("createOrder.validTotalPrice", { label });
         setError(message);
         toast.error(message);
@@ -297,15 +348,24 @@ export default function Step4Billing({
         toast.error(message);
         return;
       }
-      if (isNaN(qty) || qty < 1) {
+      if (Number.isNaN(qty) || qty < 1) {
         const message = t("createOrder.quantityMin", { label });
         setError(message);
         toast.error(message);
         return;
       }
+
+      normalizedBilling[entry.billingKey] = {
+        ...item,
+        totalPrice: String(pricePerItem),
+        discount: String(discount),
+        paidAmount: String(paidAmount),
+        quantity: String(qty),
+      };
     }
+
     setError("");
-    onNext({ billing });
+    onNext({ billing: normalizedBilling });
   };
 
   return (
@@ -324,18 +384,17 @@ export default function Step4Billing({
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        {orderTypes.map((entry, index) => (
+        {billingEntries.map((entry) => (
           <BillingCard
-            key={`${entry.type}-${index}`}
+            key={entry.billingKey}
             entry={entry}
-            value={billing[index] || DEFAULT_BILLING}
+            value={billing[entry.billingKey] || DEFAULT_BILLING}
             onChange={updateBilling}
-            index={index}
+            billingKey={entry.billingKey}
           />
         ))}
       </div>
 
-      {/* Grand total summary */}
       <div style={{ marginTop: 18 }} className="info-box ib-gold">
         <div
           style={{
@@ -350,7 +409,7 @@ export default function Step4Billing({
               {t("createOrder.grandTotal")}
             </div>
             <div style={{ fontSize: 18, fontWeight: 700 }}>
-              ${totals.total.toFixed(2)}
+              {formatCurrency(totals.total, language)}
             </div>
           </div>
           <div>
@@ -358,7 +417,7 @@ export default function Step4Billing({
               {t("createOrder.totalDiscount")}
             </div>
             <div style={{ fontSize: 18, fontWeight: 700 }}>
-              ${totals.discount.toFixed(2)}
+              {formatCurrency(totals.discount, language)}
             </div>
           </div>
           <div>
@@ -366,7 +425,7 @@ export default function Step4Billing({
               {t("common.paid")}
             </div>
             <div style={{ fontSize: 18, fontWeight: 700 }}>
-              ${totals.paid.toFixed(2)}
+              {formatCurrency(totals.paid, language)}
             </div>
           </div>
           <div>
@@ -374,7 +433,7 @@ export default function Step4Billing({
               {t("common.remaining")}
             </div>
             <div style={{ fontSize: 18, fontWeight: 700 }}>
-              ${remaining.toFixed(2)}
+              {formatCurrency(remaining, language)}
             </div>
           </div>
         </div>

@@ -5,8 +5,6 @@ import {
   LuLayoutDashboard,
   LuPackagePlus,
   LuList,
-  LuSquareCheck,
-  LuClock,
   LuArchive,
   LuPalette,
   LuBell,
@@ -16,9 +14,12 @@ import {
   LuChevronRight,
   LuChevronDown,
   LuListTodo,
+  LuListChecks,
+  LuUserCheck,
   LuShieldCheck,
   LuArrowRightLeft,
   LuWalletCards,
+  LuTruck,
 } from "react-icons/lu";
 import { useAuth } from "../context/AuthContext.jsx";
 
@@ -47,11 +48,45 @@ const ADMIN_NAV = [
       },
       { label: "common.allOrders", path: "/orders", Icon: LuList, end: true },
       {
-        label: "sidebar.completed",
-        path: "/orders/completed",
-        Icon: LuSquareCheck,
+        label: "common.pendingOrders",
+        path: "/orders/pending",
+        Icon: LuListTodo,
+        end: true,
       },
-      { label: "sidebar.pending", path: "/orders/pending", Icon: LuClock },
+      {
+        label: "common.completedOrders",
+        path: "/orders/completed",
+        Icon: LuListChecks,
+        end: true,
+      },
+      {
+        key: "assignment-dropdown",
+        label: "assignment.assignOrder",
+        Icon: LuUserCheck,
+        children: [
+          {
+            label: "assignment.clothesToWorkers",
+            path: "/orders/assignments/clothes",
+            Icon: LuScissors,
+          },
+          {
+            label: "sidebar.report",
+            path: "/orders/assignments/report",
+            Icon: LuList,
+          },
+          {
+            label: "sidebar.completedFromWorkers",
+            path: "/orders/completed-workers",
+            Icon: LuListChecks,
+          },
+        ],
+      },
+      {
+        label: "sidebar.clothesDelivery",
+        path: "/delivery",
+        Icon: LuTruck,
+        end: true,
+      },
       { label: "orders.printBills", path: "/print-bills", Icon: LuPrinter },
     ],
   },
@@ -64,8 +99,16 @@ const ADMIN_NAV = [
         label: "sidebar.transactions",
         Icon: LuWalletCards,
         children: [
-          { label: "sidebar.makeTransaction", path: "/transactions/create", Icon: LuArrowRightLeft },
-          { label: "sidebar.allTransactions", path: "/transactions", Icon: LuList },
+          {
+            label: "sidebar.makeTransaction",
+            path: "/transactions/create",
+            Icon: LuArrowRightLeft,
+          },
+          {
+            label: "sidebar.allTransactions",
+            path: "/transactions",
+            Icon: LuList,
+          },
         ],
       },
       { label: "common.boxManagement", path: "/boxes", Icon: LuArchive },
@@ -96,13 +139,25 @@ const DOKAN_NAV = [
         Icon: LuPackagePlus,
       },
       { label: "common.allOrders", path: "/orders", Icon: LuList, end: true },
-      { label: "orders.printBills", path: "/print-bills", Icon: LuPrinter },
       {
-        label: "sidebar.completed",
-        path: "/orders/completed",
-        Icon: LuSquareCheck,
+        label: "common.pendingOrders",
+        path: "/orders/pending",
+        Icon: LuListTodo,
+        end: true,
       },
-      { label: "sidebar.pending", path: "/orders/pending", Icon: LuClock },
+      {
+        label: "common.completedOrders",
+        path: "/orders/completed",
+        Icon: LuListChecks,
+        end: true,
+      },
+      {
+        label: "sidebar.clothesDelivery",
+        path: "/delivery",
+        Icon: LuTruck,
+        end: true,
+      },
+      { label: "orders.printBills", path: "/print-bills", Icon: LuPrinter },
     ],
   },
   {
@@ -113,8 +168,16 @@ const DOKAN_NAV = [
         label: "sidebar.transactions",
         Icon: LuWalletCards,
         children: [
-          { label: "sidebar.makeTransaction", path: "/transactions/create", Icon: LuArrowRightLeft },
-          { label: "sidebar.allTransactions", path: "/transactions", Icon: LuList },
+          {
+            label: "sidebar.makeTransaction",
+            path: "/transactions/create",
+            Icon: LuArrowRightLeft,
+          },
+          {
+            label: "sidebar.allTransactions",
+            path: "/transactions",
+            Icon: LuList,
+          },
         ],
       },
       { label: "common.boxManagement", path: "/boxes", Icon: LuArchive },
@@ -135,6 +198,18 @@ const WORKER_NAV = [
         end: true,
       },
       { label: "common.allOrders", path: "/orders", Icon: LuList, end: true },
+      {
+        label: "common.pendingOrders",
+        path: "/orders/pending",
+        Icon: LuListTodo,
+        end: true,
+      },
+      {
+        label: "common.completedOrders",
+        path: "/orders/completed",
+        Icon: LuListChecks,
+        end: true,
+      },
     ],
   },
 ];
@@ -177,14 +252,13 @@ function SidebarDropdown({ item, collapsed, accent }) {
           background: "none",
           border: "none",
           cursor: "pointer",
-          textAlign: "left",
+          textAlign: "start",
         }}
         onClick={() => setOpen((o) => !o)}
       >
         <span className="si">
           <Icon size={16} />
         </span>
-        
       </button>
     );
   }
@@ -200,7 +274,7 @@ function SidebarDropdown({ item, collapsed, accent }) {
           background: "none",
           border: "none",
           cursor: "pointer",
-          textAlign: "left",
+          textAlign: "start",
         }}
       >
         <span className="si">
@@ -211,7 +285,7 @@ function SidebarDropdown({ item, collapsed, accent }) {
         </span>
         <span
           style={{
-            marginLeft: "auto",
+            marginInlineStart: "auto",
             color: "rgba(255,255,255,.35)",
             display: "flex",
             transition: "transform .2s",
@@ -226,9 +300,9 @@ function SidebarDropdown({ item, collapsed, accent }) {
       {open && (
         <div
           style={{
-            paddingLeft: 10,
-            borderLeft: `2px solid ${accent}40`,
-            marginLeft: 22,
+            paddingInlineStart: 10,
+            borderInlineStart: `2px solid ${accent}40`,
+            marginInlineStart: 22,
             marginTop: 2,
             marginBottom: 4,
           }}
@@ -241,7 +315,7 @@ function SidebarDropdown({ item, collapsed, accent }) {
               className={({ isActive }) =>
                 `sb-item${isActive ? " active" : ""}`
               }
-              style={{ paddingLeft: 10, fontSize: 13 }}
+              style={{ paddingInlineStart: 10, fontSize: 13 }}
             >
               <span className="si">
                 <child.Icon size={14} />
@@ -259,6 +333,7 @@ function SidebarDropdown({ item, collapsed, accent }) {
 export default function Sidebar({ collapsed, onToggle, open }) {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const isRtl = false;
 
   const nav = ROLE_NAV[user?.accountType] || ADMIN_NAV;
   const accent = ROLE_ACCENT[user?.accountType] || "#2563EB";
@@ -281,6 +356,12 @@ export default function Sidebar({ collapsed, onToggle, open }) {
           title={collapsed ? t("sidebar.expand") : t("sidebar.collapse")}
         >
           {collapsed ? (
+            isRtl ? (
+              <LuChevronLeft size={13} />
+            ) : (
+              <LuChevronRight size={13} />
+            )
+          ) : isRtl ? (
             <LuChevronRight size={13} />
           ) : (
             <LuChevronLeft size={13} />
@@ -313,7 +394,7 @@ export default function Sidebar({ collapsed, onToggle, open }) {
             style={{
               fontSize: 11,
               color: "rgba(255,255,255,.3)",
-              marginLeft: 7,
+              marginInlineStart: 7,
             }}
           >
             {user.name}

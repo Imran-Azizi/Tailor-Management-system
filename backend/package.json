@@ -7,7 +7,7 @@
     "start": "node src/index.js",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "node prisma/seed.js",
+    "db:seed": "prisma db push --accept-data-loss && node prisma/seed.js",
     "db:studio": "prisma studio"
   },
   "dependencies": {
@@ -15,10 +15,12 @@
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
     "express": "^4.19.2",
     "express-rate-limit": "^7.3.1",
     "jsonwebtoken": "^9.0.3",
     "node-cron": "^3.0.3",
+    "tailor-system": "file:..",
     "zod": "^3.23.8"
   },
   "devDependencies": {

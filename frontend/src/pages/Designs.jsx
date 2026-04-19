@@ -5,7 +5,7 @@ import { LuPlus, LuPencil, LuTrash2 } from "react-icons/lu";
 import toast from "react-hot-toast";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
-import { PageHeader, Modal } from "../components/ui/index.jsx";
+import { PageHeader, Modal, ConfirmDeleteModal } from "../components/ui/index.jsx";
 
 const MODELS = [
   { key: "yakhan", label: "یخن", color: "#2563EB" },
@@ -28,10 +28,12 @@ const TAB_GROUPS = {
 };
 
 function DesignCard({ model }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [name, setName] = useState("");
+  const [deleteItem, setDeleteItem] = useState(null);
 
   const { data = [], isLoading } = useQuery({
     queryKey: ["design", model.key],
@@ -49,24 +51,30 @@ function DesignCard({ model }) {
       setEditing(null);
       toast.success(
         editing
-          ? `${model.label} style updated.`
-          : `${model.label} style added.`,
+          ? t("designs.styleUpdated", { model: model.label, defaultValue: `${model.label} style updated.` })
+          : t("designs.styleAdded", { model: model.label, defaultValue: `${model.label} style added.` }),
       );
     },
     onError: (error) =>
       toast.error(
-        getApiErrorMessage(error, `Unable to save ${model.label} style.`),
+        getApiErrorMessage(
+          error,
+          t("designs.saveFailed", { model: model.label, defaultValue: `Unable to save ${model.label} style.` }),
+        ),
       ),
   });
   const delMut = useMutation({
     mutationFn: (id) => api.delete(`/designs/${model.key}/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["design", model.key] });
-      toast.success(`${model.label} style deleted.`);
+      toast.success(t("designs.styleDeleted", { model: model.label, defaultValue: `${model.label} style deleted.` }));
     },
     onError: (error) =>
       toast.error(
-        getApiErrorMessage(error, `Unable to delete ${model.label} style.`),
+        getApiErrorMessage(
+          error,
+          t("designs.deleteFailed", { model: model.label, defaultValue: `Unable to delete ${model.label} style.` }),
+        ),
       ),
   });
 
@@ -87,7 +95,7 @@ function DesignCard({ model }) {
           <div>
             <p style={{ fontWeight: 700, fontSize: 14 }}>{model.label}</p>
             <p style={{ fontSize: 11, color: "var(--text3)", marginTop: 1 }}>
-              {data.length} styles
+              {t("designs.stylesCount", { count: data.length, defaultValue: `${data.length} styles` })}
             </p>
           </div>
           <button
@@ -104,17 +112,17 @@ function DesignCard({ model }) {
               gap: 4,
             }}
           >
-            <LuPlus size={12} /> Add
+            <LuPlus size={12} /> {t("common.add")}
           </button>
         </div>
 
         {isLoading ? (
-          <p style={{ fontSize: 12, color: "var(--text3)" }}>Loading…</p>
+          <p style={{ fontSize: 12, color: "var(--text3)" }}>{t("common.loading")}</p>
         ) : !data.length ? (
           <p
             style={{ fontSize: 12, color: "var(--text3)", fontStyle: "italic" }}
           >
-            No styles yet
+            {t("designs.noStyles", { defaultValue: "No styles yet" })}
           </p>
         ) : (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -159,10 +167,7 @@ function DesignCard({ model }) {
                   <LuPencil size={10} />
                 </button>
                 <button
-                  onClick={() => {
-                    if (confirm(`Delete "${item.name}"?`))
-                      delMut.mutate(item.id);
-                  }}
+                  onClick={() => setDeleteItem(item)}
                   style={{
                     background: "none",
                     border: "none",
@@ -187,17 +192,24 @@ function DesignCard({ model }) {
           setModal(false);
           setEditing(null);
         }}
-        title={`${editing ? "Edit" : "Add"} ${model.label} Style`}
+        title={t("designs.modalTitle", {
+          action: editing ? t("common.edit") : t("common.add"),
+          model: model.label,
+          defaultValue: `${editing ? "Edit" : "Add"} ${model.label} Style`,
+        })}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
-            <label className="lbl">Style Name</label>
+            <label className="lbl">{t("designs.styleName", { defaultValue: "Style Name" })}</label>
             <input
               className="inp"
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && saveMut.mutate()}
-              placeholder={`e.g. Classic ${model.label}`}
+              placeholder={t("designs.stylePlaceholder", {
+                model: model.label,
+                defaultValue: `e.g. Classic ${model.label}`,
+              })}
               autoFocus
             />
           </div>
@@ -208,7 +220,7 @@ function DesignCard({ model }) {
               className="btn btn-outline"
               style={{ flex: 1 }}
             >
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               onClick={() => saveMut.mutate()}
@@ -216,11 +228,29 @@ function DesignCard({ model }) {
               style={{ flex: 1, background: model.color }}
               disabled={!name.trim() || saveMut.isPending}
             >
-              {saveMut.isPending ? "Saving…" : "Save"}
+              {saveMut.isPending ? t("customersPage.saving", { defaultValue: "Saving..." }) : t("common.save")}
             </button>
           </div>
         </div>
       </Modal>
+
+      <ConfirmDeleteModal
+        open={!!deleteItem}
+        onClose={() => setDeleteItem(null)}
+        onConfirm={() => {
+          if (!deleteItem) return;
+          delMut.mutate(deleteItem.id, {
+            onSettled: () => setDeleteItem(null),
+          });
+        }}
+        title={t("designs.deleteTitle", { defaultValue: t("common.delete") })}
+        message={t("designs.deleteConfirm", {
+          name: deleteItem?.name || "",
+          defaultValue: `Delete "${deleteItem?.name || ""}" permanently? This action cannot be undone.`,
+        })}
+        itemName={deleteItem?.name || ""}
+        isPending={delMut.isPending}
+      />
     </div>
   );
 }

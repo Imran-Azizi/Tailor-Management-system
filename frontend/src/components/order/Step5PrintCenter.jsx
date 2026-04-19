@@ -3,7 +3,9 @@ import { useTranslation } from "react-i18next";
 import {
   CustomerBill,
   TailorBill,
+  getBillLanguageSettings,
   getMeasurementsFromOrder,
+  getOrderTypeLabel,
   printElement,
 } from "./OrderDocumentPack.jsx";
 
@@ -17,11 +19,13 @@ function toPreviewOrder(order, measurements) {
 }
 
 export default function Step5PrintCenter({ data }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const result = data?.result;
   const customer = result?.customer;
   const orders = result?.orders || [];
   const measurements = data?.measurements || {};
+  const currentLanguage = i18n.resolvedLanguage || i18n.language;
+  const billSettings = getBillLanguageSettings(currentLanguage);
 
   if (!result) {
     return (
@@ -40,7 +44,6 @@ export default function Step5PrintCenter({ data }) {
 
   return (
     <div>
-      {/* ── Success badge ── */}
       <div style={{ textAlign: "center", paddingBottom: 28 }}>
         <div
           style={{
@@ -77,7 +80,7 @@ export default function Step5PrintCenter({ data }) {
           <span style={{ fontWeight: 800, color: "var(--primary)" }}>
             #{customer?.billNumber}
           </span>
-          <span style={{ color: "var(--border2)" }}>·</span>
+          <span style={{ color: "var(--border2)" }}>•</span>
           <span style={{ color: "var(--text3)" }}>
             {orders.length}{" "}
             {orders.length > 1
@@ -85,9 +88,40 @@ export default function Step5PrintCenter({ data }) {
               : t("createOrder.orderSingular")}
           </span>
         </div>
+
+        <div
+          style={{
+            marginTop: 12,
+            display: "inline-flex",
+            gap: 8,
+            flexWrap: "wrap",
+            justifyContent: "center",
+          }}
+        >
+          {[
+            { code: "en", label: t("common.english") },
+            { code: "dari", label: t("common.dari") },
+            { code: "pashto", label: t("common.pashto") },
+          ].map((lang) => {
+            const isActive = currentLanguage === lang.code;
+            return (
+              <button
+                key={lang.code}
+                type="button"
+                className={`btn ${isActive ? "btn-gold" : "btn-outline"}`}
+                style={{ height: 34, padding: "0 12px", fontSize: 12 }}
+                onClick={() => {
+                  i18n.changeLanguage(lang.code);
+                  localStorage.setItem("lang", lang.code);
+                }}
+              >
+                {lang.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* ── Print cards ── */}
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {orders.map((order, index) => {
           const previewOrder = toPreviewOrder(order, measurements[index]);
@@ -105,7 +139,6 @@ export default function Step5PrintCenter({ data }) {
                 background: "var(--surface)",
               }}
             >
-              {/* Order label (only when multiple orders or has a name) */}
               {(orders.length > 1 || order.orderName) && (
                 <div
                   style={{
@@ -118,7 +151,7 @@ export default function Step5PrintCenter({ data }) {
                   }}
                 >
                   <span className="badge bg-gold" style={{ fontSize: 11 }}>
-                    {order.type}
+                    {getOrderTypeLabel(order.type, currentLanguage)}
                   </span>
                   {order.orderName ? (
                     <span style={{ fontSize: 13, fontWeight: 600 }}>
@@ -132,12 +165,16 @@ export default function Step5PrintCenter({ data }) {
                 </div>
               )}
 
-              {/* Two print buttons side by side */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
-                {/* Customer bill button */}
                 <button
                   type="button"
-                  onClick={() => printElement(customerId)}
+                  onClick={() =>
+                    printElement(customerId, {
+                      dir: billSettings.dir,
+                      lang: billSettings.htmlLang,
+                      title: t("orders.orderDocuments"),
+                    })
+                  }
                   style={{
                     display: "flex",
                     flexDirection: "column",
@@ -169,9 +206,7 @@ export default function Step5PrintCenter({ data }) {
                     <LuPrinter size={20} />
                   </div>
                   <div style={{ textAlign: "center" }}>
-                    <div
-                      style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.2 }}
-                    >
+                    <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.2 }}>
                       {t("createOrder.printBill")}
                     </div>
                     <div style={{ fontSize: 12, opacity: 0.82, marginTop: 2 }}>
@@ -180,10 +215,15 @@ export default function Step5PrintCenter({ data }) {
                   </div>
                 </button>
 
-                {/* Tailor shop button */}
                 <button
                   type="button"
-                  onClick={() => printElement(tailorId)}
+                  onClick={() =>
+                    printElement(tailorId, {
+                      dir: billSettings.dir,
+                      lang: billSettings.htmlLang,
+                      title: t("orders.orderDocuments"),
+                    })
+                  }
                   style={{
                     display: "flex",
                     flexDirection: "column",
@@ -216,9 +256,7 @@ export default function Step5PrintCenter({ data }) {
                     <LuScissors size={20} />
                   </div>
                   <div style={{ textAlign: "center" }}>
-                    <div
-                      style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.2 }}
-                    >
+                    <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.2 }}>
                       {t("createOrder.printBill")}
                     </div>
                     <div style={{ fontSize: 12, opacity: 0.82, marginTop: 2 }}>
@@ -228,7 +266,6 @@ export default function Step5PrintCenter({ data }) {
                 </button>
               </div>
 
-              {/* Hidden print targets (off-screen, not display:none so they render correctly) */}
               <div
                 style={{
                   position: "absolute",

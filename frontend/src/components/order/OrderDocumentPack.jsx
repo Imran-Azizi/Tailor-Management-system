@@ -9,11 +9,12 @@ import {
   LuPrinter,
   LuReceipt,
   LuScissors,
-  LuUserRound,
 } from "react-icons/lu";
 import { SHOP_CONFIG } from "../../config/shopConfig.js";
+import { toAsciiDigits } from "../../lib/normalize.js";
+import { formatCurrency } from "../../lib/currency.js";
+import { getOrderTypeLabel as getLocalizedOrderTypeLabel } from "../../lib/orderType.js";
 
-// ─── Numeric measurement field names (used to split measurements vs styles) ───
 const NUMERIC_FIELDS = new Set([
   "height",
   "shoulder",
@@ -35,26 +36,327 @@ const NUMERIC_FIELDS = new Set([
   "patPatlon",
   "pachaPatlon",
 ]);
+
 const SKIP_FIELDS = new Set(["id", "orderId", "__name"]);
 
-function Barcode({ value }) {
+const ORDER_TYPE_LABELS = {
+  en: {
+    OUTFIT: "Outfit",
+    WASKAT: "Waskat",
+    KORTY: "Korty",
+    YAKHANQAQ: "YakhanQaq",
+  },
+  dari: {
+    OUTFIT: "پیراهن تنبان",
+    WASKAT: "واسکت",
+    KORTY: "کُرتی",
+    YAKHANQAQ: "یخن قاق",
+  },
+  pashto: {
+    OUTFIT: "پيراهن تنبان",
+    WASKAT: "واسکټ",
+    KORTY: "کورتي",
+    YAKHANQAQ: "یخن قاق",
+  },
+};
+
+const BILL_TEXT = {
+  en: {
+    customerBill: "Customer Bill",
+    tailorCopy: "Tailor Shop Copy",
+    customerName: "Customer Name",
+    billNo: "Bill #",
+    qty: "Qty",
+    financialSummary: "Financial Summary",
+    totalPrice: "Total Price",
+    discount: "Discount",
+    paidAmount: "Paid Amount",
+    remaining: "Remaining",
+    paidInFull: "Completed",
+    customerInformation: "Customer Information",
+    measurementInformation: "Measurement Information",
+    stylesInformation: "Styles Information",
+    date: "Date",
+    name: "Name",
+    phone: "Phone",
+    quantity: "Quantity",
+    yes: "Yes",
+    printBillForCustomer: "Print Bill for Customer",
+    printBillForTailor: "Print Bill for Tailor Shop",
+    customerBillCopy: "A5 receipt with bill summary and financial breakdown",
+    tailorBillCopy: "Internal copy with measurements and style details",
+    orderDocumentTitle: "Order Document",
+  },
+  dari: {
+    customerBill: "بل مشتری",
+    tailorCopy: "کاپی خیاط",
+    customerName: "نام مشتری",
+    billNo: "شماره بل",
+    qty: "تعداد",
+    financialSummary: "خلاصه مالی",
+    totalPrice: "قیمت مجموعی",
+    discount: "تخفیف",
+    paidAmount: "مبلغ پرداخت‌شده",
+    remaining: "باقی‌مانده",
+    paidInFull: "تکمیل شد",
+    customerInformation: "معلومات مشتری",
+    measurementInformation: "معلومات اندازه‌گیری",
+    stylesInformation: "معلومات سبک",
+    date: "تاریخ",
+    name: "نام",
+    phone: "شماره تماس",
+    quantity: "تعداد",
+    yes: "بلی",
+    printBillForCustomer: "چاپ بل مشتری",
+    printBillForTailor: "چاپ بل خیاط",
+    customerBillCopy: "رسید A5 با خلاصه بل و تفکیک مالی",
+    tailorBillCopy: "کاپی داخلی با اندازه‌ها و جزئیات سبک",
+    orderDocumentTitle: "سند سفارش",
+  },
+  pashto: {
+    customerBill: "د مشتری بل",
+    tailorCopy: "د خياط کاپي",
+    customerName: "د مشتری نوم",
+    billNo: "د بل شمېره",
+    qty: "تعداد",
+    financialSummary: "مالي لنډيز",
+    totalPrice: "ټوله بيه",
+    discount: "تخفیف",
+    paidAmount: "ورکړل شوې پیسې",
+    remaining: "پاتې",
+    paidInFull: "بشپړ شوی",
+    customerInformation: "د مشتری معلومات",
+    measurementInformation: "د اندازو معلومات",
+    stylesInformation: "د سټایل معلومات",
+    date: "نېټه",
+    name: "نوم",
+    phone: "د تماس شمېره",
+    quantity: "تعداد",
+    yes: "هو",
+    printBillForCustomer: "د مشتری بل چاپ",
+    printBillForTailor: "د خياط بل چاپ",
+    customerBillCopy: "A5 رسيد د بل لنډيز او مالي جزیاتو سره",
+    tailorBillCopy: "داخلي کاپي د اندازو او سټایل جزياتو سره",
+    orderDocumentTitle: "د فرمایش سند",
+  },
+};
+
+const BILL_EXTRA_TEXT = {
+  en: {
+    box: "Box",
+    typeTotal: "Type Total",
+    totalAllClothes: "Total Amount",
+    totalDiscountAllClothes: "Discount",
+    totalPaidAllClothes: "Paid Amount",
+    totalRemainingAllClothes: "Remaining",
+    notAssigned: "Not Assigned",
+  },
+  dari: {
+    box: "صندوق",
+    typeTotal: "مجموع هر نوع لباس",
+    totalAllClothes: "مبلغ مجموعی",
+    totalDiscountAllClothes: "تخفیف",
+    totalPaidAllClothes: "مبلغ پرداخت‌شده",
+    totalRemainingAllClothes: "باقی‌مانده",
+    notAssigned: "تعیین نشده",
+  },
+  pashto: {
+    box: "بکس",
+    typeTotal: "د هر ډول کالیو مجموعه",
+    totalAllClothes: "ټول مبلغ",
+    totalDiscountAllClothes: "تخفیف",
+    totalPaidAllClothes: "ورکړل شوې پیسې",
+    totalRemainingAllClothes: "پاتې",
+    notAssigned: "نه دی ټاکل شوی",
+  },
+};
+
+const PRINT_SHOP_HEADER_NAME = "Khan Rahimi";
+const AFGHANISTAN_TIMEZONE = "Asia/Kabul";
+
+export function getBillLanguageSettings(language) {
+  const lang = String(language || "en").toLowerCase();
+  const langCode =
+    lang.startsWith("pashto") || lang.startsWith("ps")
+      ? "pashto"
+      : lang.startsWith("dari") || lang.startsWith("fa")
+        ? "dari"
+        : "en";
+
+  const isRtl = false;
+  const locale =
+    langCode === "en" ? "en-US" : langCode === "dari" ? "fa-AF" : "ps-AF";
+
+  return {
+    langCode,
+    locale,
+    htmlLang: locale,
+    dir: "ltr",
+    isRtl,
+    fontFamily: "'Inter','Noto Naskh Arabic','Noto Sans Arabic',sans-serif",
+    text: BILL_TEXT[langCode],
+  };
+}
+
+export function getOrderTypeLabel(type, language) {
+  return getLocalizedOrderTypeLabel(type, language);
+}
+
+function formatMoney(amount, language) {
+  return formatCurrency(amount, language, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+}
+
+function formatNumber(value) {
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Math.round(Number(value || 0)));
+}
+
+function toEnglishDigits(value) {
+  if (value === null || value === undefined || value === "") return "-";
+  return toAsciiDigits(String(value));
+}
+
+function formatMeasurementValue(value) {
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) {
+    return formatNumber(numeric);
+  }
+  return toEnglishDigits(value);
+}
+
+function formatDateWithEnglishDigits(dateInput, locale, timeZone) {
+  const value = dateInput ? new Date(dateInput) : new Date();
+  if (Number.isNaN(value.getTime())) return "-";
+  const options = {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  };
+  if (timeZone) options.timeZone = timeZone;
+  const fmt = new Intl.DateTimeFormat(`${locale}-u-nu-latn`, options);
+  return fmt.format(value);
+}
+
+function formatTimeWithEnglishDigits(dateInput, locale, timeZone) {
+  const value = dateInput ? new Date(dateInput) : new Date();
+  if (Number.isNaN(value.getTime())) return "-";
+  const options = {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  };
+  if (timeZone) options.timeZone = timeZone;
+  const fmt = new Intl.DateTimeFormat(`${locale}-u-nu-latn`, options);
+  return fmt.format(value);
+}
+
+function formatFieldKey(key, t) {
+  return t(`createOrder.fields.${key}`, {
+    defaultValue: key
+      .replace(/([A-Z])/g, " $1")
+      .replace(/^./, (s) => s.toUpperCase())
+      .trim(),
+  });
+}
+
+function getPrintDateTime(settings, timestamp) {
+  const isAfghanNow =
+    settings.langCode === "dari" || settings.langCode === "pashto";
+  const source = isAfghanNow ? new Date() : timestamp || Date.now();
+  const zone = isAfghanNow ? AFGHANISTAN_TIMEZONE : undefined;
+  return {
+    date: formatDateWithEnglishDigits(source, settings.locale, zone),
+    time: formatTimeWithEnglishDigits(source, settings.locale, zone),
+  };
+}
+
+function PrintBillHeader({ settings, title, date, time }) {
+  const alignClass = settings.isRtl ? "text-right" : "text-left";
+  const rowDirClass = settings.isRtl ? "flex-row-reverse" : "flex-row";
+  const logoUrl = SHOP_CONFIG.logoUrl || SHOP_CONFIG.logo || "";
+  const shopInitials = String(PRINT_SHOP_HEADER_NAME || "KR")
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return (
+    <div className="border-b-2 border-slate-800 bg-slate-50 px-3 py-2.5">
+      <div className={`flex items-center justify-between gap-3 ${rowDirClass}`}>
+        <div className={`flex min-w-0 items-center gap-2.5 ${rowDirClass}`}>
+          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-slate-300 bg-white">
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={PRINT_SHOP_HEADER_NAME}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-sm font-black text-slate-700">
+                {shopInitials || "KR"}
+              </div>
+            )}
+          </div>
+          <div className={`min-w-0 ${alignClass}`}>
+            <p className="truncate text-[14px] font-black text-slate-900">
+              {PRINT_SHOP_HEADER_NAME}
+            </p>
+            <p className="truncate text-[10px] text-slate-600">
+              {SHOP_CONFIG.address}
+            </p>
+            <p className="text-[10px] text-slate-600">
+              {(SHOP_CONFIG.phones || []).join(" • ")}
+            </p>
+          </div>
+        </div>
+        <div className={`shrink-0 ${alignClass}`}>
+          <p className="text-[10px] font-bold uppercase tracking-[0.06em] text-slate-600">
+            {title}
+          </p>
+          <p className="text-[10px] font-semibold text-slate-700">
+            {date} | {time}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Barcode({
+  value,
+  width = 2,
+  height = 36,
+  displayValue = true,
+  fontSize = 11,
+  margin = 6,
+  style,
+}) {
   const ref = useRef();
+
   useEffect(() => {
     if (!value || !ref.current) return;
     try {
       JsBarcode(ref.current, String(value), {
         format: "CODE128",
-        width: 2,
-        height: 36,
-        displayValue: true,
-        fontSize: 11,
-        margin: 6,
+        width,
+        height,
+        displayValue,
+        fontSize,
+        margin,
       });
-    } catch (e) {
-      console.error("Barcode generation failed", e);
+    } catch (error) {
+      console.error("Barcode generation failed", error);
     }
-  }, [value]);
-  return <svg ref={ref} style={{ maxWidth: 140, width: "100%" }} />;
+  }, [value, width, height, displayValue, fontSize, margin]);
+
+  return <svg ref={ref} style={{ maxWidth: 140, width: "100%", ...style }} />;
 }
 
 export function getMeasurementsFromOrder(order) {
@@ -67,269 +369,136 @@ export function getMeasurementsFromOrder(order) {
   return {};
 }
 
-function formatKey(key) {
-  return key
-    .replace(/([A-Z])/g, " $1")
-    .replace(/^./, (s) => s.toUpperCase())
-    .trim();
-}
-
-// ─── Shared shop header ────────────────────────────────────────────────────────
-function ShopHeader({ gradient, accent, label, date }) {
-  return (
-    <div
-      style={{
-        background: gradient,
-        color: "#fff",
-        padding: "14px 20px",
-        display: "flex",
-        alignItems: "center",
-        gap: 14,
-      }}
-    >
-      {/* Logo placeholder */}
-      <div
-        style={{
-          width: 52,
-          height: 52,
-          borderRadius: 10,
-          background: "rgba(255,255,255,0.18)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 24,
-          flexShrink: 0,
-          fontWeight: 900,
-          color: "#fff",
-        }}
-      >
-        ✂
-      </div>
-
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.1 }}>
-          {SHOP_CONFIG.name}
-        </div>
-        <div
-          style={{
-            fontSize: 11,
-            opacity: 0.85,
-            marginTop: 2,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {SHOP_CONFIG.address}
-        </div>
-        <div style={{ fontSize: 11, opacity: 0.85 }}>
-          {SHOP_CONFIG.phones.join(" • ")}
-        </div>
-      </div>
-
-      <div style={{ textAlign: "right", flexShrink: 0 }}>
-        <div
-          style={{
-            fontSize: 10,
-            opacity: 0.72,
-            textTransform: "uppercase",
-            letterSpacing: ".07em",
-            fontWeight: 700,
-          }}
-        >
-          {label}
-        </div>
-        <div style={{ fontSize: 11, opacity: 0.78, marginTop: 3 }}>{date}</div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Customer Bill ─────────────────────────────────────────────────────────────
 export function CustomerBill({ customer, order }) {
+  const { i18n, t } = useTranslation();
+  const settings = getBillLanguageSettings(
+    i18n.resolvedLanguage || i18n.language,
+  );
   const total = order?.totalPrice || 0;
   const discount = order?.discount || 0;
   const paid = order?.paidAmount || 0;
   const remaining = Math.max(0, order?.remaining ?? total - discount - paid);
   const qty = order?.quantity || 1;
-  const date = new Date(order?.createdAt || Date.now()).toLocaleDateString();
+  const orderTypeLabel = getOrderTypeLabel(order?.type, settings.langCode);
+  const { date, time } = getPrintDateTime(
+    settings,
+    order?.createdAt || Date.now(),
+  );
+  const txt = settings.text;
+  const alignClass = settings.isRtl ? "text-right" : "text-left";
+  const summaryBorderClass = settings.isRtl ? "sm:border-r-2" : "sm:border-l-2";
+  const summaryOrderClass = settings.isRtl ? "sm:order-1" : "sm:order-2";
+  const contentOrderClass = settings.isRtl ? "sm:order-2" : "sm:order-1";
+  const headClass = settings.isRtl
+    ? "text-[10px] font-bold text-slate-500"
+    : "text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500";
+  const summaryHeadClass = settings.isRtl
+    ? "text-[10px] font-extrabold text-blue-800"
+    : "text-[10px] font-extrabold uppercase tracking-[0.12em] text-blue-800";
+
+  const moneyCells = [
+    {
+      label: txt.totalPrice,
+      value: formatMoney(total, settings.langCode),
+      tone: "text-slate-900",
+    },
+    {
+      label: txt.discount,
+      value:
+        discount > 0 ? `-${formatMoney(discount, settings.langCode)}` : "-",
+      tone: "text-rose-600",
+    },
+    {
+      label: txt.paidAmount,
+      value: formatMoney(paid, settings.langCode),
+      tone: "text-emerald-700",
+    },
+    {
+      label: txt.remaining,
+      value:
+        remaining > 0
+          ? formatMoney(remaining, settings.langCode)
+          : txt.paidInFull,
+      tone: remaining > 0 ? "text-amber-600" : "text-emerald-700",
+    },
+  ];
 
   return (
     <div
-      style={{
-        fontFamily: "Inter, sans-serif",
-        background: "#fff",
-        border: "1px solid #dbe3ef",
-        borderRadius: 12,
-        overflow: "hidden",
-      }}
+      lang={settings.htmlLang}
+      dir={settings.dir}
+      className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+      style={{ fontFamily: settings.fontFamily }}
     >
-      <ShopHeader
-        gradient="linear-gradient(135deg, #0F6CBD 0%, #1D82D7 100%)"
-        label="Customer Bill"
+      <PrintBillHeader
+        settings={settings}
+        title={txt.customerBill}
         date={date}
+        time={time}
       />
 
-      {/* Main section: left table + right sidebar */}
-      <div style={{ display: "flex", borderTop: "2px solid #e2e8f0" }}>
-        {/* Left: order details table */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-          <table
-            style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}
-          >
-            <thead>
-              <tr
-                style={{
-                  background: "#f8fafc",
-                  borderBottom: "1px solid #e2e8f0",
-                }}
-              >
-                {["Bill #", "Customer Name", "Order Type", "Qty"].map((h) => (
+      <div className="grid border-t border-slate-200 sm:grid-cols-[1fr_170px]">
+        <div className={`${contentOrderClass} flex flex-col`}>
+          <table className="w-full border-collapse text-xs">
+            <thead className="bg-slate-50">
+              <tr>
+                {[txt.billNo, t("orders.orderType"), txt.qty].map((header) => (
                   <th
-                    key={h}
-                    style={{
-                      padding: "8px 10px",
-                      textAlign: "left",
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: "#64748b",
-                      textTransform: "uppercase",
-                      letterSpacing: ".06em",
-                      whiteSpace: "nowrap",
-                    }}
+                    key={header}
+                    className={`border-b border-slate-200 px-3 py-2 ${headClass} ${alignClass}`}
                   >
-                    {h}
+                    {header}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td
-                  style={{
-                    padding: "10px 10px",
-                    fontWeight: 800,
-                    fontSize: 14,
-                    color: "#0F6CBD",
-                  }}
-                >
-                  #{customer?.billNumber}
+                <td className="px-3 py-3 text-sm font-black text-sky-700 [direction:ltr] [unicode-bidi:embed]">
+                  #{toEnglishDigits(customer?.billNumber)}
                 </td>
-                <td
-                  style={{
-                    padding: "10px 10px",
-                    fontWeight: 700,
-                    fontSize: 13,
-                  }}
-                >
-                  {customer?.firstName}
-                </td>
-                <td style={{ padding: "10px 10px" }}>
-                  <span
-                    style={{
-                      background: "#DBEAFE",
-                      color: "#1E40AF",
-                      padding: "2px 8px",
-                      borderRadius: 99,
-                      fontSize: 11,
-                      fontWeight: 700,
-                    }}
-                  >
-                    {order?.type}
+                <td className={`px-3 py-3 ${alignClass}`}>
+                  <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-bold text-blue-800">
+                    {orderTypeLabel}
                   </span>
                 </td>
-                <td
-                  style={{
-                    padding: "10px 10px",
-                    fontWeight: 700,
-                    fontSize: 13,
-                  }}
-                >
-                  {qty}
+                <td className="px-3 py-3 text-sm font-bold [direction:ltr] [unicode-bidi:embed]">
+                  {formatNumber(qty)}
                 </td>
               </tr>
             </tbody>
           </table>
-
-          {/* Barcode */}
           <div
-            style={{
-              flex: 1,
-              padding: "10px 16px",
-              borderTop: "1px solid #f1f5f9",
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-            }}
+            className={`flex flex-1 items-center gap-3 border-t border-slate-100 px-4 py-3 ${settings.isRtl ? "flex-row-reverse" : "flex-row"}`}
           >
             <Barcode value={customer?.billNumber} />
-            <div style={{ fontSize: 11, color: "#94a3b8" }}>
-              {customer?.phoneNumber}
+            <div className="text-xs text-slate-500 [direction:ltr] [unicode-bidi:embed]">
+              {toEnglishDigits(customer?.phoneNumber)}
             </div>
           </div>
         </div>
 
-        {/* Right sidebar: financial summary */}
         <div
-          style={{
-            width: 165,
-            borderLeft: "2px solid #BFDBFE",
-            background: "#EFF6FF",
-            flexShrink: 0,
-            display: "flex",
-            flexDirection: "column",
-          }}
+          className={`${summaryOrderClass} ${summaryBorderClass} flex flex-col border-blue-200 bg-blue-50`}
         >
           <div
-            style={{
-              padding: "7px 12px",
-              background: "#DBEAFE",
-              fontSize: 10,
-              fontWeight: 800,
-              color: "#1E40AF",
-              textTransform: "uppercase",
-              letterSpacing: ".06em",
-              borderBottom: "1px solid #BFDBFE",
-            }}
+            className={`border-b border-blue-200 bg-blue-100 px-3 py-2 ${summaryHeadClass} ${alignClass}`}
           >
-            Financial Summary
+            {txt.financialSummary}
           </div>
-
-          {[
-            ["Total Price", `$${total.toFixed(2)}`, "#0f172a"],
-            [
-              "Discount",
-              discount > 0 ? `-$${discount.toFixed(2)}` : "—",
-              "#ef4444",
-            ],
-            ["Paid Amount", `$${paid.toFixed(2)}`, "#059669"],
-            [
-              "Remaining",
-              remaining > 0 ? `$${remaining.toFixed(2)}` : "Paid in Full",
-              remaining > 0 ? "#f97316" : "#059669",
-            ],
-          ].map(([label, value, color], idx) => (
+          {moneyCells.map((cell, index) => (
             <div
-              key={label}
-              style={{
-                padding: "10px 14px",
-                flex: 1,
-                borderBottom: idx < 3 ? "1px solid #BFDBFE" : "none",
-              }}
+              key={cell.label}
+              className={`flex-1 px-3 py-2.5 ${alignClass} ${index < moneyCells.length - 1 ? "border-b border-blue-200" : ""}`}
             >
-              <div
-                style={{
-                  fontSize: 10,
-                  color: "#64748b",
-                  fontWeight: 600,
-                  marginBottom: 3,
-                }}
+              <p className="mb-1 text-[10px] font-semibold text-slate-500">
+                {cell.label}
+              </p>
+              <p
+                className={`text-base font-extrabold [direction:ltr] [unicode-bidi:embed] ${cell.tone}`}
               >
-                {label}
-              </div>
-              <div style={{ fontSize: 15, fontWeight: 800, color }}>
-                {value}
-              </div>
+                {cell.value}
+              </p>
             </div>
           ))}
         </div>
@@ -337,32 +506,320 @@ export function CustomerBill({ customer, order }) {
     </div>
   );
 }
+export function CustomerCombinedBill({ customer, orders = [] }) {
+  const { i18n, t } = useTranslation();
+  const settings = getBillLanguageSettings(
+    i18n.resolvedLanguage || i18n.language,
+  );
+  const txt = settings.text;
+  const extraTxt = BILL_EXTRA_TEXT[settings.langCode] || BILL_EXTRA_TEXT.en;
+  const timestamp =
+    orders?.[0]?.createdAt ||
+    customer?.updatedAt ||
+    customer?.createdAt ||
+    Date.now();
+  const { date, time } = getPrintDateTime(settings, timestamp);
+  const safeOrders = Array.isArray(orders) ? orders : [];
+  const billNo = toEnglishDigits(customer?.billNumber);
+  const customerName = customer?.firstName || "-";
+  const customerPhone = toEnglishDigits(customer?.phoneNumber);
 
-// ─── Tailor Shop Bill ─────────────────────────────────────────────────────────
-function TailorSectionTitle({ children }) {
+  const typeIndex = {};
+  const typeCountTotals = safeOrders.reduce((acc, order) => {
+    const typeKey = order?.type || "ITEM";
+    acc[typeKey] = (acc[typeKey] || 0) + 1;
+    return acc;
+  }, {});
+  const totalsByType = safeOrders.reduce((acc, order) => {
+    const typeKey = order?.type || "ITEM";
+    acc[typeKey] = (acc[typeKey] || 0) + Number(order?.totalPrice || 0);
+    return acc;
+  }, {});
+
+  const rowItems = safeOrders.map((order, index) => {
+    const typeKey = order?.type || "ITEM";
+    typeIndex[typeKey] = (typeIndex[typeKey] || 0) + 1;
+    const typeLabel = getOrderTypeLabel(typeKey, settings.langCode);
+    const itemLabel =
+      (typeCountTotals[typeKey] || 0) > 1
+        ? `${typeLabel} ${typeIndex[typeKey]}`
+        : typeLabel;
+    const totalPrice = Number(order?.totalPrice || 0);
+    return {
+      order,
+      index,
+      typeKey,
+      itemLabel,
+      qty: Number(order?.quantity || 1),
+      amount: totalPrice,
+      typeTotal: totalsByType[typeKey] || totalPrice,
+      boxName: order?.box?.boxName || extraTxt.notAssigned,
+    };
+  });
+
+  const totals = safeOrders.reduce(
+    (acc, item) => {
+      acc.total += Number(item?.totalPrice || 0);
+      acc.discount += Number(item?.discount || 0);
+      acc.paid += Number(item?.paidAmount || 0);
+      return acc;
+    },
+    { total: 0, discount: 0, paid: 0 },
+  );
+  const remaining = Math.max(0, totals.total - totals.discount - totals.paid);
+  const billIsEmergency = safeOrders.some((order) => order?.isEmergency);
+  const alignClass = settings.isRtl ? "text-right" : "text-left";
+  const rowDirClass = settings.isRtl ? "flex-row-reverse" : "flex-row";
+  const tableHeadClass = settings.isRtl
+    ? "text-[9px] font-extrabold text-slate-700"
+    : "text-[9px] font-extrabold uppercase tracking-[0.06em] text-slate-700";
+
   return (
     <div
-      style={{
-        fontSize: 10,
-        fontWeight: 800,
-        textTransform: "uppercase",
-        letterSpacing: ".08em",
-        color: "#7c5a2a",
-        padding: "6px 0 6px",
-        marginBottom: 8,
-        borderBottom: "1px solid #f0e0c0",
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-      }}
+      lang={settings.htmlLang}
+      dir={settings.dir}
+      className="overflow-hidden rounded-[6px] border-2 border-slate-800 bg-white"
+      style={{ fontFamily: settings.fontFamily }}
     >
-      {children}
+      <PrintBillHeader
+        settings={settings}
+        title={txt.customerBill}
+        date={date}
+        time={time}
+      />
+
+      {billIsEmergency ? (
+        <div
+          className={`border-b border-slate-800 bg-rose-50 px-2.5 py-1.5 text-[10px] font-bold text-rose-700 ${alignClass}`}
+        >
+          {t("createOrder.emergencyOrder")}
+        </div>
+      ) : null}
+
+      <table className="w-full border-collapse table-fixed text-[9px] text-slate-800">
+        <thead className="bg-slate-100">
+          <tr>
+            <th
+              className={`w-[18%] border-b border-r border-slate-800 px-1.5 py-1 ${tableHeadClass} ${alignClass}`}
+            >
+              {txt.billNo}
+            </th>
+            <th
+              className={`w-[12%] border-b border-r border-slate-800 px-1.5 py-1 ${tableHeadClass} ${alignClass}`}
+            >
+              {txt.customerName}
+            </th>
+            <th
+              className={`w-[12%] border-b border-r border-slate-800 px-1.5 py-1 ${tableHeadClass} [direction:ltr]`}
+            >
+              {txt.phone}
+            </th>
+            <th
+              className={`w-[12%] border-b border-r border-slate-800 px-1.5 py-1 ${tableHeadClass} ${alignClass}`}
+            >
+              {t("orders.orderType")}
+            </th>
+            <th
+              className={`w-[6%] border-b border-r border-slate-800 px-1.5 py-1 ${tableHeadClass} [direction:ltr]`}
+            >
+              {txt.qty}
+            </th>
+            <th
+              className={`w-[10%] border-b border-r border-slate-800 px-1.5 py-1 ${tableHeadClass} ${alignClass}`}
+            >
+              {extraTxt.box}
+            </th>
+            <th
+              className={`w-[15%] border-b border-slate-800 px-1.5 py-1 ${tableHeadClass} [direction:ltr]`}
+            >
+              {extraTxt.typeTotal}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rowItems.length === 0 ? (
+            <tr>
+              <td
+                colSpan={7}
+                className={`border-b border-slate-800 px-2 py-2 text-[10px] ${alignClass}`}
+              >
+                {t("common.noData")}
+              </td>
+            </tr>
+          ) : (
+            rowItems.map((row) => (
+              <tr key={row.order?.id || `${row.order?.type}-${row.index}`}>
+                <td
+                  className={`border-b border-r border-slate-800 px-1.5 py-1 align-top ${alignClass}`}
+                >
+                  <p className="font-black [direction:ltr] [unicode-bidi:embed]">
+                    #{billNo}
+                  </p>
+                  <div className="mt-1">
+                    <Barcode
+                      value={customer?.billNumber || "0"}
+                      width={1}
+                      height={20}
+                      displayValue={false}
+                      margin={1}
+                      style={{ maxWidth: 86 }}
+                    />
+                  </div>
+                </td>
+                <td
+                  className={`border-b border-r border-slate-800 px-1.5 py-1 align-top font-semibold ${alignClass}`}
+                >
+                  {customerName}
+                </td>
+                <td className="border-b border-r border-slate-800 px-1.5 py-1 align-top font-semibold [direction:ltr] [unicode-bidi:embed]">
+                  {customerPhone}
+                </td>
+                <td
+                  className={`border-b border-r border-slate-800 px-1.5 py-1 align-top font-semibold ${alignClass}`}
+                >
+                  {row.itemLabel}
+                </td>
+                <td className="border-b border-r border-slate-800 px-1.5 py-1 text-center align-top font-bold [direction:ltr] [unicode-bidi:embed]">
+                  {formatNumber(row.qty)}
+                </td>
+                <td
+                  className={`border-b border-r border-slate-800 px-1.5 py-1 align-top ${alignClass}`}
+                >
+                  {row.boxName}
+                </td>
+                <td className="border-b border-slate-800 px-1.5 py-1 text-center align-top font-black text-slate-900 [direction:ltr] [unicode-bidi:embed]">
+                  {formatMoney(row.typeTotal, settings.langCode)}
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+
+      <table className="w-full border-collapse table-fixed text-[10px] text-slate-800">
+        <thead className="bg-slate-100">
+          <tr>
+            <th
+              className={`w-1/4 border-b border-r border-slate-800 px-2 py-1.5 ${tableHeadClass} ${alignClass}`}
+            >
+              {extraTxt.totalAllClothes}
+            </th>
+            <th
+              className={`w-1/4 border-b border-r border-slate-800 px-2 py-1.5 ${tableHeadClass} ${alignClass}`}
+            >
+              {extraTxt.totalDiscountAllClothes}
+            </th>
+            <th
+              className={`w-1/4 border-b border-r border-slate-800 px-2 py-1.5 ${tableHeadClass} ${alignClass}`}
+            >
+              {extraTxt.totalPaidAllClothes}
+            </th>
+            <th
+              className={`w-1/4 border-b border-slate-800 px-2 py-1.5 ${tableHeadClass} ${alignClass}`}
+            >
+              {extraTxt.totalRemainingAllClothes}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr className="bg-white">
+            <td className="border-r border-slate-800 px-2 py-2 text-center font-black text-blue-900 [direction:ltr] [unicode-bidi:embed]">
+              {formatMoney(totals.total, settings.langCode)}
+            </td>
+            <td className="border-r border-slate-800 px-2 py-2 text-center font-black text-rose-800 [direction:ltr] [unicode-bidi:embed]">
+              {formatMoney(totals.discount, settings.langCode)}
+            </td>
+            <td className="border-r border-slate-800 px-2 py-2 text-center font-black text-emerald-800 [direction:ltr] [unicode-bidi:embed]">
+              {formatMoney(totals.paid, settings.langCode)}
+            </td>
+            <td
+              className={`px-2 py-2 text-center font-black [direction:ltr] [unicode-bidi:embed] ${
+                remaining > 0 ? "text-amber-800" : "text-emerald-800"
+              }`}
+            >
+              {remaining > 0
+                ? formatMoney(remaining, settings.langCode)
+                : txt.paidInFull}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div className="border-t border-slate-800 bg-slate-50 px-2 py-1 text-[9px] text-slate-600">
+        <div
+          className={`flex items-center justify-between gap-2 ${rowDirClass}`}
+        >
+          <span>{SHOP_CONFIG.tagline || "-"}</span>
+          <span className="[direction:ltr] [unicode-bidi:embed]">
+            #{billNo}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
+function getOrderedMeasurementRows(entries, t) {
+  const order = [
+    "height",
+    "shoulder",
+    "sleeve",
+    "neck",
+    "chest",
+    "armpit",
+    "waist",
+    "skirt",
+    "tenban",
+    "pantLeg",
+    "arm",
+    "calf",
+    "sorain",
+    "patlonHeight",
+    "kamerPatlon",
+    "doroBaghlePatlon",
+    "sorainPatlon",
+    "patPatlon",
+    "pachaPatlon",
+  ];
 
-export function TailorBill({ customer, order, measurements }) {
-  const date = new Date(order?.createdAt || Date.now()).toLocaleDateString();
+  const map = new Map(entries.map((entry) => [entry[0], entry]));
+  const sorted = [];
+
+  order.forEach((key) => {
+    const item = map.get(key);
+    if (item) {
+      sorted.push(item);
+      map.delete(key);
+    }
+  });
+
+  for (const item of map.values()) {
+    sorted.push(item);
+  }
+
+  return sorted.map(([key, value]) => [formatFieldKey(key, t), value]);
+}
+
+function getOrderItemLabel(order, itemLabel, settings) {
+  if (itemLabel?.trim()) return itemLabel.trim();
+  if (order?.orderName?.trim()) return order.orderName.trim();
+  return getOrderTypeLabel(order?.type, settings.langCode);
+}
+
+export function TailorBill({ customer, order, measurements, itemLabel }) {
+  const { i18n, t } = useTranslation();
+  const settings = getBillLanguageSettings(
+    i18n.resolvedLanguage || i18n.language,
+  );
+  const txt = settings.text;
+  const dateValue = order?.createdAt || Date.now();
+  const { date, time } = getPrintDateTime(settings, dateValue);
+  const billLabel = getOrderItemLabel(order, itemLabel, settings);
+  const customerBarcode = customer?.billNumber || "-";
+  const orderBarcode =
+    order?.id || `${customer?.billNumber || "0"}-${order?.type || "item"}`;
+  const alignClass = settings.isRtl ? "text-right" : "text-left";
+  const tableHeadClass = settings.isRtl
+    ? "text-[10px] font-extrabold text-slate-700"
+    : "text-[10px] font-extrabold uppercase tracking-[0.08em] text-slate-700";
 
   const allEntries = Object.entries(measurements || {}).filter(
     ([key, value]) =>
@@ -376,176 +833,197 @@ export function TailorBill({ customer, order, measurements }) {
   const styleEntries = allEntries.filter(
     ([key, value]) => !NUMERIC_FIELDS.has(key) && value !== false,
   );
+  const rows = [
+    ...getOrderedMeasurementRows(numericEntries, t),
+    ...styleEntries.map(([key, value]) => [
+      formatFieldKey(key, t),
+      typeof value === "boolean" ? txt.yes : toEnglishDigits(value),
+    ]),
+  ];
 
   return (
     <div
-      style={{
-        fontFamily: "Inter, sans-serif",
-        background: "#fffaf3",
-        border: "1px solid #e5d9c7",
-        borderRadius: 12,
-        overflow: "hidden",
-      }}
+      lang={settings.htmlLang}
+      dir={settings.dir}
+      className="overflow-hidden rounded-[4px] border-2 border-slate-800 bg-white"
+      style={{ fontFamily: settings.fontFamily }}
     >
-      <ShopHeader
-        gradient="linear-gradient(135deg, #2B211A 0%, #584332 100%)"
-        label="Tailor Shop Copy"
+      <PrintBillHeader
+        settings={settings}
+        title={txt.tailorCopy}
         date={date}
+        time={time}
       />
 
-      <div style={{ padding: "16px 18px" }}>
-        {/* ── Section 1: Customer Information ── */}
-        <TailorSectionTitle>① Customer Information</TailorSectionTitle>
+      <div className="grid grid-cols-3 bg-slate-100 text-[11px] font-semibold text-slate-800">
         <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
-            gap: 8,
-            background: "#fff8ed",
-            border: "1px solid #fde68a",
-            borderRadius: 8,
-            padding: "10px 14px",
-            marginBottom: 16,
-          }}
+          className={`border-b border-r border-slate-800 px-2.5 py-2 ${alignClass}`}
         >
-          {[
-            ["Bill #", `#${customer?.billNumber}`],
-            ["Date", date],
-            ["Name", customer?.firstName],
-            ["Phone", customer?.phoneNumber],
-            ["Order Type", order?.type],
-            ["Quantity", order?.quantity || 1],
-          ].map(([label, value]) => (
-            <div key={label}>
-              <div
-                style={{
-                  fontSize: 10,
-                  color: "#92400e",
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: ".06em",
-                  marginBottom: 2,
-                }}
-              >
-                {label}
-              </div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
-                {value ?? "—"}
-              </div>
-            </div>
-          ))}
+          <span className="font-extrabold">{txt.billNo}</span>: #
+          {toEnglishDigits(customer?.billNumber)}
         </div>
+        <div
+          className={`border-b border-r border-slate-800 px-2.5 py-2 ${alignClass}`}
+        >
+          <span className="font-extrabold">{txt.customerName}</span>:{" "}
+          {customer?.firstName || "-"}
+        </div>
+        <div className={`border-b border-slate-800 px-2.5 py-2 ${alignClass}`}>
+          <span className="font-extrabold">{t("orders.orderType")}</span>:{" "}
+          {billLabel}
+        </div>
+      </div>
 
-        {/* ── Section 2: Measurements ── */}
-        {numericEntries.length > 0 && (
-          <>
-            <TailorSectionTitle>② Measurement Information</TailorSectionTitle>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(3, minmax(0,1fr))",
-                gap: 6,
-                marginBottom: 16,
-              }}
+      <table className="w-full border-collapse table-fixed text-[11px]">
+        <thead className="bg-slate-100">
+          <tr>
+            <th
+              className={`border-b border-r border-slate-800 px-2.5 py-1.5 ${tableHeadClass} ${alignClass}`}
             >
-              {numericEntries.map(([key, value]) => (
-                <div
-                  key={key}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "5px 9px",
-                    background: "#fff",
-                    border: "1px solid #e5d9c7",
-                    borderRadius: 6,
-                    fontSize: 11,
-                  }}
+              {t("createOrder.measurements")}
+            </th>
+            <th
+              className={`border-b border-slate-800 px-2.5 py-1.5 ${tableHeadClass} ${alignClass}`}
+            >
+              {t("createOrder.styleOptions")}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {(rows.length ? rows : [[t("common.noData"), "-"]]).map(
+            ([label, value], index) => (
+              <tr key={`${label}-${index}`}>
+                <td
+                  className={`border-b border-r border-dashed border-slate-500 px-2.5 py-1.5 align-middle ${alignClass}`}
                 >
-                  <span style={{ color: "#78716c", fontWeight: 600 }}>
-                    {formatKey(key)}
-                  </span>
-                  <span style={{ fontWeight: 800, color: "#1a1a1a" }}>
-                    {value}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+                  {label}
+                </td>
+                <td
+                  className={`border-b border-dashed border-slate-500 px-2.5 py-1.5 align-middle font-bold ${alignClass}`}
+                >
+                  {value}
+                </td>
+              </tr>
+            ),
+          )}
+          <tr>
+            <td
+              colSpan={2}
+              className={`border-b border-dashed border-slate-500 px-2.5 py-1.5 align-top ${alignClass} min-h-[110px]`}
+            >
+              {order?.orderName?.trim() || "-"}
+            </td>
+          </tr>
+        </tbody>
+      </table>
 
-        {/* ── Section 3: Styles Information ── */}
-        {styleEntries.length > 0 && (
-          <>
-            <TailorSectionTitle>③ Styles Information</TailorSectionTitle>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(2, minmax(0,1fr))",
-                gap: 6,
-              }}
-            >
-              {styleEntries.map(([key, value]) => (
-                <div
-                  key={key}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "5px 9px",
-                    background: "#fff",
-                    border: "1px solid #e5d9c7",
-                    borderRadius: 6,
-                    fontSize: 11,
-                  }}
-                >
-                  <span style={{ color: "#78716c", fontWeight: 600 }}>
-                    {formatKey(key)}
-                  </span>
-                  <span style={{ fontWeight: 800, color: "#1a1a1a" }}>
-                    {typeof value === "boolean" ? "Yes" : value}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+      <div className="grid grid-cols-2">
+        <div className="border-r border-b border-slate-800 px-2.5 py-2">
+          <div className="max-w-[180px]">
+            <Barcode value={customerBarcode} />
+          </div>
+        </div>
+        <div className="border-b border-slate-800 px-2.5 py-2">
+          <div className="max-w-[180px]">
+            <Barcode value={orderBarcode} />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 bg-slate-100 text-[11px] text-slate-800">
+        <div
+          className={`border-r border-slate-800 px-2.5 py-1.5 ${alignClass}`}
+        >
+          <span className="font-extrabold">{txt.date}</span>: {date}
+        </div>
+        <div className={`px-2.5 py-1.5 ${alignClass}`}>
+          <span className="font-extrabold">{txt.qty}</span>:{" "}
+          {formatNumber(order?.quantity || 1)} | {time}
+        </div>
       </div>
     </div>
   );
 }
-
-// ─── Print / PDF helpers ──────────────────────────────────────────────────────
-export function printElement(id) {
+export function printElement(id, options = {}) {
   const element = document.getElementById(id);
-  if (!element) return;
+  if (!element) return false;
 
   const printWindow = window.open("", "_blank", "width=800,height=1000");
-  if (!printWindow) return;
+  if (!printWindow) return false;
+
+  const dir =
+    options.dir ||
+    element.getAttribute("dir") ||
+    document.documentElement.getAttribute("dir") ||
+    "ltr";
+
+  const lang =
+    options.lang ||
+    element.getAttribute("lang") ||
+    document.documentElement.getAttribute("lang") ||
+    "en";
+
+  const title = options.title || "Order Document";
+  const isRtl = dir === "rtl";
+  const bodyFont = isRtl
+    ? "'Noto Naskh Arabic','Noto Sans Arabic','Inter',sans-serif"
+    : "'Inter','Noto Sans Arabic',sans-serif";
+
+  const styleNodes = Array.from(
+    document.querySelectorAll("link[rel='stylesheet'], style"),
+  )
+    .map((node) => node.outerHTML)
+    .join("\n");
 
   printWindow.document.write(`
-    <html>
+    <html lang="${lang}" dir="${dir}">
       <head>
-        <title>Order Document</title>
+        <meta charset="UTF-8" />
+        <title>${title}</title>
         <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Naskh+Arabic:wght@400;600;700&family=Noto+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
+        ${styleNodes}
         <style>
-          *{box-sizing:border-box;margin:0;padding:0}
-          body{font-family:'Inter',sans-serif;background:#fff;padding:8mm;color:#0f172a}
+          *{box-sizing:border-box}
           @page{size:A5 portrait;margin:0}
+          body{
+            margin:0;
+            font-family:${bodyFont};
+            line-height:1.45;
+            background:#fff;
+            padding:8mm;
+            color:#0f172a;
+            direction:${dir};
+            text-align:${isRtl ? "right" : "left"};
+            -webkit-print-color-adjust:exact;
+            print-color-adjust:exact;
+          }
           @media print{body{padding:8mm}}
         </style>
       </head>
-      <body>${element.innerHTML}</body>
+      <body dir="${dir}">
+        ${element.innerHTML}
+      </body>
     </html>
   `);
   printWindow.document.close();
-  setTimeout(() => {
+
+  const printNow = () => {
     printWindow.print();
     printWindow.close();
-  }, 400);
-}
+  };
 
+  const fontsReady = printWindow.document.fonts?.ready;
+  if (fontsReady && typeof fontsReady.then === "function") {
+    fontsReady
+      .then(() => setTimeout(printNow, 180))
+      .catch(() => setTimeout(printNow, 350));
+  } else {
+    setTimeout(printNow, 350);
+  }
+  return true;
+}
 export async function exportPdf(id, filename) {
   try {
     const { default: jsPDF } = await import("jspdf");
@@ -572,7 +1050,6 @@ export async function exportPdf(id, filename) {
   }
 }
 
-// ─── Detail field (used inside the summary hero) ──────────────────────────────
 function DetailField({ label, value, Icon }) {
   return (
     <div className="print-detail-field">
@@ -602,12 +1079,16 @@ function DetailField({ label, value, Icon }) {
   );
 }
 
-// ─── OrderDocumentPack ────────────────────────────────────────────────────────
 export function OrderDocumentPack({ customer, order, previewId }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const settings = getBillLanguageSettings(
+    i18n.resolvedLanguage || i18n.language,
+  );
   const measurements = getMeasurementsFromOrder(order);
   const customerId = `${previewId}-customer`;
   const tailorId = `${previewId}-tailor`;
+  const orderTypeLabel = getOrderTypeLabel(order?.type, settings.langCode);
+  const txt = settings.text;
 
   return (
     <div className="order-doc-pack">
@@ -642,26 +1123,29 @@ export function OrderDocumentPack({ customer, order, previewId }) {
             <div style={{ fontSize: 12, color: "rgba(255,255,255,.72)" }}>
               {t("orders.billNumber")}
             </div>
-            <div style={{ fontSize: 34, fontWeight: 900, lineHeight: 1 }}>
-              #{customer?.billNumber}
+            <div
+              style={{
+                fontSize: 34,
+                fontWeight: 900,
+                lineHeight: 1,
+                direction: "ltr",
+                unicodeBidi: "embed",
+              }}
+            >
+              #{toEnglishDigits(customer?.billNumber)}
             </div>
           </div>
         </div>
 
         <div className="order-doc-grid">
           <DetailField
-            label={t("common.customer")}
-            value={customer?.firstName}
-            Icon={LuUserRound}
-          />
-          <DetailField
             label={t("common.phone")}
-            value={customer?.phoneNumber}
+            value={toEnglishDigits(customer?.phoneNumber)}
             Icon={LuPhone}
           />
           <DetailField
             label={t("orders.orderType")}
-            value={order?.type}
+            value={orderTypeLabel}
             Icon={LuReceipt}
           />
           <DetailField
@@ -672,24 +1156,26 @@ export function OrderDocumentPack({ customer, order, previewId }) {
         </div>
       </div>
 
-      {/* Action buttons */}
       <div className="order-doc-actions">
-        {/* Customer Bill */}
         <div className="order-doc-action-card">
           <div>
-            <p className="order-doc-action-title">Print Bill for Customer</p>
-            <p className="order-doc-action-copy">
-              A5 receipt with bill summary and financial breakdown
-            </p>
+            <p className="order-doc-action-title">{txt.printBillForCustomer}</p>
+            <p className="order-doc-action-copy">{txt.customerBillCopy}</p>
           </div>
           <div className="order-doc-action-row">
             <button
               type="button"
               className="print-center-btn"
-              onClick={() => printElement(customerId)}
+              onClick={() =>
+                printElement(customerId, {
+                  dir: settings.dir,
+                  lang: settings.htmlLang,
+                  title: txt.orderDocumentTitle,
+                })
+              }
             >
               <LuPrinter size={16} />
-              <span>Print Bill for Customer</span>
+              <span>{txt.printBillForCustomer}</span>
             </button>
             <button
               type="button"
@@ -707,22 +1193,25 @@ export function OrderDocumentPack({ customer, order, previewId }) {
           </div>
         </div>
 
-        {/* Tailor Shop Bill */}
         <div className="order-doc-action-card">
           <div>
-            <p className="order-doc-action-title">Print Bill for Tailor Shop</p>
-            <p className="order-doc-action-copy">
-              Internal copy with measurements and style details
-            </p>
+            <p className="order-doc-action-title">{txt.printBillForTailor}</p>
+            <p className="order-doc-action-copy">{txt.tailorBillCopy}</p>
           </div>
           <div className="order-doc-action-row">
             <button
               type="button"
               className="print-center-btn"
-              onClick={() => printElement(tailorId)}
+              onClick={() =>
+                printElement(tailorId, {
+                  dir: settings.dir,
+                  lang: settings.htmlLang,
+                  title: txt.orderDocumentTitle,
+                })
+              }
             >
               <LuScissors size={16} />
-              <span>Print Bill for Tailor Shop</span>
+              <span>{txt.printBillForTailor}</span>
             </button>
             <button
               type="button"
@@ -741,7 +1230,6 @@ export function OrderDocumentPack({ customer, order, previewId }) {
         </div>
       </div>
 
-      {/* Hidden print targets */}
       <div className="order-doc-preview-grid">
         <div id={customerId}>
           <CustomerBill customer={customer} order={order} />

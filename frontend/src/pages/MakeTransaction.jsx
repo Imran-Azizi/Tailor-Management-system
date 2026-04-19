@@ -3,7 +3,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Select from "react-select";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import { LuArrowRightLeft, LuCheck } from "react-icons/lu";
@@ -11,7 +11,6 @@ import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { Field } from "../components/ui/index.jsx";
 
-// ─── Validation schema ────────────────────────────────────────────────────────
 const schema = z.object({
   accountType: z
     .object({ value: z.string(), label: z.string() })
@@ -31,7 +30,6 @@ const schema = z.object({
   note: z.string().optional(),
 });
 
-// ─── react-select styles matching the app theme ────────────────────────────────
 function buildSelectStyles(hasError) {
   return {
     control: (base, state) => ({
@@ -77,9 +75,9 @@ function buildSelectStyles(hasError) {
 
 const today = () => new Date().toISOString().split("T")[0];
 
-// ─── Component ────────────────────────────────────────────────────────────────
 export default function MakeTransaction() {
   const { t } = useTranslation();
+  const qc = useQueryClient();
   const [selectedAccountType, setSelectedAccountType] = useState(null);
 
   const {
@@ -100,21 +98,21 @@ export default function MakeTransaction() {
     },
   });
 
-  // Watch account type to reset user when it changes
   const watchedAccountType = watch("accountType");
   useEffect(() => {
     setSelectedAccountType(watchedAccountType?.value || null);
   }, [watchedAccountType]);
 
-  // ── Load account types ──────────────────────────────────────────────────────
   const { data: accountTypes = [], isLoading: loadingTypes } = useQuery({
     queryKey: ["transaction-account-types"],
     queryFn: () => api.get("/transactions/account-types").then((r) => r.data),
   });
 
-  const accountTypeOptions = accountTypes.map((t) => ({ value: t, label: t }));
+  const accountTypeOptions = accountTypes.map((item) => ({
+    value: item,
+    label: item,
+  }));
 
-  // ── Load users by account type ──────────────────────────────────────────────
   const { data: users = [], isLoading: loadingUsers } = useQuery({
     queryKey: ["transaction-users", selectedAccountType],
     queryFn: () =>
@@ -122,15 +120,21 @@ export default function MakeTransaction() {
     enabled: !!selectedAccountType,
   });
 
-  const userOptions = users.map((u) => ({
-    value: u.id,
-    label: `${u.name} — ${u.phoneNumber}`,
+  const userOptions = users.map((worker) => ({
+    value: worker.id,
+    label: `${worker.name} - ${worker.phoneNumber}`,
   }));
 
-  // ── Mutation ────────────────────────────────────────────────────────────────
   const mutation = useMutation({
     mutationFn: (body) => api.post("/transactions", body),
-    onSuccess: () => {
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["transactions"] }),
+        qc.invalidateQueries({
+          queryKey: ["worker-panel-transaction-summary"],
+        }),
+      ]);
+
       toast.success(t("transaction.success"));
       reset({
         accountType: null,
@@ -155,10 +159,8 @@ export default function MakeTransaction() {
     });
   };
 
-  // ─── Layout ────────────────────────────────────────────────────────────────
   return (
     <div style={{ maxWidth: 640, margin: "0 auto", paddingBottom: 40 }}>
-      {/* Page header */}
       <div
         style={{
           display: "flex",
@@ -191,7 +193,6 @@ export default function MakeTransaction() {
         </div>
       </div>
 
-      {/* Card */}
       <div
         style={{
           background: "var(--surface)",
@@ -203,7 +204,6 @@ export default function MakeTransaction() {
       >
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <div style={{ display: "grid", gap: 20 }}>
-            {/* Account Type */}
             <Field
               label={t("transaction.accountType")}
               required
@@ -219,17 +219,11 @@ export default function MakeTransaction() {
                     isLoading={loadingTypes}
                     placeholder={t("transaction.selectAccountType")}
                     styles={buildSelectStyles(!!errors.accountType)}
-                    onChange={(opt) => {
-                      field.onChange(opt);
-                      // reset user when account type changes
-                      // (handled via useEffect watching the value)
-                    }}
                   />
                 )}
               />
             </Field>
 
-            {/* User Name */}
             <Field
               label={t("transaction.userName")}
               required
@@ -258,16 +252,15 @@ export default function MakeTransaction() {
               />
             </Field>
 
-            {/* Amount + Transaction Date (two columns) */}
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 1fr",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
                 gap: 16,
               }}
             >
               <Field
-                label={t("transaction.amount")}
+                label={t("transaction.value")}
                 required
                 error={errors.amount?.message}
               >
@@ -298,7 +291,6 @@ export default function MakeTransaction() {
               </Field>
             </div>
 
-            {/* Note */}
             <Field
               label={`${t("transaction.note")} (${t("common.optional")})`}
               error={errors.note?.message}
@@ -312,7 +304,6 @@ export default function MakeTransaction() {
               />
             </Field>
 
-            {/* Submit */}
             <div
               style={{
                 display: "flex",

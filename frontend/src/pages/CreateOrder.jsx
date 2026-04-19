@@ -1,17 +1,18 @@
-import { useState } from "react";
-import { parseNumberLocale, toAsciiDigits } from "../lib/normalize.js";
+import { useEffect, useState } from "react";
+import { parseNumberLocale } from "../lib/normalize.js";
 import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { LuCheck } from "react-icons/lu";
 import toast from "react-hot-toast";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
+import i18n from "../i18n/index.js";
+import { getOrderTypeLabel } from "../lib/orderType.js";
 import Step1CustomerInfo from "../components/order/Step1CustomerInfo.jsx";
 import Step2OrderTypes from "../components/order/Step2OrderTypes.jsx";
 import Step3Measurements from "../components/order/Step3Measurements.jsx";
 import Step4Billing from "../components/order/Step4Billing.jsx";
-import Step5ReviewOrder from "../components/order/Step5ReviewOrder.jsx";
-import Step6PrintCenter from "../components/order/Step5PrintCenter.jsx";
 
 const NUMERIC_MEASUREMENT_FIELDS = new Set([
   "height",
@@ -82,8 +83,6 @@ const STEPS = [
   { label: "Order Types" },
   { label: "Measurements" },
   { label: "Billing" },
-  { label: "Review" },
-  { label: "Print Center" },
 ];
 
 const STEP_I18N = {
@@ -91,17 +90,20 @@ const STEP_I18N = {
   "Order Types": "createOrder.orderTypes",
   Measurements: "createOrder.measurements",
   Billing: "createOrder.billing",
-  Review: "createOrder.review",
-  "Print Center": "createOrder.printCenter",
 };
 
 export default function CreateOrder() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({});
   const [error, setError] = useState("");
 
   const mutation = useMutation({ mutationFn: (d) => api.post("/orders", d) });
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [step]);
 
   const merge = (d) => setForm((prev) => ({ ...prev, ...d }));
   const next = (d) => {
@@ -113,8 +115,44 @@ export default function CreateOrder() {
     setError("");
   };
 
-  const submit = async () => {
-    const merged = form;
+  const checkBoxAvailability = async (orderTypes) => {
+    for (const type of orderTypes) {
+      try {
+        const { data: boxes } = await api.get("/boxes", {
+          params: { type },
+        });
+        if (!boxes?.length) {
+          return {
+            available: false,
+            error: `No box available for ${getOrderTypeLabel(type, i18n.language)}. Please create a box first.`,
+            redirectToBox: true,
+          };
+        }
+        const currentCounts = boxes.map((b) => ({
+          ...b,
+          currentCount: b._count?.orders || 0,
+        }));
+        const availableBox = currentCounts.find((b) => b.currentCount < b.capacity);
+        if (!availableBox) {
+          return {
+            available: false,
+            error: `All boxes are full for ${getOrderTypeLabel(type, i18n.language)}. Please create a new box.`,
+            redirectToBox: true,
+          };
+        }
+      } catch (e) {
+        return {
+          available: false,
+          error: `Failed to check box availability for ${getOrderTypeLabel(type, i18n.language)}.`,
+          redirectToBox: false,
+        };
+      }
+    }
+    return { available: true };
+  };
+
+  const submit = async (mergedInput = form) => {
+    const merged = mergedInput;
     setError("");
     const measurementError = validateMeasurementsBeforeSubmit(
       merged.orderTypes || [],
@@ -127,32 +165,45 @@ export default function CreateOrder() {
       return;
     }
 
+    const boxCheck = await checkBoxAvailability(merged.orderTypes || []);
+    if (!boxCheck.available) {
+      toast.error(boxCheck.error);
+      setError(boxCheck.error);
+      if (boxCheck.redirectToBox) {
+        navigate("/boxes");
+      }
+      return;
+    }
+
+    const billEmergency = resolveBillEmergency(merged.orderTypes || []);
+    const orderItems = buildOrderItems(
+      merged.orderTypes || [],
+      merged.measurements || {},
+    );
+
     const payload = {
       customerInfo: {
+        customerId: merged.customerId,
         firstName: merged.firstName,
         phoneNumber: merged.phoneNumber,
       },
-      orders: (merged.orderTypes || []).map((entry, i) => {
-        const b = merged.billing?.[i] || {};
-        const measRaw = merged.measurements?.[i];
-        const meas = pickPrimaryMeasurementSet(entry.type, measRaw);
+      orders: orderItems.map((item) => {
+        const b = merged.billing?.[item.billingKey] || {};
+        const meas = sanitize(item.measurements);
         const pricePerItem = parseNumberLocale(b.totalPrice) || 0;
         const qtyRaw = parseNumberLocale(b.quantity);
         const qty = Number.isFinite(qtyRaw)
           ? Math.max(1, Math.floor(qtyRaw))
           : 1;
         return {
-          type: entry.type,
-          orderName: resolveOrderName(measRaw),
-          isEmergency: !!entry.isEmergency,
-          emergencyExpiry:
-            entry.isEmergency && entry.emergencyExpiry
-              ? `${entry.emergencyExpiry}T${String(Number(entry.emergencyHour) || 0).padStart(2, "0")}:00:00`
-              : null,
-          measurements: sanitize(meas),
-          totalPrice: pricePerItem * qty,
-          discount: parseNumberLocale(b.discount) || 0,
-          paidAmount: parseNumberLocale(b.paidAmount) || 0,
+          type: item.type,
+          orderName: resolveOrderName(item.measurements),
+          isEmergency: billEmergency.isEmergency,
+          emergencyExpiry: billEmergency.emergencyExpiry,
+          measurements: meas,
+          totalPrice: toWholeAmount(pricePerItem * qty),
+          discount: toWholeAmount(parseNumberLocale(b.discount) || 0),
+          paidAmount: toWholeAmount(parseNumberLocale(b.paidAmount) || 0),
           quantity: qty,
         };
       }),
@@ -160,14 +211,27 @@ export default function CreateOrder() {
 
     try {
       const res = await mutation.mutateAsync(payload);
+      const createdCustomer = res?.data?.customer;
       setForm((prev) => ({ ...prev, result: res.data }));
       toast.success(t("createOrder.orderCreatedSuccess"));
-      setStep(5); // Print Center
+      navigate("/print-bills", {
+        state: {
+          preselectCustomerId: createdCustomer?.id || null,
+          preselectBillNumber: createdCustomer?.billNumber || null,
+          fromOrderCreate: true,
+        },
+      });
     } catch (e) {
+      const errorData = e.response?.data;
       const msg = getApiErrorMessage(e, t("createOrder.createFailed"));
       setError(msg);
       toast.error(msg);
-      console.error("Order creation error:", e.response?.data || e);
+
+      if (errorData?.code === "BOX_NOT_FOUND_FOR_TYPE" || errorData?.code === "BOX_CAPACITY_FULL") {
+        navigate("/boxes");
+      }
+
+      console.error("Order creation error:", errorData || e);
     }
   };
 
@@ -245,7 +309,13 @@ export default function CreateOrder() {
           )}
           {step === 2 && (
             <Step3Measurements
-              onNext={next}
+              onNext={(d) => {
+                const orderItems = buildOrderItems(
+                  form.orderTypes || [],
+                  d.measurements || {},
+                );
+                next({ ...d, orderItems });
+              }}
               onBack={back}
               orderTypes={form.orderTypes}
               initial={form.measurements}
@@ -253,22 +323,18 @@ export default function CreateOrder() {
           )}
           {step === 3 && (
             <Step4Billing
-              onNext={next}
+              onNext={(d) => {
+                const merged = { ...form, ...d };
+                merge(d);
+                submit(merged);
+              }}
               onBack={back}
               orderTypes={form.orderTypes}
+              orderItems={form.orderItems}
               initial={form.billing}
-              loading={false}
-            />
-          )}
-          {step === 4 && (
-            <Step5ReviewOrder
-              form={form}
-              onBack={back}
-              onSubmit={submit}
               loading={mutation.isPending}
             />
           )}
-          {step === 5 && <Step6PrintCenter data={form} />}
         </div>
       </div>
 
@@ -283,6 +349,33 @@ function resolveOrderName(measurementValue) {
     : [measurementValue || {}];
   const namedSet = sets.find((set) => set?.__name?.trim());
   return namedSet?.__name?.trim() || undefined;
+}
+
+function resolveBillEmergency(orderTypes) {
+  const entries = Array.isArray(orderTypes) ? orderTypes : [];
+  const emergencyEntry = entries.find((entry) => entry?.isEmergency);
+  if (!emergencyEntry) {
+    return { isEmergency: false, emergencyExpiry: null };
+  }
+
+  if (!emergencyEntry.emergencyExpiry) {
+    return { isEmergency: true, emergencyExpiry: null };
+  }
+
+  const hour = String(Number(emergencyEntry.emergencyHour) || 0).padStart(
+    2,
+    "0",
+  );
+  return {
+    isEmergency: true,
+    emergencyExpiry: `${emergencyEntry.emergencyExpiry}T${hour}:00:00`,
+  };
+}
+
+function toWholeAmount(value) {
+  const normalized = Number(value || 0);
+  if (!Number.isFinite(normalized)) return 0;
+  return Math.max(0, Math.round(normalized));
 }
 
 function sanitize(m) {
@@ -304,46 +397,89 @@ function sanitize(m) {
   return out;
 }
 
-function pickPrimaryMeasurementSet(type, measurementValue) {
-  const sets = Array.isArray(measurementValue)
-    ? measurementValue
-    : [measurementValue || {}];
-  const requiredFields = REQUIRED_MEASUREMENT_FIELDS[type] || [];
-  return (
-    sets.find((set) =>
-      requiredFields.some((field) => {
-        const value = set?.[field];
-        if (value === undefined || value === null) return false;
-        const n =
-          typeof value === "number" ? value : parseNumberLocale(String(value));
-        return !isNaN(n);
-      }),
-    ) ||
-    sets[0] ||
-    {}
-  );
-}
-
 function validateMeasurementsBeforeSubmit(orderTypes, measurements) {
   for (let i = 0; i < orderTypes.length; i += 1) {
     const entry = orderTypes[i];
-    const primarySet = pickPrimaryMeasurementSet(entry.type, measurements?.[i]);
-    const sanitized = sanitize(primarySet);
+    const sets = normalizeMeasurementSets(measurements?.[i]);
     const required = REQUIRED_MEASUREMENT_FIELDS[entry.type] || [];
-    const missing = required.filter((field) => {
-      const value = sanitized[field];
-      return (
-        value === undefined ||
-        value === null ||
-        (typeof value === "number" && isNaN(value))
-      );
-    });
-    if (missing.length) {
-      const label = entry.name?.trim()
-        ? `${entry.type} (${entry.name.trim()})`
-        : entry.type;
-      return `Please complete required measurements for ${label}: ${missing.join(", ")}`;
+    for (let setIndex = 0; setIndex < sets.length; setIndex += 1) {
+      const currentSet = sets[setIndex];
+      const sanitized = sanitize(currentSet);
+      const missing = required.filter((field) => {
+        const value = sanitized[field];
+        return (
+          value === undefined ||
+          value === null ||
+          (typeof value === "number" && isNaN(value))
+        );
+      });
+      if (missing.length) {
+        const label =
+          currentSet?.__name?.trim() ||
+          buildDefaultItemName(entry.type, setIndex + 1);
+        return i18n.t("createOrder.completeMeasurements", {
+          type: getOrderTypeLabel(
+            entry.type,
+            i18n.resolvedLanguage || i18n.language || "en",
+          ),
+          label,
+          defaultValue: `Please complete required measurements for ${label}.`,
+        });
+      }
     }
   }
   return "";
+}
+
+function getOrderTypeDisplayName(type) {
+  return getOrderTypeLabel(
+    type,
+    i18n.resolvedLanguage || i18n.language || "en",
+  );
+}
+
+function buildDefaultItemName(type, sequence) {
+  return `${getOrderTypeDisplayName(type)} ${sequence}`;
+}
+
+function normalizeMeasurementSets(measurementValue) {
+  if (Array.isArray(measurementValue) && measurementValue.length > 0) {
+    return measurementValue.map((setValue) =>
+      setValue && typeof setValue === "object" ? setValue : {},
+    );
+  }
+  if (measurementValue && typeof measurementValue === "object") {
+    return [measurementValue];
+  }
+  return [{}];
+}
+
+function buildOrderItems(orderTypes, measurements) {
+  const items = [];
+  const typeCounter = {};
+
+  (orderTypes || []).forEach((entry, typeIndex) => {
+    const sets = normalizeMeasurementSets(measurements?.[typeIndex]);
+    sets.forEach((setValue, setIndex) => {
+      typeCounter[entry.type] = (typeCounter[entry.type] || 0) + 1;
+      const sequence = typeCounter[entry.type];
+      const displayName =
+        setValue?.__name?.trim() || buildDefaultItemName(entry.type, sequence);
+      items.push({
+        billingKey: `${typeIndex}-${setIndex}`,
+        typeIndex,
+        setIndex,
+        sequence,
+        type: entry.type,
+        displayName,
+        measurements: {
+          ...setValue,
+          __name: displayName,
+        },
+        isEmergency: !!entry?.isEmergency,
+      });
+    });
+  });
+
+  return items;
 }

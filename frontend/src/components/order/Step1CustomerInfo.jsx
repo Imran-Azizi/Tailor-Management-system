@@ -15,6 +15,7 @@ export default function Step1CustomerInfo({ onNext, initial = {} }) {
   const [isSearching, setIsSearching] = useState(false);
   const [matchedCustomer, setMatchedCustomer] = useState(null);
   const schema = z.object({
+    customerId: z.string().optional(),
     firstName: z
       .string()
       .min(
@@ -38,22 +39,38 @@ export default function Step1CustomerInfo({ onNext, initial = {} }) {
   } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
+      customerId: initial.customerId || "",
       firstName: initial.firstName || "",
       phoneNumber: initial.phoneNumber || "",
     },
   });
   const phoneNumber = watch("phoneNumber");
+  const phoneNumberField = register("phoneNumber", {
+    onBlur: () => handlePhoneSearch({ silent: true }),
+    onChange: (e) => {
+      const current = normalizePhone(e.target.value || "");
+      const matched = normalizePhone(matchedCustomer?.phoneNumber || "");
+      if (matchedCustomer && current && current !== matched) {
+        setMatchedCustomer(null);
+        setValue("customerId", "", { shouldDirty: true });
+      }
+    },
+  });
 
-  async function handlePhoneSearch() {
+  async function handlePhoneSearch({ silent = false } = {}) {
     const raw = (phoneNumber || "").trim();
     const normalized = normalizePhone(raw) || "";
 
     // require at least 7 digits for a valid phone lookup
     const digitCount = (normalized.replace(/\D/g, "") || "").length;
     if (digitCount < 7) {
-      toast.error(
-        t("createOrder.fieldRequired", { field: t("createOrder.phoneNumber") }),
-      );
+      if (!silent) {
+        toast.error(
+          t("createOrder.fieldRequired", {
+            field: t("createOrder.phoneNumber"),
+          }),
+        );
+      }
       return;
     }
 
@@ -66,10 +83,14 @@ export default function Step1CustomerInfo({ onNext, initial = {} }) {
 
       if (!customer) {
         setMatchedCustomer(null);
-        toast.error(t("createOrder.customerNotFound"));
+        setValue("customerId", "");
+        if (!silent) toast.error(t("createOrder.customerNotFound"));
         return;
       }
 
+      setValue("customerId", customer.id || "", {
+        shouldDirty: true,
+      });
       setValue("firstName", customer.firstName || "", {
         shouldValidate: true,
         shouldDirty: true,
@@ -80,12 +101,15 @@ export default function Step1CustomerInfo({ onNext, initial = {} }) {
         shouldDirty: true,
       });
       setMatchedCustomer(customer);
-      toast.success(t("createOrder.customerFound"));
+      if (!silent) toast.success(t("createOrder.customerFound"));
     } catch (error) {
       setMatchedCustomer(null);
-      toast.error(
-        getApiErrorMessage(error, t("createOrder.customerLookupFailed")),
-      );
+      setValue("customerId", "");
+      if (!silent) {
+        toast.error(
+          getApiErrorMessage(error, t("createOrder.customerLookupFailed")),
+        );
+      }
     } finally {
       setIsSearching(false);
     }
@@ -150,19 +174,18 @@ export default function Step1CustomerInfo({ onNext, initial = {} }) {
             <div className="iw">
               <LuPhone size={14} className="ico" />
               <input
-                {...register("phoneNumber")}
+                {...phoneNumberField}
                 className={`inp${errors.phoneNumber ? " err" : ""}`}
                 placeholder={t("createOrder.phoneNumber")}
                 type="tel"
               />
             </div>
-
             <button
               type="button"
               className="btn btn-secondary search-btn"
-              aria-label={t("common.search")}
               onClick={handlePhoneSearch}
               disabled={isSearching}
+              aria-label={t("common.search")}
             >
               {isSearching ? (
                 <span className="search-spinner" />
@@ -185,10 +208,6 @@ export default function Step1CustomerInfo({ onNext, initial = {} }) {
         </div>
       ) : null}
 
-      <div className="info-box ib-gold" style={{ marginBottom: 24 }}>
-        <span>{t("createOrder.existingCustomerHint")}</span>
-      </div>
-
       <button
         type="submit"
         className="btn btn-gold"
@@ -196,6 +215,8 @@ export default function Step1CustomerInfo({ onNext, initial = {} }) {
       >
         {t("createOrder.continueToOrderTypes")}
       </button>
+
+      <input type="hidden" {...register("customerId")} />
     </form>
   );
 }

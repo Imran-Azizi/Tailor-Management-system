@@ -5,18 +5,36 @@ import {
   LuCheck,
   LuX,
   LuTriangleAlert,
-  LuScissors,
-  LuReceipt,
-  LuUserRound,
-  LuFileText,
+  LuShirt,
+  LuPocket,
+  LuPersonStanding,
+  LuScissorsLineDashed,
 } from "react-icons/lu";
+import { getOrderTypeLabel } from "../../lib/orderType.js";
 
 const TYPES = [
-  { id: "OUTFIT", label: "پیراهن تنبان", Icon: LuScissors },
-  { id: "WASKAT", label: "واسکت", Icon: LuUserRound },
-  { id: "KORTY", label: "کرتی", Icon: LuReceipt },
-  { id: "YAKHANQAQ", label: "یخن قاق", Icon: LuFileText },
+  { id: "OUTFIT", Icon: LuShirt },
+  { id: "WASKAT", Icon: LuPocket },
+  { id: "KORTY", Icon: LuPersonStanding },
+  { id: "YAKHANQAQ", Icon: LuScissorsLineDashed },
 ];
+
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => {
+  const period = hour >= 12 ? "PM" : "AM";
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  return {
+    value: String(hour).padStart(2, "0"),
+    label: `${hour12}:00 ${period}`,
+  };
+});
+
+function normalizeEmergencyHour(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 0 || numeric > 23) {
+    return "08";
+  }
+  return String(Math.floor(numeric)).padStart(2, "0");
+}
 
 function isPastDate(value) {
   if (!value) return false;
@@ -26,9 +44,21 @@ function isPastDate(value) {
 }
 
 export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
-  const { t } = useTranslation();
-  const [entries, setEntries] = useState(initial.length ? initial : []);
-  const [errors, setErrors] = useState({});
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language;
+  const initialEntries = initial.length ? initial : [];
+  const initialEmergencyEntry = initialEntries.find((entry) => entry?.isEmergency);
+  const [entries, setEntries] = useState(initialEntries);
+  const [billEmergency, setBillEmergency] = useState(
+    initialEntries.some((entry) => entry?.isEmergency),
+  );
+  const [billEmergencyExpiry, setBillEmergencyExpiry] = useState(
+    initialEmergencyEntry?.emergencyExpiry || "",
+  );
+  const [billEmergencyHour, setBillEmergencyHour] = useState(
+    normalizeEmergencyHour(initialEmergencyEntry?.emergencyHour),
+  );
+  const [billEmergencyError, setBillEmergencyError] = useState("");
 
   const selectedTypes = useMemo(
     () => new Set(entries.map((entry) => entry.type)),
@@ -37,78 +67,69 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
 
   const toggleType = (id) => {
     if (selectedTypes.has(id)) {
-      setEntries(entries.filter((entry) => entry.type !== id));
-      setErrors({});
+      setEntries((current) => current.filter((entry) => entry.type !== id));
+      setBillEmergencyError("");
       return;
     }
 
-    setEntries([
-      ...entries,
-      { type: id, isEmergency: false, emergencyExpiry: "", emergencyHour: "08" },
-    ]);
-  };
-
-  const updateEntry = (idx, key, value) => {
-    setEntries((current) =>
-      current.map((entry, index) => {
-        if (index !== idx) return entry;
-        return {
-          ...entry,
-          [key]: value,
-          ...(key === "isEmergency" && !value
-            ? { emergencyExpiry: "", emergencyHour: "08" }
-            : {}),
-        };
-      }),
-    );
-
-    setErrors((current) => ({
+    setEntries((current) => [
       ...current,
-      [idx]: {
-        ...current[idx],
-        [key]: "",
-        ...(key === "isEmergency" && !value ? { emergencyExpiry: "" } : {}),
+      {
+        type: id,
+        isEmergency: billEmergency,
+        emergencyExpiry: billEmergency ? billEmergencyExpiry : "",
+        emergencyHour: billEmergency ? billEmergencyHour : "08",
       },
-    }));
+    ]);
   };
 
   const removeEntry = (idx) => {
     setEntries((current) => current.filter((_, index) => index !== idx));
-    setErrors({});
+    setBillEmergencyError("");
+  };
+
+  const syncEmergencyToEntries = (isEmergency, expiry, hour) => {
+    const normalizedHour = normalizeEmergencyHour(hour);
+    setEntries((current) =>
+      current.map((entry) => ({
+        ...entry,
+        isEmergency,
+        emergencyExpiry: isEmergency ? expiry : "",
+        emergencyHour: isEmergency ? normalizedHour : "08",
+      })),
+    );
   };
 
   const validateBeforeContinue = () => {
-    const nextErrors = {};
-
-    entries.forEach((entry, idx) => {
-      const entryErrors = {};
-
-      if (entry.isEmergency) {
-        if (!entry.emergencyExpiry) {
-          entryErrors.emergencyExpiry = t("createOrder.expiryRequired");
-        } else if (isPastDate(entry.emergencyExpiry)) {
-          entryErrors.emergencyExpiry = t("createOrder.expiryPast");
-        }
-      }
-
-      if (Object.keys(entryErrors).length) {
-        nextErrors[idx] = entryErrors;
-      }
-    });
-
-    setErrors(nextErrors);
-
     if (!entries.length) {
       toast.error(t("createOrder.selectAtLeastOne"));
       return;
     }
 
-    if (Object.keys(nextErrors).length) {
-      toast.error(t("createOrder.fixHighlightedOrderFields"));
-      return;
+    if (billEmergency) {
+      if (!billEmergencyExpiry) {
+        const message = t("createOrder.expiryRequired");
+        setBillEmergencyError(message);
+        toast.error(message);
+        return;
+      }
+      if (isPastDate(billEmergencyExpiry)) {
+        const message = t("createOrder.expiryPast");
+        setBillEmergencyError(message);
+        toast.error(message);
+        return;
+      }
     }
 
-    onNext({ orderTypes: entries });
+    const normalizedEntries = entries.map((entry) => ({
+      ...entry,
+      isEmergency: billEmergency,
+      emergencyExpiry: billEmergency ? billEmergencyExpiry : "",
+      emergencyHour: billEmergency ? billEmergencyHour : "08",
+    }));
+
+    setBillEmergencyError("");
+    onNext({ orderTypes: normalizedEntries });
   };
 
   return (
@@ -121,8 +142,9 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
       </p>
 
       <div className="type-grid" style={{ marginBottom: 22 }}>
-        {TYPES.map(({ id, label, desc, Icon }) => {
+        {TYPES.map(({ id, desc, Icon }) => {
           const selected = selectedTypes.has(id);
+          const label = getOrderTypeLabel(id, language);
           return (
             <button
               key={id}
@@ -165,6 +187,104 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
 
       {entries.length > 0 && (
         <div className="selected-order-stack" style={{ marginBottom: 18 }}>
+          <div className="selected-order-card">
+            <div className="selected-order-head" style={{ marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span className="badge bg-red" style={{ fontSize: 10 }}>
+                  {t("createOrder.priority")}
+                </span>
+                <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                  {t("createOrder.emergencyOrder")}
+                </span>
+              </div>
+            </div>
+
+            <label className="order-toggle">
+              <input
+                type="checkbox"
+                checked={billEmergency}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setBillEmergency(checked);
+                  setBillEmergencyError("");
+                  syncEmergencyToEntries(
+                    checked,
+                    billEmergencyExpiry,
+                    billEmergencyHour,
+                  );
+                }}
+              />
+              <span className={`order-toggle-pill${billEmergency ? " on" : ""}`}>
+                <LuTriangleAlert size={12} />
+                {t("createOrder.emergencyOrder")}
+              </span>
+            </label>
+
+            {billEmergency && (
+              <div className="order-expiry-wrap">
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 12,
+                  }}
+                >
+                  <div>
+                    <label className="lbl lbl-r" style={{ fontSize: 11 }}>
+                      {t("createOrder.emergencyExpiryDate")}
+                    </label>
+                    <input
+                      type="date"
+                      className={`inp${billEmergencyError ? " err" : ""}`}
+                      style={{ height: 38, fontSize: 13, width: "100%" }}
+                      value={billEmergencyExpiry}
+                      min={new Date().toISOString().split("T")[0]}
+                      onChange={(e) => {
+                        const nextValue = e.target.value;
+                        setBillEmergencyExpiry(nextValue);
+                        setBillEmergencyError("");
+                        syncEmergencyToEntries(
+                          true,
+                          nextValue,
+                          billEmergencyHour,
+                        );
+                      }}
+                    />
+                    {billEmergencyError && (
+                      <p className="err-msg">{billEmergencyError}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="lbl" style={{ fontSize: 11 }}>
+                      {t("createOrder.emergencyExpiryHour")}
+                    </label>
+                    <select
+                      className="inp"
+                      style={{ height: 38, fontSize: 13, width: "100%" }}
+                      value={billEmergencyHour}
+                      onChange={(e) => {
+                        const nextHour = normalizeEmergencyHour(e.target.value);
+                        setBillEmergencyHour(nextHour);
+                        syncEmergencyToEntries(
+                          true,
+                          billEmergencyExpiry,
+                          nextHour,
+                        );
+                      }}
+                    >
+                      {HOUR_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           <p
             style={{
               fontSize: 11,
@@ -190,11 +310,16 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
                   }}
                 >
                   <span className="badge bg-gold" style={{ fontSize: 11 }}>
-                    {entry.type}
+                    {getOrderTypeLabel(entry.type, language)}
                   </span>
                   <span style={{ fontSize: 12, color: "var(--text3)" }}>
                     {t("createOrder.configureOrder")}
                   </span>
+                  {billEmergency && (
+                    <span className="badge bg-red" style={{ fontSize: 10 }}>
+                      {t("createOrder.emergencyShort")}
+                    </span>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -211,77 +336,6 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
                   <LuX size={14} />
                 </button>
               </div>
-
-              <div className="selected-order-grid">
-                <div>
-                  <label className="lbl" style={{ fontSize: 11 }}>
-                    {t("createOrder.priority")}
-                  </label>
-                  <label className="order-toggle">
-                    <input
-                      type="checkbox"
-                      checked={entry.isEmergency}
-                      onChange={(e) =>
-                        updateEntry(idx, "isEmergency", e.target.checked)
-                      }
-                    />
-                    <span
-                      className={`order-toggle-pill${entry.isEmergency ? " on" : ""}`}
-                    >
-                      <LuTriangleAlert size={12} />
-                      {t("createOrder.emergencyOrder")}
-                    </span>
-                  </label>
-                </div>
-              </div>
-
-              {entry.isEmergency && (
-                <div className="order-expiry-wrap">
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    {/* Expiry date */}
-                    <div>
-                      <label className="lbl lbl-r" style={{ fontSize: 11 }}>
-                        {t("createOrder.emergencyExpiryDate")}
-                      </label>
-                      <input
-                        type="date"
-                        className={`inp${errors[idx]?.emergencyExpiry ? " err" : ""}`}
-                        style={{ height: 38, fontSize: 13, width: "100%" }}
-                        value={entry.emergencyExpiry}
-                        min={new Date().toISOString().split("T")[0]}
-                        onChange={(e) =>
-                          updateEntry(idx, "emergencyExpiry", e.target.value)
-                        }
-                      />
-                      {errors[idx]?.emergencyExpiry && (
-                        <p className="err-msg">{errors[idx].emergencyExpiry}</p>
-                      )}
-                    </div>
-
-                    {/* Expiry hour */}
-                    <div>
-                      <label className="lbl" style={{ fontSize: 11 }}>
-                        {t("createOrder.emergencyExpiryHour")}
-                      </label>
-                      <input
-                        type="number"
-                        className="inp"
-                        style={{ height: 38, fontSize: 13, width: "100%" }}
-                        min={0}
-                        max={23}
-                        placeholder="0–23"
-                        value={entry.emergencyHour ?? "08"}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val === "" || (Number(val) >= 0 && Number(val) <= 23)) {
-                            updateEntry(idx, "emergencyHour", val);
-                          }
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           ))}
         </div>

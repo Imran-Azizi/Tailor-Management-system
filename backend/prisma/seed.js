@@ -49,16 +49,16 @@ async function main() {
   // Seed default admin user (password: admin123)
   const adminPassword = await bcrypt.hash('admin123', 12);
   const admin = await prisma.user.upsert({
-    where: { phoneNumber: '0700000000' },
+    where: { phoneNumber: '0789577024' },
     update: {},
     create: {
       name: 'Admin',
-      phoneNumber: '0700000000',
+      phoneNumber: '0789577024',
       accountType: 'ADMIN',
       password: adminPassword,
     },
   });
-  console.log('✅ Default admin created:', admin.name, '/ phone: 0700000000 / password: admin123');
+  console.log('✅ Default admin created:', admin.name, '/ phone: 0789577024 / password: admin123');
 
   console.log('🎉 Seed complete!');
 }

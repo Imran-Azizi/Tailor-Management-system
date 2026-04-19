@@ -5,11 +5,12 @@ import toast from 'react-hot-toast';
 import {
   LuUserPlus, LuPencil, LuTrash2, LuShieldCheck, LuUser,
   LuX, LuPhone, LuLock, LuEye, LuEyeOff, LuUsers,
-  LuToggleLeft, LuToggleRight, LuMail,
+  LuToggleLeft, LuToggleRight,
 } from 'react-icons/lu';
 import api from '../lib/api.js';
 import { getApiErrorMessage } from '../lib/feedback.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { ConfirmDeleteModal } from '../components/ui/index.jsx';
 
 const ROLE_COLORS = {
   ADMIN: '#2563EB',
@@ -33,7 +34,6 @@ function UserModal({ user, onClose, onSaved }) {
   const [form, setForm] = useState({
     name: user?.name || '',
     phoneNumber: user?.phoneNumber || '',
-    email: user?.email || '',
     accountType: user?.accountType || 'DOKAN',
     password: '',
     isActive: user?.isActive ?? true,
@@ -51,7 +51,7 @@ function UserModal({ user, onClose, onSaved }) {
     }
     setSaving(true);
     try {
-      const payload = { name: form.name, phoneNumber: form.phoneNumber, email: form.email || null, accountType: form.accountType, isActive: form.isActive };
+      const payload = { name: form.name, phoneNumber: form.phoneNumber, accountType: form.accountType, isActive: form.isActive };
       if (form.password) payload.password = form.password;
       if (user) {
         const { data } = await api.put(`/users/${user.id}`, payload);
@@ -91,22 +91,6 @@ function UserModal({ user, onClose, onSaved }) {
             <div style={{ position: 'relative' }}>
               <LuPhone size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)' }} />
               <input style={{ ...inputStyle, paddingLeft: 32 }} value={form.phoneNumber} onChange={e => set('phoneNumber', e.target.value)} placeholder="0700000000" required />
-            </div>
-          </div>
-          {/* Email */}
-          <div>
-            <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--text2)', display: 'block', marginBottom: 5 }}>
-              {t('users.email')} <span style={{ color: 'var(--text3)', fontWeight: 400 }}>({t('common.optional')})</span>
-            </label>
-            <div style={{ position: 'relative' }}>
-              <LuMail size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)' }} />
-              <input
-                type="email"
-                style={{ ...inputStyle, paddingLeft: 32 }}
-                value={form.email}
-                onChange={e => set('email', e.target.value)}
-                placeholder="user@example.com"
-              />
             </div>
           </div>
           {/* Role */}
@@ -171,6 +155,7 @@ export default function UserManagement() {
   const { user: me } = useAuth();
   const qc = useQueryClient();
   const [modal, setModal] = useState(null); // null | 'new' | userObj
+  const [deleteUserTarget, setDeleteUserTarget] = useState(null);
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users'],
@@ -187,8 +172,7 @@ export default function UserManagement() {
 
   const confirmDelete = (u) => {
     if (u.id === me?.id) { toast.error(t('users.cannotDeleteSelf')); return; }
-    if (!window.confirm(t('users.confirmDelete', { name: u.name }))) return;
-    deleteMut.mutate(u.id);
+    setDeleteUserTarget(u);
   };
 
   return (
@@ -217,7 +201,7 @@ export default function UserManagement() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--surface2)' }}>
-                {[t('users.name'), t('common.phone'), t('users.email'), t('users.role'), t('users.orders'), t('common.status'), t('common.actions')].map(h => (
+                {[t('users.name'), t('common.phone'), t('users.role'), t('users.orders'), t('common.status'), t('common.actions')].map(h => (
                   <th key={h} style={{ padding: '11px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: 'var(--text3)', borderBottom: '1px solid var(--border)' }}>{h}</th>
                 ))}
               </tr>
@@ -237,16 +221,6 @@ export default function UserManagement() {
                     </div>
                   </td>
                   <td style={{ padding: '13px 16px', fontSize: 13, color: 'var(--text2)' }}>{u.phoneNumber}</td>
-                  <td style={{ padding: '13px 16px', fontSize: 13, color: 'var(--text2)' }}>
-                    {u.email ? (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <LuMail size={12} style={{ color: 'var(--text3)', flexShrink: 0 }} />
-                        {u.email}
-                      </span>
-                    ) : (
-                      <span style={{ color: 'var(--text3)' }}>—</span>
-                    )}
-                  </td>
                   <td style={{ padding: '13px 16px' }}><RoleBadge role={u.accountType} /></td>
                   <td style={{ padding: '13px 16px', fontSize: 13, color: 'var(--text2)' }}>{u._count?.assignedOrders ?? 0}</td>
                   <td style={{ padding: '13px 16px' }}>
@@ -282,6 +256,21 @@ export default function UserManagement() {
           onSaved={handleSaved}
         />
       )}
+
+      <ConfirmDeleteModal
+        open={!!deleteUserTarget}
+        onClose={() => setDeleteUserTarget(null)}
+        onConfirm={() => {
+          if (!deleteUserTarget) return;
+          deleteMut.mutate(deleteUserTarget.id, {
+            onSettled: () => setDeleteUserTarget(null),
+          });
+        }}
+        title={t('users.deleteTitle', { defaultValue: t('common.delete') })}
+        message={t('users.confirmDelete', { name: deleteUserTarget?.name || '-' })}
+        itemName={deleteUserTarget ? `${deleteUserTarget.name || ''} (${deleteUserTarget.accountType || '-'})` : ''}
+        isPending={deleteMut.isPending}
+      />
     </div>
   );
 }

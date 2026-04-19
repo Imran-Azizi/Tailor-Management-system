@@ -10,6 +10,7 @@ import {
   CartesianGrid, PieChart, Pie, Cell, Legend,
 } from 'recharts';
 import api from '../lib/api.js';
+import { getOrderTypeLabel } from '../lib/orderType.js';
 import { Spinner, Badge } from '../components/ui/index.jsx';
 
 function formatMoney(v) { return `$${Number(v || 0).toLocaleString()}`; }
@@ -24,7 +25,8 @@ const ORDER_COLORS = {
 const PIE_COLORS = ['#2563EB','#0D9488','#D97706','#DC2626','#7C3AED'];
 
 export default function CustomerReport() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language;
 
   // Fetch analytics for chart data
   const { data: analytics, isLoading: analyticsLoading } = useQuery({
@@ -43,7 +45,10 @@ export default function CustomerReport() {
 
   // Build order-type breakdown for pie
   const typeBreakdown = analytics?.ordersByType || [];
-  const pieData = typeBreakdown.map(t => ({ name: t.type || t._id, value: t._count || t.count || t.value || 0 }));
+  const pieData = typeBreakdown.map((item) => ({
+    name: getOrderTypeLabel(item.type || item._id, language),
+    value: item._count || item.count || item.value || 0,
+  }));
 
   // Monthly revenue for bar chart
   const monthly = analytics?.monthlyRevenue || [];

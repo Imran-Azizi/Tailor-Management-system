@@ -26,7 +26,7 @@ function LangBtn() {
         <span style={{ fontWeight: 700 }}>{current.slice(0, 2).toUpperCase()}</span>
       </button>
       {open && (
-        <div style={{ position: 'absolute', top: '110%', right: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: 'var(--sh-md)', minWidth: 140, zIndex: 50 }}>
+        <div style={{ position: 'absolute', top: '110%', insetInlineEnd: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: 'var(--sh-md)', minWidth: 140, zIndex: 50 }}>
           {langs.map(l => (
             <div
               key={l.code}
@@ -35,7 +35,7 @@ function LangBtn() {
             >
               <span style={{ fontSize: 11, fontWeight: 800 }}>{l.flag}</span>
               {l.label}
-              {current === l.code && <LuCheck size={12} style={{ marginLeft: 'auto' }} />}
+              {current === l.code && <LuCheck size={12} style={{ marginInlineStart: 'auto' }} />}
             </div>
           ))}
         </div>
@@ -43,20 +43,6 @@ function LangBtn() {
     </div>
   );
 }
-
-const ROLE_COLORS = {
-  ADMIN: '#2563EB',
-  DOKAN: '#7C3AED',
-  DOKHT: '#DB2777',
-  QICHIKAR: '#D97706',
-};
-
-const ROLE_LABELS = {
-  ADMIN: 'Admin',
-  DOKAN: 'Dokan',
-  DOKHT: 'Dokht',
-  QICHIKAR: 'Qichikar',
-};
 
 export default function Login() {
   const { t } = useTranslation();
@@ -118,15 +104,6 @@ export default function Login() {
           <p style={{ fontSize: 13, color: 'var(--text3)', marginTop: 4 }}>{t('auth.signInToContinue')}</p>
         </div>
 
-        {/* Role badges */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 28 }}>
-          {Object.entries(ROLE_LABELS).map(([role, label]) => (
-            <span key={role} style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 99, background: ROLE_COLORS[role] + '18', color: ROLE_COLORS[role], border: `1px solid ${ROLE_COLORS[role]}30` }}>
-              {label}
-            </span>
-          ))}
-        </div>
-
         {/* Form */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Phone */}
@@ -134,14 +111,15 @@ export default function Login() {
             <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: 'var(--text2)', marginBottom: 6 }}>
               {t('common.phone')}
             </label>
-            <div style={{ position: 'relative' }}>
-              <LuPhone size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)' }} />
+            <div style={{ position: 'relative', direction: 'ltr' }}>
+              <LuPhone size={15} style={{ position: 'absolute', insetInlineStart: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)' }} />
               <input
                 type="tel"
                 value={phone}
                 onChange={e => setPhone(e.target.value)}
                 placeholder="0700000000"
-                style={{ width: '100%', padding: '10px 12px 10px 36px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface2)', color: 'var(--text1)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+                dir="ltr"
+                style={{ width: '100%', padding: '10px 12px', paddingInlineStart: 36, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface2)', color: 'var(--text1)', fontSize: 14, outline: 'none', boxSizing: 'border-box', textAlign: 'left' }}
                 autoComplete="username"
                 disabled={loading}
               />
@@ -153,21 +131,22 @@ export default function Login() {
             <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: 'var(--text2)', marginBottom: 6 }}>
               {t('auth.password')}
             </label>
-            <div style={{ position: 'relative' }}>
-              <LuLock size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)' }} />
+            <div style={{ position: 'relative', direction: 'ltr' }}>
+              <LuLock size={15} style={{ position: 'absolute', insetInlineStart: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)' }} />
               <input
                 type={showPw ? 'text' : 'password'}
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
-                style={{ width: '100%', padding: '10px 40px 10px 36px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface2)', color: 'var(--text1)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+                placeholder="********"
+                dir="ltr"
+                style={{ width: '100%', padding: '10px 12px', paddingInlineStart: 36, paddingInlineEnd: 40, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface2)', color: 'var(--text1)', fontSize: 14, outline: 'none', boxSizing: 'border-box', textAlign: 'left' }}
                 autoComplete="current-password"
                 disabled={loading}
               />
               <button
                 type="button"
                 onClick={() => setShowPw(s => !s)}
-                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', display: 'flex' }}
+                style={{ position: 'absolute', insetInlineEnd: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', display: 'flex' }}
               >
                 {showPw ? <LuEyeOff size={15} /> : <LuEye size={15} />}
               </button>

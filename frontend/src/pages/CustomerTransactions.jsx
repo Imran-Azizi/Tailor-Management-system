@@ -6,12 +6,14 @@ import {
   LuTrendingUp, LuTrendingDown, LuClock,
 } from 'react-icons/lu';
 import api from '../lib/api.js';
+import { getOrderTypeLabel } from '../lib/orderType.js';
 import { Spinner, EmptyState, Pagination, Badge } from '../components/ui/index.jsx';
 
 function formatMoney(v) { return `$${Number(v || 0).toLocaleString()}`; }
 
 function CustomerRow({ customer, expanded, onToggle }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language;
   const orders = customer.orders || [];
   const totalBilled   = orders.reduce((s, o) => s + (o.totalPrice || 0), 0);
   const totalPaid     = orders.reduce((s, o) => s + (o.paidAmount || 0), 0);
@@ -73,7 +75,9 @@ function CustomerRow({ customer, expanded, onToggle }) {
                   <tr key={o.id} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={{ padding: '8px 10px', color: 'var(--text3)' }}>{i + 1}</td>
                     <td style={{ padding: '8px 10px' }}>
-                      <Badge v={{ OUTFIT: 'gold', WASKAT: 'teal', KORTY: 'amber', YAKHANQAQ: 'red' }[o.type] || 'gold'}>{o.type}</Badge>
+                      <Badge v={{ OUTFIT: 'gold', WASKAT: 'teal', KORTY: 'amber', YAKHANQAQ: 'red' }[o.type] || 'gold'}>
+                        {getOrderTypeLabel(o.type, language)}
+                      </Badge>
                     </td>
                     <td style={{ padding: '8px 10px', fontWeight: 600 }}>{formatMoney(o.totalPrice)}</td>
                     <td style={{ padding: '8px 10px', color: '#16a34a' }}>{formatMoney(o.paidAmount)}</td>

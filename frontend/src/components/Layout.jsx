@@ -8,8 +8,12 @@ const TITLES = {
   "/dashboard": "common.dashboard",
   "/orders/create": "common.createOrder",
   "/orders": "common.allOrders",
-  "/orders/completed": "common.completedOrders",
   "/orders/pending": "common.pendingOrders",
+  "/orders/completed": "common.completedOrders",
+  "/orders/assignments": "assignment.assignOrder",
+  "/orders/assignments/clothes": "assignment.assignOrder",
+  "/orders/assignments/report": "sidebar.report",
+  "/delivery": "sidebar.clothesDelivery",
   "/customers": "common.customers",
   "/boxes": "common.boxManagement",
   "/designs": "common.designManagement",
@@ -28,7 +32,9 @@ export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const loc = useLocation();
   const titleKey =
-    Object.entries(TITLES).find(
+    Object.entries(TITLES)
+      .sort((a, b) => b[0].length - a[0].length)
+      .find(
       ([p]) => loc.pathname === p || loc.pathname.startsWith(`${p}/`),
     )?.[1] || "appName";
 

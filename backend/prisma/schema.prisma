@@ -16,34 +16,49 @@ enum AccountType {
   QICHIKAR
 }
 
+enum TransactionKind {
+  LOAN
+}
+
+enum WorkerPaymentStatus {
+  UNPAID
+  PAID_TO_WORKER
+}
+
 model User {
   id           String      @id @default(uuid())
   name         String
   phoneNumber  String      @unique
-  email        String?     @unique
   accountType  AccountType
   password     String
   isActive     Boolean     @default(true)
   refreshToken String?
 
-  assignedOrders      Order[]            @relation("AssignedOrders")
-  assignedByOrders    Order[]            @relation("AssignedByOrders")
-  notifications       UserNotification[]
-  transactions        Transaction[]      @relation("UserTransactions")
-  createdTransactions Transaction[]      @relation("CreatedTransactions")
+  assignedOrders         Order[]            @relation("AssignedOrders")
+  assignedByOrders       Order[]            @relation("AssignedByOrders")
+  receivedOrders         Order[]            @relation("ReceivedOrders")
+  qichikarAssignedOrders Order[]            @relation("QichikarAssignedOrders")
+  dokhtAssignedOrders    Order[]            @relation("DokhtAssignedOrders")
+  qichikarReceivedOrders Order[]            @relation("QichikarReceivedOrders")
+  dokhtReceivedOrders    Order[]            @relation("DokhtReceivedOrders")
+  workerPaidOrders       Order[]            @relation("WorkerPaidByOrders")
+  qichikarPaidOrders     Order[]            @relation("QichikarPaidByOrders")
+  dokhtPaidOrders        Order[]            @relation("DokhtPaidByOrders")
+  notifications          UserNotification[]
+  transactions           Transaction[]      @relation("UserTransactions")
+  createdTransactions    Transaction[]      @relation("CreatedTransactions")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([phoneNumber])
   @@index([accountType])
-  @@index([email])
 }
 
 model UserNotification {
-  id      String @id @default(uuid())
+  id      String  @id @default(uuid())
   userId  String
-  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   orderId String?
   message String
   type    String  @default("ASSIGNMENT")
@@ -71,27 +86,74 @@ model Customer {
 }
 
 model Order {
-  id              String         @id @default(uuid())
+  id              String    @id @default(uuid())
   customerId      String
   orderName       String?
   type            OrderType
   totalPrice      Float
-  discount        Float          @default(0)
+  discount        Float     @default(0)
   paidAmount      Float
   remaining       Float
-  quantity        Int            @default(1)
-  isEmergency     Boolean        @default(false)
+  quantity        Int       @default(1)
+  isEmergency     Boolean   @default(false)
   emergencyExpiry DateTime?
-  isCompleted     Boolean        @default(false)
-  inProgress      Boolean        @default(false)
+  isCompleted     Boolean   @default(false)
+  inProgress      Boolean   @default(false)
 
   // Assignment fields
-  assignedToId   String?
-  assignedById   String?
-  assignedAt     DateTime?
-  assignmentNote String?
-  assignedTo     User?          @relation("AssignedOrders", fields: [assignedToId], references: [id])
-  assignedBy     User?          @relation("AssignedByOrders", fields: [assignedById], references: [id])
+  assignedToId    String?
+  assignedById    String?
+  assignedAt      DateTime?
+  assignmentNote  String?
+  assignmentPrice Float?
+  receivedById    String?
+  receivedAt      DateTime?
+
+  // Role-based assignment & claim tracking
+  qichikarAssignedToId String?
+  qichikarAssignedAt   DateTime?
+  qichikarReceivedById String?
+  qichikarReceivedAt   DateTime?
+  qichikarInProgress   Boolean   @default(false)
+
+  dokhtAssignedToId String?
+  dokhtAssignedAt   DateTime?
+  dokhtReceivedById String?
+  dokhtReceivedAt   DateTime?
+  dokhtInProgress   Boolean   @default(false)
+
+  // Workflow tracking for Qichikar -> Dokht flow
+  // When Qichikar completes their task, we mark qichikarCompletedAt (not full completion)
+  qichikarCompletedAt DateTime?
+  // When Dokht completes, order becomes fully completed
+  dokhtCompletedAt    DateTime?
+
+  workerPaymentStatus WorkerPaymentStatus @default(UNPAID)
+  workerPaymentAmount Float?
+  workerPaidAt        DateTime?
+  workerPaidById      String?
+
+  // Role-specific worker payments (kept separate for Qichikar and Dokht)
+  qichikarPaymentStatus WorkerPaymentStatus @default(UNPAID)
+  qichikarPaymentAmount Float?
+  qichikarPaidAt        DateTime?
+  qichikarPaidById      String?
+
+  dokhtPaymentStatus WorkerPaymentStatus @default(UNPAID)
+  dokhtPaymentAmount Float?
+  dokhtPaidAt        DateTime?
+  dokhtPaidById      String?
+
+  assignedTo         User? @relation("AssignedOrders", fields: [assignedToId], references: [id])
+  assignedBy         User? @relation("AssignedByOrders", fields: [assignedById], references: [id])
+  receivedBy         User? @relation("ReceivedOrders", fields: [receivedById], references: [id])
+  qichikarAssignedTo User? @relation("QichikarAssignedOrders", fields: [qichikarAssignedToId], references: [id])
+  dokhtAssignedTo    User? @relation("DokhtAssignedOrders", fields: [dokhtAssignedToId], references: [id])
+  qichikarReceivedBy User? @relation("QichikarReceivedOrders", fields: [qichikarReceivedById], references: [id])
+  dokhtReceivedBy    User? @relation("DokhtReceivedOrders", fields: [dokhtReceivedById], references: [id])
+  workerPaidBy       User? @relation("WorkerPaidByOrders", fields: [workerPaidById], references: [id])
+  qichikarPaidBy     User? @relation("QichikarPaidByOrders", fields: [qichikarPaidById], references: [id])
+  dokhtPaidBy        User? @relation("DokhtPaidByOrders", fields: [dokhtPaidById], references: [id])
 
   customer      Customer       @relation(fields: [customerId], references: [id])
   boxId         Int?
@@ -109,6 +171,19 @@ model Order {
   @@index([isCompleted])
   @@index([isEmergency])
   @@index([assignedToId])
+  @@index([receivedById])
+  @@index([qichikarAssignedToId])
+  @@index([dokhtAssignedToId])
+  @@index([qichikarReceivedById])
+  @@index([dokhtReceivedById])
+  @@index([workerPaymentStatus])
+  @@index([workerPaidById])
+  @@index([qichikarPaymentStatus])
+  @@index([qichikarPaidById])
+  @@index([dokhtPaymentStatus])
+  @@index([dokhtPaidById])
+  @@index([qichikarCompletedAt])
+  @@index([dokhtCompletedAt])
 }
 
 enum OrderType {
@@ -324,19 +399,21 @@ model TenbanShip {
 // ─── Transactions ─────────────────────────────────────────────────────────────
 
 model Transaction {
-  id              String      @id @default(uuid())
+  id              String          @id @default(uuid())
   accountType     AccountType
   userId          String
-  user            User        @relation("UserTransactions", fields: [userId], references: [id])
+  user            User            @relation("UserTransactions", fields: [userId], references: [id])
+  kind            TransactionKind @default(LOAN)
   amount          Float
   transactionDate DateTime
   note            String?
   createdById     String
-  createdBy       User        @relation("CreatedTransactions", fields: [createdById], references: [id])
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  createdBy       User            @relation("CreatedTransactions", fields: [createdById], references: [id])
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   @@index([userId])
   @@index([accountType])
+  @@index([kind])
   @@index([createdById])
 }
