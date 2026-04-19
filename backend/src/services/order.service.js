@@ -774,7 +774,13 @@ const buildOrderUpdateData = (existingOrder, body) => {
   const paidAmount = body.paidAmount ?? existingOrder.paidAmount;
   const quantity = body.quantity ?? existingOrder.quantity;
   const remaining = totalPrice - discount - paidAmount;
-  const nextIsCompleted = body.isCompleted ?? existingOrder.isCompleted;
+  const hasWorkerCompleted = Boolean(
+    existingOrder.dokhtCompletedAt || existingOrder.qichikarCompletedAt,
+  );
+  const autoCompleteOnFullPayment = remaining <= 0 && hasWorkerCompleted;
+  const nextIsCompleted =
+    body.isCompleted ??
+    (existingOrder.isCompleted || autoCompleteOnFullPayment);
 
   if (discount < 0 || paidAmount < 0) {
     throw Object.assign(
@@ -830,8 +836,8 @@ const buildOrderUpdateData = (existingOrder, body) => {
     paidAmount,
     remaining,
     quantity,
-    ...(body.isCompleted !== undefined
-      ? { isCompleted: body.isCompleted }
+    ...(body.isCompleted !== undefined || autoCompleteOnFullPayment
+      ? { isCompleted: body.isCompleted ?? autoCompleteOnFullPayment }
       : {}),
     ...(body.isEmergency !== undefined
       ? { isEmergency: body.isEmergency }
@@ -844,7 +850,9 @@ const buildOrderUpdateData = (existingOrder, body) => {
         }
       : {}),
     ...(body.boxId !== undefined ? { boxId: body.boxId } : {}),
-    ...(body.isCompleted === true ? { boxId: null } : {}),
+    ...(body.isCompleted === true || autoCompleteOnFullPayment
+      ? { boxId: null }
+      : {}),
   };
 };
 

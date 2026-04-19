@@ -285,8 +285,7 @@ export const markComplete = async (req, res, next) => {
         error: SAME_ROLE_CLAIM_CONFLICT_MESSAGE,
       });
     }
-    const isFinalCompletionAttempt = !isQichikar;
-    if (isFinalCompletionAttempt && Number(order.remaining || 0) > 0) {
+    if (!isWorker && Number(order.remaining || 0) > 0) {
       return res.status(400).json({
         error:
           "This order cannot be marked as completed until full payment is confirmed by admin.",
@@ -349,64 +348,33 @@ export const markComplete = async (req, res, next) => {
         return res.json({ ...result, smsSent: false });
       }
 
-      try {
-        result = await service.markComplete(req.params.id);
-        result = await prisma.order.update({
-          where: { id: req.params.id },
-          data: {
-            dokhtCompletedAt: order.dokhtCompletedAt || new Date(),
-            dokhtInProgress: false,
-            dokhtReceivedById: null,
-            dokhtReceivedAt: null,
-          },
-          include: {
-            customer: true,
-            box: true,
-            assignedTo: { select: { id: true, name: true, accountType: true } },
-            assignedBy: { select: { id: true, name: true } },
-            receivedBy: { select: { id: true, name: true, accountType: true } },
-          },
+      if (order.dokhtCompletedAt) {
+        return res.status(400).json({
+          error: "Dokht work for this order is already completed.",
         });
-      } catch (error) {
-        if (
-          error?.code === "BOX_CAPACITY_FULL" ||
-          error?.code === "BOX_NOT_FOUND_FOR_TYPE"
-        ) {
-          const boxSuffix = error?.boxName ? ` (${error.boxName})` : "";
-          const baseMessage =
-            error.code === "BOX_CAPACITY_FULL"
-              ? `capacity of this box is full${boxSuffix}`
-              : `No box found for ${order.type} orders`;
-          const detailMessage = `${baseMessage} - ${order.customer.firstName} - Bill #${order.customer.billNumber} - ${order.type}.`;
-
-          await Promise.all(
-            admins.map((admin) =>
-              prisma.userNotification.create({
-                data: {
-                  userId: admin.id,
-                  orderId: req.params.id,
-                  message: detailMessage,
-                  type: "BOX_CAPACITY",
-                },
-              }),
-            ),
-          );
-
-          return res
-            .status(error.status || 400)
-            .json({ error: error.message || baseMessage });
-        }
-        throw error;
       }
 
-      try {
-        await sendCustomerCompletionSMS(order.customer, order);
-        smsSent = true;
-      } catch (smsError) {
-        console.error("Failed to send completion SMS:", smsError);
-      }
+      result = await prisma.order.update({
+        where: { id: req.params.id },
+        data: {
+          dokhtCompletedAt: new Date(),
+          dokhtInProgress: false,
+          dokhtReceivedById: null,
+          dokhtReceivedAt: null,
+          inProgress: false,
+          receivedById: null,
+          receivedAt: null,
+        },
+        include: {
+          customer: true,
+          box: true,
+          assignedTo: { select: { id: true, name: true, accountType: true } },
+          assignedBy: { select: { id: true, name: true } },
+          receivedBy: { select: { id: true, name: true, accountType: true } },
+        },
+      });
 
-      const msg = `Worker Name: ${user.name} | Bill Number: ${order.customer.billNumber} | Order Type: ${order.type} | Customer Name: ${order.customer.firstName} | This order has been completed successfully.`;
+      const msg = `Dokht Name: ${user.name} | Bill Number: ${order.customer.billNumber} | Order Type: ${order.type} | Customer Name: ${order.customer.firstName} | Stitching completed successfully and waiting for full payment / admin completion.`;
       await Promise.all(
         admins.map((admin) =>
           prisma.userNotification.create({

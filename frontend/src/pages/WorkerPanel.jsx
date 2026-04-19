@@ -533,6 +533,7 @@ export default function WorkerPanel() {
   const qc = useQueryClient();
   const language = i18n.resolvedLanguage || i18n.language || "en";
   const cfg = ROLE_CONFIG[user?.accountType] || ROLE_CONFIG.QICHIKAR;
+  const workerScope = [user?.id, user?.accountType];
 
   const [activeTab, setActiveTab] = useState("all");
   const [billSearch, setBillSearch] = useState("");
@@ -545,9 +546,10 @@ export default function WorkerPanel() {
   const [optimisticCompletedIds, setOptimisticCompletedIds] = useState([]);
 
   const { data: orderPayload, isLoading } = useQuery({
-    queryKey: ["worker-panel-orders"],
+    queryKey: ["worker-panel-orders", ...workerScope],
     queryFn: () =>
       api.get("/orders", { params: { limit: 200 } }).then((r) => r.data),
+    enabled: Boolean(user?.id && user?.accountType),
     refetchInterval: 30000,
   });
 
@@ -556,14 +558,16 @@ export default function WorkerPanel() {
     : orderPayload?.data || [];
 
   const { data: allNotifs = [] } = useQuery({
-    queryKey: ["worker-panel-notifs"],
+    queryKey: ["worker-panel-notifs", ...workerScope],
     queryFn: () => api.get("/users/me/notifications").then((r) => r.data),
+    enabled: Boolean(user?.id && user?.accountType),
     refetchInterval: 30000,
   });
 
   const { data: workerMoneySummary } = useQuery({
-    queryKey: ["worker-panel-transaction-summary"],
+    queryKey: ["worker-panel-transaction-summary", ...workerScope],
     queryFn: () => api.get("/transactions/me/summary").then((r) => r.data),
+    enabled: Boolean(user?.id && user?.accountType),
     refetchInterval: 30000,
   });
 
@@ -687,6 +691,7 @@ export default function WorkerPanel() {
   const totalCompletedPayments = Number(
     workerMoneySummary?.totalCompletedPayments || 0,
   );
+  const currentMoney = totalCompletedPayments - totalLoanAmount;
 
   const filteredOrders = useMemo(() => {
     const accountType = user?.accountType;
@@ -983,68 +988,62 @@ export default function WorkerPanel() {
         className="card"
         style={{ padding: 14, display: "grid", gap: 10 }}
       >
+        {/* ── Card header: badge + customer info ── */}
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
             gap: 8,
-            flexWrap: "wrap",
+            alignItems: "flex-start",
           }}
         >
-          <div
+          <span
+            className="badge"
             style={{
-              display: "flex",
-              gap: 6,
-              alignItems: "center",
-              flexWrap: "wrap",
+              background: `${typeColor}18`,
+              color: typeColor,
+              border: `1px solid ${typeColor}40`,
+              flexShrink: 0,
             }}
           >
-            <span
-              className="badge"
+            {getOrderTypeLabel(order.type, language)}
+          </span>
+          {order.orderName && (
+            <div
               style={{
-                background: `${typeColor}18`,
-                color: typeColor,
-                border: `1px solid ${typeColor}40`,
+                fontSize: 11,
+                color: "var(--text3)",
+                textAlign: "right",
+                flexShrink: 0,
               }}
             >
-              {getOrderTypeLabel(order.type, language)}
-            </span>
-            {order.qichikarAssignedToId && (
-              <span
-                className="badge"
-                style={{
-                  background: "#FEF3C7",
-                  color: "#92400E",
-                  border: "1px solid #F59E0B55",
-                }}
-              >
-                {t("workerPanel.assignedQichikar", "Assigned to Qichikar")}
-              </span>
-            )}
-            {order.dokhtAssignedToId && (
-              <span
-                className="badge"
-                style={{
-                  background: "#FCE7F3",
-                  color: "#9D174D",
-                  border: "1px solid #EC489955",
-                }}
-              >
-                {t("workerPanel.assignedDokht", "Assigned to Dokht")}
-              </span>
-            )}
-            #{order.customer?.billNumber || "-"}{" "}
-            {order.customer?.phoneNumber
-              ? `- ${order.customer.phoneNumber}`
-              : ""}
-          </div>
-          {order.orderName && (
-            <div style={{ fontSize: 12, color: "var(--text2)" }}>
               {order.orderName}
             </div>
           )}
         </div>
 
+        {/* ── Customer identity block ── */}
+        <div style={{ display: "grid", gap: 2 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text1)" }}>
+            {order.customer?.firstName || "-"}
+          </div>
+          <div
+            style={{
+              fontSize: 12,
+              color: "var(--text3)",
+              display: "flex",
+              gap: 10,
+              flexWrap: "wrap",
+            }}
+          >
+            <span>#{order.customer?.billNumber || "-"}</span>
+            {order.customer?.phoneNumber && (
+              <span>{order.customer.phoneNumber}</span>
+            )}
+          </div>
+        </div>
+
+        {/* ── Assignment / received info ── */}
         {receivedByCurrentUser && roleState.receivedAt ? (
           <div style={{ fontSize: 12, color: "var(--text3)" }}>
             {t("workerPanel.receivedOn", "Received on")}:{" "}
@@ -1060,9 +1059,12 @@ export default function WorkerPanel() {
           )
         )}
 
-        <div style={{ fontSize: 12, color: "var(--text2)" }}>
-          {t("workerPanel.price", "Price")}: $
-          {paidToWorker ? Number(payment.amount || 0).toLocaleString() : "0"}
+        {/* ── Price row ── */}
+        <div style={{ fontSize: 12, color: "var(--text2)", fontWeight: 600 }}>
+          {t("workerPanel.price", "Price")}:{" "}
+          <span style={{ color: "var(--text1)" }}>
+            ${paidToWorker ? Number(payment.amount || 0).toLocaleString() : "0"}
+          </span>
         </div>
 
         <div
@@ -1174,32 +1176,6 @@ export default function WorkerPanel() {
           <div style={{ fontSize: 12, color: "var(--text2)" }}>
             {t("workerPanel.orderType", "Order Type")}:{" "}
             {getOrderTypeLabel(order.type, language)}
-          </div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {order.qichikarAssignedToId && (
-              <span
-                className="badge"
-                style={{
-                  background: "#FEF3C7",
-                  color: "#92400E",
-                  border: "1px solid #F59E0B55",
-                }}
-              >
-                {t("workerPanel.assignedQichikar", "Assigned to Qichikar")}
-              </span>
-            )}
-            {order.dokhtAssignedToId && (
-              <span
-                className="badge"
-                style={{
-                  background: "#FCE7F3",
-                  color: "#9D174D",
-                  border: "1px solid #EC489955",
-                }}
-              >
-                {t("workerPanel.assignedDokht", "Assigned to Dokht")}
-              </span>
-            )}
           </div>
         </div>
 
@@ -1333,12 +1309,6 @@ export default function WorkerPanel() {
               <LuCircleDollarSign size={18} />$
               {totalCompletedPayments.toLocaleString()}
             </div>
-            <div style={{ fontSize: 11, color: "var(--text3)" }}>
-              {t(
-                "workerPanel.totalCompletedPaymentsHint",
-                "Paid from completed worker orders by admin",
-              )}
-            </div>
           </div>
 
           <div
@@ -1369,11 +1339,34 @@ export default function WorkerPanel() {
               <LuCircleDollarSign size={18} />$
               {totalLoanAmount.toLocaleString()}
             </div>
-            <div style={{ fontSize: 11, color: "var(--text3)" }}>
-              {t(
-                "workerPanel.loanTotalHint",
-                "Total LOAN transactions from Make Transaction",
-              )}
+          </div>
+
+          <div
+            style={{
+              border: `1px solid ${currentMoney >= 0 ? "#86EFAC" : "#FCA5A5"}`,
+              background: currentMoney >= 0 ? "#F0FDF4" : "#FEF2F2",
+              borderRadius: 10,
+              padding: "10px 12px",
+              display: "grid",
+              gap: 4,
+            }}
+          >
+            <div
+              style={{ fontSize: 12, color: "var(--text3)", fontWeight: 600 }}
+            >
+              {t("workerPanel.currentMoney", "Current Money")}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                color: currentMoney >= 0 ? "#15803D" : "#DC2626",
+                fontWeight: 800,
+                fontSize: 20,
+              }}
+            >
+              <LuCircleDollarSign size={18} />${currentMoney.toLocaleString()}
             </div>
           </div>
         </div>
