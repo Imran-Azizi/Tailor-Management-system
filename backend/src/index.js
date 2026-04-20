@@ -12,6 +12,8 @@ import designRoutes from "./routes/design.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
 import analyticsRoutes from "./routes/analytics.routes.js";
 import transactionRoutes from "./routes/transaction.routes.js";
+import dailyTaskRoutes from "./routes/dailyTask.routes.js";
+import rakhtRoutes from "./routes/rakht.routes.js";
 import { startCronJobs } from "./cron/notifications.cron.js";
 
 const app = express();
@@ -44,6 +46,8 @@ app.use("/api/designs", designRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/transactions", transactionRoutes);
+app.use("/api/daily-tasks", dailyTaskRoutes);
+app.use("/api/rakhts", rakhtRoutes);
 
 // Health check
 app.get("/api/health", (req, res) =>

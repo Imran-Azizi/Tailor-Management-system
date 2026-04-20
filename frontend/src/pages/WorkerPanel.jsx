@@ -424,6 +424,72 @@ function OrderDetailsModal({ order, language, t, onClose }) {
               marginBottom: 8,
             }}
           >
+            {t("createOrder.rakhtSelection", {
+              defaultValue: "Rakht Selection",
+            })}
+          </p>
+          <div style={tableWrapStyle}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th style={thStyle}>{t("common.field", "Field")}</th>
+                  <th style={thStyle}>{t("common.value", "Value")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  [
+                    t("rakht.brandName", { defaultValue: "Brand" }),
+                    order?.rakhtBrandName || "-",
+                  ],
+                  [
+                    t("rakht.color", { defaultValue: "Color" }),
+                    order?.rakhtColor || "-",
+                  ],
+                  [
+                    t("rakht.requiredMeters", {
+                      defaultValue: "Required Meters",
+                    }),
+                    order?.rakhtRequiredMeters != null
+                      ? Number(order.rakhtRequiredMeters).toFixed(2)
+                      : "-",
+                  ],
+                  [
+                    t("rakht.piecePrice", { defaultValue: "Piece Price" }),
+                    order?.rakhtPiecePrice != null
+                      ? Number(order.rakhtPiecePrice).toLocaleString()
+                      : "-",
+                  ],
+                ].map(([field, value], index, arr) => (
+                  <tr key={field}>
+                    <td style={tdStyle}>{field}</td>
+                    <td
+                      style={{
+                        ...tdStyle,
+                        borderBottom:
+                          index === arr.length - 1
+                            ? "none"
+                            : tdStyle.borderBottom,
+                      }}
+                    >
+                      {value}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 14 }}>
+          <p
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: "var(--text3)",
+              marginBottom: 8,
+            }}
+          >
             {t("createOrder.measurements", "Measurements")}
           </p>
           <div style={tableWrapStyle}>
@@ -1043,6 +1109,22 @@ export default function WorkerPanel() {
           </div>
         </div>
 
+        {(order?.rakhtBrandName || order?.rakhtColor) && (
+          <div className="order-mobile-rakht">
+            <span className="order-rakht-chip order-rakht-chip--brand">
+              {order.rakhtBrandName || "-"}
+            </span>
+            <span className="order-rakht-chip order-rakht-chip--color">
+              {order.rakhtColor || "-"}
+            </span>
+            {order?.rakhtRequiredMeters != null && (
+              <span className="order-rakht-chip order-rakht-chip--meters">
+                {Number(order.rakhtRequiredMeters).toFixed(2)}m
+              </span>
+            )}
+          </div>
+        )}
+
         {/* ── Assignment / received info ── */}
         {receivedByCurrentUser && roleState.receivedAt ? (
           <div style={{ fontSize: 12, color: "var(--text3)" }}>
@@ -1177,6 +1259,21 @@ export default function WorkerPanel() {
             {t("workerPanel.orderType", "Order Type")}:{" "}
             {getOrderTypeLabel(order.type, language)}
           </div>
+          {(order?.rakhtBrandName || order?.rakhtColor) && (
+            <div className="order-mobile-rakht">
+              <span className="order-rakht-chip order-rakht-chip--brand">
+                {order.rakhtBrandName || "-"}
+              </span>
+              <span className="order-rakht-chip order-rakht-chip--color">
+                {order.rakhtColor || "-"}
+              </span>
+              {order?.rakhtRequiredMeters != null && (
+                <span className="order-rakht-chip order-rakht-chip--meters">
+                  {Number(order.rakhtRequiredMeters).toFixed(2)}m
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {receivedByCurrentUser ? (

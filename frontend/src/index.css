@@ -878,6 +878,40 @@ select.inp{
   gap:6px;
   flex-wrap:wrap;
 }
+.order-rakht-inline,
+.order-mobile-rakht{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:wrap;
+  margin-top:8px;
+}
+.order-rakht-chip{
+  display:inline-flex;
+  align-items:center;
+  min-height:24px;
+  padding:4px 9px;
+  border-radius:999px;
+  border:1px solid transparent;
+  font-size:11px;
+  font-weight:700;
+  line-height:1;
+}
+.order-rakht-chip--brand{
+  background:#FEF3C7;
+  border-color:#FCD34D;
+  color:#92400E;
+}
+.order-rakht-chip--color{
+  background:#E0F2FE;
+  border-color:#7DD3FC;
+  color:#075985;
+}
+.order-rakht-chip--meters{
+  background:#ECFDF5;
+  border-color:#86EFAC;
+  color:#166534;
+}
 .order-mobile-metrics{
   display:grid;
   grid-template-columns:repeat(2,minmax(0,1fr));

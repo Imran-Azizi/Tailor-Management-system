@@ -17,6 +17,7 @@ import {
   normalizePhone,
   toAsciiDigits,
 } from "../lib/normalize.js";
+import { resolveRakhtColorHex } from "../lib/rakhtColors.js";
 
 export default function PrintBills() {
   const { t, i18n } = useTranslation();
@@ -24,9 +25,7 @@ export default function PrintBills() {
   const navigate = useNavigate();
   const resolvedLanguage = i18n.resolvedLanguage || i18n.language;
   const billSettings = getBillLanguageSettings(resolvedLanguage);
-  const billText = billSettings.text;
-  const currentLanguage = billSettings.langCode;
-  const isRtl = billSettings.isRtl;
+  const { text: billText, langCode: currentLanguage, isRtl } = billSettings;
   const alignClass = isRtl ? "text-right" : "text-left";
   const preselectCustomerId = location?.state?.preselectCustomerId;
 
@@ -151,8 +150,7 @@ export default function PrintBills() {
         );
         const found =
           customersWithOrders.find(
-            (c) =>
-              normalizeText(c.firstName || "") === normalizedName,
+            (c) => normalizeText(c.firstName || "") === normalizedName,
           ) || customersWithOrders[0];
         if (found) {
           const full = await fetchCustomerDetails(found.id);
@@ -335,7 +333,10 @@ export default function PrintBills() {
             </div>
 
             <div style={{ marginTop: 12 }} className="vstack">
-              <div className="form-row" style={{ gridTemplateColumns: "1fr 1fr" }}>
+              <div
+                className="form-row"
+                style={{ gridTemplateColumns: "1fr 1fr" }}
+              >
                 <button
                   aria-label={t("common.search")}
                   type="button"
@@ -365,7 +366,10 @@ export default function PrintBills() {
             <div style={{ marginTop: 18 }}>
               {customer ? (
                 <div>
-                  <div className="info-box ib-gold" style={{ marginBottom: 12 }}>
+                  <div
+                    className="info-box ib-gold"
+                    style={{ marginBottom: 12 }}
+                  >
                     <div
                       style={{
                         display: "grid",
@@ -469,9 +473,16 @@ export default function PrintBills() {
                                 : "border-slate-200 bg-white"
                             }`}
                           >
-                            <div className={`flex flex-wrap items-center justify-between gap-3 ${alignClass}`}>
-                              <div className={`flex flex-wrap items-center gap-2 ${isRtl ? "flex-row-reverse" : "flex-row"}`}>
-                                <span className="badge bg-gold" style={{ fontSize: 11 }}>
+                            <div
+                              className={`flex flex-wrap items-center justify-between gap-3 ${alignClass}`}
+                            >
+                              <div
+                                className={`flex flex-wrap items-center gap-2 ${isRtl ? "flex-row-reverse" : "flex-row"}`}
+                              >
+                                <span
+                                  className="badge bg-gold"
+                                  style={{ fontSize: 11 }}
+                                >
                                   {itemLabel}
                                 </span>
                                 {order.orderName ? (
@@ -493,6 +504,86 @@ export default function PrintBills() {
                                 {`${t("createOrder.printBill")} ${itemLabel}`}
                               </button>
                             </div>
+
+                            {(order?.rakhtBrandName || order?.rakhtColor) && (
+                              <div
+                                style={{
+                                  marginTop: 10,
+                                  display: "flex",
+                                  flexWrap: "wrap",
+                                  gap: 8,
+                                  alignItems: "center",
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    fontWeight: 800,
+                                    color: "#92400E",
+                                    textTransform: "uppercase",
+                                    letterSpacing: ".08em",
+                                  }}
+                                >
+                                  {t("createOrder.rakhtSelection", {
+                                    defaultValue: "Rakht",
+                                  })}
+                                </span>
+                                <span
+                                  className="badge"
+                                  style={{
+                                    background: "#FEF3C7",
+                                    color: "#92400E",
+                                    border: "1px solid #FCD34D",
+                                  }}
+                                >
+                                  {order.rakhtBrandName || "-"}
+                                </span>
+                                <span
+                                  className="badge"
+                                  style={{
+                                    background: "#EFF6FF",
+                                    color: "#1D4ED8",
+                                    border: "1px solid #BFDBFE",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 6,
+                                  }}
+                                >
+                                  {resolveRakhtColorHex(
+                                    order.rakhtColor,
+                                    order.rakhtColorHex,
+                                  ) ? (
+                                    <span
+                                      style={{
+                                        width: 10,
+                                        height: 10,
+                                        borderRadius: "50%",
+                                        border: "1px solid rgba(15,23,42,0.16)",
+                                        background: resolveRakhtColorHex(
+                                          order.rakhtColor,
+                                          order.rakhtColorHex,
+                                        ),
+                                      }}
+                                    />
+                                  ) : null}
+                                  {order.rakhtColor || "-"}
+                                </span>
+                                {order?.rakhtRequiredMeters != null && (
+                                  <span
+                                    style={{
+                                      fontSize: 11,
+                                      fontWeight: 700,
+                                      color: "#0F172A",
+                                    }}
+                                  >
+                                    {Number(order.rakhtRequiredMeters).toFixed(
+                                      2,
+                                    )}
+                                    m
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
                       })}

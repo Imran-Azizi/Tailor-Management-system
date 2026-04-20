@@ -47,6 +47,7 @@ model User {
   notifications          UserNotification[]
   transactions           Transaction[]      @relation("UserTransactions")
   createdTransactions    Transaction[]      @relation("CreatedTransactions")
+  createdDailyTasks      DailyTask[]        @relation("CreatedDailyTasks")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -86,19 +87,26 @@ model Customer {
 }
 
 model Order {
-  id              String    @id @default(uuid())
-  customerId      String
-  orderName       String?
-  type            OrderType
-  totalPrice      Float
-  discount        Float     @default(0)
-  paidAmount      Float
-  remaining       Float
-  quantity        Int       @default(1)
-  isEmergency     Boolean   @default(false)
-  emergencyExpiry DateTime?
-  isCompleted     Boolean   @default(false)
-  inProgress      Boolean   @default(false)
+  id                  String    @id @default(uuid())
+  customerId          String
+  orderName           String?
+  type                OrderType
+  rakhtId             String?
+  rakhtCompanyName    String?
+  rakhtBrandName      String?
+  rakhtColor          String?
+  rakhtColorHex       String?
+  rakhtRequiredMeters Float?
+  rakhtPiecePrice     Float?
+  totalPrice          Float
+  discount            Float     @default(0)
+  paidAmount          Float
+  remaining           Float
+  quantity            Int       @default(1)
+  isEmergency         Boolean   @default(false)
+  emergencyExpiry     DateTime?
+  isCompleted         Boolean   @default(false)
+  inProgress          Boolean   @default(false)
 
   // Assignment fields
   assignedToId    String?
@@ -156,6 +164,7 @@ model Order {
   dokhtPaidBy        User? @relation("DokhtPaidByOrders", fields: [dokhtPaidById], references: [id])
 
   customer      Customer       @relation(fields: [customerId], references: [id])
+  rakht         Rakht?         @relation(fields: [rakhtId], references: [id], onDelete: SetNull)
   boxId         Int?
   box           Box?           @relation(fields: [boxId], references: [id])
   outfit        Outfit?
@@ -168,6 +177,7 @@ model Order {
 
   @@index([customerId])
   @@index([type])
+  @@index([rakhtId])
   @@index([isCompleted])
   @@index([isEmergency])
   @@index([assignedToId])
@@ -184,6 +194,26 @@ model Order {
   @@index([dokhtPaidById])
   @@index([qichikarCompletedAt])
   @@index([dokhtCompletedAt])
+}
+
+model Rakht {
+  id           String   @id @default(uuid())
+  companyName  String
+  brandName    String
+  color        String
+  colorHex     String
+  metersPerTon Float
+  totalTons    Float
+  totalMeters  Float
+  usedMeters   Float    @default(0)
+  price        Float
+  orders       Order[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([companyName])
+  @@index([brandName])
+  @@index([color])
 }
 
 enum OrderType {
@@ -394,6 +424,24 @@ model TenbanShip {
   name      String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ─── Daily Tasks ─────────────────────────────────────────────────────────────
+
+model DailyTask {
+  id            String   @id @default(uuid())
+  fromName      String
+  recipientName String
+  amount        Float
+  taskDate      DateTime
+  note          String?
+  createdById   String
+  createdBy     User     @relation("CreatedDailyTasks", fields: [createdById], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([createdById])
+  @@index([taskDate])
 }
 
 // ─── Transactions ─────────────────────────────────────────────────────────────

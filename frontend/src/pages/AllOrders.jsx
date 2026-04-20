@@ -129,9 +129,13 @@ function AssignModal({ order, onClose, onAssigned }) {
             <LuX size={16} />
           </button>
         </div>
-                <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 16 }}>
           <strong>{order.customer?.firstName}</strong> - Bill #
-          {order.customer?.billNumber} | {getOrderTypeLabel(order.type, i18n.resolvedLanguage || i18n.language)}
+          {order.customer?.billNumber} |{" "}
+          {getOrderTypeLabel(
+            order.type,
+            i18n.resolvedLanguage || i18n.language,
+          )}
         </div>
         <div style={{ marginBottom: 14 }}>
           <label
@@ -317,7 +321,9 @@ function OrderViewModal({ orderId, open, onClose }) {
                     <Badge v={TV[data.type] || "gold"}>
                       {getOrderTypeLabel(data.type, language)}
                     </Badge>
-                    {data.isEmergency && <Badge v="red">{t("orders.emergencyBadge")}</Badge>}
+                    {data.isEmergency && (
+                      <Badge v="red">{t("orders.emergencyBadge")}</Badge>
+                    )}
                   </div>
                   <h3 style={{ fontSize: 24, fontWeight: 900 }}>
                     {data.customer?.firstName}
@@ -329,7 +335,9 @@ function OrderViewModal({ orderId, open, onClose }) {
                       marginTop: 4,
                     }}
                   >
-                    {t("orders.createdOn", { date: new Date(data.createdAt).toLocaleString() })}
+                    {t("orders.createdOn", {
+                      date: new Date(data.createdAt).toLocaleString(),
+                    })}
                   </p>
                 </div>
                 <div style={{ textAlign: "right" }}>
@@ -353,6 +361,28 @@ function OrderViewModal({ orderId, open, onClose }) {
               <div className="order-view-summary-row">
                 <span>{t("common.phone")}</span>
                 <strong>{data.customer?.phoneNumber || "-"}</strong>
+              </div>
+              <div className="order-view-summary-row">
+                <span>
+                  {t("createOrder.rakhtSelection", { defaultValue: "Rakht" })}
+                </span>
+                <strong>
+                  {data.rakhtBrandName
+                    ? `${data.rakhtBrandName} / ${data.rakhtColor || "-"}`
+                    : "-"}
+                </strong>
+              </div>
+              <div className="order-view-summary-row">
+                <span>
+                  {t("rakht.requiredMeters", {
+                    defaultValue: "Required Meters",
+                  })}
+                </span>
+                <strong>
+                  {data.rakhtRequiredMeters != null
+                    ? Number(data.rakhtRequiredMeters).toFixed(2)
+                    : "-"}
+                </strong>
               </div>
               <div className="order-view-summary-row">
                 <span>{t("common.total")}</span>
@@ -485,7 +515,13 @@ function RowDropdown({
   );
 }
 
-const ORDER_TYPE_FILTER_VALUES = ["ALL", "OUTFIT", "KORTY", "WASKAT", "YAKHANQAQ"];
+const ORDER_TYPE_FILTER_VALUES = [
+  "ALL",
+  "OUTFIT",
+  "KORTY",
+  "WASKAT",
+  "YAKHANQAQ",
+];
 
 export default function AllOrders({ filter, mode = "orders" }) {
   const { t, i18n } = useTranslation();
@@ -664,7 +700,9 @@ export default function AllOrders({ filter, mode = "orders" }) {
             <LuReceipt size={16} />
           </span>
           <div className="order-dashboard-copy">
-            <div className="order-dashboard-label">{t("orders.listedTotal")}</div>
+            <div className="order-dashboard-label">
+              {t("orders.listedTotal")}
+            </div>
             <strong className="order-dashboard-value">
               {formatMoney(totals.total, language)}
             </strong>
@@ -687,7 +725,9 @@ export default function AllOrders({ filter, mode = "orders" }) {
           </span>
           <div className="order-dashboard-copy">
             <div className="order-dashboard-label">{t("common.remaining")}</div>
-            <strong className={`order-dashboard-value ${totals.remaining > 0 ? "order-dashboard-value--remaining" : "order-dashboard-value--paid"}`}>
+            <strong
+              className={`order-dashboard-value ${totals.remaining > 0 ? "order-dashboard-value--remaining" : "order-dashboard-value--paid"}`}
+            >
               {formatMoney(totals.remaining, language)}
             </strong>
           </div>
@@ -701,128 +741,160 @@ export default function AllOrders({ filter, mode = "orders" }) {
           <>
             <div className="all-orders-desktop">
               <div className="tbl-wrap all-orders-table-wrap">
-              <table className="tbl all-orders-table">
-                <thead>
-                  <tr>
-                    {[
-                      "Bill #",
-                      t("common.customer"),
-                      t("common.type"),
-                      t("common.total"),
-                      t("createOrder.discount"),
-                      t("common.paid"),
-                      t("common.remaining"),
-                      t("common.status"),
-                      t("common.date"),
-                      t("common.actions"),
-                    ].map((h) => (
-                      <th key={h}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {!orders.length ? (
+                <table className="tbl all-orders-table">
+                  <thead>
                     <tr>
-                      <td colSpan={10}>
-                        <EmptyState
-                          message={t("orders.noOrders")}
-                          Icon={LuClipboardList}
-                        />
-                      </td>
+                      {[
+                        "Bill #",
+                        t("common.customer"),
+                        t("common.type"),
+                        t("common.total"),
+                        t("createOrder.discount"),
+                        t("common.paid"),
+                        t("common.remaining"),
+                        t("common.status"),
+                        t("common.date"),
+                        t("common.actions"),
+                      ].map((h) => (
+                        <th key={h}>{h}</th>
+                      ))}
                     </tr>
-                  ) : (
-                    orders.map((o) => {
-                      const billNumber = o?.customer?.billNumber;
-                      const showBillEmergencyBadge =
-                        billNumber !== null &&
-                        billNumber !== undefined &&
-                        billEmergencyMeta.hasEmergencyByBill[billNumber] &&
-                        billEmergencyMeta.firstOrderIdByBill[billNumber] === o.id;
-                      return (
-                        <tr key={o.id}>
-                          <td>
-                            <span className="order-bill-chip">#{o.customer?.billNumber}</span>
-                          </td>
-                          <td>
-                            <div className="order-customer-name">
-                              {o.customer?.firstName}
-                            </div>
-                            <div className="order-customer-phone">
-                              {o.customer?.phoneNumber}
-                            </div>
-                          </td>
-                          <td>
-                            <Badge v={TV[o.type] || "gold"}>
-                              {getOrderTypeLabel(o.type, language)}
-                            </Badge>
-                          </td>
-                          <td className="order-money-cell order-money-cell--total">
-                            {formatMoney(o.totalPrice, language)}
-                          </td>
-                          <td className="order-money-cell order-money-cell--discount">
-                            {formatMoney(o.discount, language)}
-                          </td>
-                          <td className="order-money-cell order-money-cell--paid">
-                            {formatMoney(o.paidAmount, language)}
-                          </td>
-                          <td className={`order-money-cell ${o.remaining > 0 ? "order-money-cell--remaining" : "order-money-cell--settled"}`}>
-                            {o.remaining > 0
-                              ? formatMoney(o.remaining, language)
-                              : t("orders.paidInFull")}
-                          </td>
-                          <td>
-                            <div className="order-status-badges">
-                              {showBillEmergencyBadge && (
-                                <Badge v="red">{t("createOrder.emergencyOrder")}</Badge>
+                  </thead>
+                  <tbody>
+                    {!orders.length ? (
+                      <tr>
+                        <td colSpan={10}>
+                          <EmptyState
+                            message={t("orders.noOrders")}
+                            Icon={LuClipboardList}
+                          />
+                        </td>
+                      </tr>
+                    ) : (
+                      orders.map((o) => {
+                        const billNumber = o?.customer?.billNumber;
+                        const showBillEmergencyBadge =
+                          billNumber !== null &&
+                          billNumber !== undefined &&
+                          billEmergencyMeta.hasEmergencyByBill[billNumber] &&
+                          billEmergencyMeta.firstOrderIdByBill[billNumber] ===
+                            o.id;
+                        return (
+                          <tr key={o.id}>
+                            <td>
+                              <span className="order-bill-chip">
+                                #{o.customer?.billNumber}
+                              </span>
+                            </td>
+                            <td>
+                              <div className="order-customer-name">
+                                {o.customer?.firstName}
+                              </div>
+                              <div className="order-customer-phone">
+                                {o.customer?.phoneNumber}
+                              </div>
+                              {(o?.rakhtBrandName || o?.rakhtColor) && (
+                                <div className="order-rakht-inline">
+                                  <span className="order-rakht-chip order-rakht-chip--brand">
+                                    {o.rakhtBrandName || "-"}
+                                  </span>
+                                  <span className="order-rakht-chip order-rakht-chip--color">
+                                    {o.rakhtColor || "-"}
+                                  </span>
+                                  {o?.rakhtRequiredMeters != null && (
+                                    <span className="order-rakht-chip order-rakht-chip--meters">
+                                      {Number(o.rakhtRequiredMeters).toFixed(2)}
+                                      m
+                                    </span>
+                                  )}
+                                </div>
                               )}
-                              <Badge
-                                v={
-                                  statusFilter === "completed"
-                                    ? "red"
-                                    : o.remaining > 0
-                                      ? "amber"
-                                      : "green"
-                                }
-                              >
-                                {statusFilter === "completed"
-                                  ? completedStatusLabel
-                                  : o.remaining > 0
-                                    ? t("delivery.notFullyPaidBadge", "Not fully paid")
-                                    : t("delivery.fullyPaidBadge", "Fully paid")}
+                            </td>
+                            <td>
+                              <Badge v={TV[o.type] || "gold"}>
+                                {getOrderTypeLabel(o.type, language)}
                               </Badge>
-                            </div>
-                          </td>
-                          <td className="order-date-text">
-                            {new Date(o.createdAt).toLocaleDateString()}
-                          </td>
-                          <td>
-                            <RowDropdown
-                              order={o}
-                              isAdmin={isAdmin}
-                              showAssign={canManageAssignments}
-                              onAssign={() => setAssignModal(o)}
-                              onEdit={() => navigate(`/orders/${o.id}/edit`)}
-                              onDelete={() =>
-                                setDeleteOrderTarget({
-                                  id: o.id,
-                                  customerName: o.customer?.firstName || "",
-                                  billNumber: o.customer?.billNumber,
-                                })
-                              }
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
+                            </td>
+                            <td className="order-money-cell order-money-cell--total">
+                              {formatMoney(o.totalPrice, language)}
+                            </td>
+                            <td className="order-money-cell order-money-cell--discount">
+                              {formatMoney(o.discount, language)}
+                            </td>
+                            <td className="order-money-cell order-money-cell--paid">
+                              {formatMoney(o.paidAmount, language)}
+                            </td>
+                            <td
+                              className={`order-money-cell ${o.remaining > 0 ? "order-money-cell--remaining" : "order-money-cell--settled"}`}
+                            >
+                              {o.remaining > 0
+                                ? formatMoney(o.remaining, language)
+                                : t("orders.paidInFull")}
+                            </td>
+                            <td>
+                              <div className="order-status-badges">
+                                {showBillEmergencyBadge && (
+                                  <Badge v="red">
+                                    {t("createOrder.emergencyOrder")}
+                                  </Badge>
+                                )}
+                                <Badge
+                                  v={
+                                    statusFilter === "completed"
+                                      ? "red"
+                                      : o.remaining > 0
+                                        ? "amber"
+                                        : "green"
+                                  }
+                                >
+                                  {statusFilter === "completed"
+                                    ? completedStatusLabel
+                                    : o.remaining > 0
+                                      ? t(
+                                          "delivery.notFullyPaidBadge",
+                                          "Not fully paid",
+                                        )
+                                      : t(
+                                          "delivery.fullyPaidBadge",
+                                          "Fully paid",
+                                        )}
+                                </Badge>
+                              </div>
+                            </td>
+                            <td className="order-date-text">
+                              {new Date(o.createdAt).toLocaleDateString()}
+                            </td>
+                            <td>
+                              <RowDropdown
+                                order={o}
+                                isAdmin={isAdmin}
+                                showAssign={canManageAssignments}
+                                onAssign={() => setAssignModal(o)}
+                                onEdit={() => navigate(`/orders/${o.id}/edit`)}
+                                onDelete={() =>
+                                  setDeleteOrderTarget({
+                                    id: o.id,
+                                    customerName: o.customer?.firstName || "",
+                                    billNumber: o.customer?.billNumber,
+                                  })
+                                }
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             <div className="all-orders-mobile">
               {!orders.length ? (
-                <EmptyState message={t("orders.noOrders")} Icon={LuClipboardList} />
+                <EmptyState
+                  message={t("orders.noOrders")}
+                  Icon={LuClipboardList}
+                />
               ) : (
                 orders.map((o) => {
                   const billNumber = o?.customer?.billNumber;
@@ -835,7 +907,9 @@ export default function AllOrders({ filter, mode = "orders" }) {
                   return (
                     <div key={o.id} className="order-mobile-card">
                       <div className="order-mobile-head">
-                        <span className="order-mobile-bill">#{o.customer?.billNumber}</span>
+                        <span className="order-mobile-bill">
+                          #{o.customer?.billNumber}
+                        </span>
                         <RowDropdown
                           order={o}
                           isAdmin={isAdmin}
@@ -859,12 +933,30 @@ export default function AllOrders({ filter, mode = "orders" }) {
                         {o.customer?.phoneNumber}
                       </div>
 
+                      {(o?.rakhtBrandName || o?.rakhtColor) && (
+                        <div className="order-mobile-rakht">
+                          <span className="order-rakht-chip order-rakht-chip--brand">
+                            {o.rakhtBrandName || "-"}
+                          </span>
+                          <span className="order-rakht-chip order-rakht-chip--color">
+                            {o.rakhtColor || "-"}
+                          </span>
+                          {o?.rakhtRequiredMeters != null && (
+                            <span className="order-rakht-chip order-rakht-chip--meters">
+                              {Number(o.rakhtRequiredMeters).toFixed(2)}m
+                            </span>
+                          )}
+                        </div>
+                      )}
+
                       <div className="order-mobile-badges">
                         <Badge v={TV[o.type] || "gold"}>
                           {getOrderTypeLabel(o.type, language)}
                         </Badge>
                         {showBillEmergencyBadge && (
-                          <Badge v="red">{t("createOrder.emergencyOrder")}</Badge>
+                          <Badge v="red">
+                            {t("createOrder.emergencyOrder")}
+                          </Badge>
                         )}
                         <Badge
                           v={
@@ -878,35 +970,48 @@ export default function AllOrders({ filter, mode = "orders" }) {
                           {statusFilter === "completed"
                             ? completedStatusLabel
                             : o.remaining > 0
-                              ? t("delivery.notFullyPaidBadge", "Not fully paid")
+                              ? t(
+                                  "delivery.notFullyPaidBadge",
+                                  "Not fully paid",
+                                )
                               : t("delivery.fullyPaidBadge", "Fully paid")}
                         </Badge>
                       </div>
 
                       <div className="order-mobile-metrics">
                         <div className="order-mobile-metric">
-                          <div className="order-mobile-label">{t("common.total")}</div>
+                          <div className="order-mobile-label">
+                            {t("common.total")}
+                          </div>
                           <div className="order-mobile-value">
                             {formatMoney(o.totalPrice, language)}
                           </div>
                         </div>
                         <div className="order-mobile-metric">
-                          <div className="order-mobile-label">{t("createOrder.discount")}</div>
+                          <div className="order-mobile-label">
+                            {t("createOrder.discount")}
+                          </div>
                           <div className="order-mobile-value">
                             {formatMoney(o.discount, language)}
                           </div>
                         </div>
                         <div className="order-mobile-metric">
-                          <div className="order-mobile-label">{t("common.paid")}</div>
+                          <div className="order-mobile-label">
+                            {t("common.paid")}
+                          </div>
                           <div className="order-mobile-value order-mobile-value--paid">
                             {formatMoney(o.paidAmount, language)}
                           </div>
                         </div>
                         <div className="order-mobile-metric">
-                          <div className="order-mobile-label">{t("common.remaining")}</div>
+                          <div className="order-mobile-label">
+                            {t("common.remaining")}
+                          </div>
                           <div
                             className={`order-mobile-value${
-                              o.remaining > 0 ? " order-mobile-value--remaining" : ""
+                              o.remaining > 0
+                                ? " order-mobile-value--remaining"
+                                : ""
                             }`}
                           >
                             {o.remaining > 0
@@ -948,7 +1053,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
             qc.invalidateQueries({ queryKey: ["orders"], stale: true });
             qc.invalidateQueries({ queryKey: ["order-detail"] });
             qc.invalidateQueries({ queryKey: ["assignable-workers"] });
-            await new Promise(r => setTimeout(r, 50));
+            await new Promise((r) => setTimeout(r, 50));
             qc.refetchQueries({ queryKey: ["orders"], stale: true });
           }}
         />
@@ -980,4 +1085,3 @@ export default function AllOrders({ filter, mode = "orders" }) {
     </div>
   );
 }
-

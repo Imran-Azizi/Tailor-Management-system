@@ -10,6 +10,7 @@ import { getApiErrorMessage } from "../lib/feedback.js";
 import i18n from "../i18n/index.js";
 import { getOrderTypeLabel } from "../lib/orderType.js";
 import Step1CustomerInfo from "../components/order/Step1CustomerInfo.jsx";
+import Step2RakhtSelection from "../components/order/Step2RakhtSelection.jsx";
 import Step2OrderTypes from "../components/order/Step2OrderTypes.jsx";
 import Step3Measurements from "../components/order/Step3Measurements.jsx";
 import Step4Billing from "../components/order/Step4Billing.jsx";
@@ -80,6 +81,7 @@ const REQUIRED_MEASUREMENT_FIELDS = {
 
 const STEPS = [
   { label: "Customer" },
+  { label: "Rakht" },
   { label: "Order Types" },
   { label: "Measurements" },
   { label: "Billing" },
@@ -87,9 +89,18 @@ const STEPS = [
 
 const STEP_I18N = {
   Customer: "createOrder.customerInfo",
+  Rakht: "createOrder.rakhtSelection",
   "Order Types": "createOrder.orderTypes",
   Measurements: "createOrder.measurements",
   Billing: "createOrder.billing",
+};
+
+const STEP_FALLBACKS = {
+  Customer: "Customer Information",
+  Rakht: "Rakht Selection",
+  "Order Types": "Order Types",
+  Measurements: "Measurements",
+  Billing: "Billing",
 };
 
 export default function CreateOrder() {
@@ -132,7 +143,9 @@ export default function CreateOrder() {
           ...b,
           currentCount: b._count?.orders || 0,
         }));
-        const availableBox = currentCounts.find((b) => b.currentCount < b.capacity);
+        const availableBox = currentCounts.find(
+          (b) => b.currentCount < b.capacity,
+        );
         if (!availableBox) {
           return {
             available: false,
@@ -161,7 +174,7 @@ export default function CreateOrder() {
     if (measurementError) {
       setError(measurementError);
       toast.error(measurementError);
-      setStep(2);
+      setStep(3);
       return;
     }
 
@@ -186,6 +199,13 @@ export default function CreateOrder() {
         customerId: merged.customerId,
         firstName: merged.firstName,
         phoneNumber: merged.phoneNumber,
+      },
+      rakhtSelection: {
+        rakhtId: merged?.rakhtSelection?.rakhtId,
+        requiredMeters: parseNumberLocale(
+          merged?.rakhtSelection?.requiredMeters || 0,
+        ),
+        piecePrice: parseNumberLocale(merged?.rakhtSelection?.piecePrice || 0),
       },
       orders: orderItems.map((item) => {
         const b = merged.billing?.[item.billingKey] || {};
@@ -227,7 +247,10 @@ export default function CreateOrder() {
       setError(msg);
       toast.error(msg);
 
-      if (errorData?.code === "BOX_NOT_FOUND_FOR_TYPE" || errorData?.code === "BOX_CAPACITY_FULL") {
+      if (
+        errorData?.code === "BOX_NOT_FOUND_FOR_TYPE" ||
+        errorData?.code === "BOX_CAPACITY_FULL"
+      ) {
         navigate("/boxes");
       }
 
@@ -278,7 +301,9 @@ export default function CreateOrder() {
                 }}
                 className="step-lbl"
               >
-                {t(STEP_I18N[s.label] || s.label)}
+                {t(STEP_I18N[s.label] || s.label, {
+                  defaultValue: STEP_FALLBACKS[s.label] || s.label,
+                })}
               </span>
             </div>
             {i < STEPS.length - 1 && (
@@ -301,13 +326,16 @@ export default function CreateOrder() {
         <div key={step} className="step-panel">
           {step === 0 && <Step1CustomerInfo onNext={next} initial={form} />}
           {step === 1 && (
+            <Step2RakhtSelection onNext={next} onBack={back} initial={form} />
+          )}
+          {step === 2 && (
             <Step2OrderTypes
               onNext={next}
               onBack={back}
               initial={form.orderTypes}
             />
           )}
-          {step === 2 && (
+          {step === 3 && (
             <Step3Measurements
               onNext={(d) => {
                 const orderItems = buildOrderItems(
@@ -321,7 +349,7 @@ export default function CreateOrder() {
               initial={form.measurements}
             />
           )}
-          {step === 3 && (
+          {step === 4 && (
             <Step4Billing
               onNext={(d) => {
                 const merged = { ...form, ...d };

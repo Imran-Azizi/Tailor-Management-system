@@ -20,6 +20,7 @@ import {
   LuArrowRightLeft,
   LuWalletCards,
   LuTruck,
+  LuClipboardList,
 } from "react-icons/lu";
 import { useAuth } from "../context/AuthContext.jsx";
 
@@ -35,6 +36,23 @@ const ADMIN_NAV = [
         path: "/dashboard",
         Icon: LuLayoutDashboard,
         end: true,
+      },
+      {
+        key: "daily-tasks-dropdown",
+        label: "sidebar.dailyTasks",
+        Icon: LuClipboardList,
+        children: [
+          {
+            label: "dailyTasks.title",
+            path: "/daily-tasks",
+            Icon: LuClipboardList,
+          },
+          {
+            label: "dailyTasks.allTitle",
+            path: "/daily-tasks/all",
+            Icon: LuList,
+          },
+        ],
       },
     ],
   },
@@ -127,6 +145,23 @@ const DOKAN_NAV = [
         path: "/dashboard",
         Icon: LuLayoutDashboard,
         end: true,
+      },
+      {
+        key: "daily-tasks-dropdown",
+        label: "sidebar.dailyTasks",
+        Icon: LuClipboardList,
+        children: [
+          {
+            label: "dailyTasks.title",
+            path: "/daily-tasks",
+            Icon: LuClipboardList,
+          },
+          {
+            label: "dailyTasks.allTitle",
+            path: "/daily-tasks/all",
+            Icon: LuList,
+          },
+        ],
       },
     ],
   },

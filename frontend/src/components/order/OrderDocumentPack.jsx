@@ -13,6 +13,7 @@ import {
 import { SHOP_CONFIG } from "../../config/shopConfig.js";
 import { toAsciiDigits } from "../../lib/normalize.js";
 import { formatCurrency } from "../../lib/currency.js";
+import { resolveRakhtColorHex } from "../../lib/rakhtColors.js";
 import { getOrderTypeLabel as getLocalizedOrderTypeLabel } from "../../lib/orderType.js";
 
 const NUMERIC_FIELDS = new Set([
@@ -523,6 +524,28 @@ export function CustomerCombinedBill({ customer, orders = [] }) {
   const billNo = toEnglishDigits(customer?.billNumber);
   const customerName = customer?.firstName || "-";
   const customerPhone = toEnglishDigits(customer?.phoneNumber);
+  const uniqueRakhtCombos = Array.from(
+    new Map(
+      safeOrders
+        .filter((order) => order?.rakhtBrandName || order?.rakhtColor)
+        .map((order) => [
+          `${order?.rakhtBrandName || "-"}:${order?.rakhtColor || "-"}:${order?.rakhtColorHex || "-"}`,
+          {
+            brand: order?.rakhtBrandName || "-",
+            color: order?.rakhtColor || "-",
+            colorHex: order?.rakhtColorHex || null,
+            meters:
+              order?.rakhtRequiredMeters != null
+                ? Number(order.rakhtRequiredMeters)
+                : null,
+          },
+        ]),
+    ).values(),
+  );
+  const totalRakhtMeters = safeOrders.reduce(
+    (sum, order) => sum + Number(order?.rakhtRequiredMeters || 0),
+    0,
+  );
 
   const typeIndex = {};
   const typeCountTotals = safeOrders.reduce((acc, order) => {
@@ -593,6 +616,57 @@ export function CustomerCombinedBill({ customer, orders = [] }) {
           className={`border-b border-slate-800 bg-rose-50 px-2.5 py-1.5 text-[10px] font-bold text-rose-700 ${alignClass}`}
         >
           {t("createOrder.emergencyOrder")}
+        </div>
+      ) : null}
+
+      {uniqueRakhtCombos.length ? (
+        <div className="border-b border-slate-800 bg-amber-50 px-2 py-2 text-slate-800">
+          <div
+            className={`mb-1 text-[9px] font-extrabold uppercase tracking-[0.08em] text-amber-800 ${alignClass}`}
+          >
+            {t("createOrder.rakhtSelection", {
+              defaultValue: "Rakht Selection",
+            })}
+          </div>
+          <div
+            className={`flex flex-wrap gap-1.5 ${settings.isRtl ? "justify-end" : "justify-start"}`}
+          >
+            {uniqueRakhtCombos.map((item) => (
+              <span
+                key={`${item.brand}-${item.color}`}
+                className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-white px-2 py-1 text-[9px] font-semibold text-amber-900"
+              >
+                <span>{item.brand}</span>
+                <span className="text-slate-400">•</span>
+                <span className="inline-flex items-center gap-1">
+                  {item.colorHex ? (
+                    <span
+                      style={{
+                        width: 9,
+                        height: 9,
+                        borderRadius: "50%",
+                        border: "1px solid rgba(15,23,42,0.16)",
+                        background: item.colorHex,
+                        flexShrink: 0,
+                      }}
+                    />
+                  ) : null}
+                  <span>{item.color}</span>
+                </span>
+                {item.meters != null ? (
+                  <>
+                    <span className="text-slate-400">•</span>
+                    <span className="[direction:ltr] [unicode-bidi:embed]">
+                      {formatNumber(item.meters)}m
+                    </span>
+                  </>
+                ) : null}
+              </span>
+            ))}
+            <span className="inline-flex items-center rounded-full border border-emerald-300 bg-emerald-100 px-2 py-1 text-[9px] font-black text-emerald-800 [direction:ltr] [unicode-bidi:embed]">
+              {formatNumber(totalRakhtMeters)}m
+            </span>
+          </div>
         </div>
       ) : null}
 
@@ -804,6 +878,28 @@ function getOrderItemLabel(order, itemLabel, settings) {
   return getOrderTypeLabel(order?.type, settings.langCode);
 }
 
+function renderRakhtColorValue(colorName, colorHex) {
+  const swatchHex = resolveRakhtColorHex(colorName, colorHex);
+
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+      {swatchHex ? (
+        <span
+          style={{
+            width: 12,
+            height: 12,
+            borderRadius: "50%",
+            border: "1px solid rgba(15,23,42,0.18)",
+            background: swatchHex,
+            flexShrink: 0,
+          }}
+        />
+      ) : null}
+      <span>{colorName || "-"}</span>
+    </span>
+  );
+}
+
 export function TailorBill({ customer, order, measurements, itemLabel }) {
   const { i18n, t } = useTranslation();
   const settings = getBillLanguageSettings(
@@ -833,12 +929,35 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
   const styleEntries = allEntries.filter(
     ([key, value]) => !NUMERIC_FIELDS.has(key) && value !== false,
   );
+  const rakhtRows = [
+    [
+      t("rakht.brandName", { defaultValue: "Rakht Brand" }),
+      order?.rakhtBrandName || "-",
+    ],
+    [
+      t("rakht.color", { defaultValue: "Rakht Color" }),
+      renderRakhtColorValue(order?.rakhtColor, order?.rakhtColorHex),
+    ],
+    [
+      t("rakht.requiredMeters", { defaultValue: "Required Meters" }),
+      order?.rakhtRequiredMeters != null
+        ? formatMeasurementValue(order.rakhtRequiredMeters)
+        : "-",
+    ],
+    [
+      t("rakht.piecePrice", { defaultValue: "Piece Price" }),
+      order?.rakhtPiecePrice != null
+        ? formatMeasurementValue(order.rakhtPiecePrice)
+        : "-",
+    ],
+  ];
   const rows = [
     ...getOrderedMeasurementRows(numericEntries, t),
     ...styleEntries.map(([key, value]) => [
       formatFieldKey(key, t),
       typeof value === "boolean" ? txt.yes : toEnglishDigits(value),
     ]),
+    ...rakhtRows,
   ];
 
   return (

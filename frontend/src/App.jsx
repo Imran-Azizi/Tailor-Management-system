@@ -30,6 +30,9 @@ import ClothesDeliveryToCustomer from "./pages/ClothesDeliveryToCustomer.jsx";
 import AssignOrders from "./pages/AssignOrders.jsx";
 import AssignOrdersReport from "./pages/AssignOrdersReport.jsx";
 import CompletedWorkerOrders from "./pages/CompletedWorkerOrders.jsx";
+import DailyTasks from "./pages/DailyTasks.jsx";
+import AllDailyTasks from "./pages/AllDailyTasks.jsx";
+import DailyTaskDetails from "./pages/DailyTaskDetails.jsx";
 
 export default function App() {
   return (
@@ -200,6 +203,31 @@ export default function App() {
                 element={
                   <RoleRoute roles={["ADMIN", "DOKAN"]}>
                     <AllTransactions />
+                  </RoleRoute>
+                }
+              />
+
+              <Route
+                path="daily-tasks"
+                element={
+                  <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                    <DailyTasks />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="daily-tasks/all"
+                element={
+                  <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                    <AllDailyTasks />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="daily-tasks/:id"
+                element={
+                  <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                    <DailyTaskDetails />
                   </RoleRoute>
                 }
               />

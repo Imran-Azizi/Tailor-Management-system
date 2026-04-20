@@ -929,7 +929,84 @@ const notifyAdminsToCreateBox = async (
   );
 };
 
-export const createOrder = async ({ customerInfo, orders: orderItems }) => {
+const reserveRakhtStock = async (tx, selection) => {
+  const requiredMeters = Number(selection?.requiredMeters || 0);
+  const piecePrice = Number(selection?.piecePrice || 0);
+
+  if (!selection?.rakhtId) {
+    throw Object.assign(new Error("Rakht selection is required"), {
+      status: 400,
+    });
+  }
+
+  if (!Number.isFinite(requiredMeters) || requiredMeters <= 0) {
+    throw Object.assign(
+      new Error("Required meters must be a positive number"),
+      {
+        status: 400,
+      },
+    );
+  }
+
+  if (!Number.isFinite(piecePrice) || piecePrice < 0) {
+    throw Object.assign(new Error("Piece price must be a valid number"), {
+      status: 400,
+    });
+  }
+
+  const rakht = await tx.rakht.findUnique({ where: { id: selection.rakhtId } });
+  if (!rakht) {
+    throw Object.assign(new Error("Selected Rakht not found"), {
+      status: 404,
+    });
+  }
+
+  const safeAvailable = Math.max(
+    0,
+    Number(rakht.totalMeters || 0) - Number(rakht.usedMeters || 0),
+  );
+  if (safeAvailable < requiredMeters) {
+    throw Object.assign(
+      new Error(`Insufficient Rakht stock. Available: ${safeAvailable}`),
+      { status: 400 },
+    );
+  }
+
+  const updateResult = await tx.rakht.updateMany({
+    where: {
+      id: rakht.id,
+      usedMeters: {
+        lte: Number(rakht.totalMeters || 0) - requiredMeters,
+      },
+    },
+    data: {
+      usedMeters: { increment: requiredMeters },
+    },
+  });
+
+  if (updateResult.count !== 1) {
+    throw Object.assign(
+      new Error("Rakht stock changed. Please try again with updated stock."),
+      { status: 409 },
+    );
+  }
+
+  return {
+    rakhtId: rakht.id,
+    rakhtCompanyName: rakht.companyName,
+    rakhtBrandName: rakht.brandName,
+    rakhtColor: rakht.color,
+    rakhtColorHex: rakht.colorHex,
+    rakhtRequiredMeters: requiredMeters,
+    rakhtPiecePrice: piecePrice,
+  };
+};
+
+export const createOrder = async ({
+  customerInfo,
+  rakhtSelection,
+  orders: orderItems,
+}) => {
   return prisma.$transaction(async (tx) => {
     let customer;
 
@@ -978,6 +1055,7 @@ export const createOrder = async ({ customerInfo, orders: orderItems }) => {
 
     const createdOrders = [];
     const alertedTypes = new Set();
+    const rakhtSnapshot = await reserveRakhtStock(tx, rakhtSelection);
 
     for (const item of orderItems) {
       const {
@@ -1003,6 +1081,7 @@ export const createOrder = async ({ customerInfo, orders: orderItems }) => {
           customerId: customer.id,
           type,
           orderName: orderName || null,
+          ...rakhtSnapshot,
           totalPrice,
           discount,
           paidAmount,
@@ -1334,6 +1413,13 @@ export const updateOrderBill = async (
           customerId: seed.customerId,
           type,
           orderName: orderName || null,
+          rakhtId: seed.rakhtId ?? null,
+          rakhtCompanyName: seed.rakhtCompanyName ?? null,
+          rakhtBrandName: seed.rakhtBrandName ?? null,
+          rakhtColor: seed.rakhtColor ?? null,
+          rakhtColorHex: seed.rakhtColorHex ?? null,
+          rakhtRequiredMeters: seed.rakhtRequiredMeters ?? null,
+          rakhtPiecePrice: seed.rakhtPiecePrice ?? null,
           totalPrice,
           discount,
           paidAmount,
