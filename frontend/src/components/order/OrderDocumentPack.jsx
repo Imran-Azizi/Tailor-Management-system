@@ -145,7 +145,7 @@ const BILL_TEXT = {
 const BILL_EXTRA_TEXT = {
   en: {
     box: "Box",
-    typeTotal: "Type Total",
+    itemPrice: "Item Price",
     totalAllClothes: "Total Amount",
     totalDiscountAllClothes: "Discount",
     totalPaidAllClothes: "Paid Amount",
@@ -154,7 +154,7 @@ const BILL_EXTRA_TEXT = {
   },
   dari: {
     box: "صندوق",
-    typeTotal: "مجموع هر نوع لباس",
+    itemPrice: "قیمت هر مورد",
     totalAllClothes: "مبلغ مجموعی",
     totalDiscountAllClothes: "تخفیف",
     totalPaidAllClothes: "مبلغ پرداخت‌شده",
@@ -163,7 +163,7 @@ const BILL_EXTRA_TEXT = {
   },
   pashto: {
     box: "بکس",
-    typeTotal: "د هر ډول کالیو مجموعه",
+    itemPrice: "د هر توکي بیه",
     totalAllClothes: "ټول مبلغ",
     totalDiscountAllClothes: "تخفیف",
     totalPaidAllClothes: "ورکړل شوې پیسې",
@@ -553,11 +553,6 @@ export function CustomerCombinedBill({ customer, orders = [] }) {
     acc[typeKey] = (acc[typeKey] || 0) + 1;
     return acc;
   }, {});
-  const totalsByType = safeOrders.reduce((acc, order) => {
-    const typeKey = order?.type || "ITEM";
-    acc[typeKey] = (acc[typeKey] || 0) + Number(order?.totalPrice || 0);
-    return acc;
-  }, {});
 
   const rowItems = safeOrders.map((order, index) => {
     const typeKey = order?.type || "ITEM";
@@ -575,7 +570,6 @@ export function CustomerCombinedBill({ customer, orders = [] }) {
       itemLabel,
       qty: Number(order?.quantity || 1),
       amount: totalPrice,
-      typeTotal: totalsByType[typeKey] || totalPrice,
       boxName: order?.box?.boxName || extraTxt.notAssigned,
     };
   });
@@ -706,7 +700,7 @@ export function CustomerCombinedBill({ customer, orders = [] }) {
             <th
               className={`w-[15%] border-b border-slate-800 px-1.5 py-1 ${tableHeadClass} [direction:ltr]`}
             >
-              {extraTxt.typeTotal}
+              {extraTxt.itemPrice}
             </th>
           </tr>
         </thead>
@@ -762,7 +756,7 @@ export function CustomerCombinedBill({ customer, orders = [] }) {
                   {row.boxName}
                 </td>
                 <td className="border-b border-slate-800 px-1.5 py-1 text-center align-top font-black text-slate-900 [direction:ltr] [unicode-bidi:embed]">
-                  {formatMoney(row.typeTotal, settings.langCode)}
+                  {formatMoney(row.amount, settings.langCode)}
                 </td>
               </tr>
             ))
@@ -1258,7 +1252,7 @@ export function OrderDocumentPack({ customer, order, previewId }) {
 
         <div className="order-doc-grid">
           <DetailField
-            label={t("common.phone")}
+            label={t("common.phone", "Phone")}
             value={toEnglishDigits(customer?.phoneNumber)}
             Icon={LuPhone}
           />
@@ -1268,7 +1262,7 @@ export function OrderDocumentPack({ customer, order, previewId }) {
             Icon={LuReceipt}
           />
           <DetailField
-            label={t("common.status")}
+            label={t("common.status", "Status")}
             value={order?.isCompleted ? t("orders.done") : t("orders.pending")}
             Icon={LuFileText}
           />

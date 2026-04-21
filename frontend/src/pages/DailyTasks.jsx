@@ -212,22 +212,13 @@ function DailyTaskForm({ onSuccess }) {
           marginTop: 24,
           display: "flex",
           alignItems: "center",
-          justifyContent: "flex-end",
+          justifyContent: "center",
           gap: 10,
           paddingTop: 16,
           borderTop: "1px solid var(--border)",
           flexWrap: "wrap",
         }}
       >
-        <button
-          type="button"
-          className="btn btn-outline"
-          style={{ gap: 6, minWidth: 110 }}
-          onClick={() => reset({ taskDate: nowLocalInput() })}
-          disabled={mutation.isPending}
-        >
-          {t("common.reset", "Reset")}
-        </button>
         <button
           type="submit"
           disabled={mutation.isPending}

@@ -20,6 +20,8 @@ const BOX_CAPACITY_FULL_REGEX =
   /^capacity of this box is full(?: \((.+?)\))? - (.+?) - Bill #(\d+) - (.+?)\.?$/i;
 const BOX_NOT_FOUND_REGEX =
   /^No box found for (.+?) orders - (.+?) - Bill #(\d+) - (.+?)\.?$/i;
+const ADMIN_PAYMENT_REGEX =
+  /^Admin has given you ([\d.]+) on (\d{4}-\d{2}-\d{2})\.?$/i;
 
 const normalizeOrderTypeFromText = (typeText) => {
   const raw = String(typeText || "")
@@ -142,6 +144,15 @@ const parseKnownUserNotification = (notification) => {
     };
   }
 
+  matched = msg.match(ADMIN_PAYMENT_REGEX);
+  if (matched) {
+    return {
+      kind: "ADMIN_PAYMENT",
+      amount: matched[1],
+      date: matched[2],
+    };
+  }
+
   return null;
 };
 
@@ -239,6 +250,19 @@ export function formatUserNotificationMessage(
       customer: parsed.customerName || "-",
       billNumber: parsed.billNumber || "-",
       orderType: orderTypeLabel || "-",
+    });
+  }
+
+  if (parsed.kind === "ADMIN_PAYMENT") {
+    const formattedDate = parsed.date
+      ? new Date(parsed.date).toLocaleDateString(
+          language === "dari" || language === "pashto" ? "fa" : "en-US",
+          { year: "numeric", month: "long", day: "numeric" },
+        )
+      : parsed.date;
+    return t("notificationMessages.adminPayment", {
+      amount: parsed.amount,
+      date: formattedDate,
     });
   }
 

@@ -857,7 +857,7 @@ function OrderCard({
             }}
           >
             {order.remaining > 0
-              ? `${t("common.remaining")}: ${fmt$(order.remaining)}`
+              ? `${t("common.remaining", "Remaining")}: ${fmt$(order.remaining)}`
               : "✓ " + t("orders.paidInFull")}
           </p>
         </div>

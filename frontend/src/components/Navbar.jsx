@@ -17,6 +17,8 @@ import {
   LuShieldCheck,
   LuChevronDown,
   LuX,
+  LuArrowRight,
+  LuCircleDollarSign,
 } from "react-icons/lu";
 import { useTheme } from "../context/ThemeContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -116,6 +118,15 @@ function SystemNotifPanel({ onClose }) {
       <div className="notif-panel-head">
         <span className="notif-panel-title">{t("navbar.notifications")}</span>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {workerNotifs.length > 0 && (
+            <button
+              onClick={() => readAllWorkerMut.mutate()}
+              disabled={readAllWorkerMut.isPending}
+              className="notif-panel-link-btn"
+            >
+              {t("navbar.markAllRead")}
+            </button>
+          )}
           {emergency.length > 0 && (
             <button
               onClick={() => {
@@ -149,10 +160,12 @@ function SystemNotifPanel({ onClose }) {
                   padding: "8px 14px 6px",
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "space-between",
+                  gap: 6,
                   background: "var(--surface2)",
+                  borderBottom: "1px solid var(--border)",
                 }}
               >
+                <LuBell size={12} style={{ color: "#2563EB" }} />
                 <span
                   style={{
                     fontSize: 11,
@@ -164,62 +177,82 @@ function SystemNotifPanel({ onClose }) {
                 >
                   {t("navbar.workUpdates")}
                 </span>
-                <button
-                  onClick={() => readAllWorkerMut.mutate()}
-                  disabled={readAllWorkerMut.isPending}
-                  style={{
-                    fontSize: 11,
-                    color: "var(--text3)",
-                    cursor: "pointer",
-                    background: "none",
-                    border: "none",
-                    fontWeight: 500,
-                  }}
-                >
-                  {t("navbar.markAllRead")}
-                </button>
               </div>
-              {workerNotifs.slice(0, 6).map((n) => (
-                <div key={n.id} className="notif-panel-item">
-                  <LuBell
-                    size={13}
-                    style={{ color: "#2563EB", flexShrink: 0, marginTop: 2 }}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <NotificationText
-                      language={language}
-                      style={{
-                        fontSize: 12,
-                        lineHeight: 1.4,
-                        color: "var(--text1)",
-                      }}
-                    >
-                      {formatUserNotificationMessage(n, t, language)}
-                    </NotificationText>
-                    <p
-                      style={{
-                        fontSize: 11,
-                        color: "var(--text3)",
-                        marginTop: 2,
-                      }}
-                    >
-                      {formatDateTimeLocale(n.createdAt, language)}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => readWorkerMut.mutate(n.id)}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      color: "var(--text3)",
-                      display: "flex",
-                    }}
+              {workerNotifs.slice(0, 6).map((n) => {
+                const isActionable =
+                  n.orderId &&
+                  (n.type === "WORK_COMPLETED" ||
+                    n.type === "QICHIKAR_READY_FOR_DOKHT");
+                const handleRowClick = () => {
+                  if (!isActionable) return;
+                  readWorkerMut.mutate(n.id);
+                  navigate(
+                    `/orders/completed-workers?orderId=${encodeURIComponent(n.orderId)}`,
+                  );
+                  onClose();
+                };
+                return (
+                  <div
+                    key={n.id}
+                    className="notif-panel-item"
+                    onClick={isActionable ? handleRowClick : undefined}
+                    style={isActionable ? { cursor: "pointer" } : undefined}
                   >
-                    <LuCheck size={13} />
-                  </button>
-                </div>
-              ))}
+                    <LuBell
+                      size={13}
+                      style={{ color: "#2563EB", flexShrink: 0, marginTop: 2 }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <NotificationText
+                        language={language}
+                        style={{
+                          fontSize: 12,
+                          lineHeight: 1.4,
+                          color: "var(--text1)",
+                        }}
+                      >
+                        {formatUserNotificationMessage(n, t, language)}
+                      </NotificationText>
+                      <p
+                        style={{
+                          fontSize: 11,
+                          color: "var(--text3)",
+                          marginTop: 2,
+                        }}
+                      >
+                        {formatDateTimeLocale(n.createdAt, language)}
+                      </p>
+                      {isActionable && (
+                        <p
+                          style={{
+                            fontSize: 11,
+                            color: "var(--primary)",
+                            marginTop: 3,
+                            fontWeight: 600,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 3,
+                          }}
+                        >
+                          {t("navbar.viewOrder", "View & Pay")}
+                          <LuArrowRight size={11} />
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        readWorkerMut.mutate(n.id);
+                      }}
+                      title={t("navbar.markAsRead")}
+                      className="notif-panel-close-btn"
+                      style={{ width: 26, height: 26, borderRadius: 6 }}
+                    >
+                      <LuCheck size={12} />
+                    </button>
+                  </div>
+                );
+              })}
             </>
           )}
 
@@ -229,9 +262,14 @@ function SystemNotifPanel({ onClose }) {
               <div
                 style={{
                   padding: "8px 14px 6px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
                   background: "var(--surface2)",
+                  borderBottom: "1px solid var(--border)",
                 }}
               >
+                <LuTriangleAlert size={12} style={{ color: "#EF4444" }} />
                 <span
                   style={{
                     fontSize: 11,
@@ -277,15 +315,11 @@ function SystemNotifPanel({ onClose }) {
                   </div>
                   <button
                     onClick={() => readEmergencyMut.mutate(n.id)}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      color: "var(--text3)",
-                      display: "flex",
-                    }}
+                    title={t("navbar.markAsRead")}
+                    className="notif-panel-close-btn"
+                    style={{ width: 26, height: 26, borderRadius: 6 }}
                   >
-                    <LuCheck size={13} />
+                    <LuCheck size={12} />
                   </button>
                 </div>
               ))}
@@ -301,13 +335,16 @@ function SystemNotifPanel({ onClose }) {
 function UserNotifPanel({ onClose }) {
   const { t, i18n } = useTranslation();
   const qc = useQueryClient();
-  const navigate = useNavigate();
+  const { user } = useAuth();
   const language = i18n.resolvedLanguage || i18n.language || "en";
-  const { data: notifs = [] } = useQuery({
+  const roleColor = ROLE_COLORS[user?.accountType] || "#888";
+
+  const { data: notifsRaw = [] } = useQuery({
     queryKey: ["my-notifs-nav"],
     queryFn: () =>
       api.get("/users/me/notifications?unread=true").then((r) => r.data),
   });
+  const notifs = Array.isArray(notifsRaw) ? notifsRaw : [];
 
   const readAllMut = useMutation({
     mutationFn: () => api.patch("/users/me/notifications/read-all"),
@@ -335,37 +372,22 @@ function UserNotifPanel({ onClose }) {
       ),
   });
 
+  const paymentNotifs = notifs.filter((n) => n.type === "ADMIN_PAYMENT");
+  const otherNotifs = notifs.filter((n) => n.type !== "ADMIN_PAYMENT");
+
   return (
     <>
       <div className="notif-panel-head">
         <span className="notif-panel-title">{t("navbar.notifications")}</span>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {notifs.length > 0 && (
-            <>
-              <button
-                onClick={() => {
-                  navigate("/my-tasks");
-                  onClose();
-                }}
-                className="notif-panel-link-btn"
-              >
-                {t("navbar.viewAll")}
-              </button>
-              <button
-                onClick={() => readAllMut.mutate()}
-                disabled={readAllMut.isPending}
-                style={{
-                  fontSize: 12,
-                  color: "var(--text3)",
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  background: "none",
-                  border: "none",
-                }}
-              >
-                {t("navbar.markAllRead")}
-              </button>
-            </>
+            <button
+              onClick={() => readAllMut.mutate()}
+              disabled={readAllMut.isPending}
+              className="notif-panel-link-btn"
+            >
+              {t("workerLayout.markAllRead")}
+            </button>
           )}
           <button
             onClick={onClose}
@@ -376,55 +398,140 @@ function UserNotifPanel({ onClose }) {
           </button>
         </div>
       </div>
+
       {notifs.length === 0 ? (
         <div className="notif-panel-empty">{t("navbar.allCaughtUp")}</div>
       ) : (
         <div className="notif-panel-scroll">
-          {notifs.slice(0, 8).map((n) => (
-            <div
-              key={n.id}
-              className="notif-panel-item"
-              style={{ cursor: "default" }}
-            >
-              <LuBell
-                size={13}
-                style={{ color: "#2563EB", flexShrink: 0, marginTop: 3 }}
-              />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <NotificationText
-                  language={language}
-                  style={{
-                    fontSize: 12,
-                    lineHeight: 1.45,
-                    color: "var(--text1)",
-                  }}
-                >
-                  {formatUserNotificationMessage(n, t, language)}
-                </NotificationText>
-                <p
-                  style={{ fontSize: 11, color: "var(--text3)", marginTop: 3 }}
-                >
-                  {formatDateTimeLocale(n.createdAt, language)}
-                </p>
-              </div>
-              <button
-                onClick={() => readOneMut.mutate(n.id)}
-                title={t("navbar.markAsRead")}
+          {paymentNotifs.length > 0 && (
+            <>
+              <div
                 style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "var(--text3)",
+                  padding: "8px 14px 6px",
                   display: "flex",
-                  padding: "3px 4px",
-                  borderRadius: 4,
-                  flexShrink: 0,
+                  alignItems: "center",
+                  gap: 6,
+                  background: "var(--surface2)",
+                  borderBottom: "1px solid var(--border)",
                 }}
               >
-                <LuCheck size={13} />
-              </button>
-            </div>
-          ))}
+                <LuCircleDollarSign size={12} style={{ color: "#16A34A" }} />
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "#16A34A",
+                    textTransform: "uppercase",
+                    letterSpacing: ".06em",
+                  }}
+                >
+                  {t("workerLayout.paymentsFromAdmin", "Payments from Admin")}
+                </span>
+              </div>
+              {paymentNotifs.map((n) => (
+                <div key={n.id} className="notif-panel-item">
+                  <LuCircleDollarSign
+                    size={14}
+                    style={{ color: "#16A34A", flexShrink: 0, marginTop: 2 }}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <NotificationText
+                      language={language}
+                      style={{
+                        fontSize: 13,
+                        lineHeight: 1.45,
+                        color: "var(--text1)",
+                      }}
+                    >
+                      {formatUserNotificationMessage(n, t, language)}
+                    </NotificationText>
+                    <p
+                      style={{
+                        fontSize: 11,
+                        color: "var(--text3)",
+                        marginTop: 3,
+                      }}
+                    >
+                      {formatDateTimeLocale(n.createdAt, language)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => readOneMut.mutate(n.id)}
+                    title={t("navbar.markAsRead")}
+                    className="notif-panel-close-btn"
+                    style={{ width: 26, height: 26, borderRadius: 6 }}
+                  >
+                    <LuCheck size={12} />
+                  </button>
+                </div>
+              ))}
+            </>
+          )}
+
+          {otherNotifs.length > 0 && (
+            <>
+              <div
+                style={{
+                  padding: "8px 14px 6px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  background: "var(--surface2)",
+                  borderBottom: "1px solid var(--border)",
+                }}
+              >
+                <LuBell size={12} style={{ color: roleColor }} />
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "var(--text3)",
+                    textTransform: "uppercase",
+                    letterSpacing: ".06em",
+                  }}
+                >
+                  {t("navbar.workUpdates", "Work Updates")}
+                </span>
+              </div>
+              {otherNotifs.slice(0, 8).map((n) => (
+                <div key={n.id} className="notif-panel-item">
+                  <LuBell
+                    size={13}
+                    style={{ color: roleColor, flexShrink: 0, marginTop: 3 }}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <NotificationText
+                      language={language}
+                      style={{
+                        fontSize: 12,
+                        lineHeight: 1.45,
+                        color: "var(--text1)",
+                      }}
+                    >
+                      {formatUserNotificationMessage(n, t, language)}
+                    </NotificationText>
+                    <p
+                      style={{
+                        fontSize: 11,
+                        color: "var(--text3)",
+                        marginTop: 3,
+                      }}
+                    >
+                      {formatDateTimeLocale(n.createdAt, language)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => readOneMut.mutate(n.id)}
+                    title={t("navbar.markAsRead")}
+                    className="notif-panel-close-btn"
+                    style={{ width: 26, height: 26, borderRadius: 6 }}
+                  >
+                    <LuCheck size={12} />
+                  </button>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       )}
     </>
@@ -633,10 +740,10 @@ export default function Navbar({ onHamburger, pageTitle }) {
     <>
       <header className="navbar no-print">
         <button
-          className="nav-btn"
+          className="nav-btn md:hidden"
           onClick={onHamburger}
-          style={{ display: "none" }}
           id="ham-btn"
+          aria-label={t("common.menu", "Menu")}
         >
           <LuMenu size={20} />
         </button>
@@ -692,26 +799,12 @@ export default function Navbar({ onHamburger, pageTitle }) {
           >
             <LuBell size={18} />
             {unreadCount > 0 && (
-              <span
-                className="notif-dot"
-                style={{
-                  minWidth: 16,
-                  height: 16,
-                  borderRadius: 99,
-                  background: "#EF4444",
-                  color: "#fff",
-                  fontSize: 10,
-                  fontWeight: 700,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  position: "absolute",
-                  top: -4,
-                  insetInlineEnd: -4,
-                  padding: "0 4px",
-                }}
-              >
-                {unreadCount > 9 ? "9+" : unreadCount}
+              <span className="notif-dot">
+                {unreadCount > 99
+                  ? "99+"
+                  : unreadCount > 9
+                    ? "9+"
+                    : unreadCount}
               </span>
             )}
           </button>

@@ -372,10 +372,10 @@ export const getAllOrders = async ({
   const skip = (Number(page) - 1) * Number(limit);
   const where = {};
   if (status === "completed") {
-    where.OR = [{ isCompleted: true }, { remaining: { lte: 0 } }];
+    where.isCompleted = true;
   }
   if (status === "pending") {
-    where.AND = [{ isCompleted: false }, { remaining: { gt: 0 } }];
+    where.isCompleted = false;
   }
   if (type) where.type = type;
   if (search)
@@ -600,6 +600,7 @@ export const getCompletedOrdersFromWorkers = async ({
   paymentStatus,
   qichikarUserId,
   dokhtUserId,
+  orderId,
 } = {}) => {
   const skip = (Number(page) - 1) * Number(limit);
   const where = {
@@ -652,6 +653,10 @@ export const getCompletedOrdersFromWorkers = async ({
       dokhtAssignedToId: String(dokhtUserId).trim(),
       dokhtCompletedAt: { not: null },
     });
+  }
+
+  if (orderId && String(orderId).trim()) {
+    where.AND.push({ id: String(orderId).trim() });
   }
 
   const data = await findManyOrdersSafe(
@@ -774,13 +779,18 @@ const buildOrderUpdateData = (existingOrder, body) => {
   const paidAmount = body.paidAmount ?? existingOrder.paidAmount;
   const quantity = body.quantity ?? existingOrder.quantity;
   const remaining = totalPrice - discount - paidAmount;
-  const hasWorkerCompleted = Boolean(
-    existingOrder.dokhtCompletedAt || existingOrder.qichikarCompletedAt,
-  );
-  const autoCompleteOnFullPayment = remaining <= 0 && hasWorkerCompleted;
-  const nextIsCompleted =
-    body.isCompleted ??
-    (existingOrder.isCompleted || autoCompleteOnFullPayment);
+
+  if (
+    body.isCompleted !== undefined &&
+    body.isCompleted !== existingOrder.isCompleted
+  ) {
+    throw Object.assign(
+      new Error(
+        "Order completion is only allowed through the Clothes Delivery Receive action.",
+      ),
+      { status: 400 },
+    );
+  }
 
   if (discount < 0 || paidAmount < 0) {
     throw Object.assign(
@@ -809,15 +819,6 @@ const buildOrderUpdateData = (existingOrder, body) => {
     });
   }
 
-  if (nextIsCompleted && remaining > 0) {
-    throw Object.assign(
-      new Error(
-        "This order cannot be marked as completed until full payment is confirmed by admin.",
-      ),
-      { status: 400 },
-    );
-  }
-
   if (
     (body.isEmergency ?? existingOrder.isEmergency) &&
     !body.emergencyExpiry &&
@@ -836,9 +837,6 @@ const buildOrderUpdateData = (existingOrder, body) => {
     paidAmount,
     remaining,
     quantity,
-    ...(body.isCompleted !== undefined || autoCompleteOnFullPayment
-      ? { isCompleted: body.isCompleted ?? autoCompleteOnFullPayment }
-      : {}),
     ...(body.isEmergency !== undefined
       ? { isEmergency: body.isEmergency }
       : {}),
@@ -850,9 +848,6 @@ const buildOrderUpdateData = (existingOrder, body) => {
         }
       : {}),
     ...(body.boxId !== undefined ? { boxId: body.boxId } : {}),
-    ...(body.isCompleted === true || autoCompleteOnFullPayment
-      ? { boxId: null }
-      : {}),
   };
 };
 

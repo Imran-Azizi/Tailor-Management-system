@@ -7,7 +7,12 @@ import { getApiErrorMessage } from "../lib/feedback.js";
 import { parseNumberLocale } from "../lib/normalize.js";
 import { formatCurrency } from "../lib/currency.js";
 import { getOrderTypeLabel } from "../lib/orderType.js";
-import { Card, EmptyState, PageHeader, Spinner } from "../components/ui/index.jsx";
+import {
+  Card,
+  EmptyState,
+  PageHeader,
+  Spinner,
+} from "../components/ui/index.jsx";
 
 function formatMoney(value, language) {
   return formatCurrency(value, language, {
@@ -21,16 +26,10 @@ export default function ClothesDeliveryToCustomer() {
   const language = i18n.resolvedLanguage || i18n.language;
   const normalizedLanguage = String(language || "en").toLowerCase();
   const isEnglish = normalizedLanguage.startsWith("en");
-  const isDari = normalizedLanguage.startsWith("dari") || normalizedLanguage.startsWith("fa");
-  const isPashto = normalizedLanguage.startsWith("pashto") || normalizedLanguage.startsWith("ps");
   const isRtl = false;
   const dir = "ltr";
   const receiveButtonText = isEnglish ? "Receive" : "رسید";
-  const completedStatusText = isDari
-    ? "تکمیل‌شد"
-    : isPashto
-      ? "بشپړ شو"
-      : t("common.completed", "Completed");
+  const completedStatusText = t("orders.done", "Completed");
 
   const [mode, setMode] = useState("bill"); // bill | phone
   const [query, setQuery] = useState("");
@@ -58,13 +57,18 @@ export default function ClothesDeliveryToCustomer() {
     const trimmed = query.trim();
     if (!trimmed) {
       toast.error(
-        t("common.search") + " " + (mode === "bill" ? t("delivery.searchByBill") : t("delivery.searchByPhone")),
+        t("common.search") +
+          " " +
+          (mode === "bill"
+            ? t("delivery.searchByBill")
+            : t("delivery.searchByPhone")),
       );
       return;
     }
     setLoading(true);
     try {
-      const params = mode === "bill" ? { billNumber: trimmed } : { phoneNumber: trimmed };
+      const params =
+        mode === "bill" ? { billNumber: trimmed } : { phoneNumber: trimmed };
       const { data } = await api.get("/orders/lookup", { params });
       setResult(data);
       // Default payment input to full remaining per order.
@@ -82,29 +86,39 @@ export default function ClothesDeliveryToCustomer() {
   };
 
   const submitPayment = async (order) => {
-    const raw = payments[order.id] ?? "";
-    const amount = parseNumberLocale(raw);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      toast.error(t("delivery.invalidAmount"));
-      return;
-    }
-
     const remaining = Number(order.remaining || 0);
-    if (amount - remaining > 0.001) {
-      toast.error(t("delivery.paymentGreaterThanRemaining"));
-      return;
-    }
 
     setPaying(true);
     try {
-      const newPaid = (order.paidAmount || 0) + amount;
-      const nextRemaining = (order.remaining || 0) - amount;
-      const shouldComplete = nextRemaining <= 0.001;
+      let nextRemaining = remaining;
 
-      await api.put(`/orders/${order.id}`, {
-        paidAmount: newPaid,
-        ...(shouldComplete ? { isCompleted: true } : {}),
-      });
+      if (remaining > 0.001) {
+        const raw = payments[order.id] ?? "";
+        const amount = parseNumberLocale(raw);
+
+        if (!Number.isFinite(amount) || amount <= 0) {
+          toast.error(t("delivery.invalidAmount"));
+          return;
+        }
+
+        if (amount - remaining > 0.001) {
+          toast.error(t("delivery.paymentGreaterThanRemaining"));
+          return;
+        }
+
+        const newPaid = (order.paidAmount || 0) + amount;
+        nextRemaining = remaining - amount;
+
+        await api.put(`/orders/${order.id}`, {
+          paidAmount: newPaid,
+        });
+      }
+
+      if (nextRemaining <= 0.001) {
+        await api.patch(`/orders/${order.id}/complete`, {
+          deliveryReceive: true,
+        });
+      }
 
       toast.success(t("delivery.paymentRecorded"));
       await runSearch();
@@ -120,7 +134,10 @@ export default function ClothesDeliveryToCustomer() {
       className={`page ${isRtl ? "[font-family:'Noto_Naskh_Arabic','Noto_Sans_Arabic','Tahoma','Inter',sans-serif]" : ""}`}
       dir={dir}
     >
-      <PageHeader title={t("sidebar.clothesDelivery")} subtitle={t("delivery.subtitle")} />
+      <PageHeader
+        title={t("sidebar.clothesDelivery")}
+        subtitle={t("delivery.subtitle")}
+      />
 
       <Card title={t("delivery.searchTitle")}>
         <div className="grid gap-4">
@@ -134,18 +151,28 @@ export default function ClothesDeliveryToCustomer() {
                   : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
               } ${isRtl ? "text-right" : "text-left"}`}
             >
-              <div className={`flex items-center gap-3 ${isRtl ? "flex-row-reverse" : ""}`}>
-                <div className={`rounded-md p-2 ${mode === "bill" ? "bg-blue-100" : "bg-slate-100"}`}>
+              <div
+                className={`flex items-center gap-3 ${isRtl ? "flex-row-reverse" : ""}`}
+              >
+                <div
+                  className={`rounded-md p-2 ${mode === "bill" ? "bg-blue-100" : "bg-slate-100"}`}
+                >
                   <LuReceipt size={18} />
                 </div>
                 <div>
-                  <div className="text-sm font-semibold">{t("delivery.searchByBill")}</div>
-                  <div className="text-xs opacity-70">{t("delivery.searchByBillHint")}</div>
+                  <div className="text-sm font-semibold">
+                    {t("delivery.searchByBill")}
+                  </div>
+                  <div className="text-xs opacity-70">
+                    {t("delivery.searchByBillHint")}
+                  </div>
                 </div>
               </div>
               <div
                 className={`h-4 w-4 rounded-full border ${
-                  mode === "bill" ? "border-blue-600 bg-blue-600" : "border-slate-300"
+                  mode === "bill"
+                    ? "border-blue-600 bg-blue-600"
+                    : "border-slate-300"
                 }`}
               />
             </button>
@@ -159,18 +186,28 @@ export default function ClothesDeliveryToCustomer() {
                   : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
               } ${isRtl ? "text-right" : "text-left"}`}
             >
-              <div className={`flex items-center gap-3 ${isRtl ? "flex-row-reverse" : ""}`}>
-                <div className={`rounded-md p-2 ${mode === "phone" ? "bg-blue-100" : "bg-slate-100"}`}>
+              <div
+                className={`flex items-center gap-3 ${isRtl ? "flex-row-reverse" : ""}`}
+              >
+                <div
+                  className={`rounded-md p-2 ${mode === "phone" ? "bg-blue-100" : "bg-slate-100"}`}
+                >
                   <LuPhone size={18} />
                 </div>
                 <div>
-                  <div className="text-sm font-semibold">{t("delivery.searchByPhone")}</div>
-                  <div className="text-xs opacity-70">{t("delivery.searchByPhoneHint")}</div>
+                  <div className="text-sm font-semibold">
+                    {t("delivery.searchByPhone")}
+                  </div>
+                  <div className="text-xs opacity-70">
+                    {t("delivery.searchByPhoneHint")}
+                  </div>
                 </div>
               </div>
               <div
                 className={`h-4 w-4 rounded-full border ${
-                  mode === "phone" ? "border-blue-600 bg-blue-600" : "border-slate-300"
+                  mode === "phone"
+                    ? "border-blue-600 bg-blue-600"
+                    : "border-slate-300"
                 }`}
               />
             </button>
@@ -185,7 +222,11 @@ export default function ClothesDeliveryToCustomer() {
             <input
               id="delivery-search-input"
               className="inp"
-              placeholder={mode === "bill" ? t("delivery.billPlaceholder") : t("delivery.phonePlaceholder")}
+              placeholder={
+                mode === "bill"
+                  ? t("delivery.billPlaceholder")
+                  : t("delivery.phonePlaceholder")
+              }
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
@@ -219,29 +260,43 @@ export default function ClothesDeliveryToCustomer() {
           <div className="grid gap-4">
             <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className={`text-xs font-semibold text-slate-500 ${isRtl ? "tracking-normal" : "uppercase tracking-wide"}`}>
-                  {t("common.total")}
+                <div
+                  className={`text-xs font-semibold text-slate-500 ${isRtl ? "tracking-normal" : "uppercase tracking-wide"}`}
+                >
+                  {t("common.total", "Total")}
                 </div>
-                <div className="mt-2 text-lg font-extrabold text-slate-900">{formatMoney(totals.total, language)}</div>
+                <div className="mt-2 text-lg font-extrabold text-slate-900">
+                  {formatMoney(totals.total, language)}
+                </div>
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className={`text-xs font-semibold text-slate-500 ${isRtl ? "tracking-normal" : "uppercase tracking-wide"}`}>
-                  {t("createOrder.discount")}
+                <div
+                  className={`text-xs font-semibold text-slate-500 ${isRtl ? "tracking-normal" : "uppercase tracking-wide"}`}
+                >
+                  {t("createOrder.discount", "Discount")}
                 </div>
-                <div className="mt-2 text-lg font-extrabold text-slate-900">{formatMoney(totals.discount, language)}</div>
+                <div className="mt-2 text-lg font-extrabold text-slate-900">
+                  {formatMoney(totals.discount, language)}
+                </div>
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className={`text-xs font-semibold text-slate-500 ${isRtl ? "tracking-normal" : "uppercase tracking-wide"}`}>
-                  {t("common.paid")}
+                <div
+                  className={`text-xs font-semibold text-slate-500 ${isRtl ? "tracking-normal" : "uppercase tracking-wide"}`}
+                >
+                  {t("common.paid", "Paid")}
                 </div>
-                <div className="mt-2 text-lg font-extrabold text-emerald-700">{formatMoney(totals.paid, language)}</div>
+                <div className="mt-2 text-lg font-extrabold text-emerald-700">
+                  {formatMoney(totals.paid, language)}
+                </div>
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className={`text-xs font-semibold text-slate-500 ${isRtl ? "tracking-normal" : "uppercase tracking-wide"}`}>
-                  {t("common.remaining")}
+                <div
+                  className={`text-xs font-semibold text-slate-500 ${isRtl ? "tracking-normal" : "uppercase tracking-wide"}`}
+                >
+                  {t("common.remaining", "Remaining")}
                 </div>
                 <div
                   className={`mt-2 text-lg font-extrabold ${
@@ -260,27 +315,39 @@ export default function ClothesDeliveryToCustomer() {
                     isRtl ? "sm:flex-row-reverse" : "sm:flex-row"
                   }`}
                 >
-                  <div className={`flex items-center gap-3 ${isRtl ? "flex-row-reverse" : ""}`}>
+                  <div
+                    className={`flex items-center gap-3 ${isRtl ? "flex-row-reverse" : ""}`}
+                  >
                     <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-100 text-base font-extrabold text-blue-700">
-                      {(result.customer?.firstName || "C").slice(0, 1).toUpperCase()}
+                      {(result.customer?.firstName || "C")
+                        .slice(0, 1)
+                        .toUpperCase()}
                     </div>
                     <div className={isRtl ? "text-right" : "text-left"}>
-                      <p className="text-xs font-semibold text-slate-500">{t("common.customer")}</p>
+                      <p className="text-xs font-semibold text-slate-500">
+                        {t("common.customer", "Customer")}
+                      </p>
                       <h3 className="text-lg font-extrabold tracking-tight text-slate-900">
                         {result.customer?.firstName || "-"}
                       </h3>
                     </div>
                   </div>
 
-                  <div className={`grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 ${isRtl ? "text-right" : "text-left"}`}>
+                  <div
+                    className={`grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 ${isRtl ? "text-right" : "text-left"}`}
+                  >
                     <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
-                      <p className="text-[11px] font-semibold text-slate-500">{t("orders.billNumber")}</p>
+                      <p className="text-[11px] font-semibold text-slate-500">
+                        {t("orders.billNumber")}
+                      </p>
                       <p className="text-sm font-black text-slate-900 [direction:ltr] [unicode-bidi:embed]">
                         #{result.customer?.billNumber || "-"}
                       </p>
                     </div>
                     <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
-                      <p className="text-[11px] font-semibold text-slate-500">{t("common.phone")}</p>
+                      <p className="text-[11px] font-semibold text-slate-500">
+                        {t("common.phone", "Phone")}
+                      </p>
                       <p className="text-sm font-black text-slate-900 [direction:ltr] [unicode-bidi:embed]">
                         {result.customer?.phoneNumber || "-"}
                       </p>
@@ -294,23 +361,42 @@ export default function ClothesDeliveryToCustomer() {
                   <thead>
                     <tr
                       className={`text-xs font-semibold text-slate-500 ${
-                        isRtl ? "tracking-normal text-right" : "uppercase tracking-wide text-left"
+                        isRtl
+                          ? "tracking-normal text-right"
+                          : "uppercase tracking-wide text-left"
                       }`}
                     >
-                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3">{t("delivery.orderHeader")}</th>
-                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3">{t("common.type")}</th>
-                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3">{t("common.total")}</th>
-                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3">{t("createOrder.discount")}</th>
-                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3">{t("common.paid")}</th>
-                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3">{t("common.remaining")}</th>
-                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3">{t("common.status")}</th>
-                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3">{t("delivery.remainingPayment")}</th>
+                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                        {t("delivery.orderHeader")}
+                      </th>
+                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                        {t("common.type", "Type")}
+                      </th>
+                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                        {t("common.total", "Total")}
+                      </th>
+                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                        {t("createOrder.discount", "Discount")}
+                      </th>
+                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                        {t("common.paid", "Paid")}
+                      </th>
+                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                        {t("common.remaining", "Remaining")}
+                      </th>
+                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                        {t("common.status", "Status")}
+                      </th>
+                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                        {t("delivery.remainingPayment")}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {orders.map((o, idx) => {
                       const remaining = Number(o.remaining || 0);
-                      const isCompleted = Boolean(o.isCompleted) || remaining <= 0.001;
+                      const isCompleted = Boolean(o.isCompleted);
+                      const readyToReceive = !isCompleted && remaining <= 0.001;
 
                       return (
                         <tr key={o.id} className="hover:bg-slate-50/80">
@@ -345,15 +431,34 @@ export default function ClothesDeliveryToCustomer() {
                               <span className="inline-flex items-center rounded-full bg-rose-100 px-3 py-1 text-xs font-bold text-rose-700">
                                 {completedStatusText}
                               </span>
+                            ) : readyToReceive ? (
+                              <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
+                                {t(
+                                  "delivery.readyToReceive",
+                                  "Ready to receive",
+                                )}
+                              </span>
                             ) : (
                               <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
-                                {t("delivery.notFullyPaidBadge")}
+                                {t(
+                                  "delivery.notFullyPaidBadge",
+                                  "Not Completed",
+                                )}
                               </span>
                             )}
                           </td>
                           <td className="border-b border-slate-100 px-4 py-3">
                             {isCompleted ? (
                               <span className="text-sm text-slate-500">-</span>
+                            ) : readyToReceive ? (
+                              <button
+                                type="button"
+                                className="inline-flex h-10 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                                onClick={() => submitPayment(o)}
+                                disabled={paying}
+                              >
+                                {receiveButtonText}
+                              </button>
                             ) : (
                               <div
                                 className={`flex flex-col gap-2 md:items-center ${
@@ -363,7 +468,12 @@ export default function ClothesDeliveryToCustomer() {
                                 <input
                                   className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 md:w-40"
                                   value={payments[o.id] ?? ""}
-                                  onChange={(e) => setPayments((p) => ({ ...p, [o.id]: e.target.value }))}
+                                  onChange={(e) =>
+                                    setPayments((p) => ({
+                                      ...p,
+                                      [o.id]: e.target.value,
+                                    }))
+                                  }
                                   inputMode="decimal"
                                   placeholder={String(remaining)}
                                   disabled={paying}

@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
@@ -8,6 +9,7 @@ import {
   LuSearch,
   LuSquareCheckBig,
   LuUser,
+  LuX,
 } from "react-icons/lu";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
@@ -46,6 +48,8 @@ export default function CompletedWorkerOrders() {
   const { t, i18n } = useTranslation();
   const qc = useQueryClient();
   const language = i18n.resolvedLanguage || i18n.language || "en";
+  const [searchParams, setSearchParams] = useSearchParams();
+  const highlightOrderId = searchParams.get("orderId") || "";
 
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -56,14 +60,39 @@ export default function CompletedWorkerOrders() {
   const [pendingPayments, setPendingPayments] = useState({});
   const [confirmPayment, setConfirmPayment] = useState(null);
 
+  // When a specific order is linked from a notification, reset page to 1
+  useEffect(() => {
+    if (highlightOrderId) setPage(1);
+  }, [highlightOrderId]);
+
+  // Refs for auto-scrolling to the highlighted row
+  const rowRefs = useRef({});
+
+  // After data loads, scroll the highlighted row into view
+  useEffect(() => {
+    if (!highlightOrderId) return;
+    const node = rowRefs.current[highlightOrderId];
+    if (node) {
+      node.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  });
+
   const params = useMemo(() => {
     const next = { page, limit: LIMIT };
     if (search.trim()) next.search = search.trim();
     if (paymentStatus !== "ALL") next.paymentStatus = paymentStatus;
     if (qichikarUserId) next.qichikarUserId = qichikarUserId;
     if (dokhtUserId) next.dokhtUserId = dokhtUserId;
+    if (highlightOrderId) next.orderId = highlightOrderId;
     return next;
-  }, [dokhtUserId, page, paymentStatus, qichikarUserId, search]);
+  }, [
+    dokhtUserId,
+    highlightOrderId,
+    page,
+    paymentStatus,
+    qichikarUserId,
+    search,
+  ]);
 
   const { data: workerOptions = [], isLoading: isWorkersLoading } = useQuery({
     queryKey: ["assignable-workers"],
@@ -156,6 +185,9 @@ export default function CompletedWorkerOrders() {
     setQichikarUserId("");
     setDokhtUserId("");
     setPage(1);
+    if (highlightOrderId) {
+      setSearchParams({}, { replace: true });
+    }
   };
 
   const handleSavePayment = (order) => {
@@ -214,6 +246,46 @@ export default function CompletedWorkerOrders() {
           "Review finished worker orders and register payment for each completion.",
         )}
       />
+
+      {highlightOrderId && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            padding: "10px 16px",
+            borderRadius: 10,
+            background: "#EFF6FF",
+            border: "1px solid #BFDBFE",
+            marginBottom: 4,
+          }}
+        >
+          <span style={{ fontSize: 13, color: "#1D4ED8", fontWeight: 500 }}>
+            {t(
+              "completedWorkerOrders.focusedOrder",
+              "Showing order from notification — highlighted below.",
+            )}
+          </span>
+          <button
+            onClick={resetFilters}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "#1D4ED8",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+          >
+            <LuX size={13} />
+            {t("completedWorkerOrders.clearFocus", "Clear")}
+          </button>
+        </div>
+      )}
 
       <div
         style={{
@@ -376,8 +448,8 @@ export default function CompletedWorkerOrders() {
 
           <button
             type="submit"
-            className="btn btn-primary"
-            style={{ minWidth: 110 }}
+            className="btn btn-outline"
+            style={{ minWidth: 110, height: 40, fontWeight: 600, gap: 8 }}
           >
             <LuSearch size={14} />
             {t("common.search", "Search")}
@@ -491,8 +563,20 @@ export default function CompletedWorkerOrders() {
                     (order.workerPaymentAmount != null
                       ? String(order.workerPaymentAmount)
                       : "");
+                  const isHighlighted =
+                    highlightOrderId && order.id === highlightOrderId;
                   return (
-                    <tr key={rowKey}>
+                    <tr
+                      key={rowKey}
+                      ref={
+                        isHighlighted
+                          ? (node) => {
+                              rowRefs.current[highlightOrderId] = node;
+                            }
+                          : undefined
+                      }
+                      className={isHighlighted ? "row-highlight" : undefined}
+                    >
                       <td>{order.assignedTo?.name || "-"}</td>
                       <td>
                         {order.workerRole ||

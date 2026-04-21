@@ -302,13 +302,13 @@ export default function PrintBills() {
                   className="lbl"
                   style={{ textAlign: isRtl ? "right" : "left" }}
                 >
-                  {t("common.phone")}
+                  {t("common.phone", "Phone")}
                 </label>
                 <input
                   id="print-bills-phone"
-                  aria-label={t("common.phone")}
+                  aria-label={t("common.phone", "Phone")}
                   className="inp"
-                  placeholder={t("common.phone")}
+                  placeholder={t("common.phone", "Phone")}
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                 />
@@ -395,7 +395,7 @@ export default function PrintBills() {
                       </div>
                       <div>
                         <div style={{ fontSize: 10, color: "var(--text3)" }}>
-                          {t("common.phone")}
+                          {t("common.phone", "Phone")}
                         </div>
                         <div style={{ fontWeight: 700 }}>
                           {toEnglishDigits(customer.phoneNumber)}

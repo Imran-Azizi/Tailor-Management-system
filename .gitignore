@@ -16,7 +16,7 @@ build/
 out/
 
 # ─── Prisma ──────────────────────────────────────────────────────
-backend/prisma/migrations/*/migration.sql
+# migration.sql files must be committed so 'prisma migrate deploy' works in production
 
 # ─── Logs ────────────────────────────────────────────────────────
 logs/

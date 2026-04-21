@@ -13,6 +13,8 @@ const SAME_ROLE_CLAIM_CONFLICT_MESSAGE =
   "this order already receive by someone else try another";
 const QICHIKAR_NOT_COMPLETED_MESSAGE =
   "This order cannot be received yet. Waiting for the Qichikar (cutting) worker to complete their work first.";
+const COMPLETED_REASSIGN_BLOCK_MESSAGE =
+  "This order completed, you can not assign it again";
 
 const getRoleFieldKeys = (accountType) => {
   if (accountType === "QICHIKAR") {
@@ -253,6 +255,7 @@ export const updateBill = async (req, res, next) => {
 export const markComplete = async (req, res, next) => {
   try {
     const user = req.user;
+    const isDeliveryReceiveAction = req.body?.deliveryReceive === true;
     const order = await prisma.order.findUnique({
       where: { id: req.params.id },
       include: {
@@ -270,6 +273,19 @@ export const markComplete = async (req, res, next) => {
     const isWorker = WORKER_ACCOUNT_TYPES.includes(user.accountType);
     const isQichikar = user.accountType === "QICHIKAR";
     const roleValues = getRoleOrderValues(order, user.accountType);
+
+    if (!isWorker && user.accountType !== "ADMIN") {
+      return res.status(403).json({
+        error: "Only admin can mark delivery completion for customer handover.",
+      });
+    }
+
+    if (!isWorker && !isDeliveryReceiveAction) {
+      return res.status(400).json({
+        error:
+          "Order completion is only allowed from Clothes Delivery Receive action.",
+      });
+    }
 
     if (isWorker && roleValues.assignedToId !== user.id) {
       return res
@@ -636,6 +652,16 @@ export const markReceived = async (req, res, next) => {
         },
       });
 
+      await tx.userNotification.updateMany({
+        where: {
+          userId: user.id,
+          orderId,
+          isRead: false,
+          type: "ASSIGNMENT",
+        },
+        data: { isRead: true },
+      });
+
       return {
         kind: "OK",
         updated,
@@ -814,6 +840,18 @@ export const payWorkerForCompletedOrder = async (req, res, next) => {
       },
     });
 
+    const roleLabel = paymentRole === "DOKHT" ? "Dokht" : "Qichikar";
+    const payoutMsg = `Admin paid your completed ${roleLabel} order - Bill #${order.customer.billNumber} (${order.customer.firstName}) - Amount: $${Number(paymentAmount).toLocaleString()}.`;
+
+    await prisma.userNotification.create({
+      data: {
+        userId: completedWorker.id,
+        orderId,
+        message: payoutMsg,
+        type: "WORKER_PAYMENT",
+      },
+    });
+
     res.json(updated);
   } catch (error) {
     next(error);
@@ -840,6 +878,9 @@ export const assign = async (req, res, next) => {
       select: {
         id: true,
         type: true,
+        isCompleted: true,
+        qichikarCompletedAt: true,
+        dokhtCompletedAt: true,
         qichikarAssignedToId: true,
         dokhtAssignedToId: true,
         assignedToId: true,
@@ -867,6 +908,18 @@ export const assign = async (req, res, next) => {
       if (!["QICHIKAR", "DOKHT"].includes(worker.accountType)) {
         return res.status(400).json({
           error: "Orders can only be assigned to Qichikar or Dokht.",
+        });
+      }
+
+      const isRoleCompleted =
+        existingOrder.isCompleted ||
+        (worker.accountType === "QICHIKAR"
+          ? Boolean(existingOrder.qichikarCompletedAt)
+          : Boolean(existingOrder.dokhtCompletedAt));
+
+      if (isRoleCompleted) {
+        return res.status(409).json({
+          error: COMPLETED_REASSIGN_BLOCK_MESSAGE,
         });
       }
 
@@ -912,6 +965,7 @@ export const assign = async (req, res, next) => {
     const nextAssignmentPrice = nextAssignedToId
       ? Number(normalizedAssignmentPrice || 0)
       : 0;
+    const assignmentPaidAt = nextAssignmentPrice > 0 ? new Date() : null;
 
     const order = await prisma.$transaction(async (tx) => {
       const currentOrder = await tx.order.findUnique({
@@ -945,6 +999,20 @@ export const assign = async (req, res, next) => {
           assignedAt: nextAssignedToId ? new Date() : null,
           assignmentNote: storedAssignmentNote,
           assignmentPrice: nextAssignedToId ? normalizedAssignmentPrice : null,
+          workerPaymentStatus:
+            nextAssignedToId && nextAssignmentPrice > 0
+              ? "PAID_TO_WORKER"
+              : "UNPAID",
+          workerPaymentAmount:
+            nextAssignedToId && nextAssignmentPrice > 0
+              ? normalizedAssignmentPrice
+              : null,
+          workerPaidAt:
+            nextAssignedToId && nextAssignmentPrice > 0
+              ? assignmentPaidAt
+              : null,
+          workerPaidById:
+            nextAssignedToId && nextAssignmentPrice > 0 ? req.user.id : null,
           receivedById: nextAssignedToId ? null : currentOrder.receivedById,
           receivedAt: nextAssignedToId ? null : currentOrder.receivedAt,
           qichikarAssignedToId: isAssigningQichikar
@@ -962,6 +1030,28 @@ export const assign = async (req, res, next) => {
           qichikarInProgress: isAssigningQichikar
             ? false
             : currentOrder.qichikarInProgress,
+          qichikarPaymentStatus: isAssigningQichikar
+            ? nextAssignmentPrice > 0
+              ? "PAID_TO_WORKER"
+              : "UNPAID"
+            : currentOrder.qichikarAssignedToId
+              ? undefined
+              : undefined,
+          qichikarPaymentAmount: isAssigningQichikar
+            ? nextAssignmentPrice > 0
+              ? normalizedAssignmentPrice
+              : null
+            : undefined,
+          qichikarPaidAt: isAssigningQichikar
+            ? nextAssignmentPrice > 0
+              ? assignmentPaidAt
+              : null
+            : undefined,
+          qichikarPaidById: isAssigningQichikar
+            ? nextAssignmentPrice > 0
+              ? req.user.id
+              : null
+            : undefined,
           dokhtAssignedToId: isAssigningDokht
             ? nextAssignedToId
             : currentOrder.dokhtAssignedToId,
@@ -977,6 +1067,28 @@ export const assign = async (req, res, next) => {
           dokhtInProgress: isAssigningDokht
             ? false
             : currentOrder.dokhtInProgress,
+          dokhtPaymentStatus: isAssigningDokht
+            ? nextAssignmentPrice > 0
+              ? "PAID_TO_WORKER"
+              : "UNPAID"
+            : currentOrder.dokhtAssignedToId
+              ? undefined
+              : undefined,
+          dokhtPaymentAmount: isAssigningDokht
+            ? nextAssignmentPrice > 0
+              ? normalizedAssignmentPrice
+              : null
+            : undefined,
+          dokhtPaidAt: isAssigningDokht
+            ? nextAssignmentPrice > 0
+              ? assignmentPaidAt
+              : null
+            : undefined,
+          dokhtPaidById: isAssigningDokht
+            ? nextAssignmentPrice > 0
+              ? req.user.id
+              : null
+            : undefined,
         },
         include: {
           customer: {

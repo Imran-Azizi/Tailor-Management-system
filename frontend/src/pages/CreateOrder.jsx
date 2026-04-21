@@ -211,20 +211,16 @@ export default function CreateOrder() {
         const b = merged.billing?.[item.billingKey] || {};
         const meas = sanitize(item.measurements);
         const pricePerItem = parseNumberLocale(b.totalPrice) || 0;
-        const qtyRaw = parseNumberLocale(b.quantity);
-        const qty = Number.isFinite(qtyRaw)
-          ? Math.max(1, Math.floor(qtyRaw))
-          : 1;
         return {
           type: item.type,
           orderName: resolveOrderName(item.measurements),
           isEmergency: billEmergency.isEmergency,
           emergencyExpiry: billEmergency.emergencyExpiry,
           measurements: meas,
-          totalPrice: toWholeAmount(pricePerItem * qty),
+          totalPrice: toWholeAmount(pricePerItem),
           discount: toWholeAmount(parseNumberLocale(b.discount) || 0),
           paidAmount: toWholeAmount(parseNumberLocale(b.paidAmount) || 0),
-          quantity: qty,
+          quantity: 1,
         };
       }),
     };

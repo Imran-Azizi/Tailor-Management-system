@@ -1,488 +1,241 @@
-import { useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
-  LuLayoutDashboard,
-  LuPackagePlus,
-  LuList,
-  LuArchive,
-  LuPalette,
-  LuBell,
-  LuPrinter,
-  LuScissors,
   LuChevronLeft,
   LuChevronRight,
-  LuChevronDown,
-  LuListTodo,
-  LuListChecks,
-  LuUserCheck,
-  LuShieldCheck,
-  LuArrowRightLeft,
-  LuWalletCards,
-  LuTruck,
-  LuClipboardList,
+  LuPanelLeftClose,
+  LuScissors,
 } from "react-icons/lu";
 import { useAuth } from "../context/AuthContext.jsx";
+import api from "../lib/api.js";
+import SidebarGroup from "./sidebar/SidebarGroup.jsx";
+import { isRouteActive } from "./sidebar/routeMatch.js";
+import { getRoleAccent, getSidebarSections } from "./sidebar/sidebarConfig.js";
 
-// ─── Nav definitions ─────────────────────────────────────────────────────────
-// Items with a `children` array render as collapsible dropdowns.
-
-const ADMIN_NAV = [
-  {
-    section: "sidebar.overview",
-    items: [
-      {
-        label: "common.dashboard",
-        path: "/dashboard",
-        Icon: LuLayoutDashboard,
-        end: true,
-      },
-      {
-        key: "daily-tasks-dropdown",
-        label: "sidebar.dailyTasks",
-        Icon: LuClipboardList,
-        children: [
-          {
-            label: "dailyTasks.title",
-            path: "/daily-tasks",
-            Icon: LuClipboardList,
-          },
-          {
-            label: "dailyTasks.allTitle",
-            path: "/daily-tasks/all",
-            Icon: LuList,
-          },
-        ],
-      },
-    ],
-  },
-  {
-    section: "sidebar.orders",
-    items: [
-      {
-        label: "common.createOrder",
-        path: "/orders/create",
-        Icon: LuPackagePlus,
-      },
-      { label: "common.allOrders", path: "/orders", Icon: LuList, end: true },
-      {
-        label: "common.pendingOrders",
-        path: "/orders/pending",
-        Icon: LuListTodo,
-        end: true,
-      },
-      {
-        label: "common.completedOrders",
-        path: "/orders/completed",
-        Icon: LuListChecks,
-        end: true,
-      },
-      {
-        key: "assignment-dropdown",
-        label: "assignment.assignOrder",
-        Icon: LuUserCheck,
-        children: [
-          {
-            label: "assignment.clothesToWorkers",
-            path: "/orders/assignments/clothes",
-            Icon: LuScissors,
-          },
-          {
-            label: "sidebar.report",
-            path: "/orders/assignments/report",
-            Icon: LuList,
-          },
-          {
-            label: "sidebar.completedFromWorkers",
-            path: "/orders/completed-workers",
-            Icon: LuListChecks,
-          },
-        ],
-      },
-      {
-        label: "sidebar.clothesDelivery",
-        path: "/delivery",
-        Icon: LuTruck,
-        end: true,
-      },
-      { label: "orders.printBills", path: "/print-bills", Icon: LuPrinter },
-    ],
-  },
-  {
-    section: "sidebar.management",
-    items: [
-      { label: "users.title", path: "/users", Icon: LuShieldCheck },
-      {
-        key: "transactions-dropdown",
-        label: "sidebar.transactions",
-        Icon: LuWalletCards,
-        children: [
-          {
-            label: "sidebar.makeTransaction",
-            path: "/transactions/create",
-            Icon: LuArrowRightLeft,
-          },
-          {
-            label: "sidebar.allTransactions",
-            path: "/transactions",
-            Icon: LuList,
-          },
-        ],
-      },
-      { label: "common.boxManagement", path: "/boxes", Icon: LuArchive },
-      { label: "common.designManagement", path: "/designs", Icon: LuPalette },
-      { label: "common.notifications", path: "/notifications", Icon: LuBell },
-    ],
-  },
-];
-
-const DOKAN_NAV = [
-  {
-    section: "sidebar.overview",
-    items: [
-      {
-        label: "common.dashboard",
-        path: "/dashboard",
-        Icon: LuLayoutDashboard,
-        end: true,
-      },
-      {
-        key: "daily-tasks-dropdown",
-        label: "sidebar.dailyTasks",
-        Icon: LuClipboardList,
-        children: [
-          {
-            label: "dailyTasks.title",
-            path: "/daily-tasks",
-            Icon: LuClipboardList,
-          },
-          {
-            label: "dailyTasks.allTitle",
-            path: "/daily-tasks/all",
-            Icon: LuList,
-          },
-        ],
-      },
-    ],
-  },
-  {
-    section: "sidebar.orders",
-    items: [
-      {
-        label: "common.createOrder",
-        path: "/orders/create",
-        Icon: LuPackagePlus,
-      },
-      { label: "common.allOrders", path: "/orders", Icon: LuList, end: true },
-      {
-        label: "common.pendingOrders",
-        path: "/orders/pending",
-        Icon: LuListTodo,
-        end: true,
-      },
-      {
-        label: "common.completedOrders",
-        path: "/orders/completed",
-        Icon: LuListChecks,
-        end: true,
-      },
-      {
-        label: "sidebar.clothesDelivery",
-        path: "/delivery",
-        Icon: LuTruck,
-        end: true,
-      },
-      { label: "orders.printBills", path: "/print-bills", Icon: LuPrinter },
-    ],
-  },
-  {
-    section: "sidebar.management",
-    items: [
-      {
-        key: "transactions-dropdown",
-        label: "sidebar.transactions",
-        Icon: LuWalletCards,
-        children: [
-          {
-            label: "sidebar.makeTransaction",
-            path: "/transactions/create",
-            Icon: LuArrowRightLeft,
-          },
-          {
-            label: "sidebar.allTransactions",
-            path: "/transactions",
-            Icon: LuList,
-          },
-        ],
-      },
-      { label: "common.boxManagement", path: "/boxes", Icon: LuArchive },
-      { label: "common.designManagement", path: "/designs", Icon: LuPalette },
-      { label: "common.notifications", path: "/notifications", Icon: LuBell },
-    ],
-  },
-];
-
-const WORKER_NAV = [
-  {
-    section: "sidebar.overview",
-    items: [
-      {
-        label: "myTasks.title",
-        path: "/my-tasks",
-        Icon: LuListTodo,
-        end: true,
-      },
-      { label: "common.allOrders", path: "/orders", Icon: LuList, end: true },
-      {
-        label: "common.pendingOrders",
-        path: "/orders/pending",
-        Icon: LuListTodo,
-        end: true,
-      },
-      {
-        label: "common.completedOrders",
-        path: "/orders/completed",
-        Icon: LuListChecks,
-        end: true,
-      },
-    ],
-  },
-];
-
-const ROLE_NAV = {
-  ADMIN: ADMIN_NAV,
-  DOKAN: DOKAN_NAV,
-  QICHIKAR: WORKER_NAV,
-  DOKHT: WORKER_NAV,
-};
-
-const ROLE_ACCENT = {
-  ADMIN: "#2563EB",
-  DOKAN: "#7C3AED",
-  QICHIKAR: "#D97706",
-  DOKHT: "#DB2777",
-};
-
-// ─── Dropdown nav item ────────────────────────────────────────────────────────
-function SidebarDropdown({ item, collapsed, accent }) {
-  const { t } = useTranslation();
-  const location = useLocation();
-
-  // Auto-open when any child is active
-  const anyChildActive = item.children.some((c) =>
-    location.pathname.startsWith(c.path),
-  );
-  const [open, setOpen] = useState(anyChildActive);
-
-  const { Icon } = item;
-
-  if (collapsed) {
-    // In collapsed mode just show the icon without sub-items
-    return (
-      <button
-        className="sb-item"
-        title={t(item.label)}
-        style={{
-          width: "100%",
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          textAlign: "start",
-        }}
-        onClick={() => setOpen((o) => !o)}
-      >
-        <span className="si">
-          <Icon size={16} />
-        </span>
-      </button>
-    );
+function loadExpandedState(storageKey) {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
   }
+}
 
-  return (
-    <div>
-      {/* Parent trigger */}
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className={`sb-item${anyChildActive ? " active" : ""}`}
-        style={{
-          width: "100%",
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          textAlign: "start",
-        }}
-      >
-        <span className="si">
-          <Icon size={16} />
-        </span>
-        <span className="sl" style={{ flex: 1 }}>
-          {t(item.label)}
-        </span>
-        <span
-          style={{
-            marginInlineStart: "auto",
-            color: "rgba(255,255,255,.35)",
-            display: "flex",
-            transition: "transform .2s",
-            transform: open ? "rotate(180deg)" : "rotate(0deg)",
-          }}
-        >
-          <LuChevronDown size={13} />
-        </span>
-      </button>
-
-      {/* Children */}
-      {open && (
-        <div
-          style={{
-            paddingInlineStart: 10,
-            borderInlineStart: `2px solid ${accent}40`,
-            marginInlineStart: 22,
-            marginTop: 2,
-            marginBottom: 4,
-          }}
-        >
-          {item.children.map((child) => (
-            <NavLink
-              key={child.path}
-              to={child.path}
-              end
-              className={({ isActive }) =>
-                `sb-item${isActive ? " active" : ""}`
-              }
-              style={{ paddingInlineStart: 10, fontSize: 13 }}
-            >
-              <span className="si">
-                <child.Icon size={14} />
-              </span>
-              <span className="sl">{t(child.label)}</span>
-            </NavLink>
-          ))}
-        </div>
-      )}
-    </div>
+function isChildActive(pathname, children) {
+  return children.some((child) =>
+    isRouteActive(pathname, child.path, child.end ?? true),
   );
 }
 
-// ─── Sidebar ──────────────────────────────────────────────────────────────────
-export default function Sidebar({ collapsed, onToggle, open }) {
-  const { t } = useTranslation();
-  const { user } = useAuth();
-  const isRtl = false;
+function withLocalizedLabels(sections, t) {
+  return sections.map((section) => ({
+    ...section,
+    title: t(section.label, section.fallback),
+    items: section.items.map((item) => ({
+      ...item,
+      text: t(item.label, item.fallback),
+      children: item.children?.map((child) => ({
+        ...child,
+        text: t(child.label, child.fallback),
+      })),
+    })),
+  }));
+}
 
-  const nav = ROLE_NAV[user?.accountType] || ADMIN_NAV;
-  const accent = ROLE_ACCENT[user?.accountType] || "#2563EB";
+function withActiveDefaults(stored, sections, pathname) {
+  const next = { ...stored };
+
+  sections.forEach((section) => {
+    section.items.forEach((item) => {
+      if (!item.children?.length) return;
+      if (next[item.key] != null) return;
+      next[item.key] = isChildActive(pathname, item.children);
+    });
+  });
+
+  return next;
+}
+
+export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
+  const { t, i18n } = useTranslation();
+  const { user } = useAuth();
+  const location = useLocation();
+
+  const role = user?.accountType || "ADMIN";
+  const accent = getRoleAccent(role);
+  const isRtl = (i18n.dir?.() || "ltr") === "rtl";
+  const expandedStorageKey = `sidebar:expanded:${role}`;
+
+  const sections = useMemo(
+    () => withLocalizedLabels(getSidebarSections(role), t),
+    [role, t],
+  );
+
+  const [expandedGroups, setExpandedGroups] = useState(() =>
+    withActiveDefaults(
+      loadExpandedState(expandedStorageKey),
+      sections,
+      location.pathname,
+    ),
+  );
+
+  useEffect(() => {
+    setExpandedGroups(
+      (prev) =>
+        withActiveDefaults(
+          loadExpandedState(expandedStorageKey),
+          sections,
+          location.pathname,
+        ) || prev,
+    );
+  }, [expandedStorageKey, sections, location.pathname]);
+
+  useEffect(() => {
+    localStorage.setItem(expandedStorageKey, JSON.stringify(expandedGroups));
+  }, [expandedGroups, expandedStorageKey]);
+
+  const { data: pendingOrdersData } = useQuery({
+    queryKey: ["orders-sidebar-pending-count", role],
+    queryFn: () =>
+      api
+        .get("/orders", {
+          params: {
+            status: "pending",
+            page: 1,
+            limit: 1,
+          },
+        })
+        .then((r) => r.data),
+    enabled: Boolean(user?.id),
+    refetchInterval: 30_000,
+  });
+
+  const pendingCount =
+    pendingOrdersData?.total ?? pendingOrdersData?.data?.length ?? 0;
+
+  const badges = useMemo(
+    () => ({
+      pendingOrders: pendingCount,
+    }),
+    [pendingCount],
+  );
+
+  const toggleGroup = (groupKey, currentlyOpen) => {
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [groupKey]: !currentlyOpen,
+    }));
+  };
 
   return (
     <aside
-      className={`sidebar ${collapsed ? "collapsed" : ""} ${open ? "open" : ""}`}
+      className={`sidebar ${collapsed ? "collapsed" : ""} ${open ? "open" : ""} no-print`}
+      style={{
+        background:
+          "radial-gradient(900px 420px at -20% -10%, rgba(59,130,246,0.22), transparent), radial-gradient(700px 300px at 120% 10%, rgba(16,185,129,0.12), transparent), linear-gradient(180deg, #081224 0%, #0C172B 34%, #0F172A 100%)",
+        borderRight: isRtl ? undefined : "1px solid rgba(148,163,184,.2)",
+        borderLeft: isRtl ? "1px solid rgba(148,163,184,.2)" : undefined,
+      }}
     >
-      <div className="sb-logo">
-        <div className="sb-icon-box" style={{ background: accent }}>
-          <LuScissors size={17} color="#fff" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(255,255,255,0.06),transparent_26%,transparent)]" />
+
+      <header className="flex h-[var(--nav-h)] shrink-0 items-center gap-2 border-b border-white/10 px-3">
+        <div
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-md"
+          style={{ background: accent }}
+          aria-hidden="true"
+        >
+          <LuScissors size={18} color="white" />
         </div>
-        <div className="sb-brand">
-          <h1>{t("appName")}</h1>
-          <p>{t("appSubtitle")}</p>
-        </div>
+
+        {!collapsed && (
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-sm font-semibold tracking-tight text-white">
+              {t("appName")}
+            </h1>
+            <p className="truncate text-[11px] text-slate-300/70">
+              {t("appSubtitle")}
+            </p>
+          </div>
+        )}
+
         <button
-          className="sb-toggle"
+          type="button"
+          className="hidden h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-300 transition hover:bg-white/10 hover:text-white md:inline-flex"
           onClick={onToggle}
           title={collapsed ? t("sidebar.expand") : t("sidebar.collapse")}
+          aria-label={collapsed ? t("sidebar.expand") : t("sidebar.collapse")}
         >
           {collapsed ? (
             isRtl ? (
-              <LuChevronLeft size={13} />
+              <LuChevronLeft size={14} />
             ) : (
-              <LuChevronRight size={13} />
+              <LuChevronRight size={14} />
             )
           ) : isRtl ? (
-            <LuChevronRight size={13} />
+            <LuChevronRight size={14} />
           ) : (
-            <LuChevronLeft size={13} />
+            <LuChevronLeft size={14} />
           )}
         </button>
-      </div>
 
-      {/* Role badge */}
-      {!collapsed && user && (
-        <div
-          style={{
-            padding: "8px 16px",
-            borderBottom: "1px solid var(--sb-bdr)",
-          }}
+        <button
+          type="button"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-300 transition hover:bg-white/10 hover:text-white md:hidden"
+          onClick={onNavigate}
+          aria-label={t("common.close", "Close")}
+          title={t("common.close", "Close")}
         >
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              padding: "2px 9px",
-              borderRadius: 99,
-              background: accent + "28",
-              color: accent,
-              letterSpacing: ".04em",
-            }}
-          >
-            {user.accountType}
-          </span>
-          <span
-            style={{
-              fontSize: 11,
-              color: "rgba(255,255,255,.3)",
-              marginInlineStart: 7,
-            }}
-          >
-            {user.name}
-          </span>
+          <LuPanelLeftClose size={15} />
+        </button>
+      </header>
+
+      {!collapsed && user && (
+        <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-2.5">
+          <div className="min-w-0">
+            <p className="truncate text-xs font-semibold uppercase tracking-[0.08em] text-slate-300/80">
+              {user.accountType}
+            </p>
+            <p className="truncate text-xs text-slate-400">{user.name}</p>
+          </div>
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/25 bg-emerald-400/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.09em] text-emerald-200">
+            <span
+              className="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-300"
+              aria-hidden="true"
+            />
+            {t("common.active", "Active")}
+          </div>
         </div>
       )}
 
-      <nav className="sb-nav">
-        {nav.map(({ section, items }) => (
-          <div key={section}>
-            <div className="sb-section">{t(section)}</div>
-            {items.map((item) =>
-              item.children ? (
-                <SidebarDropdown
-                  key={item.key || item.label}
-                  item={item}
-                  collapsed={collapsed}
-                  accent={accent}
-                />
-              ) : (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  end={item.end}
-                  className={({ isActive }) =>
-                    `sb-item${isActive ? " active" : ""}`
-                  }
-                  title={collapsed ? t(item.label) : undefined}
-                >
-                  <span className="si">
-                    <item.Icon size={16} />
-                  </span>
-                  <span className="sl">{t(item.label)}</span>
-                </NavLink>
-              ),
-            )}
-          </div>
-        ))}
+      <nav
+        className="relative z-[1] flex-1 overflow-y-auto overflow-x-visible px-0 pb-4 pt-2 scroll-smooth"
+        role="navigation"
+        aria-label={t("sidebar.overview", "Sidebar")}
+      >
+        <div role="menu" aria-orientation="vertical">
+          {sections.map((group) => (
+            <SidebarGroup
+              key={group.key}
+              group={group}
+              collapsed={collapsed}
+              accent={accent}
+              isRtl={isRtl}
+              expanded={expandedGroups}
+              onToggle={toggleGroup}
+              badges={badges}
+              onNavigate={onNavigate}
+            />
+          ))}
+        </div>
       </nav>
 
       {!collapsed && (
-        <div
-          style={{
-            padding: "10px 16px",
-            borderTop: "1px solid var(--sb-bdr)",
-            fontSize: 11,
-            color: "rgba(255,255,255,.18)",
-            textAlign: "center",
-            flexShrink: 0,
-          }}
-        >
+        <footer className="relative z-[1] shrink-0 border-t border-white/10 px-3 py-2 text-center text-[11px] text-slate-400">
           {t("sidebar.copyright")}
-        </div>
+        </footer>
       )}
     </aside>
   );

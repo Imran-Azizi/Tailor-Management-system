@@ -1,10 +1,11 @@
 import { useMemo } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
+import Select from "react-select";
 import { LuFactory, LuPalette, LuRuler, LuWallet } from "react-icons/lu";
 import api from "../../lib/api.js";
 import { resolveRakhtColorHex } from "../../lib/rakhtColors.js";
@@ -37,6 +38,7 @@ export default function Step2RakhtSelection({ onNext, onBack, initial = {} }) {
   });
 
   const {
+    control,
     register,
     watch,
     setValue,
@@ -71,12 +73,22 @@ export default function Step2RakhtSelection({ onNext, onBack, initial = {} }) {
         return true;
       })
       .map((item) => item.brandName)
-      .sort((left, right) => left.localeCompare(right));
+      .sort((left, right) => left.localeCompare(right))
+      .map((brand) => ({ value: brand, label: brand }));
   }, [rakhtRows]);
 
   const filteredByBrand = useMemo(
     () => (rakhtRows || []).filter((item) => item.brandName === brandName),
     [rakhtRows, brandName],
+  );
+
+  const rakhtOptions = useMemo(
+    () =>
+      filteredByBrand.map((item) => ({
+        value: item.id,
+        label: `${item.color} (${item.companyName})`,
+      })),
+    [filteredByBrand],
   );
 
   const selectedRakht = useMemo(
@@ -153,25 +165,42 @@ export default function Step2RakhtSelection({ onNext, onBack, initial = {} }) {
         >
           <div className="iw">
             <LuFactory size={14} className="ico" />
-            <select
-              className={`inp${errors.brandName ? " err" : ""}`}
-              {...register("brandName")}
-              onChange={(event) => {
-                const { value } = event.target;
-                setValue("brandName", value, { shouldValidate: true });
-                setValue("rakhtId", "", { shouldValidate: true });
-                setValue("piecePrice", "", { shouldValidate: false });
-              }}
-            >
-              <option value="">
-                {t("common.select", { defaultValue: "Select" })}
-              </option>
-              {brandOptions.map((brand) => (
-                <option key={brand} value={brand}>
-                  {brand}
-                </option>
-              ))}
-            </select>
+            <Controller
+              name="brandName"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  classNamePrefix="rs"
+                  options={brandOptions}
+                  placeholder={t("common.select", { defaultValue: "Select" })}
+                  value={
+                    brandOptions.find(
+                      (option) => option.value === field.value,
+                    ) || null
+                  }
+                  onChange={(option) => {
+                    const value = option?.value || "";
+                    field.onChange(value);
+                    setValue("rakhtId", "", { shouldValidate: true });
+                    setValue("piecePrice", "", { shouldValidate: false });
+                  }}
+                  styles={{
+                    control: (base, state) => ({
+                      ...base,
+                      minHeight: 40,
+                      borderRadius: 10,
+                      borderColor: errors.brandName
+                        ? "var(--danger)"
+                        : state.isFocused
+                          ? "var(--primary)"
+                          : "var(--border)",
+                      boxShadow: "none",
+                    }),
+                    menu: (base) => ({ ...base, zIndex: 20 }),
+                  }}
+                />
+              )}
+            />
           </div>
         </Field>
 
@@ -182,32 +211,53 @@ export default function Step2RakhtSelection({ onNext, onBack, initial = {} }) {
         >
           <div className="iw">
             <LuPalette size={14} className="ico" />
-            <select
-              className={`inp${errors.rakhtId ? " err" : ""}`}
-              {...register("rakhtId")}
-              onChange={(event) => {
-                const { value } = event.target;
-                const selected = filteredByBrand.find(
-                  (item) => item.id === value,
-                );
-                setValue("rakhtId", value, { shouldValidate: true });
-                if (selected) {
-                  setValue("piecePrice", String(Number(selected.price || 0)), {
-                    shouldValidate: true,
-                  });
-                }
-              }}
-              disabled={!brandName}
-            >
-              <option value="">
-                {t("common.select", { defaultValue: "Select" })}
-              </option>
-              {filteredByBrand.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.color} ({item.companyName})
-                </option>
-              ))}
-            </select>
+            <Controller
+              name="rakhtId"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  classNamePrefix="rs"
+                  options={rakhtOptions}
+                  isDisabled={!brandName}
+                  placeholder={t("common.select", { defaultValue: "Select" })}
+                  value={
+                    rakhtOptions.find(
+                      (option) => option.value === field.value,
+                    ) || null
+                  }
+                  onChange={(option) => {
+                    const value = option?.value || "";
+                    field.onChange(value);
+                    const selected = filteredByBrand.find(
+                      (item) => item.id === value,
+                    );
+                    if (selected) {
+                      setValue(
+                        "piecePrice",
+                        String(Number(selected.price || 0)),
+                        {
+                          shouldValidate: true,
+                        },
+                      );
+                    }
+                  }}
+                  styles={{
+                    control: (base, state) => ({
+                      ...base,
+                      minHeight: 40,
+                      borderRadius: 10,
+                      borderColor: errors.rakhtId
+                        ? "var(--danger)"
+                        : state.isFocused
+                          ? "var(--primary)"
+                          : "var(--border)",
+                      boxShadow: "none",
+                    }),
+                    menu: (base) => ({ ...base, zIndex: 20 }),
+                  }}
+                />
+              )}
+            />
           </div>
         </Field>
 

@@ -225,6 +225,35 @@ function getVisibleSearchOrders(searchResult, userId, accountType) {
   });
 }
 
+function upsertOrderInWorkerPayload(previousPayload, nextOrder) {
+  if (!nextOrder?.id) return previousPayload;
+
+  if (Array.isArray(previousPayload)) {
+    const next = previousPayload.slice();
+    const index = next.findIndex((item) => item?.id === nextOrder.id);
+    if (index >= 0) {
+      next[index] = { ...next[index], ...nextOrder };
+      return next;
+    }
+    return [nextOrder, ...next];
+  }
+
+  const existing = Array.isArray(previousPayload?.data)
+    ? previousPayload.data
+    : [];
+  const index = existing.findIndex((item) => item?.id === nextOrder.id);
+  const data = index >= 0 ? existing.slice() : [nextOrder, ...existing];
+
+  if (index >= 0) {
+    data[index] = { ...data[index], ...nextOrder };
+  }
+
+  return {
+    ...(previousPayload || {}),
+    data,
+  };
+}
+
 function ConfirmActionModal({ config, pending, onClose, onConfirm }) {
   if (!config) return null;
 
@@ -309,7 +338,11 @@ function OrderDetailsModal({ order, language, t, onClose }) {
   const payment = getRolePaymentState(order, order?.assignedTo?.accountType);
   const measure = getMeasure(order);
   const paidToWorker = payment.status === "PAID_TO_WORKER";
-  const priceValue = paidToWorker ? Number(payment.amount || 0) : 0;
+  const priceValue = paidToWorker
+    ? Number(payment.amount || 0)
+    : order?.assignmentPrice != null
+      ? Number(order.assignmentPrice)
+      : 0;
   const measurementRows = Object.entries(NUM_LABELS).filter(
     ([key]) => measure[key] != null,
   );
@@ -634,7 +667,8 @@ export default function WorkerPanel() {
     queryKey: ["worker-panel-transaction-summary", ...workerScope],
     queryFn: () => api.get("/transactions/me/summary").then((r) => r.data),
     enabled: Boolean(user?.id && user?.accountType),
-    refetchInterval: 30000,
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
   });
 
   const unreadNotifs = allNotifs.filter((n) => !n.isRead);
@@ -659,8 +693,30 @@ export default function WorkerPanel() {
 
   const receiveMut = useMutation({
     mutationFn: (id) => api.patch(`/orders/${id}/receive`).then((r) => r.data),
-    onSuccess: () => {
+    onSuccess: (updatedOrder) => {
+      qc.setQueryData(["worker-panel-orders", ...workerScope], (prev) =>
+        upsertOrderInWorkerPayload(prev, updatedOrder),
+      );
+      qc.setQueryData(["worker-panel-notifs", ...workerScope], (prev = []) =>
+        Array.isArray(prev)
+          ? prev.map((notif) =>
+              notif?.orderId === updatedOrder?.id
+                ? { ...notif, isRead: true }
+                : notif,
+            )
+          : prev,
+      );
+      qc.setQueryData(
+        ["worker-notifs-dropdown", ...workerScope],
+        (prev = []) =>
+          Array.isArray(prev)
+            ? prev.filter((notif) => notif?.orderId !== updatedOrder?.id)
+            : prev,
+      );
       qc.invalidateQueries({ queryKey: ["worker-panel-orders"] });
+      qc.invalidateQueries({ queryKey: ["worker-panel-notifs"] });
+      qc.invalidateQueries({ queryKey: ["worker-notifs-count"] });
+      qc.invalidateQueries({ queryKey: ["worker-notifs-dropdown"] });
       setActiveTab("assigned");
       toast.success(
         t(
@@ -735,12 +791,20 @@ export default function WorkerPanel() {
 
   const stats = useMemo(() => {
     const accountType = user?.accountType;
+    const userId = user?.id;
     return {
-      all: orders.length,
+      all: orders.filter((order) => {
+        const roleState = getRoleOrderState(order, accountType);
+        return (
+          isWorkerCompletedForRole(order, accountType) ||
+          roleState.receivedById === userId
+        );
+      }).length,
       assigned: orders.filter(
         (order) =>
           !isWorkerCompletedForRole(order, accountType) &&
-          !getRoleOrderState(order, accountType).inProgress,
+          !getRoleOrderState(order, accountType).inProgress &&
+          getRoleOrderState(order, accountType).receivedById === userId,
       ).length,
       inProgress: orders.filter(
         (order) =>
@@ -759,6 +823,30 @@ export default function WorkerPanel() {
   );
   const currentMoney = totalCompletedPayments - totalLoanAmount;
 
+  const newAssignedOrders = useMemo(() => {
+    const accountType = user?.accountType;
+    const userId = user?.id;
+
+    return orders.filter((order) => {
+      if (isWorkerCompletedForRole(order, accountType)) return false;
+
+      const roleState = getRoleOrderState(order, accountType);
+      const assignedToCurrentUser = roleState.assignedToId === userId;
+      const receivedByCurrentUser = roleState.receivedById === userId;
+      const receivedByOtherUser =
+        roleState.receivedById && roleState.receivedById !== userId;
+
+      if (
+        !assignedToCurrentUser ||
+        receivedByCurrentUser ||
+        receivedByOtherUser
+      )
+        return false;
+
+      return !roleState.inProgress;
+    });
+  }, [orders, user?.accountType, user?.id]);
+
   const filteredOrders = useMemo(() => {
     const accountType = user?.accountType;
     if (activeTab === "assigned")
@@ -766,6 +854,7 @@ export default function WorkerPanel() {
         (order) =>
           !isWorkerCompletedForRole(order, accountType) &&
           !getRoleOrderState(order, accountType).inProgress &&
+          getRoleOrderState(order, accountType).receivedById === user?.id &&
           !optimisticInProgressIds.includes(order.id) &&
           !optimisticCompletedIds.includes(order.id),
       );
@@ -783,13 +872,22 @@ export default function WorkerPanel() {
           isWorkerCompletedForRole(order, accountType) ||
           optimisticCompletedIds.includes(order.id),
       );
-    return orders;
+    return orders.filter((order) => {
+      const roleState = getRoleOrderState(order, accountType);
+      return (
+        isWorkerCompletedForRole(order, accountType) ||
+        roleState.receivedById === user?.id ||
+        optimisticInProgressIds.includes(order.id) ||
+        optimisticCompletedIds.includes(order.id)
+      );
+    });
   }, [
     activeTab,
     optimisticCompletedIds,
     optimisticInProgressIds,
     orders,
     user?.accountType,
+    user?.id,
   ]);
 
   const canOrderBeReceived = (order) => {
@@ -1144,9 +1242,29 @@ export default function WorkerPanel() {
         {/* ── Price row ── */}
         <div style={{ fontSize: 12, color: "var(--text2)", fontWeight: 600 }}>
           {t("workerPanel.price", "Price")}:{" "}
-          <span style={{ color: "var(--text1)" }}>
-            ${paidToWorker ? Number(payment.amount || 0).toLocaleString() : "0"}
+          <span
+            style={{
+              color: paidToWorker ? "#15803d" : "var(--text1)",
+            }}
+          >
+            {paidToWorker
+              ? `$${Number(payment.amount || 0).toLocaleString()}`
+              : order.assignmentPrice != null
+                ? `$${Number(order.assignmentPrice).toLocaleString()}`
+                : "-"}
           </span>
+          {!paidToWorker && order.assignmentPrice != null && (
+            <span
+              style={{
+                fontSize: 11,
+                color: "var(--text3)",
+                marginLeft: 4,
+                fontWeight: 400,
+              }}
+            >
+              ({t("workerPanel.assignedPrice", "assigned")})
+            </span>
+          )}
         </div>
 
         <div
@@ -1530,7 +1648,7 @@ export default function WorkerPanel() {
         ) : null}
       </div>
 
-      {unreadNotifs.length > 0 && (
+      {(newAssignedOrders.length > 0 || unreadNotifs.length > 0) && (
         <div className="card" style={{ padding: 0 }}>
           <div
             style={{
@@ -1551,61 +1669,135 @@ export default function WorkerPanel() {
                 className="badge"
                 style={{ background: cfg.color, color: "#fff" }}
               >
-                {unreadNotifs.length}
+                {newAssignedOrders.length}
               </span>
             </div>
-            <button
-              className="btn btn-outline btn-sm"
-              onClick={() => readAllMut.mutate()}
-            >
-              {t("workerPanel.markAllRead", "Mark all read")}
-            </button>
-          </div>
-          <div style={{ maxHeight: 250, overflowY: "auto" }}>
-            {unreadNotifs.map((item) => (
-              <div
-                key={item.id}
-                style={{
-                  padding: "10px 14px",
-                  borderBottom: "1px solid var(--border)",
-                  display: "flex",
-                  gap: 8,
-                }}
+            {unreadNotifs.length > 0 && (
+              <button
+                className="btn btn-outline btn-sm"
+                onClick={() => readAllMut.mutate()}
               >
-                <LuCircleAlert
-                  size={14}
-                  style={{ color: cfg.color, marginTop: 2, flexShrink: 0 }}
-                />
-                <div style={{ flex: 1 }}>
-                  <NotificationText
-                    language={language}
-                    style={{
-                      fontSize: 13,
-                      color: "var(--text1)",
-                      lineHeight: 1.45,
-                    }}
-                  >
-                    {formatUserNotificationMessage(item, t, language)}
-                  </NotificationText>
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: "var(--text3)",
-                      marginTop: 3,
-                    }}
-                  >
-                    {formatDateTimeLocale(item.createdAt, language)}
-                  </div>
-                </div>
-                <button
-                  className="btn btn-outline btn-sm"
-                  onClick={() => readOneMut.mutate(item.id)}
-                >
-                  <LuCheck size={13} />
-                </button>
-              </div>
-            ))}
+                {t("workerPanel.markAllRead", "Mark all read")}
+              </button>
+            )}
           </div>
+          {newAssignedOrders.length > 0 && (
+            <div style={{ padding: 12, display: "grid", gap: 8 }}>
+              {newAssignedOrders.slice(0, 6).map((order) => {
+                const canReceive = canOrderBeReceived(order);
+
+                return (
+                  <div
+                    key={`new-assigned-${order.id}`}
+                    style={{
+                      border: "1px solid var(--border)",
+                      borderRadius: 10,
+                      background: "var(--surface2)",
+                      padding: "10px 12px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 700,
+                          color: "var(--text1)",
+                        }}
+                      >
+                        {order.customer?.firstName || "-"} #
+                        {order.customer?.billNumber || "-"}
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--text3)" }}>
+                        {getOrderTypeLabel(order.type, language)}
+                      </div>
+                      {order.assignmentPrice != null && (
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: "var(--text2)",
+                            fontWeight: 600,
+                            marginTop: 2,
+                          }}
+                        >
+                          ${Number(order.assignmentPrice).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      className="btn btn-gold btn-sm"
+                      onClick={() => openConfirm("receive", order)}
+                      disabled={pendingAction || !canReceive}
+                      title={
+                        canReceive
+                          ? ""
+                          : getAssignmentBlockReason(order) ||
+                            t(
+                              "workerPanel.cannotReceiveOrder",
+                              "You cannot receive this order.",
+                            )
+                      }
+                    >
+                      <LuCheck size={13} />{" "}
+                      {t("workerPanel.receive", "Receive")}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {unreadNotifs.length > 0 && (
+            <div style={{ maxHeight: 250, overflowY: "auto" }}>
+              {unreadNotifs.map((item) => (
+                <div
+                  key={item.id}
+                  style={{
+                    padding: "10px 14px",
+                    borderBottom: "1px solid var(--border)",
+                    display: "flex",
+                    gap: 8,
+                  }}
+                >
+                  <LuCircleAlert
+                    size={14}
+                    style={{ color: cfg.color, marginTop: 2, flexShrink: 0 }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <NotificationText
+                      language={language}
+                      style={{
+                        fontSize: 13,
+                        color: "var(--text1)",
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      {formatUserNotificationMessage(item, t, language)}
+                    </NotificationText>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: "var(--text3)",
+                        marginTop: 3,
+                      }}
+                    >
+                      {formatDateTimeLocale(item.createdAt, language)}
+                    </div>
+                  </div>
+                  <button
+                    className="btn btn-outline btn-sm"
+                    onClick={() => readOneMut.mutate(item.id)}
+                  >
+                    <LuCheck size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

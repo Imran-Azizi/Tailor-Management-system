@@ -47,7 +47,9 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
   const initialEntries = initial.length ? initial : [];
-  const initialEmergencyEntry = initialEntries.find((entry) => entry?.isEmergency);
+  const initialEmergencyEntry = initialEntries.find(
+    (entry) => entry?.isEmergency,
+  );
   const [entries, setEntries] = useState(initialEntries);
   const [billEmergency, setBillEmergency] = useState(
     initialEntries.some((entry) => entry?.isEmergency),
@@ -85,6 +87,11 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
 
   const removeEntry = (idx) => {
     setEntries((current) => current.filter((_, index) => index !== idx));
+    setBillEmergencyError("");
+  };
+
+  const removeType = (type) => {
+    setEntries((current) => current.filter((entry) => entry.type !== type));
     setBillEmergencyError("");
   };
 
@@ -214,7 +221,9 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
                   );
                 }}
               />
-              <span className={`order-toggle-pill${billEmergency ? " on" : ""}`}>
+              <span
+                className={`order-toggle-pill${billEmergency ? " on" : ""}`}
+              >
                 <LuTriangleAlert size={12} />
                 {t("createOrder.emergencyOrder")}
               </span>
@@ -298,46 +307,93 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
             {t("createOrder.selectedOrders", { count: entries.length })}
           </p>
 
-          {entries.map((entry, idx) => (
-            <div key={`${entry.type}-${idx}`} className="selected-order-card">
-              <div className="selected-order-head">
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <span className="badge bg-gold" style={{ fontSize: 11 }}>
-                    {getOrderTypeLabel(entry.type, language)}
-                  </span>
-                  <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                    {t("createOrder.configureOrder")}
-                  </span>
-                  {billEmergency && (
-                    <span className="badge bg-red" style={{ fontSize: 10 }}>
-                      {t("createOrder.emergencyShort")}
+          {entries.length === 1 ? (
+            entries.map((entry, idx) => (
+              <div key={`${entry.type}-${idx}`} className="selected-order-card">
+                <div className="selected-order-head">
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <span className="badge bg-gold" style={{ fontSize: 11 }}>
+                      {getOrderTypeLabel(entry.type, language)}
                     </span>
-                  )}
+                    <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                      {t("createOrder.configureOrder")}
+                    </span>
+                    {billEmergency && (
+                      <span className="badge bg-red" style={{ fontSize: 10 }}>
+                        {t("createOrder.emergencyShort")}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeEntry(idx)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "var(--text3)",
+                      display: "flex",
+                      padding: 2,
+                    }}
+                  >
+                    <LuX size={14} />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => removeEntry(idx)}
+              </div>
+            ))
+          ) : (
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 8,
+                marginBottom: 2,
+              }}
+            >
+              {entries.map((entry) => (
+                <span
+                  key={entry.type}
                   style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "var(--text3)",
-                    display: "flex",
-                    padding: 2,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    borderRadius: 999,
+                    border: "1px solid var(--border2)",
+                    background: "var(--surface2)",
+                    color: "var(--text2)",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    padding: "6px 10px",
                   }}
                 >
-                  <LuX size={14} />
-                </button>
-              </div>
+                  {getOrderTypeLabel(entry.type, language)}
+                  <button
+                    type="button"
+                    onClick={() => removeType(entry.type)}
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      color: "var(--text3)",
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      padding: 0,
+                    }}
+                    aria-label={t("common.remove", { defaultValue: "Remove" })}
+                  >
+                    <LuX size={12} />
+                  </button>
+                </span>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       )}
 

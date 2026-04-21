@@ -13,11 +13,13 @@ import {
   LuLanguages,
   LuChevronDown,
   LuX,
+  LuCircleDollarSign,
 } from "react-icons/lu";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTheme } from "../context/ThemeContext.jsx";
 import api from "../lib/api.js";
 import { formatUserNotificationMessage } from "../lib/notifications.js";
+import { formatDateTimeLocale } from "../lib/locale.js";
 import { NotificationText } from "./ui/index.jsx";
 
 const ROLE_CONFIG = {
@@ -35,26 +37,44 @@ function useOutside(ref, fn) {
   }, [ref, fn]);
 }
 
-function WorkerNotifDropdown({ roleColor, onClose }) {
+function WorkerNotifDrawer({ open, roleColor, onClose }) {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const qc = useQueryClient();
   const language = i18n.resolvedLanguage || i18n.language || "en";
   const workerScope = [user?.id, user?.accountType];
 
-  const { data: notifs = [] } = useQuery({
-    queryKey: ["worker-notifs-dropdown", ...workerScope],
+  // Lock body scroll and handle Escape key when open
+  useEffect(() => {
+    if (!open) return undefined;
+    const onEsc = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("keydown", onEsc);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open, onClose]);
+
+  const { data: notifsRaw = [] } = useQuery({
+    queryKey: ["worker-notifs-drawer", ...workerScope],
     queryFn: () =>
       api
         .get("/users/me/notifications", { params: { unread: true } })
         .then((r) => r.data),
-    enabled: Boolean(user?.id && user?.accountType),
+    enabled: Boolean(user?.id && user?.accountType) && open,
+    refetchInterval: open ? 20_000 : false,
   });
+
+  const notifs = Array.isArray(notifsRaw) ? notifsRaw : [];
 
   const readAllMut = useMutation({
     mutationFn: () => api.patch("/users/me/notifications/read-all"),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["worker-notifs-dropdown"] });
+      qc.invalidateQueries({ queryKey: ["worker-notifs-drawer"] });
       qc.invalidateQueries({ queryKey: ["worker-notifs-count"] });
       qc.invalidateQueries({ queryKey: ["worker-panel-notifs"] });
     },
@@ -63,137 +83,200 @@ function WorkerNotifDropdown({ roleColor, onClose }) {
   const readOneMut = useMutation({
     mutationFn: (id) => api.patch(`/users/me/notifications/${id}/read`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["worker-notifs-dropdown"] });
+      qc.invalidateQueries({ queryKey: ["worker-notifs-drawer"] });
       qc.invalidateQueries({ queryKey: ["worker-notifs-count"] });
       qc.invalidateQueries({ queryKey: ["worker-panel-notifs"] });
     },
   });
 
+  // Classify: payment notifications vs assignment/status notifications
+  const paymentNotifs = notifs.filter((n) => n.type === "ADMIN_PAYMENT");
+  const otherNotifs = notifs.filter((n) => n.type !== "ADMIN_PAYMENT");
+
   return (
     <div
-      style={{
-        position: "absolute",
-        top: "110%",
-        right: 0,
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
-        borderRadius: 12,
-        boxShadow: "var(--sh-lg)",
-        width: 340,
-        zIndex: 300,
-      }}
+      className={`notif-drawer no-print${open ? " open" : ""}`}
+      aria-hidden={!open}
     >
-      <div
-        style={{
-          padding: "12px 16px 10px",
-          borderBottom: "1px solid var(--border)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
+      <button
+        className="notif-drawer-backdrop"
+        onClick={onClose}
+        aria-label={t("common.close")}
+        tabIndex={open ? 0 : -1}
+      />
+      <aside
+        className="notif-drawer-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("workerLayout.notifications")}
+        aria-hidden={!open}
       >
-        <span style={{ fontWeight: 700, fontSize: 14, color: "var(--text1)" }}>
-          {t("workerLayout.notifications")}
-        </span>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {notifs.length > 0 && (
+        {/* Header */}
+        <div className="notif-panel-head">
+          <span className="notif-panel-title">
+            {t("workerLayout.notifications")}
+          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {notifs.length > 0 && (
+              <button
+                onClick={() => readAllMut.mutate()}
+                disabled={readAllMut.isPending}
+                className="notif-panel-link-btn"
+              >
+                {t("workerLayout.markAllRead")}
+              </button>
+            )}
             <button
-              onClick={() => readAllMut.mutate()}
-              disabled={readAllMut.isPending}
-              style={{
-                fontSize: 12,
-                color: "var(--text3)",
-                fontWeight: 500,
-                cursor: "pointer",
-                background: "none",
-                border: "none",
-              }}
+              onClick={onClose}
+              className="notif-panel-close-btn"
+              aria-label={t("common.close")}
             >
-              {t("workerLayout.markAllRead")}
+              <LuX size={16} />
             </button>
-          )}
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: "var(--text3)",
-              display: "flex",
-            }}
-          >
-            <LuX size={14} />
-          </button>
+          </div>
         </div>
-      </div>
 
-      {notifs.length === 0 ? (
-        <div
-          style={{
-            padding: "28px 16px",
-            textAlign: "center",
-            color: "var(--text3)",
-            fontSize: 13,
-          }}
-        >
-          {t("workerLayout.noNewAssignments")}
-        </div>
-      ) : (
-        <div style={{ maxHeight: 360, overflowY: "auto" }}>
-          {notifs.slice(0, 10).map((n) => (
-            <div
-              key={n.id}
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 10,
-                padding: "11px 14px",
-                borderBottom: "1px solid var(--border)",
-              }}
-            >
-              <LuBell
-                size={13}
-                style={{ color: roleColor, flexShrink: 0, marginTop: 3 }}
-              />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <NotificationText
-                  language={language}
+        {/* Body */}
+        {notifs.length === 0 ? (
+          <div className="notif-panel-empty">
+            {t("workerLayout.noNewAssignments")}
+          </div>
+        ) : (
+          <div className="notif-panel-scroll">
+            {/* Payment notifications from Admin */}
+            {paymentNotifs.length > 0 && (
+              <>
+                <div
                   style={{
-                    fontSize: 12,
-                    lineHeight: 1.45,
-                    color: "var(--text1)",
+                    padding: "8px 14px 6px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    background: "var(--surface2)",
+                    borderBottom: "1px solid var(--border)",
                   }}
                 >
-                  {formatUserNotificationMessage(n, t, language)}
-                </NotificationText>
-                <p
-                  style={{ fontSize: 11, color: "var(--text3)", marginTop: 3 }}
+                  <LuCircleDollarSign size={12} style={{ color: "#16A34A" }} />
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: "#16A34A",
+                      textTransform: "uppercase",
+                      letterSpacing: ".06em",
+                    }}
+                  >
+                    {t("workerLayout.paymentsFromAdmin", "Payments from Admin")}
+                  </span>
+                </div>
+                {paymentNotifs.map((n) => (
+                  <div key={n.id} className="notif-panel-item">
+                    <LuCircleDollarSign
+                      size={14}
+                      style={{ color: "#16A34A", flexShrink: 0, marginTop: 2 }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <NotificationText
+                        language={language}
+                        style={{
+                          fontSize: 13,
+                          lineHeight: 1.45,
+                          color: "var(--text1)",
+                        }}
+                      >
+                        {formatUserNotificationMessage(n, t, language)}
+                      </NotificationText>
+                      <p
+                        style={{
+                          fontSize: 11,
+                          color: "var(--text3)",
+                          marginTop: 3,
+                        }}
+                      >
+                        {formatDateTimeLocale(n.createdAt, language)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => readOneMut.mutate(n.id)}
+                      title={t("navbar.markAsRead")}
+                      className="notif-panel-close-btn"
+                      style={{ width: 26, height: 26, borderRadius: 6 }}
+                    >
+                      <LuCheck size={12} />
+                    </button>
+                  </div>
+                ))}
+              </>
+            )}
+
+            {/* Assignment / status notifications */}
+            {otherNotifs.length > 0 && (
+              <>
+                <div
+                  style={{
+                    padding: "8px 14px 6px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    background: "var(--surface2)",
+                    borderBottom: "1px solid var(--border)",
+                  }}
                 >
-                  {new Date(n.createdAt).toLocaleString(
-                    i18n.resolvedLanguage || i18n.language || "en",
-                  )}
-                </p>
-              </div>
-              <button
-                onClick={() => readOneMut.mutate(n.id)}
-                title={t("navbar.markAsRead")}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "var(--text3)",
-                  display: "flex",
-                  padding: "3px 4px",
-                  borderRadius: 4,
-                  flexShrink: 0,
-                }}
-              >
-                <LuCheck size={13} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+                  <LuBell size={12} style={{ color: roleColor }} />
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: "var(--text3)",
+                      textTransform: "uppercase",
+                      letterSpacing: ".06em",
+                    }}
+                  >
+                    {t("navbar.workUpdates", "Work Updates")}
+                  </span>
+                </div>
+                {otherNotifs.map((n) => (
+                  <div key={n.id} className="notif-panel-item">
+                    <LuBell
+                      size={13}
+                      style={{ color: roleColor, flexShrink: 0, marginTop: 3 }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <NotificationText
+                        language={language}
+                        style={{
+                          fontSize: 12,
+                          lineHeight: 1.45,
+                          color: "var(--text1)",
+                        }}
+                      >
+                        {formatUserNotificationMessage(n, t, language)}
+                      </NotificationText>
+                      <p
+                        style={{
+                          fontSize: 11,
+                          color: "var(--text3)",
+                          marginTop: 3,
+                        }}
+                      >
+                        {formatDateTimeLocale(n.createdAt, language)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => readOneMut.mutate(n.id)}
+                      title={t("navbar.markAsRead")}
+                      className="notif-panel-close-btn"
+                      style={{ width: 26, height: 26, borderRadius: 6 }}
+                    >
+                      <LuCheck size={12} />
+                    </button>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        )}
+      </aside>
     </div>
   );
 }
@@ -333,11 +416,9 @@ export default function WorkerLayout() {
   const [langOpen, setLangOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
 
-  const notifRef = useRef();
   const langRef = useRef();
   const userRef = useRef();
 
-  useOutside(notifRef, () => setNotifOpen(false));
   useOutside(langRef, () => setLangOpen(false));
   useOutside(userRef, () => setUserOpen(false));
 
@@ -345,7 +426,7 @@ export default function WorkerLayout() {
   const { color: roleColor, labelKey } = cfg;
   const roleLabel = t(labelKey);
 
-  const { data: unreadNotifs = [] } = useQuery({
+  const { data: unreadNotifsRaw = [] } = useQuery({
     queryKey: ["worker-notifs-count", ...workerScope],
     queryFn: () =>
       api
@@ -354,6 +435,8 @@ export default function WorkerLayout() {
     enabled: Boolean(user?.id && user?.accountType),
     refetchInterval: 30_000,
   });
+
+  const unreadNotifs = Array.isArray(unreadNotifsRaw) ? unreadNotifsRaw : [];
 
   const currentLang = (i18n.resolvedLanguage || "en").slice(0, 2).toUpperCase();
 
@@ -418,11 +501,14 @@ export default function WorkerLayout() {
           </div>
         </div>
 
-        <div style={{ position: "relative" }} ref={langRef}>
+        <div
+          style={{ position: "relative" }}
+          ref={langRef}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           <button
             onClick={() => {
               setLangOpen((o) => !o);
-              setNotifOpen(false);
               setUserOpen(false);
             }}
             style={btnStyle}
@@ -437,48 +523,44 @@ export default function WorkerLayout() {
           {dark ? <LuSun size={15} /> : <LuMoon size={15} />}
         </button>
 
-        <div style={{ position: "relative" }} ref={notifRef}>
-          <button
-            onClick={() => {
-              setNotifOpen((o) => !o);
-              setLangOpen(false);
-              setUserOpen(false);
-            }}
-            style={{ ...btnStyle, position: "relative" }}
-          >
-            <LuBell size={17} />
-            {unreadNotifs.length > 0 && (
-              <span
-                style={{
-                  position: "absolute",
-                  top: -5,
-                  right: -5,
-                  minWidth: 17,
-                  height: 17,
-                  borderRadius: 99,
-                  background: "#EF4444",
-                  color: "#fff",
-                  fontSize: 10,
-                  fontWeight: 700,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "0 4px",
-                }}
-              >
-                {unreadNotifs.length > 9 ? "9+" : unreadNotifs.length}
-              </span>
-            )}
-          </button>
-          {notifOpen && (
-            <WorkerNotifDropdown
-              roleColor={roleColor}
-              onClose={() => setNotifOpen(false)}
-            />
+        <button
+          onClick={() => {
+            setNotifOpen(true);
+            setLangOpen(false);
+            setUserOpen(false);
+          }}
+          style={{ ...btnStyle, position: "relative" }}
+        >
+          <LuBell size={17} />
+          {unreadNotifs.length > 0 && (
+            <span
+              style={{
+                position: "absolute",
+                top: -5,
+                right: -5,
+                minWidth: 17,
+                height: 17,
+                borderRadius: 99,
+                background: "#EF4444",
+                color: "#fff",
+                fontSize: 10,
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "0 4px",
+              }}
+            >
+              {unreadNotifs.length > 9 ? "9+" : unreadNotifs.length}
+            </span>
           )}
-        </div>
+        </button>
 
-        <div style={{ position: "relative" }} ref={userRef}>
+        <div
+          style={{ position: "relative" }}
+          ref={userRef}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           <button
             onClick={() => {
               setUserOpen((o) => !o);
@@ -535,6 +617,12 @@ export default function WorkerLayout() {
       >
         <Outlet />
       </main>
+
+      <WorkerNotifDrawer
+        open={notifOpen}
+        roleColor={roleColor}
+        onClose={() => setNotifOpen(false)}
+      />
     </div>
   );
 }

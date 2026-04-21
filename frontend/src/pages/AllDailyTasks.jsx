@@ -37,8 +37,8 @@ import {
 
 function formatMoney(v) {
   return `$${Number(v || 0).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   })}`;
 }
 
@@ -216,8 +216,14 @@ function ActionMenu({ open, setOpen, onView, onEdit, onDelete, t, compact }) {
   }, [open, setOpen]);
 
   return (
-    <div ref={menuRef} style={{ position: "relative" }}>
+    <div
+      ref={menuRef}
+      style={{ position: "relative" }}
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
       <button
+        type="button"
         ref={triggerRef}
         className="btn btn-sm dt-action-toggle"
         style={{
@@ -254,8 +260,10 @@ function ActionMenu({ open, setOpen, onView, onEdit, onDelete, t, compact }) {
           onClick={(e) => e.stopPropagation()}
         >
           <button
+            type="button"
             className="dt-action-item"
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               setOpen(false);
               onView();
             }}
@@ -264,8 +272,10 @@ function ActionMenu({ open, setOpen, onView, onEdit, onDelete, t, compact }) {
             {t("common.view")}
           </button>
           <button
+            type="button"
             className="dt-action-item"
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               setOpen(false);
               onEdit();
             }}
@@ -274,8 +284,10 @@ function ActionMenu({ open, setOpen, onView, onEdit, onDelete, t, compact }) {
             {t("dailyTasks.update", "Update")}
           </button>
           <button
+            type="button"
             className="dt-action-item dt-action-item-danger"
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               setOpen(false);
               onDelete();
             }}
@@ -441,7 +453,10 @@ function TaskRow({
       >
         {task.note || <span style={{ opacity: 0.35 }}>—</span>}
       </td>
-      <td style={{ textAlign: "right", width: 72 }}>
+      <td
+        style={{ textAlign: "right", width: 72 }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <ActionMenu
           open={openMenu === task.id}
           setOpen={(value) => setOpenMenu(value ? task.id : null)}
@@ -584,8 +599,10 @@ function TaskCard({ task, onClick, onEdit, onDelete, openMenu, setOpenMenu }) {
           justifyContent: "space-between",
           alignItems: "center",
         }}
+        onClick={(e) => e.stopPropagation()}
       >
         <button
+          type="button"
           className="btn btn-outline btn-sm"
           style={{ gap: 4, justifyContent: "center" }}
           onClick={(e) => {
@@ -731,8 +748,9 @@ export default function AllDailyTasks() {
         subtitle={t("dailyTasks.allSubtitle")}
         action={
           <button
-            className="btn btn-primary dt-add-task-btn"
-            style={{ gap: 6, minWidth: 164, height: 40 }}
+            type="button"
+            className="btn btn-outline btn-sm dt-toolbar-btn"
+            style={{ gap: 6, minWidth: 132, height: 38 }}
             onClick={() => navigate("/daily-tasks")}
           >
             <LuPlus size={14} />
@@ -814,7 +832,7 @@ export default function AllDailyTasks() {
             </div>
             <button
               type="submit"
-              className="btn btn-primary btn-sm"
+              className="btn btn-outline btn-sm dt-toolbar-btn"
               style={{ gap: 4, minWidth: 98, height: 38 }}
             >
               <LuSearch size={13} />
@@ -839,6 +857,7 @@ export default function AllDailyTasks() {
           </form>
 
           <button
+            type="button"
             className="btn btn-outline btn-sm"
             onClick={() => refetch()}
             disabled={isFetching}
@@ -1016,8 +1035,8 @@ export default function AllDailyTasks() {
               <input
                 type="number"
                 className="inp"
-                min="0.01"
-                step="0.01"
+                min="1"
+                step="1"
                 value={editForm.amount}
                 onChange={(e) =>
                   setEditForm((s) => ({ ...s, amount: e.target.value }))
@@ -1111,15 +1130,14 @@ export default function AllDailyTasks() {
           border-color: var(--border2);
         }
 
-        .dt-add-task-btn {
+        .dt-toolbar-btn {
           border-radius: 10px;
           padding-inline: 16px;
-          box-shadow: 0 6px 18px rgba(37,99,235,.18);
-          transition: transform .16s ease, box-shadow .16s ease;
+          transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease, background .16s ease;
         }
-        .dt-add-task-btn:hover {
+        .dt-toolbar-btn:hover {
           transform: translateY(-1px);
-          box-shadow: 0 10px 20px rgba(37,99,235,.22);
+          box-shadow: var(--sh-md);
         }
 
         .dt-search-input {

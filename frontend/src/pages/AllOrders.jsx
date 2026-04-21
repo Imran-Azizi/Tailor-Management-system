@@ -35,6 +35,16 @@ import { OrderDocumentPack } from "../components/order/OrderDocumentPack.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 
 const ROLE_COLORS = { QICHIKAR: "#D97706", DOKHT: "#DB2777" };
+const COMPLETED_REASSIGN_BLOCK_MESSAGE =
+  "This order completed, you can not assign it again";
+
+function isCompletedForWorkerType(order, workerType) {
+  if (!order || !workerType) return false;
+  if (order.isCompleted) return true;
+  if (workerType === "QICHIKAR") return Boolean(order.qichikarCompletedAt);
+  if (workerType === "DOKHT") return Boolean(order.dokhtCompletedAt);
+  return false;
+}
 
 function AssignModal({ order, onClose, onAssigned }) {
   const { t, i18n } = useTranslation();
@@ -55,6 +65,18 @@ function AssignModal({ order, onClose, onAssigned }) {
   const handleAssign = async () => {
     setSaving(true);
     try {
+      const selectedWorker = workers.find(
+        (worker) => worker.id === selectedUserId,
+      );
+      if (
+        selectedUserId &&
+        isCompletedForWorkerType(order, selectedWorker?.accountType)
+      ) {
+        toast.error(COMPLETED_REASSIGN_BLOCK_MESSAGE);
+        setSaving(false);
+        return;
+      }
+
       let parsedPrice = null;
       if (selectedUserId) {
         parsedPrice = parseNumberLocale(price);
@@ -359,7 +381,7 @@ function OrderViewModal({ orderId, open, onClose }) {
 
             <div className="order-view-summary-card">
               <div className="order-view-summary-row">
-                <span>{t("common.phone")}</span>
+                <span>{t("common.phone", "Phone")}</span>
                 <strong>{data.customer?.phoneNumber || "-"}</strong>
               </div>
               <div className="order-view-summary-row">
@@ -385,17 +407,17 @@ function OrderViewModal({ orderId, open, onClose }) {
                 </strong>
               </div>
               <div className="order-view-summary-row">
-                <span>{t("common.total")}</span>
+                <span>{t("common.total", "Total")}</span>
                 <strong>{formatMoney(data.totalPrice, language)}</strong>
               </div>
               <div className="order-view-summary-row">
-                <span>{t("common.paid")}</span>
+                <span>{t("common.paid", "Paid")}</span>
                 <strong style={{ color: "#15803D" }}>
                   {formatMoney(data.paidAmount, language)}
                 </strong>
               </div>
               <div className="order-view-summary-row">
-                <span>{t("common.remaining")}</span>
+                <span>{t("common.remaining", "Remaining")}</span>
                 <strong
                   style={{ color: data.remaining > 0 ? "#DC2626" : "#15803D" }}
                 >
@@ -713,7 +735,9 @@ export default function AllOrders({ filter, mode = "orders" }) {
             <LuBadgeDollarSign size={16} />
           </span>
           <div className="order-dashboard-copy">
-            <div className="order-dashboard-label">{t("common.paid")}</div>
+            <div className="order-dashboard-label">
+              {t("common.paid", "Paid")}
+            </div>
             <strong className="order-dashboard-value order-dashboard-value--paid">
               {formatMoney(totals.paid, language)}
             </strong>
@@ -724,7 +748,9 @@ export default function AllOrders({ filter, mode = "orders" }) {
             <LuPhone size={16} />
           </span>
           <div className="order-dashboard-copy">
-            <div className="order-dashboard-label">{t("common.remaining")}</div>
+            <div className="order-dashboard-label">
+              {t("common.remaining", "Remaining")}
+            </div>
             <strong
               className={`order-dashboard-value ${totals.remaining > 0 ? "order-dashboard-value--remaining" : "order-dashboard-value--paid"}`}
             >
@@ -746,15 +772,15 @@ export default function AllOrders({ filter, mode = "orders" }) {
                     <tr>
                       {[
                         "Bill #",
-                        t("common.customer"),
-                        t("common.type"),
-                        t("common.total"),
-                        t("createOrder.discount"),
-                        t("common.paid"),
-                        t("common.remaining"),
-                        t("common.status"),
-                        t("common.date"),
-                        t("common.actions"),
+                        t("common.customer", "Customer"),
+                        t("common.type", "Type"),
+                        t("common.total", "Total"),
+                        t("createOrder.discount", "Discount"),
+                        t("common.paid", "Paid"),
+                        t("common.remaining", "Remaining"),
+                        t("common.status", "Status"),
+                        t("common.date", "Date"),
+                        t("common.actions", "Actions"),
                       ].map((h) => (
                         <th key={h}>{h}</th>
                       ))}
@@ -838,27 +864,24 @@ export default function AllOrders({ filter, mode = "orders" }) {
                                     {t("createOrder.emergencyOrder")}
                                   </Badge>
                                 )}
-                                <Badge
-                                  v={
-                                    statusFilter === "completed"
-                                      ? "red"
-                                      : o.remaining > 0
-                                        ? "amber"
-                                        : "green"
-                                  }
-                                >
-                                  {statusFilter === "completed"
-                                    ? completedStatusLabel
-                                    : o.remaining > 0
-                                      ? t(
-                                          "delivery.notFullyPaidBadge",
-                                          "Not fully paid",
-                                        )
-                                      : t(
-                                          "delivery.fullyPaidBadge",
-                                          "Fully paid",
-                                        )}
-                                </Badge>
+                                {(() => {
+                                  const isCompletedStatus =
+                                    statusFilter === "completed" ||
+                                    o.isCompleted;
+
+                                  return (
+                                    <Badge
+                                      v={isCompletedStatus ? "red" : "amber"}
+                                    >
+                                      {isCompletedStatus
+                                        ? completedStatusLabel
+                                        : t(
+                                            "delivery.notFullyPaidBadge",
+                                            "Not Completed",
+                                          )}
+                                    </Badge>
+                                  );
+                                })()}
                               </div>
                             </td>
                             <td className="order-date-text">
@@ -958,30 +981,27 @@ export default function AllOrders({ filter, mode = "orders" }) {
                             {t("createOrder.emergencyOrder")}
                           </Badge>
                         )}
-                        <Badge
-                          v={
-                            statusFilter === "completed"
-                              ? "red"
-                              : o.remaining > 0
-                                ? "amber"
-                                : "green"
-                          }
-                        >
-                          {statusFilter === "completed"
-                            ? completedStatusLabel
-                            : o.remaining > 0
-                              ? t(
-                                  "delivery.notFullyPaidBadge",
-                                  "Not fully paid",
-                                )
-                              : t("delivery.fullyPaidBadge", "Fully paid")}
-                        </Badge>
+                        {(() => {
+                          const isCompletedStatus =
+                            statusFilter === "completed" || o.isCompleted;
+
+                          return (
+                            <Badge v={isCompletedStatus ? "red" : "amber"}>
+                              {isCompletedStatus
+                                ? completedStatusLabel
+                                : t(
+                                    "delivery.notFullyPaidBadge",
+                                    "Not Completed",
+                                  )}
+                            </Badge>
+                          );
+                        })()}
                       </div>
 
                       <div className="order-mobile-metrics">
                         <div className="order-mobile-metric">
                           <div className="order-mobile-label">
-                            {t("common.total")}
+                            {t("common.total", "Total")}
                           </div>
                           <div className="order-mobile-value">
                             {formatMoney(o.totalPrice, language)}
@@ -989,7 +1009,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
                         </div>
                         <div className="order-mobile-metric">
                           <div className="order-mobile-label">
-                            {t("createOrder.discount")}
+                            {t("createOrder.discount", "Discount")}
                           </div>
                           <div className="order-mobile-value">
                             {formatMoney(o.discount, language)}
@@ -997,7 +1017,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
                         </div>
                         <div className="order-mobile-metric">
                           <div className="order-mobile-label">
-                            {t("common.paid")}
+                            {t("common.paid", "Paid")}
                           </div>
                           <div className="order-mobile-value order-mobile-value--paid">
                             {formatMoney(o.paidAmount, language)}
@@ -1005,7 +1025,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
                         </div>
                         <div className="order-mobile-metric">
                           <div className="order-mobile-label">
-                            {t("common.remaining")}
+                            {t("common.remaining", "Remaining")}
                           </div>
                           <div
                             className={`order-mobile-value${

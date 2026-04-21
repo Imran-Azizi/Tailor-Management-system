@@ -229,7 +229,7 @@ function RakhtTab() {
                   {t("rakht.availableMeters", { defaultValue: "Available" })}
                 </th>
                 <th>{t("rakht.price", { defaultValue: "Price" })}</th>
-                <th>{t("common.actions")}</th>
+                <th>{t("common.actions", "Actions")}</th>
               </tr>
             </thead>
             <tbody>

@@ -110,7 +110,8 @@ export default function EditOrder() {
   });
 
   const mutation = useMutation({
-    mutationFn: (payload) => api.put(`/orders/${id}/bill`, payload).then((r) => r.data),
+    mutationFn: (payload) =>
+      api.put(`/orders/${id}/bill`, payload).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["order-detail"] });
@@ -138,7 +139,9 @@ export default function EditOrder() {
     const emergencyDate = emergencyOrder?.emergencyExpiry
       ? new Date(emergencyOrder.emergencyExpiry)
       : null;
-    const emergencyExpiry = emergencyDate ? emergencyDate.toISOString().split("T")[0] : "";
+    const emergencyExpiry = emergencyDate
+      ? emergencyDate.toISOString().split("T")[0]
+      : "";
     const emergencyHour = emergencyDate
       ? String(emergencyDate.getHours()).padStart(2, "0")
       : "08";
@@ -160,7 +163,9 @@ export default function EditOrder() {
         const safe = meas && typeof meas === "object" ? meas : {};
         return {
           ...safe,
-          __name: order.orderName || `${getOrderTypeLabel(entry.type, i18n.resolvedLanguage || i18n.language)} ${setIdx + 1}`,
+          __name:
+            order.orderName ||
+            `${getOrderTypeLabel(entry.type, i18n.resolvedLanguage || i18n.language)} ${setIdx + 1}`,
           __orderId: order.id,
         };
       });
@@ -213,7 +218,10 @@ export default function EditOrder() {
     }
 
     const billEmergency = resolveBillEmergency(merged.orderTypes || []);
-    const orderItems = buildOrderItems(merged.orderTypes || [], merged.measurements || {});
+    const orderItems = buildOrderItems(
+      merged.orderTypes || [],
+      merged.measurements || {},
+    );
 
     const payload = {
       customerInfo: {
@@ -225,8 +233,6 @@ export default function EditOrder() {
         const b = merged.billing?.[item.billingKey] || {};
         const meas = sanitize(item.measurements);
         const pricePerItem = parseNumberLocale(b.totalPrice) || 0;
-        const qtyRaw = parseNumberLocale(b.quantity);
-        const qty = Number.isFinite(qtyRaw) ? Math.max(1, Math.floor(qtyRaw)) : 1;
         return {
           id: item.orderId || undefined,
           type: item.type,
@@ -234,10 +240,10 @@ export default function EditOrder() {
           isEmergency: billEmergency.isEmergency,
           emergencyExpiry: billEmergency.emergencyExpiry,
           measurements: meas,
-          totalPrice: toWholeAmount(pricePerItem * qty),
+          totalPrice: toWholeAmount(pricePerItem),
           discount: toWholeAmount(parseNumberLocale(b.discount) || 0),
           paidAmount: toWholeAmount(parseNumberLocale(b.paidAmount) || 0),
-          quantity: qty,
+          quantity: 1,
         };
       }),
     };
@@ -245,7 +251,9 @@ export default function EditOrder() {
     try {
       const res = await mutation.mutateAsync(payload);
       toast.success(t("orders.updated"));
-      navigate("/orders", { state: { search: String(res?.customer?.firstName || "") } });
+      navigate("/orders", {
+        state: { search: String(res?.customer?.firstName || "") },
+      });
     } catch (e) {
       const msg = getApiErrorMessage(e, t("orders.updateFailed"));
       setError(msg);
@@ -256,8 +264,14 @@ export default function EditOrder() {
   if (isLoading || !form) return <Spinner />;
 
   return (
-    <div className="page create-order-shell" style={{ maxWidth: 920, margin: "0 auto" }}>
-      <div className="step-progress-wrap" style={{ display: "flex", alignItems: "center", marginBottom: 32 }}>
+    <div
+      className="page create-order-shell"
+      style={{ maxWidth: 920, margin: "0 auto" }}
+    >
+      <div
+        className="step-progress-wrap"
+        style={{ display: "flex", alignItems: "center", marginBottom: 32 }}
+      >
         {STEPS.map((s, i) => (
           <div
             key={i}
@@ -277,7 +291,9 @@ export default function EditOrder() {
                 flexShrink: 0,
               }}
             >
-              <div className={`step-dot ${i < step ? "done" : i === step ? "active" : "pending"}`}>
+              <div
+                className={`step-dot ${i < step ? "done" : i === step ? "active" : "pending"}`}
+              >
                 {i < step ? <LuCheck size={13} /> : <span>{i + 1}</span>}
               </div>
               <span
@@ -293,7 +309,10 @@ export default function EditOrder() {
               </span>
             </div>
             {i < STEPS.length - 1 && (
-              <div className={`step-line ${i < step ? "done" : "pending"}`} style={{ margin: "0 6px", marginBottom: 18 }} />
+              <div
+                className={`step-line ${i < step ? "done" : "pending"}`}
+                style={{ margin: "0 6px", marginBottom: 18 }}
+              />
             )}
           </div>
         ))}
@@ -318,12 +337,19 @@ export default function EditOrder() {
             />
           )}
           {step === 1 && (
-            <Step2OrderTypes onNext={next} onBack={back} initial={form.orderTypes} />
+            <Step2OrderTypes
+              onNext={next}
+              onBack={back}
+              initial={form.orderTypes}
+            />
           )}
           {step === 2 && (
             <Step3Measurements
               onNext={(d) => {
-                const orderItems = buildOrderItems(form.orderTypes || [], d.measurements || {});
+                const orderItems = buildOrderItems(
+                  form.orderTypes || [],
+                  d.measurements || {},
+                );
                 next({ ...d, orderItems });
               }}
               onBack={back}
@@ -354,7 +380,9 @@ export default function EditOrder() {
 }
 
 function resolveOrderName(measurementValue) {
-  const sets = Array.isArray(measurementValue) ? measurementValue : [measurementValue || {}];
+  const sets = Array.isArray(measurementValue)
+    ? measurementValue
+    : [measurementValue || {}];
   const namedSet = sets.find((set) => set?.__name?.trim());
   return namedSet?.__name?.trim() || undefined;
 }
@@ -363,10 +391,17 @@ function resolveBillEmergency(orderTypes) {
   const entries = Array.isArray(orderTypes) ? orderTypes : [];
   const emergencyEntry = entries.find((entry) => entry?.isEmergency);
   if (!emergencyEntry) return { isEmergency: false, emergencyExpiry: null };
-  if (!emergencyEntry.emergencyExpiry) return { isEmergency: true, emergencyExpiry: null };
+  if (!emergencyEntry.emergencyExpiry)
+    return { isEmergency: true, emergencyExpiry: null };
 
-  const hour = String(Number(emergencyEntry.emergencyHour) || 0).padStart(2, "0");
-  return { isEmergency: true, emergencyExpiry: `${emergencyEntry.emergencyExpiry}T${hour}:00:00` };
+  const hour = String(Number(emergencyEntry.emergencyHour) || 0).padStart(
+    2,
+    "0",
+  );
+  return {
+    isEmergency: true,
+    emergencyExpiry: `${emergencyEntry.emergencyExpiry}T${hour}:00:00`,
+  };
 }
 
 function toWholeAmount(value) {
@@ -379,7 +414,14 @@ function sanitize(m) {
   if (!m || typeof m !== "object") return {};
   const out = {};
   for (const [k, v] of Object.entries(m)) {
-    if (v === undefined || v === null || v === "" || k === "__name" || k === "__orderId") continue;
+    if (
+      v === undefined ||
+      v === null ||
+      v === "" ||
+      k === "__name" ||
+      k === "__orderId"
+    )
+      continue;
     if (typeof v === "boolean") {
       out[k] = v;
       continue;
@@ -404,12 +446,19 @@ function validateMeasurementsBeforeSubmit(orderTypes, measurements) {
       const sanitized = sanitize(currentSet);
       const missing = required.filter((field) => {
         const value = sanitized[field];
-        return value === undefined || value === null || (typeof value === "number" && isNaN(value));
+        return (
+          value === undefined ||
+          value === null ||
+          (typeof value === "number" && isNaN(value))
+        );
       });
       if (missing.length) {
         const label = currentSet?.__name?.trim() || `Set ${setIndex + 1}`;
         return i18n.t("createOrder.completeMeasurements", {
-          type: getOrderTypeLabel(entry.type, i18n.resolvedLanguage || i18n.language || "en"),
+          type: getOrderTypeLabel(
+            entry.type,
+            i18n.resolvedLanguage || i18n.language || "en",
+          ),
           label,
           defaultValue: `Please complete required measurements for ${label}.`,
         });
@@ -421,9 +470,12 @@ function validateMeasurementsBeforeSubmit(orderTypes, measurements) {
 
 function normalizeMeasurementSets(measurementValue) {
   if (Array.isArray(measurementValue) && measurementValue.length > 0) {
-    return measurementValue.map((setValue) => (setValue && typeof setValue === "object" ? setValue : {}));
+    return measurementValue.map((setValue) =>
+      setValue && typeof setValue === "object" ? setValue : {},
+    );
   }
-  if (measurementValue && typeof measurementValue === "object") return [measurementValue];
+  if (measurementValue && typeof measurementValue === "object")
+    return [measurementValue];
   return [{}];
 }
 

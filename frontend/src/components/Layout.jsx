@@ -1,8 +1,18 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import Sidebar from "./Sidebar.jsx";
 import Navbar from "./Navbar.jsx";
+
+const SIDEBAR_COLLAPSED_KEY = "layout:sidebar-collapsed";
+
+function getInitialCollapsed() {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 const TITLES = {
   "/dashboard": "common.dashboard",
@@ -28,15 +38,23 @@ const TITLES = {
 
 export default function Layout() {
   const { t } = useTranslation();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(getInitialCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
   const loc = useLocation();
+
+  useEffect(() => {
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
+  }, [collapsed]);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [loc.pathname]);
   const titleKey =
     Object.entries(TITLES)
       .sort((a, b) => b[0].length - a[0].length)
       .find(
-      ([p]) => loc.pathname === p || loc.pathname.startsWith(`${p}/`),
-    )?.[1] || "appName";
+        ([p]) => loc.pathname === p || loc.pathname.startsWith(`${p}/`),
+      )?.[1] || "appName";
 
   return (
     <>
@@ -44,6 +62,7 @@ export default function Layout() {
         collapsed={collapsed}
         onToggle={() => setCollapsed((c) => !c)}
         open={mobileOpen}
+        onNavigate={() => setMobileOpen(false)}
       />
       <div
         className={`sb-overlay${mobileOpen ? " on" : ""}`}

@@ -6,7 +6,7 @@
         "Are you sure you want to delete this item? This action cannot be undone.",
     },
     sidebar: {
-      clothesDelivery: "Clothes Delivery to Customer",
+      clothesDelivery: "Delivery to Customer",
     },
     ui: {
       pageSummary: "Page {{page}} of {{pages}} · {{total}} total",
@@ -164,10 +164,11 @@
         "Capacity of this box is full for {{orderType}} - {{customer}} - Bill #{{billNumber}}.",
       boxNotFound:
         "No box found for {{orderType}} orders - {{customer}} - Bill #{{billNumber}}.",
+      adminPayment: "Admin has given you ${{amount}} on {{date}}.",
     },
     delivery: {
       orderHeader: "Order",
-      notFullyPaidBadge: "Not fully paid",
+      notFullyPaidBadge: "Not Completed",
       fullyPaidBadge: "Fully paid",
       invalidAmount: "Invalid amount",
       paymentGreaterThanRemaining:
@@ -575,10 +576,12 @@
         "ظرفیت این بکس برای {{orderType}} تکمیل است - {{customer}} - بل #{{billNumber}}.",
       boxNotFound:
         "برای سفارش‌های {{orderType}} بکس یافت نشد - {{customer}} - بل #{{billNumber}}.",
+      adminPayment:
+        "ادمین برای شما {{amount}} افغانی در تاریخ {{date}} پرداخت کرد.",
     },
     delivery: {
       orderHeader: "سفارش",
-      notFullyPaidBadge: "مکمل پرداخت نشده",
+      notFullyPaidBadge: "تکمیل نشده",
       fullyPaidBadge: "مکمل پرداخت شده",
       invalidAmount: "مقدار نامعتبر است",
       paymentGreaterThanRemaining: "پرداخت نمی‌تواند بیشتر از باقی‌مانده باشد",
@@ -980,10 +983,12 @@
         "د {{orderType}} لپاره د دې بکس ظرفیت ډک دی - {{customer}} - بل #{{billNumber}}.",
       boxNotFound:
         "د {{orderType}} فرمایشونو لپاره بکس ونه موندل شو - {{customer}} - بل #{{billNumber}}.",
+      adminPayment:
+        "ادمین ستاسو لپاره {{amount}} افغاني د {{date}} نیټه ورکړه.",
     },
     delivery: {
       orderHeader: "فرمایش",
-      notFullyPaidBadge: "بشپړ تادیه شوی نه دی",
+      notFullyPaidBadge: "بشپړ شوی نه دی",
       fullyPaidBadge: "بشپړ تادیه شوی",
       invalidAmount: "ناسم مقدار",
       paymentGreaterThanRemaining: "تادیه له پاتې مقدار څخه زیاته نه شي کېدای",

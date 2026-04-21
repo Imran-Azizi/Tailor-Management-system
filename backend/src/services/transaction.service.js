@@ -10,7 +10,13 @@ const USER_SELECT = {
 const WORKER_PAYMENT_NOTE_PREFIX = "Worker completion payment -";
 
 export const createTransaction = async (data, createdById) => {
-  return prisma.transaction.create({
+  // Fetch the target user's accountType so we know whether to notify them
+  const targetUser = await prisma.user.findUnique({
+    where: { id: data.userId },
+    select: { id: true, accountType: true },
+  });
+
+  const transaction = await prisma.transaction.create({
     data: {
       accountType: data.accountType,
       userId: data.userId,
@@ -25,6 +31,30 @@ export const createTransaction = async (data, createdById) => {
       createdBy: { select: { id: true, name: true } },
     },
   });
+
+  // Notify worker users (DOKHT / QICHIKAR) when admin gives them money
+  if (
+    targetUser &&
+    (targetUser.accountType === "DOKHT" ||
+      targetUser.accountType === "QICHIKAR")
+  ) {
+    // Store the date as YYYY-MM-DD so the frontend can format it per locale
+    const dateStr =
+      data.transactionDate instanceof Date
+        ? data.transactionDate.toISOString().split("T")[0]
+        : String(data.transactionDate).split("T")[0];
+
+    const message = `Admin has given you ${data.amount} on ${dateStr}.`;
+    await prisma.userNotification.create({
+      data: {
+        userId: data.userId,
+        message,
+        type: "ADMIN_PAYMENT",
+      },
+    });
+  }
+
+  return transaction;
 };
 
 export const getTransactionSummaryForUser = async (userId, accountType) => {
@@ -32,13 +62,11 @@ export const getTransactionSummaryForUser = async (userId, accountType) => {
     accountType === "DOKHT"
       ? {
           dokhtAssignedToId: userId,
-          dokhtCompletedAt: { not: null },
           dokhtPaymentStatus: "PAID_TO_WORKER",
         }
       : accountType === "QICHIKAR"
         ? {
             qichikarAssignedToId: userId,
-            qichikarCompletedAt: { not: null },
             qichikarPaymentStatus: "PAID_TO_WORKER",
           }
         : {
@@ -58,9 +86,10 @@ export const getTransactionSummaryForUser = async (userId, accountType) => {
       by: ["kind"],
       where: {
         userId,
-        NOT: {
-          note: { startsWith: WORKER_PAYMENT_NOTE_PREFIX },
-        },
+        OR: [
+          { note: null },
+          { NOT: { note: { startsWith: WORKER_PAYMENT_NOTE_PREFIX } } },
+        ],
       },
       _sum: { amount: true },
     }),
@@ -100,9 +129,10 @@ export const getTransactions = async ({
   const skip = (page - 1) * limit;
 
   const where = {
-    NOT: {
-      note: { startsWith: WORKER_PAYMENT_NOTE_PREFIX },
-    },
+    OR: [
+      { note: null },
+      { NOT: { note: { startsWith: WORKER_PAYMENT_NOTE_PREFIX } } },
+    ],
   };
   if (accountType) where.accountType = accountType;
   if (search) {

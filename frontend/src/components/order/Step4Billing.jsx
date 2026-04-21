@@ -6,7 +6,7 @@ import { formatCurrency } from "../../lib/currency.js";
 import { getOrderTypeLabel } from "../../lib/orderType.js";
 
 const DEFAULT_BILLING = {
-  totalPrice: "", // treated as price-per-item; actual total = totalPrice * quantity
+  totalPrice: "",
   discount: "",
   paidAmount: "",
   quantity: "1",
@@ -37,7 +37,11 @@ function getDisplayLabel(entry, index, language = "en") {
   return `${orderType} ${sequence}`;
 }
 
-function buildBillingEntries(orderTypes = [], orderItems = [], language = "en") {
+function buildBillingEntries(
+  orderTypes = [],
+  orderItems = [],
+  language = "en",
+) {
   if (Array.isArray(orderItems) && orderItems.length > 0) {
     return orderItems.map((item, index) => ({
       ...item,
@@ -76,14 +80,10 @@ function BillingCard({ entry, value, onChange, billingKey }) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
   const pricePerItem = toWholeAmount(parseNumberLocale(value.totalPrice));
-  const qtyRaw = parseNumberLocale(value.quantity);
-  const quantity = Number.isFinite(qtyRaw)
-    ? Math.max(1, Math.floor(qtyRaw))
-    : 1;
   const discount = toWholeAmount(parseNumberLocale(value.discount));
   const paidAmount = toWholeAmount(parseNumberLocale(value.paidAmount));
 
-  const computedTotal = pricePerItem * quantity;
+  const computedTotal = pricePerItem;
   const remaining = Math.max(0, computedTotal - discount - paidAmount);
 
   const setField = (key, next) =>
@@ -125,7 +125,9 @@ function BillingCard({ entry, value, onChange, billingKey }) {
           {getOrderTypeLabel(entry.type, language)}
         </span>
         {entry.displayName && (
-          <span style={{ fontSize: 13, fontWeight: 600 }}>{entry.displayName}</span>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>
+            {entry.displayName}
+          </span>
         )}
         {entry.isEmergency && (
           <span className="badge bg-red" style={{ fontSize: 10 }}>
@@ -137,7 +139,7 @@ function BillingCard({ entry, value, onChange, billingKey }) {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1fr 1fr",
+          gridTemplateColumns: "1fr",
           gap: 12,
           marginBottom: 12,
         }}
@@ -152,19 +154,6 @@ function BillingCard({ entry, value, onChange, billingKey }) {
             value={value.totalPrice}
             onChange={(e) => setField("totalPrice", e.target.value)}
             placeholder="0"
-            style={inputStyle}
-          />
-        </div>
-        <div>
-          <label className="lbl" style={labelStyle}>
-            {t("common.quantity")}
-          </label>
-          <input
-            className="inp"
-            inputMode="numeric"
-            value={value.quantity}
-            onChange={(e) => setField("quantity", e.target.value)}
-            placeholder="1"
             style={inputStyle}
           />
         </div>
@@ -183,13 +172,7 @@ function BillingCard({ entry, value, onChange, billingKey }) {
         }}
       >
         <span style={{ fontSize: 12, color: "var(--text3)", fontWeight: 600 }}>
-          {t("createOrder.totalPrice")}&nbsp;
-          {quantity > 1 && (
-            <span style={{ color: "var(--text3)", fontWeight: 400 }}>
-              ({formatWholeAmount(quantity)} x{" "}
-              {formatCurrency(pricePerItem, language)})
-            </span>
-          )}
+          {t("createOrder.totalPrice")}
         </span>
         <span
           style={{ fontSize: 16, fontWeight: 800, color: "var(--primary)" }}
@@ -239,7 +222,7 @@ function BillingCard({ entry, value, onChange, billingKey }) {
         >
           {discount > 0 && (
             <span style={{ color: "var(--text3)" }}>
-              {t("createOrder.afterDiscount")} {" "}
+              {t("createOrder.afterDiscount")}{" "}
               <strong style={{ color: "var(--text1)" }}>
                 {formatCurrency(computedTotal - discount, language)}
               </strong>
@@ -252,7 +235,7 @@ function BillingCard({ entry, value, onChange, billingKey }) {
             }}
           >
             {remaining > 0
-              ? `${t("common.remaining")}: ${formatCurrency(remaining, language)}`
+              ? `${t("common.remaining", "Remaining")}: ${formatCurrency(remaining, language)}`
               : t("createOrder.fullyPaid")}
           </span>
         </div>
@@ -285,11 +268,7 @@ export default function Step4Billing({
       (acc, entry) => {
         const item = billing[entry.billingKey] || DEFAULT_BILLING;
         const pricePerItem = toWholeAmount(parseNumberLocale(item.totalPrice));
-        const qtyRaw = parseNumberLocale(item.quantity);
-        const qty = Number.isFinite(qtyRaw)
-          ? Math.max(1, Math.floor(qtyRaw))
-          : 1;
-        const total = pricePerItem * qty;
+        const total = pricePerItem;
         const discount = toWholeAmount(parseNumberLocale(item.discount));
         const paidAmount = toWholeAmount(parseNumberLocale(item.paidAmount));
 
@@ -317,12 +296,14 @@ export default function Step4Billing({
       const item = billing[entry.billingKey] || DEFAULT_BILLING;
       const rawPrice = parseNumberLocale(item.totalPrice);
       const pricePerItem = toWholeAmount(rawPrice);
-      const qtyRaw = parseNumberLocale(item.quantity);
-      const qty = Number.isFinite(qtyRaw) ? Math.max(1, Math.floor(qtyRaw)) : 1;
-      const totalPrice = pricePerItem * qty;
+      const totalPrice = pricePerItem;
       const discount = toWholeAmount(parseNumberLocale(item.discount || "0"));
-      const paidAmount = toWholeAmount(parseNumberLocale(item.paidAmount || "0"));
-      const label = entry.displayName || `${getOrderTypeLabel(entry.type, language)} ${index + 1}`;
+      const paidAmount = toWholeAmount(
+        parseNumberLocale(item.paidAmount || "0"),
+      );
+      const label =
+        entry.displayName ||
+        `${getOrderTypeLabel(entry.type, language)} ${index + 1}`;
 
       if (Number.isNaN(rawPrice) || pricePerItem <= 0) {
         const message = t("createOrder.validTotalPrice", { label });
@@ -348,19 +329,12 @@ export default function Step4Billing({
         toast.error(message);
         return;
       }
-      if (Number.isNaN(qty) || qty < 1) {
-        const message = t("createOrder.quantityMin", { label });
-        setError(message);
-        toast.error(message);
-        return;
-      }
-
       normalizedBilling[entry.billingKey] = {
         ...item,
         totalPrice: String(pricePerItem),
         discount: String(discount),
         paidAmount: String(paidAmount),
-        quantity: String(qty),
+        quantity: "1",
       };
     }
 
@@ -422,7 +396,7 @@ export default function Step4Billing({
           </div>
           <div>
             <div style={{ fontSize: 11, color: "var(--text3)" }}>
-              {t("common.paid")}
+              {t("common.paid", "Paid")}
             </div>
             <div style={{ fontSize: 18, fontWeight: 700 }}>
               {formatCurrency(totals.paid, language)}
@@ -430,7 +404,7 @@ export default function Step4Billing({
           </div>
           <div>
             <div style={{ fontSize: 11, color: "var(--text3)" }}>
-              {t("common.remaining")}
+              {t("common.remaining", "Remaining")}
             </div>
             <div style={{ fontSize: 18, fontWeight: 700 }}>
               {formatCurrency(remaining, language)}

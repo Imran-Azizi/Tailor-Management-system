@@ -360,7 +360,7 @@ const resources = {
         createdBy: "Created By",
       },
       delivery: {
-        notFullyPaidBadge: "Not fully paid",
+        notFullyPaidBadge: "Not Completed",
         fullyPaidBadge: "Paid",
         orderLabel: "Order {{number}}",
         orderHeader: "Order #",
@@ -1293,11 +1293,6 @@ i18n.use(initReactI18next).init({
   fallbackLng: "en",
   interpolation: { escapeValue: false },
 });
-
-// Return correct text direction for current language.
-i18n.dir = (lng) => {
-  return "ltr";
-};
 
 for (const [lang, bundle] of Object.entries(LOCALE_PATCHES)) {
   i18n.addResourceBundle(lang, "translation", bundle, true, true);
