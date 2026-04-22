@@ -92,6 +92,7 @@ model Order {
   orderName           String?
   type                OrderType
   rakhtId             String?
+  rakhtTonId          String?
   rakhtCompanyName    String?
   rakhtBrandName      String?
   rakhtColor          String?
@@ -165,6 +166,7 @@ model Order {
 
   customer      Customer       @relation(fields: [customerId], references: [id])
   rakht         Rakht?         @relation(fields: [rakhtId], references: [id], onDelete: SetNull)
+  rakhtTon      RakhtTon?      @relation(fields: [rakhtTonId], references: [id], onDelete: SetNull)
   boxId         Int?
   box           Box?           @relation(fields: [boxId], references: [id])
   outfit        Outfit?
@@ -178,6 +180,7 @@ model Order {
   @@index([customerId])
   @@index([type])
   @@index([rakhtId])
+  @@index([rakhtTonId])
   @@index([isCompleted])
   @@index([isEmergency])
   @@index([assignedToId])
@@ -197,23 +200,36 @@ model Order {
 }
 
 model Rakht {
-  id           String   @id @default(uuid())
-  companyName  String
-  brandName    String
-  color        String
-  colorHex     String
-  metersPerTon Float
-  totalTons    Float
-  totalMeters  Float
-  usedMeters   Float    @default(0)
-  price        Float
-  orders       Order[]
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String     @id @default(uuid())
+  companyName    String
+  brandName      String
+  tonQuantity    Int
+  totalPrice     Float
+  givenMoney     Float      @default(0)
+  remainingMoney Float      @default(0)
+  date           DateTime   @default(now())
+  tons           RakhtTon[]
+  orders         Order[]
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 
   @@index([companyName])
   @@index([brandName])
-  @@index([color])
+}
+
+model RakhtTon {
+  id          String   @id @default(uuid())
+  rakhtId     String
+  rakht       Rakht    @relation(fields: [rakhtId], references: [id], onDelete: Cascade)
+  name        String
+  colorHex    String
+  totalMeters Float
+  usedMeters  Float    @default(0)
+  orders      Order[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([rakhtId])
 }
 
 enum OrderType {

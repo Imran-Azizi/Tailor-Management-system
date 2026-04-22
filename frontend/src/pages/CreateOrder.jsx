@@ -81,9 +81,9 @@ const REQUIRED_MEASUREMENT_FIELDS = {
 
 const STEPS = [
   { label: "Customer" },
-  { label: "Rakht" },
   { label: "Order Types" },
   { label: "Measurements" },
+  { label: "Rakht" },
   { label: "Billing" },
 ];
 
@@ -174,7 +174,7 @@ export default function CreateOrder() {
     if (measurementError) {
       setError(measurementError);
       toast.error(measurementError);
-      setStep(3);
+      setStep(2);
       return;
     }
 
@@ -200,18 +200,20 @@ export default function CreateOrder() {
         firstName: merged.firstName,
         phoneNumber: merged.phoneNumber,
       },
-      rakhtSelection: {
-        rakhtId: merged?.rakhtSelection?.rakhtId,
-        requiredMeters: parseNumberLocale(
-          merged?.rakhtSelection?.requiredMeters || 0,
-        ),
-        piecePrice: parseNumberLocale(merged?.rakhtSelection?.piecePrice || 0),
-      },
+      rakhtSelections: (merged?.rakhtSelections || []).map((selection) => ({
+        type: selection.type,
+        orderItemKey: selection.orderItemKey,
+        rakhtId: selection.rakhtId,
+        rakhtTonId: selection.rakhtTonId,
+        requiredMeters: parseNumberLocale(selection.requiredMeters || 0),
+        piecePrice: 0,
+      })),
       orders: orderItems.map((item) => {
         const b = merged.billing?.[item.billingKey] || {};
         const meas = sanitize(item.measurements);
         const pricePerItem = parseNumberLocale(b.totalPrice) || 0;
         return {
+          orderItemKey: item.billingKey,
           type: item.type,
           orderName: resolveOrderName(item.measurements),
           isEmergency: billEmergency.isEmergency,
@@ -322,16 +324,13 @@ export default function CreateOrder() {
         <div key={step} className="step-panel">
           {step === 0 && <Step1CustomerInfo onNext={next} initial={form} />}
           {step === 1 && (
-            <Step2RakhtSelection onNext={next} onBack={back} initial={form} />
-          )}
-          {step === 2 && (
             <Step2OrderTypes
               onNext={next}
               onBack={back}
               initial={form.orderTypes}
             />
           )}
-          {step === 3 && (
+          {step === 2 && (
             <Step3Measurements
               onNext={(d) => {
                 const orderItems = buildOrderItems(
@@ -343,6 +342,15 @@ export default function CreateOrder() {
               onBack={back}
               orderTypes={form.orderTypes}
               initial={form.measurements}
+            />
+          )}
+          {step === 3 && (
+            <Step2RakhtSelection
+              onNext={next}
+              onBack={back}
+              initial={form}
+              orderTypes={form.orderTypes}
+              orderItems={form.orderItems}
             />
           )}
           {step === 4 && (
@@ -487,8 +495,7 @@ function buildOrderItems(orderTypes, measurements) {
     sets.forEach((setValue, setIndex) => {
       typeCounter[entry.type] = (typeCounter[entry.type] || 0) + 1;
       const sequence = typeCounter[entry.type];
-      const displayName =
-        setValue?.__name?.trim() || buildDefaultItemName(entry.type, sequence);
+      const displayName = buildDefaultItemName(entry.type, sequence);
       items.push({
         billingKey: `${typeIndex}-${setIndex}`,
         typeIndex,

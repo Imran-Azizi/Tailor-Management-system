@@ -10,6 +10,7 @@ const optionalText = z.preprocess((value) => {
 }, z.string().optional());
 
 const orderItemSchema = z.object({
+  orderItemKey: optionalText,
   type: z.enum(["OUTFIT", "WASKAT", "KORTY", "YAKHANQAQ"]),
   orderName: optionalText,
   totalPrice: z.number().min(0),
@@ -27,7 +28,10 @@ const orderBillItemSchema = orderItemSchema.extend({
 });
 
 const rakhtSelectionSchema = z.object({
+  orderItemKey: optionalText,
+  type: z.enum(["OUTFIT", "WASKAT", "KORTY", "YAKHANQAQ"]),
   rakhtId: z.string().min(1, "Rakht is required"),
+  rakhtTonId: z.string().min(1, "Rakht ton is required"),
   requiredMeters: z.number().positive("Required meters must be positive"),
   piecePrice: z.number().min(0, "Piece price cannot be negative"),
 });
@@ -38,7 +42,9 @@ export const createOrderSchema = z.object({
     firstName: optionalText,
     phoneNumber: optionalText,
   }),
-  rakhtSelection: rakhtSelectionSchema,
+  rakhtSelections: z
+    .array(rakhtSelectionSchema)
+    .min(1, "At least one Rakht selection is required"),
   orders: z.array(orderItemSchema).min(1, "At least one order item required"),
 });
 

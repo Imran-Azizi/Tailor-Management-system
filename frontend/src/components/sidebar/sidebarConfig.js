@@ -42,20 +42,20 @@ const ADMIN_SECTIONS = [
       {
         key: "dailyTasks",
         label: "sidebar.dailyTasks",
-        fallback: "Daily Tasks",
+        fallback: "Daily Expenses",
         icon: LuClipboardList,
         children: [
           {
             key: "todayTasks",
             label: "dailyTasks.title",
-            fallback: "Today Tasks",
+            fallback: "Today Expenses",
             path: "/daily-tasks",
             icon: LuClipboardList,
           },
           {
             key: "allTasks",
             label: "dailyTasks.allTitle",
-            fallback: "All Tasks",
+            fallback: "All Expenses",
             path: "/daily-tasks/all",
             icon: LuList,
           },
@@ -234,20 +234,20 @@ const DOKAN_SECTIONS = [
       {
         key: "dailyTasks",
         label: "sidebar.dailyTasks",
-        fallback: "Daily Tasks",
+        fallback: "Daily Expenses",
         icon: LuClipboardList,
         children: [
           {
             key: "todayTasks",
             label: "dailyTasks.title",
-            fallback: "Today Tasks",
+            fallback: "Today Expenses",
             path: "/daily-tasks",
             icon: LuClipboardList,
           },
           {
             key: "allTasks",
             label: "dailyTasks.allTitle",
-            fallback: "All Tasks",
+            fallback: "All Expenses",
             path: "/daily-tasks/all",
             icon: LuList,
           },
@@ -368,7 +368,7 @@ const DOKAN_SECTIONS = [
     key: "reports",
     label: "sidebar.report",
     fallback: "Reports",
-items: [
+    items: [
       {
         key: "manageOrders",
         label: "sidebar.orders",

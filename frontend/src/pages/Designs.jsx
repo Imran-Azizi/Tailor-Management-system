@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -6,21 +6,14 @@ import {
   LuPencil,
   LuTrash2,
   LuFactory,
-  LuPalette,
-  LuRuler,
-  LuScale,
   LuBadgeDollarSign,
+  LuCalendar,
 } from "react-icons/lu";
+import Select from "react-select";
 import { z } from "zod";
 import toast from "react-hot-toast";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
-import {
-  DEFAULT_RAKHT_COLOR_HEX,
-  RAKHT_COLOR_OPTIONS,
-  findRakhtColorOptionByHex,
-  normalizeRakhtColorHex,
-} from "../lib/rakhtColors.js";
 import {
   PageHeader,
   Modal,
@@ -48,15 +41,32 @@ const TAB_GROUPS = {
   RAKHT: [],
 };
 
-const rakhtSchema = z.object({
-  companyName: z.string().trim().min(1),
-  brandName: z.string().trim().min(1),
-  color: z.string().trim().min(1),
+const TON_QTY_OPTIONS = Array.from({ length: 30 }, (_, i) => ({
+  value: i + 1,
+  label: String(i + 1),
+}));
+
+const emptyTon = () => ({ name: "", colorHex: "#94A3B8", totalMeters: "" });
+
+const rakhtTonSchema = z.object({
+  name: z.string().trim().min(1),
   colorHex: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
-  metersPerTon: z.coerce.number().positive(),
-  totalTons: z.coerce.number().positive(),
-  price: z.coerce.number().min(0),
+  totalMeters: z.coerce.number().positive(),
 });
+
+const rakhtSchema = z
+  .object({
+    companyName: z.string().trim().min(1),
+    brandName: z.string().trim().min(1),
+    tonQuantity: z.number().int().min(1).max(30),
+    tons: z.array(rakhtTonSchema),
+    totalPrice: z.coerce.number().min(0),
+    givenMoney: z.coerce.number().min(0),
+  })
+  .refine((d) => d.tons.length === d.tonQuantity, {
+    message: "Ton items count must match Ton Quantity",
+    path: ["tons"],
+  });
 
 function RakhtTab() {
   const { t } = useTranslation();
@@ -64,24 +74,22 @@ function RakhtTab() {
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteItem, setDeleteItem] = useState(null);
-  const [form, setForm] = useState({
+
+  const emptyForm = () => ({
     companyName: "",
     brandName: "",
-    color: "",
-    colorHex: DEFAULT_RAKHT_COLOR_HEX,
-    metersPerTon: "",
-    totalTons: "",
-    price: "",
+    tonQuantity: null,
+    tons: [],
+    totalPrice: "",
+    givenMoney: "",
   });
+
+  const [form, setForm] = useState(emptyForm());
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["rakht-list"],
     queryFn: () => api.get("/rakhts").then((res) => res.data),
   });
-
-  const companies = Array.from(
-    new Set((rows || []).map((row) => row.companyName).filter(Boolean)),
-  ).sort((left, right) => left.localeCompare(right));
 
   const saveMut = useMutation({
     mutationFn: (payload) =>
@@ -92,15 +100,7 @@ function RakhtTab() {
       qc.invalidateQueries({ queryKey: ["rakht-list"] });
       setModal(false);
       setEditing(null);
-      setForm({
-        companyName: "",
-        brandName: "",
-        color: "",
-        colorHex: DEFAULT_RAKHT_COLOR_HEX,
-        metersPerTon: "",
-        totalTons: "",
-        price: "",
-      });
+      setForm(emptyForm());
       toast.success(
         editing
           ? t("rakht.updated", { defaultValue: "Rakht updated." })
@@ -133,15 +133,7 @@ function RakhtTab() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({
-      companyName: companies[0] || "",
-      brandName: "",
-      color: "",
-      colorHex: DEFAULT_RAKHT_COLOR_HEX,
-      metersPerTon: "",
-      totalTons: "",
-      price: "",
-    });
+    setForm(emptyForm());
     setModal(true);
   };
 
@@ -150,17 +142,54 @@ function RakhtTab() {
     setForm({
       companyName: item.companyName || "",
       brandName: item.brandName || "",
-      color: item.color || "",
-      colorHex: normalizeRakhtColorHex(item.colorHex, item.color),
-      metersPerTon: String(item.metersPerTon ?? ""),
-      totalTons: String(item.totalTons ?? ""),
-      price: String(item.price ?? ""),
+      tonQuantity: item.tonQuantity || null,
+      tons: (item.tons || []).map((ton) => ({
+        name: ton.name || "",
+        colorHex: ton.colorHex || "#94A3B8",
+        totalMeters: String(ton.totalMeters ?? ""),
+      })),
+      totalPrice: String(item.totalPrice ?? ""),
+      givenMoney: String(item.givenMoney ?? ""),
     });
     setModal(true);
   };
 
+  const handleTonQtyChange = (option) => {
+    const qty = option?.value || 0;
+    setForm((prev) => {
+      const current = prev.tons || [];
+      const next =
+        qty > current.length
+          ? [
+              ...current,
+              ...Array.from({ length: qty - current.length }, emptyTon),
+            ]
+          : current.slice(0, qty);
+      return { ...prev, tonQuantity: qty, tons: next };
+    });
+  };
+
+  const updateTon = (index, field, value) => {
+    setForm((prev) => {
+      const tons = [...prev.tons];
+      tons[index] = { ...tons[index], [field]: value };
+      return { ...prev, tons };
+    });
+  };
+
+  const remainingMoney = useMemo(() => {
+    const total = parseInt(form.totalPrice, 10) || 0;
+    const given = parseInt(form.givenMoney, 10) || 0;
+    return Math.max(0, total - given);
+  }, [form.totalPrice, form.givenMoney]);
+
+  const todayDisplay = new Date().toLocaleDateString();
+
   const submit = () => {
-    const parsed = rakhtSchema.safeParse(form);
+    const parsed = rakhtSchema.safeParse({
+      ...form,
+      tonQuantity: form.tonQuantity,
+    });
     if (!parsed.success) {
       toast.error(
         t("rakht.validationError", {
@@ -171,8 +200,6 @@ function RakhtTab() {
     }
     saveMut.mutate(parsed.data);
   };
-
-  const selectedPreset = findRakhtColorOptionByHex(form.colorHex);
 
   return (
     <div className="card" style={{ padding: 18 }}>
@@ -192,8 +219,7 @@ function RakhtTab() {
           </p>
           <p style={{ fontSize: 12, color: "var(--text3)" }}>
             {t("rakht.subtitle", {
-              defaultValue:
-                "Manage fabric brands, stock meters, and price settings.",
+              defaultValue: "Manage fabric brands, stock meters, and payments.",
             })}
           </p>
         </div>
@@ -221,14 +247,15 @@ function RakhtTab() {
               <tr>
                 <th>{t("rakht.companyName", { defaultValue: "Company" })}</th>
                 <th>{t("rakht.brandName", { defaultValue: "Brand" })}</th>
-                <th>{t("rakht.color", { defaultValue: "Color" })}</th>
+                <th>{t("rakht.tonQuantity", { defaultValue: "Tons" })}</th>
                 <th>
-                  {t("rakht.totalMeters", { defaultValue: "Total Meters" })}
+                  {t("rakht.totalPrice", { defaultValue: "Total Price" })}
                 </th>
+                <th>{t("rakht.givenMoney", { defaultValue: "Given" })}</th>
                 <th>
-                  {t("rakht.availableMeters", { defaultValue: "Available" })}
+                  {t("rakht.remainingMoney", { defaultValue: "Remaining" })}
                 </th>
-                <th>{t("rakht.price", { defaultValue: "Price" })}</th>
+                <th>{t("rakht.date", { defaultValue: "Date" })}</th>
                 <th>{t("common.actions", "Actions")}</th>
               </tr>
             </thead>
@@ -237,33 +264,25 @@ function RakhtTab() {
                 <tr key={item.id}>
                   <td>{item.companyName}</td>
                   <td>{item.brandName}</td>
+                  <td>{item.tonQuantity}</td>
                   <td>
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                        fontWeight: 600,
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: 12,
-                          height: 12,
-                          borderRadius: "50%",
-                          border: "1px solid var(--border)",
-                          background: normalizeRakhtColorHex(
-                            item.colorHex,
-                            item.color,
-                          ),
-                        }}
-                      />
-                      {item.color}
-                    </span>
+                    {Math.round(Number(item.totalPrice || 0)).toLocaleString()}
                   </td>
-                  <td>{Number(item.totalMeters || 0).toFixed(2)}</td>
-                  <td>{Number(item.availableMeters || 0).toFixed(2)}</td>
-                  <td>{Number(item.price || 0).toLocaleString()}</td>
+                  <td>
+                    {Math.round(Number(item.givenMoney || 0)).toLocaleString()}
+                  </td>
+                  <td>
+                    {Math.round(
+                      item.remainingMoney ??
+                        Math.max(
+                          0,
+                          (item.totalPrice || 0) - (item.givenMoney || 0),
+                        ),
+                    ).toLocaleString()}
+                  </td>
+                  <td>
+                    {item.date ? new Date(item.date).toLocaleDateString() : "-"}
+                  </td>
                   <td>
                     <div style={{ display: "flex", gap: 8 }}>
                       <button
@@ -300,7 +319,8 @@ function RakhtTab() {
             : t("rakht.addTitle", { defaultValue: "Add Rakht" })
         }
       >
-        <div style={{ display: "grid", gap: 12 }}>
+        <div style={{ display: "grid", gap: 14 }}>
+          {/* Company Name */}
           <div>
             <label className="lbl">
               {t("rakht.companyName", { defaultValue: "Company Name" })}
@@ -310,240 +330,252 @@ function RakhtTab() {
               <input
                 className="inp"
                 value={form.companyName}
-                list="rakht-company-options"
-                onChange={(event) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    companyName: event.target.value,
-                  }))
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, companyName: e.target.value }))
                 }
               />
-              <datalist id="rakht-company-options">
-                {companies.map((company) => (
-                  <option key={company} value={company} />
-                ))}
-              </datalist>
             </div>
           </div>
 
+          {/* Brand Name */}
           <div>
             <label className="lbl">
-              {t("rakht.brandName", { defaultValue: "Rakht Brand" })}
+              {t("rakht.brandName", { defaultValue: "Brand Name" })}
             </label>
             <div className="iw">
               <LuFactory size={14} className="ico" />
               <input
                 className="inp"
                 value={form.brandName}
-                onChange={(event) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    brandName: event.target.value,
-                  }))
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, brandName: e.target.value }))
                 }
               />
             </div>
           </div>
 
+          {/* Ton Quantity */}
           <div>
             <label className="lbl">
-              {t("rakht.color", { defaultValue: "Rakht Color" })}
+              {t("rakht.tonQuantity", { defaultValue: "Ton Quantity" })}
             </label>
-            <div className="iw">
-              <LuPalette size={14} className="ico" />
-              <input
-                className="inp"
-                value={form.color}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, color: event.target.value }))
-                }
-                placeholder={t("rakht.colorPlaceholder", {
-                  defaultValue: "e.g. Navy Blue",
-                })}
-              />
-            </div>
-            <div
-              style={{
-                marginTop: 10,
-                display: "grid",
-                gridTemplateColumns: "auto 1fr",
-                gap: 10,
-                alignItems: "center",
-              }}
-            >
-              <input
-                type="color"
-                aria-label={t("rakht.colorHex", {
-                  defaultValue: "Color Picker",
-                })}
-                value={form.colorHex}
-                onChange={(event) => {
-                  const nextHex = normalizeRakhtColorHex(event.target.value);
-                  const preset = findRakhtColorOptionByHex(nextHex);
-                  setForm((prev) => ({
-                    ...prev,
-                    colorHex: nextHex,
-                    color: prev.color || preset?.name || prev.color,
-                  }));
-                }}
-                style={{
-                  width: 48,
-                  height: 40,
-                  border: "1px solid var(--border)",
+            <Select
+              classNamePrefix="rs"
+              options={TON_QTY_OPTIONS}
+              value={
+                form.tonQuantity
+                  ? { value: form.tonQuantity, label: String(form.tonQuantity) }
+                  : null
+              }
+              onChange={handleTonQtyChange}
+              placeholder={t("common.select", { defaultValue: "Select" })}
+              styles={{
+                control: (base, state) => ({
+                  ...base,
+                  minHeight: 40,
                   borderRadius: 10,
-                  background: "transparent",
-                  padding: 4,
-                  cursor: "pointer",
-                }}
-              />
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  flexWrap: "wrap",
-                }}
-              >
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "7px 10px",
-                    borderRadius: 999,
-                    border: "1px solid var(--border)",
-                    background: "var(--surface2)",
-                    fontSize: 12,
-                    fontWeight: 700,
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: "50%",
-                      border: "1px solid rgba(15,23,42,0.12)",
-                      background: form.colorHex,
-                    }}
-                  />
-                  {form.color || selectedPreset?.name || form.colorHex}
-                </span>
-                <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                  {form.colorHex}
-                </span>
-              </div>
-            </div>
-            <div
-              style={{
-                marginTop: 10,
-                display: "flex",
-                gap: 8,
-                flexWrap: "wrap",
+                  borderColor: state.isFocused
+                    ? "var(--primary)"
+                    : "var(--border)",
+                  boxShadow: "none",
+                }),
+                menu: (base) => ({ ...base, zIndex: 20 }),
               }}
-            >
-              {RAKHT_COLOR_OPTIONS.map((option) => {
-                const active = form.colorHex === option.hex;
-                return (
-                  <button
-                    key={option.hex}
-                    type="button"
-                    onClick={() =>
-                      setForm((prev) => ({
-                        ...prev,
-                        color: option.name,
-                        colorHex: option.hex,
-                      }))
-                    }
-                    className="btn btn-outline btn-sm"
-                    style={{
-                      borderColor: active ? option.hex : "var(--border)",
-                      background: active ? `${option.hex}18` : "transparent",
-                      color: "var(--text1)",
-                      gap: 8,
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 12,
-                        height: 12,
-                        borderRadius: "50%",
-                        border: "1px solid rgba(15,23,42,0.14)",
-                        background: option.hex,
-                      }}
-                    />
-                    {option.name}
-                  </button>
-                );
-              })}
-            </div>
+            />
           </div>
 
+          {/* Dynamic Ton Groups */}
+          {form.tons.length > 0 && (
+            <div style={{ display: "grid", gap: 12 }}>
+              <p
+                style={{ fontSize: 13, fontWeight: 600, color: "var(--text2)" }}
+              >
+                {t("rakht.tonDetails", { defaultValue: "Ton Details" })}
+              </p>
+              {form.tons.map((ton, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    border: "1px solid var(--border)",
+                    borderRadius: 10,
+                    padding: "12px 14px",
+                    display: "grid",
+                    gap: 10,
+                    background: "var(--surface2)",
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: "var(--text3)",
+                    }}
+                  >
+                    {t("rakht.ton", { defaultValue: "Ton" })} #{idx + 1}
+                  </p>
+
+                  {/* Name */}
+                  <div>
+                    <label className="lbl">
+                      {t("rakht.tonName", { defaultValue: "Name" })}
+                    </label>
+                    <div className="iw">
+                      <input
+                        className="inp"
+                        value={ton.name}
+                        onChange={(e) => updateTon(idx, "name", e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Color + Total Meters in a row */}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "auto 1fr",
+                      gap: 10,
+                      alignItems: "end",
+                    }}
+                  >
+                    <div>
+                      <label className="lbl">
+                        {t("rakht.tonColor", { defaultValue: "Color" })}
+                      </label>
+                      <input
+                        type="color"
+                        aria-label={t("rakht.tonColor", {
+                          defaultValue: "Color",
+                        })}
+                        value={ton.colorHex}
+                        onChange={(e) =>
+                          updateTon(idx, "colorHex", e.target.value)
+                        }
+                        style={{
+                          display: "block",
+                          width: 48,
+                          height: 40,
+                          border: "1px solid var(--border)",
+                          borderRadius: 10,
+                          padding: 4,
+                          cursor: "pointer",
+                          background: "transparent",
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="lbl">
+                        {t("rakht.tonTotalMeters", {
+                          defaultValue: "Total Meters",
+                        })}
+                      </label>
+                      <div className="iw">
+                        <input
+                          className="inp"
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={ton.totalMeters}
+                          onChange={(e) =>
+                            updateTon(idx, "totalMeters", e.target.value)
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Payment Summary */}
           <div
-            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 12,
+            }}
           >
             <div>
               <label className="lbl">
-                {t("rakht.metersPerTon", { defaultValue: "Meters per Ton" })}
+                {t("rakht.totalPrice", { defaultValue: "Total Price" })}
               </label>
               <div className="iw">
-                <LuRuler size={14} className="ico" />
+                <LuBadgeDollarSign size={14} className="ico" />
                 <input
                   className="inp"
                   type="number"
-                  min="0.01"
-                  step="0.01"
-                  value={form.metersPerTon}
-                  onChange={(event) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      metersPerTon: event.target.value,
-                    }))
+                  min="0"
+                  step="1"
+                  value={form.totalPrice}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, totalPrice: e.target.value }))
                   }
                 />
               </div>
             </div>
             <div>
               <label className="lbl">
-                {t("rakht.totalTons", { defaultValue: "Total Tons" })}
+                {t("rakht.givenMoney", { defaultValue: "Given Money" })}
               </label>
               <div className="iw">
-                <LuScale size={14} className="ico" />
+                <LuBadgeDollarSign size={14} className="ico" />
                 <input
                   className="inp"
                   type="number"
-                  min="0.01"
-                  step="0.01"
-                  value={form.totalTons}
-                  onChange={(event) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      totalTons: event.target.value,
-                    }))
+                  min="0"
+                  step="1"
+                  value={form.givenMoney}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, givenMoney: e.target.value }))
                   }
                 />
               </div>
             </div>
           </div>
 
+          {/* Remaining Money (read-only) */}
           <div>
             <label className="lbl">
-              {t("rakht.price", { defaultValue: "Price" })}
+              {t("rakht.remainingMoney", { defaultValue: "Remaining Money" })}
             </label>
-            <div className="iw">
+            <div
+              className="iw"
+              style={{ background: "var(--surface2)", opacity: 0.8 }}
+            >
               <LuBadgeDollarSign size={14} className="ico" />
               <input
                 className="inp"
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.price}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, price: event.target.value }))
-                }
+                readOnly
+                value={remainingMoney.toLocaleString()}
+                style={{ cursor: "default" }}
               />
             </div>
           </div>
 
+          {/* Date (auto-generated) */}
+          <div>
+            <label className="lbl">
+              {t("rakht.date", { defaultValue: "Date" })}
+            </label>
+            <div
+              className="iw"
+              style={{ background: "var(--surface2)", opacity: 0.8 }}
+            >
+              <LuCalendar size={14} className="ico" />
+              <input
+                className="inp"
+                readOnly
+                value={
+                  editing?.date
+                    ? new Date(editing.date).toLocaleDateString()
+                    : todayDisplay
+                }
+                style={{ cursor: "default" }}
+              />
+            </div>
+          </div>
+
+          {/* Actions */}
           <div style={{ display: "flex", gap: 10 }}>
             <button
               type="button"

@@ -485,11 +485,6 @@ export default function PrintBills() {
                                 >
                                   {itemLabel}
                                 </span>
-                                {order.orderName ? (
-                                  <span className="text-xs font-semibold text-slate-700">
-                                    {order.orderName}
-                                  </span>
-                                ) : null}
                               </div>
                               <button
                                 type="button"

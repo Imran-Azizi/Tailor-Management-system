@@ -20,6 +20,7 @@
     "express-rate-limit": "^7.3.1",
     "jsonwebtoken": "^9.0.3",
     "node-cron": "^3.0.3",
+    "pdfkit": "^0.18.0",
     "tailor-system": "file:..",
     "zod": "^3.23.8"
   },

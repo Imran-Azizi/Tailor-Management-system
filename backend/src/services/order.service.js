@@ -75,6 +75,42 @@ const REQUIRED_MEASUREMENT_FIELDS = {
   ],
 };
 
+const ALLOWED_MEASUREMENT_FIELDS = {
+  OUTFIT: new Set([
+    ...REQUIRED_MEASUREMENT_FIELDS.OUTFIT,
+    "neckStyle",
+    "sleeveStyle",
+    "sleeveSize",
+    "skirtStyle",
+    "frontPocket",
+    "sidePocket",
+    "underPocket",
+    "outfitDesign",
+    "outfitStyle",
+    "buttonStyle",
+    "pantStyle",
+    "additionalStyleInfo",
+  ]),
+  WASKAT: new Set([
+    ...REQUIRED_MEASUREMENT_FIELDS.WASKAT,
+    "neckStyle",
+    "shoulderState",
+    "waskatStyle",
+  ]),
+  KORTY: new Set([...REQUIRED_MEASUREMENT_FIELDS.KORTY, "style"]),
+  YAKHANQAQ: new Set([
+    ...REQUIRED_MEASUREMENT_FIELDS.YAKHANQAQ,
+    "neckStyle",
+    "sleeveStyle",
+    "sleeveSize",
+    "skirtStyle",
+    "frontPocket",
+    "yakhanQaqDesign",
+    "buttonStyle",
+    "pantStyle",
+  ]),
+};
+
 export const enrichOrderAssignment = (order) => {
   if (!order || typeof order !== "object") return order;
 
@@ -934,6 +970,12 @@ const reserveRakhtStock = async (tx, selection) => {
     });
   }
 
+  if (!selection?.rakhtTonId) {
+    throw Object.assign(new Error("Rakht ton selection is required"), {
+      status: 400,
+    });
+  }
+
   if (!Number.isFinite(requiredMeters) || requiredMeters <= 0) {
     throw Object.assign(
       new Error("Required meters must be a positive number"),
@@ -956,9 +998,18 @@ const reserveRakhtStock = async (tx, selection) => {
     });
   }
 
+  const ton = await tx.rakhtTon.findUnique({
+    where: { id: selection.rakhtTonId },
+  });
+  if (!ton || ton.rakhtId !== rakht.id) {
+    throw Object.assign(new Error("Selected Rakht ton not found"), {
+      status: 404,
+    });
+  }
+
   const safeAvailable = Math.max(
     0,
-    Number(rakht.totalMeters || 0) - Number(rakht.usedMeters || 0),
+    Number(ton.totalMeters || 0) - Number(ton.usedMeters || 0),
   );
   if (safeAvailable < requiredMeters) {
     throw Object.assign(
@@ -967,11 +1018,11 @@ const reserveRakhtStock = async (tx, selection) => {
     );
   }
 
-  const updateResult = await tx.rakht.updateMany({
+  const updateResult = await tx.rakhtTon.updateMany({
     where: {
-      id: rakht.id,
+      id: ton.id,
       usedMeters: {
-        lte: Number(rakht.totalMeters || 0) - requiredMeters,
+        lte: Number(ton.totalMeters || 0) - requiredMeters,
       },
     },
     data: {
@@ -988,10 +1039,11 @@ const reserveRakhtStock = async (tx, selection) => {
 
   return {
     rakhtId: rakht.id,
+    rakhtTonId: ton.id,
     rakhtCompanyName: rakht.companyName,
     rakhtBrandName: rakht.brandName,
-    rakhtColor: rakht.color,
-    rakhtColorHex: rakht.colorHex,
+    rakhtColor: ton.name,
+    rakhtColorHex: ton.colorHex,
     rakhtRequiredMeters: requiredMeters,
     rakhtPiecePrice: piecePrice,
   };
@@ -999,7 +1051,7 @@ const reserveRakhtStock = async (tx, selection) => {
 
 export const createOrder = async ({
   customerInfo,
-  rakhtSelection,
+  rakhtSelections,
   orders: orderItems,
 }) => {
   return prisma.$transaction(async (tx) => {
@@ -1050,10 +1102,33 @@ export const createOrder = async ({
 
     const createdOrders = [];
     const alertedTypes = new Set();
-    const rakhtSnapshot = await reserveRakhtStock(tx, rakhtSelection);
+    const rakhtSnapshotByOrderItemKey = new Map();
+    const rakhtSnapshotQueueByType = new Map();
+
+    for (const selection of rakhtSelections || []) {
+      if (!selection?.type) continue;
+      const snapshot = await reserveRakhtStock(tx, selection);
+
+      if (selection?.orderItemKey) {
+        const key = String(selection.orderItemKey);
+        if (rakhtSnapshotByOrderItemKey.has(key)) {
+          throw Object.assign(
+            new Error(`Duplicate Rakht selection for order item ${key}.`),
+            { status: 400 },
+          );
+        }
+        rakhtSnapshotByOrderItemKey.set(key, snapshot);
+        continue;
+      }
+
+      const queue = rakhtSnapshotQueueByType.get(selection.type) || [];
+      queue.push(snapshot);
+      rakhtSnapshotQueueByType.set(selection.type, queue);
+    }
 
     for (const item of orderItems) {
       const {
+        orderItemKey,
         type,
         orderName,
         totalPrice,
@@ -1064,9 +1139,32 @@ export const createOrder = async ({
         quantity = 1,
         measurements,
       } = item;
-      const normalizedMeasurements = sanitizeMeasurements(measurements);
+      const normalizedMeasurements = sanitizeMeasurements(measurements, type);
 
       validateMeasurements(type, normalizedMeasurements, orderName);
+
+      const itemKey =
+        orderItemKey !== undefined && orderItemKey !== null
+          ? String(orderItemKey)
+          : "";
+      const rakhtSnapshotFromItem = itemKey
+        ? rakhtSnapshotByOrderItemKey.get(itemKey)
+        : null;
+
+      const typeQueue = rakhtSnapshotQueueByType.get(type) || [];
+      const rakhtSnapshot = rakhtSnapshotFromItem || typeQueue.shift() || null;
+      if (typeQueue.length >= 0) {
+        rakhtSnapshotQueueByType.set(type, typeQueue);
+      }
+
+      if (!rakhtSnapshot) {
+        throw Object.assign(
+          new Error(
+            `Rakht selection is required for order ${itemKey || type}.`,
+          ),
+          { status: 400 },
+        );
+      }
 
       const remaining = totalPrice - discount - paidAmount;
       const autoBox = await resolveAutoBoxForNewOrder(tx, type);
@@ -1138,11 +1236,13 @@ export const createOrder = async ({
   });
 };
 
-const sanitizeMeasurements = (m) => {
+const sanitizeMeasurements = (m, type) => {
   if (!m || typeof m !== "object") return {};
+  const allowedFields = type ? ALLOWED_MEASUREMENT_FIELDS[type] : null;
   const result = {};
   for (const [k, raw] of Object.entries(m)) {
     if (k === "__name") continue;
+    if (allowedFields && !allowedFields.has(k)) continue;
     if (raw === undefined || raw === null) continue;
 
     // Normalize strings first so whitespace-only values become empty and are skipped
@@ -1237,7 +1337,7 @@ const computeRemaining = ({ totalPrice, discount, paidAmount }) =>
   Number(totalPrice || 0) - Number(discount || 0) - Number(paidAmount || 0);
 
 const upsertMeasurementsForType = async (tx, type, orderId, measurements) => {
-  const normalized = sanitizeMeasurements(measurements);
+  const normalized = sanitizeMeasurements(measurements, type);
   validateMeasurements(type, normalized);
 
   if (type === "OUTFIT") {
@@ -1360,7 +1460,7 @@ export const updateOrderBill = async (
 
         validateMeasurements(
           type,
-          sanitizeMeasurements(measurements),
+          sanitizeMeasurements(measurements, type),
           orderName,
         );
 
@@ -1397,7 +1497,7 @@ export const updateOrderBill = async (
       }
 
       // New item -> create new order under same customer
-      const normalizedMeasurements = sanitizeMeasurements(measurements);
+      const normalizedMeasurements = sanitizeMeasurements(measurements, type);
       validateMeasurements(type, normalizedMeasurements, orderName);
 
       const remaining = totalPrice - discount - paidAmount;

@@ -1,10 +1,11 @@
 import { useNavigate } from "react-router-dom";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
+import Select from "react-select";
 import {
   LuClipboardList,
   LuUsers,
@@ -14,12 +15,16 @@ import {
   LuSend,
 } from "react-icons/lu";
 import api from "../lib/api.js";
+import { buildSelectStyles } from "../lib/dailyTasks.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { Field, PageHeader } from "../components/ui/index.jsx";
 
 // ─── Zod schema ───────────────────────────────────────────────────────────────
 const schema = z.object({
-  fromName: z.string().min(1, "Sender name is required"),
+  fromName: z
+    .object({ value: z.string(), label: z.string() })
+    .nullable()
+    .refine((value) => value !== null, { message: "Sender is required" }),
   recipientName: z.string().min(1, "Recipient name is required"),
   amount: z
     .string()
@@ -78,6 +83,7 @@ function DailyTaskForm({ onSuccess }) {
   const qc = useQueryClient();
 
   const {
+    control,
     register,
     handleSubmit,
     reset,
@@ -87,13 +93,29 @@ function DailyTaskForm({ onSuccess }) {
     defaultValues: { taskDate: nowLocalInput() },
   });
 
+  const { data: dokanUsers = [], isLoading: loadingDokanUsers } = useQuery({
+    queryKey: ["daily-task-senders"],
+    queryFn: () => api.get("/users/dokan").then((r) => r.data),
+  });
+
+  const senderOptions = dokanUsers.map((user) => ({
+    value: user.name,
+    label: user.name,
+  }));
+
   const mutation = useMutation({
     mutationFn: (payload) =>
       api.post("/daily-tasks", payload).then((r) => r.data),
     onSuccess: () => {
       toast.success(t("dailyTasks.created"));
       qc.invalidateQueries({ queryKey: ["daily-tasks"] });
-      reset({ taskDate: nowLocalInput() });
+      reset({
+        fromName: null,
+        recipientName: "",
+        amount: "",
+        taskDate: nowLocalInput(),
+        note: "",
+      });
       onSuccess?.();
     },
     onError: (err) =>
@@ -102,7 +124,7 @@ function DailyTaskForm({ onSuccess }) {
 
   const onSubmit = (data) =>
     mutation.mutate({
-      fromName: data.fromName.trim(),
+      fromName: data.fromName.value,
       recipientName: data.recipientName.trim(),
       amount: Number(data.amount),
       taskDate: new Date(data.taskDate).toISOString(),
@@ -111,12 +133,6 @@ function DailyTaskForm({ onSuccess }) {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate>
-      {/* ── Parties section ── */}
-      <SectionHeader
-        icon={LuUsers}
-        label={t("dailyTasks.partiesSection", "Parties")}
-        accent="#2563EB"
-      />
       <div
         style={{
           display: "grid",
@@ -130,10 +146,26 @@ function DailyTaskForm({ onSuccess }) {
           error={errors.fromName?.message}
           required
         >
-          <input
-            className={`inp${errors.fromName ? " inp-err" : ""}`}
-            placeholder={t("dailyTasks.fromNamePlaceholder")}
-            {...register("fromName")}
+          <Controller
+            name="fromName"
+            control={control}
+            render={({ field }) => (
+              <Select
+                {...field}
+                options={senderOptions}
+                isSearchable
+                isClearable
+                isLoading={loadingDokanUsers}
+                placeholder={t(
+                  "dailyTasks.senderPlaceholder",
+                  "Select a Dokan sender",
+                )}
+                noOptionsMessage={() =>
+                  t("dailyTasks.noSenders", "No Dokan users found")
+                }
+                styles={buildSelectStyles(Boolean(errors.fromName))}
+              />
+            )}
           />
         </Field>
         <Field
@@ -149,12 +181,6 @@ function DailyTaskForm({ onSuccess }) {
         </Field>
       </div>
 
-      {/* ── Transaction details section ── */}
-      <SectionHeader
-        icon={LuBadgeDollarSign}
-        label={t("dailyTasks.transactionSection", "Transaction Details")}
-        accent="#16A34A"
-      />
       <div
         style={{
           display: "grid",

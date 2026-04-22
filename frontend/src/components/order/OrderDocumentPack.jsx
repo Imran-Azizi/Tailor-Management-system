@@ -524,29 +524,6 @@ export function CustomerCombinedBill({ customer, orders = [] }) {
   const billNo = toEnglishDigits(customer?.billNumber);
   const customerName = customer?.firstName || "-";
   const customerPhone = toEnglishDigits(customer?.phoneNumber);
-  const uniqueRakhtCombos = Array.from(
-    new Map(
-      safeOrders
-        .filter((order) => order?.rakhtBrandName || order?.rakhtColor)
-        .map((order) => [
-          `${order?.rakhtBrandName || "-"}:${order?.rakhtColor || "-"}:${order?.rakhtColorHex || "-"}`,
-          {
-            brand: order?.rakhtBrandName || "-",
-            color: order?.rakhtColor || "-",
-            colorHex: order?.rakhtColorHex || null,
-            meters:
-              order?.rakhtRequiredMeters != null
-                ? Number(order.rakhtRequiredMeters)
-                : null,
-          },
-        ]),
-    ).values(),
-  );
-  const totalRakhtMeters = safeOrders.reduce(
-    (sum, order) => sum + Number(order?.rakhtRequiredMeters || 0),
-    0,
-  );
-
   const typeIndex = {};
   const typeCountTotals = safeOrders.reduce((acc, order) => {
     const typeKey = order?.type || "ITEM";
@@ -571,6 +548,13 @@ export function CustomerCombinedBill({ customer, orders = [] }) {
       qty: Number(order?.quantity || 1),
       amount: totalPrice,
       boxName: order?.box?.boxName || extraTxt.notAssigned,
+      rakhtColor: order?.rakhtColor || "-",
+      rakhtColorHex: order?.rakhtColorHex || null,
+      rakhtBrandName: order?.rakhtBrandName || "-",
+      rakhtMeters:
+        order?.rakhtRequiredMeters != null
+          ? Number(order.rakhtRequiredMeters)
+          : null,
     };
   });
 
@@ -595,7 +579,7 @@ export function CustomerCombinedBill({ customer, orders = [] }) {
     <div
       lang={settings.htmlLang}
       dir={settings.dir}
-      className="overflow-hidden rounded-[6px] border-2 border-slate-800 bg-white"
+      className="print-a6-sheet overflow-hidden rounded-[6px] border-2 border-slate-800 bg-white"
       style={{ fontFamily: settings.fontFamily }}
     >
       <PrintBillHeader
@@ -613,62 +597,11 @@ export function CustomerCombinedBill({ customer, orders = [] }) {
         </div>
       ) : null}
 
-      {uniqueRakhtCombos.length ? (
-        <div className="border-b border-slate-800 bg-amber-50 px-2 py-2 text-slate-800">
-          <div
-            className={`mb-1 text-[9px] font-extrabold uppercase tracking-[0.08em] text-amber-800 ${alignClass}`}
-          >
-            {t("createOrder.rakhtSelection", {
-              defaultValue: "Rakht Selection",
-            })}
-          </div>
-          <div
-            className={`flex flex-wrap gap-1.5 ${settings.isRtl ? "justify-end" : "justify-start"}`}
-          >
-            {uniqueRakhtCombos.map((item) => (
-              <span
-                key={`${item.brand}-${item.color}`}
-                className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-white px-2 py-1 text-[9px] font-semibold text-amber-900"
-              >
-                <span>{item.brand}</span>
-                <span className="text-slate-400">•</span>
-                <span className="inline-flex items-center gap-1">
-                  {item.colorHex ? (
-                    <span
-                      style={{
-                        width: 9,
-                        height: 9,
-                        borderRadius: "50%",
-                        border: "1px solid rgba(15,23,42,0.16)",
-                        background: item.colorHex,
-                        flexShrink: 0,
-                      }}
-                    />
-                  ) : null}
-                  <span>{item.color}</span>
-                </span>
-                {item.meters != null ? (
-                  <>
-                    <span className="text-slate-400">•</span>
-                    <span className="[direction:ltr] [unicode-bidi:embed]">
-                      {formatNumber(item.meters)}m
-                    </span>
-                  </>
-                ) : null}
-              </span>
-            ))}
-            <span className="inline-flex items-center rounded-full border border-emerald-300 bg-emerald-100 px-2 py-1 text-[9px] font-black text-emerald-800 [direction:ltr] [unicode-bidi:embed]">
-              {formatNumber(totalRakhtMeters)}m
-            </span>
-          </div>
-        </div>
-      ) : null}
-
       <table className="w-full border-collapse table-fixed text-[9px] text-slate-800">
         <thead className="bg-slate-100">
           <tr>
             <th
-              className={`w-[18%] border-b border-r border-slate-800 px-1.5 py-1 ${tableHeadClass} ${alignClass}`}
+              className={`w-[15%] border-b border-r border-slate-800 px-1.5 py-1 ${tableHeadClass} ${alignClass}`}
             >
               {txt.billNo}
             </th>
@@ -698,6 +631,11 @@ export function CustomerCombinedBill({ customer, orders = [] }) {
               {extraTxt.box}
             </th>
             <th
+              className={`w-[18%] border-b border-r border-slate-800 px-1.5 py-1 ${tableHeadClass} ${alignClass}`}
+            >
+              {t("createOrder.rakhtSelection", { defaultValue: "Rakht" })}
+            </th>
+            <th
               className={`w-[15%] border-b border-slate-800 px-1.5 py-1 ${tableHeadClass} [direction:ltr]`}
             >
               {extraTxt.itemPrice}
@@ -708,7 +646,7 @@ export function CustomerCombinedBill({ customer, orders = [] }) {
           {rowItems.length === 0 ? (
             <tr>
               <td
-                colSpan={7}
+                colSpan={8}
                 className={`border-b border-slate-800 px-2 py-2 text-[10px] ${alignClass}`}
               >
                 {t("common.noData")}
@@ -754,6 +692,34 @@ export function CustomerCombinedBill({ customer, orders = [] }) {
                   className={`border-b border-r border-slate-800 px-1.5 py-1 align-top ${alignClass}`}
                 >
                   {row.boxName}
+                </td>
+                <td
+                  className={`border-b border-r border-slate-800 px-1.5 py-1 align-top ${alignClass}`}
+                >
+                  <p className="inline-flex items-center gap-1 font-semibold text-slate-900">
+                    {row.rakhtColorHex ? (
+                      <span
+                        style={{
+                          width: 9,
+                          height: 9,
+                          borderRadius: "50%",
+                          border: "1px solid rgba(15,23,42,0.16)",
+                          background: resolveRakhtColorHex(
+                            row.rakhtColor,
+                            row.rakhtColorHex,
+                          ),
+                          flexShrink: 0,
+                        }}
+                      />
+                    ) : null}
+                    <span>{row.rakhtColor}</span>
+                  </p>
+                  <p className="mt-0.5 text-[8px] text-slate-600 [direction:ltr] [unicode-bidi:embed]">
+                    {row.rakhtBrandName} -{" "}
+                    {row.rakhtMeters != null
+                      ? `${formatNumber(row.rakhtMeters)}m`
+                      : "-"}
+                  </p>
                 </td>
                 <td className="border-b border-slate-800 px-1.5 py-1 text-center align-top font-black text-slate-900 [direction:ltr] [unicode-bidi:embed]">
                   {formatMoney(row.amount, settings.langCode)}
@@ -958,7 +924,7 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
     <div
       lang={settings.htmlLang}
       dir={settings.dir}
-      className="overflow-hidden rounded-[4px] border-2 border-slate-800 bg-white"
+      className="print-a6-sheet overflow-hidden rounded-[4px] border-2 border-slate-800 bg-white"
       style={{ fontFamily: settings.fontFamily }}
     >
       <PrintBillHeader
@@ -1099,20 +1065,21 @@ export function printElement(id, options = {}) {
         ${styleNodes}
         <style>
           *{box-sizing:border-box}
-          @page{size:A5 portrait;margin:0}
+          @page{size:A6 portrait;margin:0}
           body{
             margin:0;
             font-family:${bodyFont};
             line-height:1.45;
             background:#fff;
-            padding:8mm;
+            padding:4mm;
             color:#0f172a;
             direction:${dir};
             text-align:${isRtl ? "right" : "left"};
             -webkit-print-color-adjust:exact;
             print-color-adjust:exact;
           }
-          @media print{body{padding:8mm}}
+          .print-a6-sheet{max-width:100%;margin:0 auto}
+          @media print{body{padding:4mm}}
         </style>
       </head>
       <body dir="${dir}">
@@ -1152,7 +1119,7 @@ export async function exportPdf(id, filename) {
     const pdf = new jsPDF({
       orientation: "portrait",
       unit: "mm",
-      format: "a5",
+      format: "a6",
     });
     const width = pdf.internal.pageSize.getWidth();
     const height = (canvas.height * width) / canvas.width;

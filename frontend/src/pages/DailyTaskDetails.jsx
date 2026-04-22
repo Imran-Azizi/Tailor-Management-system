@@ -15,7 +15,9 @@ import {
   LuShield,
   LuClock,
 } from "react-icons/lu";
+import { useAuth } from "../context/AuthContext.jsx";
 import api from "../lib/api.js";
+import { isDailyTaskEditable } from "../lib/dailyTasks.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import {
   ConfirmDeleteModal,
@@ -200,8 +202,13 @@ export default function DailyTaskDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { isAdmin } = useAuth();
   const qc = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const expiredActionMessage = t(
+    "dailyTasks.editExpired",
+    "Editing time expired",
+  );
 
   const {
     data: task,
@@ -258,6 +265,8 @@ export default function DailyTaskDetails() {
       </div>
     );
 
+  const canDeleteTask = isAdmin && isDailyTaskEditable(task);
+
   return (
     <div className="page" style={{ paddingBottom: 40 }}>
       {/* ── Header ── */}
@@ -274,17 +283,47 @@ export default function DailyTaskDetails() {
               <LuArrowLeft size={14} />
               {t("common.back")}
             </button>
-            <button
-              className="btn btn-danger"
-              style={{ gap: 6 }}
-              onClick={() => setConfirmDelete(true)}
-            >
-              <LuTrash2 size={14} />
-              {t("common.delete")}
-            </button>
+            {isAdmin && (
+              <div title={canDeleteTask ? undefined : expiredActionMessage}>
+                <button
+                  className="btn btn-danger"
+                  style={{ gap: 6 }}
+                  disabled={!canDeleteTask}
+                  onClick={() => {
+                    if (!canDeleteTask) return;
+                    setConfirmDelete(true);
+                  }}
+                >
+                  <LuTrash2 size={14} />
+                  {t("common.delete")}
+                </button>
+              </div>
+            )}
           </div>
         }
       />
+
+      {isAdmin && !canDeleteTask && (
+        <div
+          title={expiredActionMessage}
+          style={{
+            marginBottom: 16,
+            padding: "12px 14px",
+            borderRadius: "var(--r)",
+            border: "1px solid #FCD34D",
+            background: "#FFFBEB",
+            color: "#92400E",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          <LuClock size={14} />
+          {expiredActionMessage}
+        </div>
+      )}
 
       {/* ── Hero banner ── */}
       <div

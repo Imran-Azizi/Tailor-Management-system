@@ -3,13 +3,16 @@ import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
+import Select from "react-select";
 import {
   LuBadgeCheck,
   LuBadgeDollarSign,
   LuCalendarDays,
+  LuChevronDown,
   LuClipboardList,
   LuEllipsisVertical,
   LuEye,
+  LuFileText,
   LuHash,
   LuInbox,
   LuPencil,
@@ -24,7 +27,13 @@ import {
   LuChevronRight,
   LuTrash2,
 } from "react-icons/lu";
+import { useAuth } from "../context/AuthContext.jsx";
 import api from "../lib/api.js";
+import {
+  buildSelectStyles,
+  downloadDailyTaskReportPdf,
+  isDailyTaskEditable,
+} from "../lib/dailyTasks.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import {
   ConfirmDeleteModal,
@@ -42,16 +51,11 @@ function formatMoney(v) {
   })}`;
 }
 
-function formatDate(iso) {
-  return new Date(iso).toLocaleDateString(undefined, {
+function formatDateTime(iso) {
+  return new Date(iso).toLocaleString(undefined, {
     year: "numeric",
     month: "short",
     day: "numeric",
-  });
-}
-
-function formatTime(iso) {
-  return new Date(iso).toLocaleTimeString(undefined, {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -176,7 +180,18 @@ function StatBanner({ label, value, Icon, accent, sub }) {
   );
 }
 
-function ActionMenu({ open, setOpen, onView, onEdit, onDelete, t, compact }) {
+function ActionMenu({
+  open,
+  setOpen,
+  onView,
+  onEdit,
+  onDelete,
+  t,
+  compact,
+  canManage,
+  isEditable,
+  disabledReason,
+}) {
   const menuRef = useRef(null);
   const triggerRef = useRef(null);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
@@ -271,30 +286,62 @@ function ActionMenu({ open, setOpen, onView, onEdit, onDelete, t, compact }) {
             <LuEye size={13} />
             {t("common.view")}
           </button>
-          <button
-            type="button"
-            className="dt-action-item"
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpen(false);
-              onEdit();
-            }}
-          >
-            <LuPencil size={13} />
-            {t("dailyTasks.update", "Update")}
-          </button>
-          <button
-            type="button"
-            className="dt-action-item dt-action-item-danger"
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpen(false);
-              onDelete();
-            }}
-          >
-            <LuTrash2 size={13} />
-            {t("common.delete")}
-          </button>
+          {canManage && (
+            <>
+              <button
+                type="button"
+                className="dt-action-item"
+                aria-disabled={!isEditable}
+                title={isEditable ? undefined : disabledReason}
+                style={
+                  isEditable
+                    ? undefined
+                    : { opacity: 0.55, cursor: "not-allowed" }
+                }
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!isEditable) return;
+                  setOpen(false);
+                  onEdit();
+                }}
+              >
+                <LuPencil size={13} />
+                {t("dailyTasks.update", "Update")}
+              </button>
+              <button
+                type="button"
+                className="dt-action-item dt-action-item-danger"
+                aria-disabled={!isEditable}
+                title={isEditable ? undefined : disabledReason}
+                style={
+                  isEditable
+                    ? undefined
+                    : { opacity: 0.55, cursor: "not-allowed" }
+                }
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!isEditable) return;
+                  setOpen(false);
+                  onDelete();
+                }}
+              >
+                <LuTrash2 size={13} />
+                {t("common.delete")}
+              </button>
+              {!isEditable && (
+                <div
+                  style={{
+                    padding: "8px 12px 10px",
+                    borderTop: "1px solid var(--border)",
+                    fontSize: 11.5,
+                    color: "var(--text3)",
+                  }}
+                >
+                  {disabledReason}
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>
@@ -377,8 +424,11 @@ function TaskRow({
   isRtlNote,
   openMenu,
   setOpenMenu,
+  canManage,
+  disabledReason,
 }) {
   const { t } = useTranslation();
+  const isEditable = isDailyTaskEditable(task);
 
   return (
     <tr
@@ -426,14 +476,9 @@ function TaskRow({
         </span>
       </td>
       <td style={{ textAlign: "center" }}>
-        <div>
-          <p style={{ fontSize: 13, color: "var(--text1)", fontWeight: 600 }}>
-            {formatDate(task.taskDate)}
-          </p>
-          <p style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 1 }}>
-            {formatTime(task.taskDate)}
-          </p>
-        </div>
+        <p style={{ fontSize: 13, color: "var(--text1)", fontWeight: 600 }}>
+          {formatDateTime(task.taskDate)}
+        </p>
       </td>
       <td
         style={{
@@ -463,6 +508,9 @@ function TaskRow({
           onView={() => onClick(task.id)}
           onEdit={() => onEdit(task)}
           onDelete={() => onDelete(task)}
+          canManage={canManage}
+          isEditable={isEditable}
+          disabledReason={disabledReason}
           t={t}
         />
       </td>
@@ -470,8 +518,18 @@ function TaskRow({
   );
 }
 
-function TaskCard({ task, onClick, onEdit, onDelete, openMenu, setOpenMenu }) {
+function TaskCard({
+  task,
+  onClick,
+  onEdit,
+  onDelete,
+  openMenu,
+  setOpenMenu,
+  canManage,
+  disabledReason,
+}) {
   const { t } = useTranslation();
+  const isEditable = isDailyTaskEditable(task);
 
   return (
     <div
@@ -567,7 +625,7 @@ function TaskCard({ task, onClick, onEdit, onDelete, openMenu, setOpenMenu }) {
           }}
         >
           <LuCalendarDays size={12} />
-          {formatDate(task.taskDate)} · {formatTime(task.taskDate)}
+          {formatDateTime(task.taskDate)}
         </span>
         <LuChevronRight
           size={14}
@@ -613,15 +671,20 @@ function TaskCard({ task, onClick, onEdit, onDelete, openMenu, setOpenMenu }) {
           <LuEye size={12} />
           {t("common.view")}
         </button>
-        <ActionMenu
-          compact
-          open={openMenu === task.id}
-          setOpen={(value) => setOpenMenu(value ? task.id : null)}
-          onView={() => onClick(task.id)}
-          onEdit={() => onEdit(task)}
-          onDelete={() => onDelete(task)}
-          t={t}
-        />
+        {canManage && (
+          <ActionMenu
+            compact
+            open={openMenu === task.id}
+            setOpen={(value) => setOpenMenu(value ? task.id : null)}
+            onView={() => onClick(task.id)}
+            onEdit={() => onEdit(task)}
+            onDelete={() => onDelete(task)}
+            canManage={canManage}
+            isEditable={isEditable}
+            disabledReason={disabledReason}
+            t={t}
+          />
+        )}
       </div>
     </div>
   );
@@ -629,14 +692,18 @@ function TaskCard({ task, onClick, onEdit, onDelete, openMenu, setOpenMenu }) {
 
 export default function AllDailyTasks() {
   const { t, i18n } = useTranslation();
+  const { isAdmin } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [openMenu, setOpenMenu] = useState(null);
+  const [reportMenuOpen, setReportMenuOpen] = useState(false);
   const [editTask, setEditTask] = useState(null);
   const [deleteTask, setDeleteTask] = useState(null);
+  const [reportDate, setReportDate] = useState("");
+  const reportMenuRef = useRef(null);
   const [editForm, setEditForm] = useState({
     fromName: "",
     recipientName: "",
@@ -644,6 +711,10 @@ export default function AllDailyTasks() {
     taskDate: "",
     note: "",
   });
+  const expiredActionMessage = t(
+    "dailyTasks.editExpired",
+    "Editing time expired",
+  );
 
   const toLocalInput = (iso) => {
     const d = new Date(iso);
@@ -652,6 +723,12 @@ export default function AllDailyTasks() {
   };
 
   const openEdit = (task) => {
+    if (!isAdmin) return;
+    if (!isDailyTaskEditable(task)) {
+      toast.error(expiredActionMessage);
+      return;
+    }
+
     setEditTask(task);
     setEditForm({
       fromName: task.fromName || "",
@@ -661,6 +738,30 @@ export default function AllDailyTasks() {
       note: task.note || "",
     });
   };
+
+  const requestDelete = (task) => {
+    if (!isAdmin) return;
+    if (!isDailyTaskEditable(task)) {
+      toast.error(expiredActionMessage);
+      return;
+    }
+
+    setDeleteTask(task);
+  };
+
+  const { data: dokanUsers = [], isLoading: loadingDokanUsers } = useQuery({
+    queryKey: ["daily-task-senders"],
+    queryFn: () => api.get("/users/dokan").then((r) => r.data),
+  });
+
+  const senderOptions = useMemo(
+    () =>
+      dokanUsers.map((user) => ({
+        value: user.name,
+        label: user.name,
+      })),
+    [dokanUsers],
+  );
 
   const updateMutation = useMutation({
     mutationFn: ({ id, payload }) =>
@@ -721,6 +822,33 @@ export default function AllDailyTasks() {
     [tasks],
   );
   const isRtlNote = isRtlTextLanguage(i18n.language);
+  const summaryTotalTasks = total;
+  const summaryTotalAmount = totalAmount;
+  const reportTypeOptions = [
+    { value: "daily", label: t("dailyTasks.reportDailyFull", "Daily Report") },
+    { value: "weekly", label: t("dailyTasks.reportWeeklyFull", "Weekly Report") },
+    { value: "monthly", label: t("dailyTasks.reportMonthlyFull", "Monthly Report") },
+    { value: "yearly", label: t("dailyTasks.reportYearlyFull", "Yearly Report") },
+  ];
+
+  const reportMutation = useMutation({
+    mutationFn: ({ reportType }) =>
+      downloadDailyTaskReportPdf({ reportType, date: reportDate }),
+    onSuccess: (_, vars) => {
+      toast.success(
+        t("dailyTasks.reportGenerated", "Report PDF generated successfully."),
+      );
+      setReportMenuOpen(false);
+    },
+    onError: (err) => {
+      toast.error(
+        getApiErrorMessage(
+          err,
+          t("dailyTasks.reportFailed", "Failed to generate report PDF."),
+        ),
+      );
+    },
+  });
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -734,12 +862,32 @@ export default function AllDailyTasks() {
     setPage(1);
   };
 
+  const handleReportDownload = (reportType) => {
+    reportMutation.mutate({ reportType });
+  };
+
   useEffect(() => {
-    if (!openMenu) return;
-    const close = () => setOpenMenu(null);
+    if (!openMenu && !reportMenuOpen) return;
+    const close = () => {
+      setOpenMenu(null);
+      setReportMenuOpen(false);
+    };
     window.addEventListener("scroll", close, true);
     return () => window.removeEventListener("scroll", close, true);
-  }, [openMenu]);
+  }, [openMenu, reportMenuOpen]);
+
+  useEffect(() => {
+    if (!reportMenuOpen) return;
+
+    const handleClickOutside = (event) => {
+      if (!reportMenuRef.current?.contains(event.target)) {
+        setReportMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [reportMenuOpen]);
 
   return (
     <div className="page" style={{ paddingBottom: 40 }}>
@@ -747,15 +895,67 @@ export default function AllDailyTasks() {
         title={t("dailyTasks.allTitle")}
         subtitle={t("dailyTasks.allSubtitle")}
         action={
-          <button
-            type="button"
-            className="btn btn-outline btn-sm dt-toolbar-btn"
-            style={{ gap: 6, minWidth: 132, height: 38 }}
-            onClick={() => navigate("/daily-tasks")}
-          >
-            <LuPlus size={14} />
-            {t("dailyTasks.title")}
-          </button>
+          <div ref={reportMenuRef} style={{ position: "relative" }}>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm dt-toolbar-btn"
+              style={{ gap: 6, minWidth: 136, height: 38 }}
+              onClick={() => setReportMenuOpen((prev) => !prev)}
+              disabled={!isAdmin || reportMutation.isPending}
+            >
+              <LuFileText size={14} />
+              {t("dailyTasks.report", "Report")}
+              <LuChevronDown size={14} />
+            </button>
+
+            {reportMenuOpen && isAdmin && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 6px)",
+                  right: 0,
+                  minWidth: 248,
+                  borderRadius: "var(--r)",
+                  border: "1px solid var(--border)",
+                  background: "var(--surface)",
+                  boxShadow: "var(--sh-lg)",
+                  zIndex: 30,
+                  padding: 10,
+                  display: "grid",
+                  gap: 8,
+                }}
+              >
+                <Field
+                  label={t(
+                    "dailyTasks.selectedDate",
+                    "Selected Date (optional)",
+                  )}
+                >
+                  <input
+                    type="date"
+                    className="inp"
+                    value={reportDate}
+                    onChange={(e) => setReportDate(e.target.value)}
+                    style={{ height: 36 }}
+                  />
+                </Field>
+
+                {reportTypeOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    style={{ justifyContent: "flex-start", gap: 6, height: 36 }}
+                    disabled={reportMutation.isPending}
+                    onClick={() => handleReportDownload(option.value)}
+                  >
+                    <LuFileText size={13} />
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         }
       />
 
@@ -770,7 +970,7 @@ export default function AllDailyTasks() {
       >
         <StatBanner
           label={t("dailyTasks.totalTasks")}
-          value={total}
+          value={summaryTotalTasks}
           Icon={LuClipboardList}
           accent="#2563EB"
           sub={
@@ -781,7 +981,7 @@ export default function AllDailyTasks() {
         />
         <StatBanner
           label={t("dailyTasks.totalAmount")}
-          value={formatMoney(totalAmount)}
+          value={formatMoney(summaryTotalAmount)}
           Icon={LuBadgeDollarSign}
           accent="#16A34A"
           sub={`${tasks.length} ${t("dailyTasks.taskCount", "tasks on page")}`}
@@ -855,6 +1055,16 @@ export default function AllDailyTasks() {
               </button>
             )}
           </form>
+
+          <button
+            type="button"
+            className="btn btn-outline btn-sm dt-toolbar-btn"
+            style={{ gap: 6, minWidth: 132, height: 38 }}
+            onClick={() => navigate("/daily-tasks")}
+          >
+            <LuPlus size={14} />
+            {t("dailyTasks.newTask", "New Expense")}
+          </button>
 
           <button
             type="button"
@@ -957,8 +1167,10 @@ export default function AllDailyTasks() {
                       isRtlNote={isRtlNote}
                       openMenu={openMenu}
                       setOpenMenu={setOpenMenu}
+                      canManage={isAdmin}
+                      disabledReason={expiredActionMessage}
                       onEdit={openEdit}
-                      onDelete={setDeleteTask}
+                      onDelete={requestDelete}
                       onClick={(id) => navigate(`/daily-tasks/${id}`)}
                     />
                   ))}
@@ -981,8 +1193,10 @@ export default function AllDailyTasks() {
                   task={task}
                   openMenu={openMenu}
                   setOpenMenu={setOpenMenu}
+                  canManage={isAdmin}
+                  disabledReason={expiredActionMessage}
                   onEdit={openEdit}
-                  onDelete={setDeleteTask}
+                  onDelete={requestDelete}
                   onClick={(id) => navigate(`/daily-tasks/${id}`)}
                 />
               ))}
@@ -1014,11 +1228,26 @@ export default function AllDailyTasks() {
             }}
           >
             <Field label={t("dailyTasks.fromName")} required>
-              <input
-                className="inp"
-                value={editForm.fromName}
-                onChange={(e) =>
-                  setEditForm((s) => ({ ...s, fromName: e.target.value }))
+              <Select
+                value={
+                  senderOptions.find(
+                    (option) => option.value === editForm.fromName,
+                  ) || null
+                }
+                options={senderOptions}
+                isSearchable
+                isClearable
+                isLoading={loadingDokanUsers}
+                placeholder={t(
+                  "dailyTasks.senderPlaceholder",
+                  "Select a Dokan sender",
+                )}
+                noOptionsMessage={() =>
+                  t("dailyTasks.noSenders", "No Dokan users found")
+                }
+                styles={buildSelectStyles(false)}
+                onChange={(option) =>
+                  setEditForm((s) => ({ ...s, fromName: option?.value || "" }))
                 }
               />
             </Field>
@@ -1089,7 +1318,7 @@ export default function AllDailyTasks() {
               type="submit"
               className="btn btn-primary"
               style={{ gap: 6, minWidth: 132 }}
-              disabled={updateMutation.isPending}
+              disabled={updateMutation.isPending || !editForm.fromName}
             >
               <LuSave size={13} />
               {updateMutation.isPending

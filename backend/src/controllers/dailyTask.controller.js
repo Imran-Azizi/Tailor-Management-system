@@ -3,6 +3,22 @@ import {
   updateDailyTaskSchema,
 } from "../validators/dailyTask.validator.js";
 import * as service from "../services/dailyTask.service.js";
+import { buildDailyTaskReportPdf } from "../lib/dailyTaskReportPdf.js";
+
+const DAILY_TASK_EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+function ensureTaskIsEditable(task) {
+  const createdAt = new Date(task.createdAt).getTime();
+
+  if (
+    Number.isNaN(createdAt) ||
+    Date.now() - createdAt > DAILY_TASK_EDIT_WINDOW_MS
+  ) {
+    const error = new Error("Editing time expired.");
+    error.status = 403;
+    throw error;
+  }
+}
 
 /** GET /api/daily-tasks */
 export const listDailyTasks = async (req, res, next) => {
@@ -14,6 +30,41 @@ export const listDailyTasks = async (req, res, next) => {
       search,
     });
     res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/** GET /api/daily-tasks/report */
+export const dailyTaskReport = async (req, res, next) => {
+  try {
+    const { reportType = "monthly", date, from, to } = req.query;
+    const result = await service.getDailyTaskReport({
+      reportType,
+      date,
+      from,
+      to,
+    });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/** GET /api/daily-tasks/report/pdf */
+export const dailyTaskReportPdf = async (req, res, next) => {
+  try {
+    const { reportType = "daily", date, from, to } = req.query;
+    const report = await service.getDailyTaskReport({ reportType, date, from, to });
+    const pdfBuffer = await buildDailyTaskReportPdf(report);
+
+    const safeType = String(report.filters.reportType || "daily").toLowerCase();
+    const filename = `daily-task-${safeType}-report.pdf`;
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+    res.send(pdfBuffer);
   } catch (err) {
     next(err);
   }
@@ -51,6 +102,8 @@ export const updateDailyTask = async (req, res, next) => {
     if (!existing)
       return res.status(404).json({ error: "Daily task not found." });
 
+    ensureTaskIsEditable(existing);
+
     const body = updateDailyTaskSchema.parse({
       ...req.body,
       amount: Number(req.body.amount),
@@ -69,6 +122,9 @@ export const deleteDailyTask = async (req, res, next) => {
     const existing = await service.getDailyTaskById(req.params.id);
     if (!existing)
       return res.status(404).json({ error: "Daily task not found." });
+
+    ensureTaskIsEditable(existing);
+
     await service.deleteDailyTask(req.params.id);
     res.json({ success: true });
   } catch (err) {

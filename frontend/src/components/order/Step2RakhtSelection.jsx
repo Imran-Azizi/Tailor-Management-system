@@ -1,146 +1,194 @@
-import { useMemo } from "react";
-import { Controller, useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import Select from "react-select";
-import { LuFactory, LuPalette, LuRuler, LuWallet } from "react-icons/lu";
+import { LuRuler } from "react-icons/lu";
 import api from "../../lib/api.js";
-import { resolveRakhtColorHex } from "../../lib/rakhtColors.js";
 import { Field } from "../ui/index.jsx";
+import { getOrderTypeLabel } from "../../lib/orderType.js";
 
-const numberText = z
-  .string()
-  .min(1)
-  .refine((value) => Number(value) >= 0 && Number.isFinite(Number(value)), {
-    message: "Invalid number",
-  });
+const emptySelection = {
+  companyName: "",
+  brandName: "",
+  rakhtTonId: "",
+  requiredMeters: "",
+};
 
-export default function Step2RakhtSelection({ onNext, onBack, initial = {} }) {
-  const { t } = useTranslation();
-
-  const schema = z.object({
-    brandName: z.string().min(1),
-    rakhtId: z.string().min(1),
-    requiredMeters: numberText.refine((value) => Number(value) > 0, {
-      message: t("createOrder.requiredMetersPositive", {
-        defaultValue: "Required meters must be greater than 0",
-      }),
-    }),
-    piecePrice: numberText,
-  });
+export default function Step2RakhtSelection({
+  onNext,
+  onBack,
+  initial = {},
+  orderTypes = [],
+  orderItems = [],
+}) {
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language;
 
   const { data: rakhtRows = [], isLoading } = useQuery({
     queryKey: ["rakht-list"],
     queryFn: () => api.get("/rakhts").then((res) => res.data),
   });
 
-  const {
-    control,
-    register,
-    watch,
-    setValue,
-    handleSubmit,
-    formState: { errors },
-  } = useForm({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      brandName: initial?.rakhtSelection?.rakhtBrandName || "",
-      rakhtId: initial?.rakhtSelection?.rakhtId || "",
-      requiredMeters:
-        initial?.rakhtSelection?.requiredMeters !== undefined
-          ? String(initial.rakhtSelection.requiredMeters)
-          : "",
-      piecePrice:
-        initial?.rakhtSelection?.piecePrice !== undefined
-          ? String(initial.rakhtSelection.piecePrice)
-          : "",
-    },
-  });
+  const selectionItems = useMemo(() => {
+    if (Array.isArray(orderItems) && orderItems.length > 0) {
+      return orderItems.map((item, index) => {
+        const key = String(
+          item?.billingKey ?? `${item?.type || "ITEM"}-${index}`,
+        );
+        const type = item?.type;
+        const fallbackLabel = `${getOrderTypeLabel(type, language)} ${index + 1}`;
+        const label = item?.displayName?.trim() || fallbackLabel;
+        return { key, type, label };
+      });
+    }
 
-  const brandName = watch("brandName");
-  const rakhtId = watch("rakhtId");
-  const requiredMeters = Number(watch("requiredMeters") || 0);
+    return (orderTypes || []).map((entry, index) => {
+      const type = entry?.type;
+      const key = `${type || "ITEM"}-${index}`;
+      const label = `${getOrderTypeLabel(type, language)} ${index + 1}`;
+      return { key, type, label };
+    });
+  }, [orderItems, orderTypes, language]);
 
-  const brandOptions = useMemo(() => {
+  const [selections, setSelections] = useState({});
+
+  useEffect(() => {
+    const incoming = initial?.rakhtSelections || [];
+    setSelections((prev) => {
+      const next = {};
+      selectionItems.forEach((item) => {
+        const existing =
+          incoming.find((entry) => entry?.orderItemKey === item.key) ||
+          incoming.find((entry) => entry?.type === item.type);
+        const fallback = prev[item.key] || emptySelection;
+        next[item.key] = {
+          companyName: existing?.rakhtCompanyName || fallback.companyName || "",
+          brandName: existing?.rakhtBrandName || fallback.brandName || "",
+          rakhtTonId: existing?.rakhtTonId || fallback.rakhtTonId || "",
+          requiredMeters:
+            existing?.requiredMeters !== undefined
+              ? String(existing.requiredMeters)
+              : fallback.requiredMeters || "",
+        };
+      });
+      return next;
+    });
+  }, [initial?.rakhtSelections, selectionItems]);
+
+  const companyOptions = useMemo(() => {
     const seen = new Set();
     return (rakhtRows || [])
       .filter((item) => {
-        if (!item?.brandName || seen.has(item.brandName)) return false;
-        seen.add(item.brandName);
+        if (!item?.companyName || seen.has(item.companyName)) return false;
+        seen.add(item.companyName);
         return true;
       })
-      .map((item) => item.brandName)
+      .map((item) => item.companyName)
       .sort((left, right) => left.localeCompare(right))
-      .map((brand) => ({ value: brand, label: brand }));
+      .map((company) => ({ value: company, label: company }));
   }, [rakhtRows]);
 
-  const filteredByBrand = useMemo(
-    () => (rakhtRows || []).filter((item) => item.brandName === brandName),
-    [rakhtRows, brandName],
-  );
+  const updateSelection = (itemKey, patch) => {
+    setSelections((prev) => ({
+      ...prev,
+      [itemKey]: { ...(prev[itemKey] || emptySelection), ...patch },
+    }));
+  };
 
-  const rakhtOptions = useMemo(
-    () =>
-      filteredByBrand.map((item) => ({
-        value: item.id,
-        label: `${item.color} (${item.companyName})`,
-      })),
-    [filteredByBrand],
-  );
+  const handleSubmit = (event) => {
+    event.preventDefault();
 
-  const selectedRakht = useMemo(
-    () => (rakhtRows || []).find((item) => item.id === rakhtId) || null,
-    [rakhtRows, rakhtId],
-  );
-
-  const remainingMeters = selectedRakht
-    ? Number(selectedRakht.availableMeters || 0) - requiredMeters
-    : 0;
-
-  const onSubmit = (values) => {
-    const selected = (rakhtRows || []).find(
-      (item) => item.id === values.rakhtId,
-    );
-
-    if (!selected) {
+    if (!selectionItems.length) {
       toast.error(
-        t("createOrder.selectRakhtFirst", {
-          defaultValue: "Please select a Rakht option first.",
+        t("createOrder.selectAtLeastOne", {
+          defaultValue: "Please select at least one order type.",
         }),
       );
       return;
     }
 
-    const requestedMeters = Number(values.requiredMeters || 0);
-    const currentAvailable = Number(selected.availableMeters || 0);
+    const rakhtSelections = [];
 
-    if (requestedMeters > currentAvailable) {
-      toast.error(
-        t("createOrder.insufficientRakhtMeters", {
-          available: currentAvailable,
-          defaultValue: `Insufficient meters. Available: ${currentAvailable}`,
-        }),
+    for (const item of selectionItems) {
+      const current = selections[item.key] || emptySelection;
+      const companyName = current.companyName || "";
+      const brandName = current.brandName || "";
+      const rakhtTonId = current.rakhtTonId || "";
+      const requiredMeters = Math.round(Number(current.requiredMeters || 0));
+
+      const orderTypeLabel =
+        item.label || getOrderTypeLabel(item.type, language);
+
+      if (!companyName || !brandName || !rakhtTonId || requiredMeters <= 0) {
+        toast.error(
+          t("createOrder.completeRakhtSelectionForItem", {
+            type: orderTypeLabel,
+            defaultValue: `Please complete Rakht selection for ${orderTypeLabel}.`,
+          }),
+        );
+        return;
+      }
+
+      const selectedRakht = (rakhtRows || []).find(
+        (item) =>
+          item.companyName === companyName && item.brandName === brandName,
       );
-      return;
+
+      if (!selectedRakht) {
+        toast.error(
+          t("createOrder.selectRakhtFirst", {
+            defaultValue: "Please select company and brand first.",
+          }),
+        );
+        return;
+      }
+
+      const ton = (selectedRakht.tons || []).find(
+        (entry) => entry.id === rakhtTonId,
+      );
+      if (!ton) {
+        toast.error(
+          t("createOrder.selectTonFirst", {
+            defaultValue: "Please choose a color first.",
+          }),
+        );
+        return;
+      }
+
+      const tonAvailable = Math.round(
+        Number(ton.availableMeters ?? ton.totalMeters ?? 0),
+      );
+
+      if (requiredMeters > tonAvailable) {
+        toast.error(
+          t("createOrder.insufficientRakhtMeters", {
+            available: tonAvailable,
+            defaultValue: `Insufficient meters. Available: ${tonAvailable}`,
+          }),
+        );
+        return;
+      }
+
+      rakhtSelections.push({
+        type: item.type,
+        orderItemKey: item.key,
+        rakhtId: selectedRakht.id,
+        rakhtTonId: ton.id,
+        rakhtCompanyName: selectedRakht.companyName,
+        rakhtBrandName: selectedRakht.brandName,
+        rakhtColor: ton.name,
+        rakhtColorHex: ton.colorHex,
+        requiredMeters,
+        piecePrice: 0,
+      });
     }
 
-    onNext({
-      rakhtSelection: {
-        rakhtId: selected.id,
-        rakhtBrandName: selected.brandName,
-        rakhtColor: selected.color,
-        rakhtColorHex: resolveRakhtColorHex(selected.color, selected.colorHex),
-        requiredMeters: requestedMeters,
-        piecePrice: Number(values.piecePrice || 0),
-      },
-    });
+    onNext({ rakhtSelections });
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)}>
+    <form onSubmit={handleSubmit}>
       <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>
         {t("createOrder.rakhtSelection", { defaultValue: "Rakht Selection" })}
       </h2>
@@ -157,194 +205,312 @@ export default function Step2RakhtSelection({ onNext, onBack, initial = {} }) {
         </p>
       ) : null}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-        <Field
-          label={t("rakht.brandName", { defaultValue: "Brand Name" })}
-          error={errors.brandName?.message}
-          required
-        >
-          <div className="iw">
-            <LuFactory size={14} className="ico" />
-            <Controller
-              name="brandName"
-              control={control}
-              render={({ field }) => (
-                <Select
-                  classNamePrefix="rs"
-                  options={brandOptions}
-                  placeholder={t("common.select", { defaultValue: "Select" })}
-                  value={
-                    brandOptions.find(
-                      (option) => option.value === field.value,
-                    ) || null
-                  }
-                  onChange={(option) => {
-                    const value = option?.value || "";
-                    field.onChange(value);
-                    setValue("rakhtId", "", { shouldValidate: true });
-                    setValue("piecePrice", "", { shouldValidate: false });
-                  }}
-                  styles={{
-                    control: (base, state) => ({
-                      ...base,
-                      minHeight: 40,
-                      borderRadius: 10,
-                      borderColor: errors.brandName
-                        ? "var(--danger)"
-                        : state.isFocused
-                          ? "var(--primary)"
-                          : "var(--border)",
-                      boxShadow: "none",
-                    }),
-                    menu: (base) => ({ ...base, zIndex: 20 }),
-                  }}
-                />
-              )}
-            />
-          </div>
-        </Field>
-
-        <Field
-          label={t("rakht.color", { defaultValue: "Color" })}
-          error={errors.rakhtId?.message}
-          required
-        >
-          <div className="iw">
-            <LuPalette size={14} className="ico" />
-            <Controller
-              name="rakhtId"
-              control={control}
-              render={({ field }) => (
-                <Select
-                  classNamePrefix="rs"
-                  options={rakhtOptions}
-                  isDisabled={!brandName}
-                  placeholder={t("common.select", { defaultValue: "Select" })}
-                  value={
-                    rakhtOptions.find(
-                      (option) => option.value === field.value,
-                    ) || null
-                  }
-                  onChange={(option) => {
-                    const value = option?.value || "";
-                    field.onChange(value);
-                    const selected = filteredByBrand.find(
-                      (item) => item.id === value,
-                    );
-                    if (selected) {
-                      setValue(
-                        "piecePrice",
-                        String(Number(selected.price || 0)),
-                        {
-                          shouldValidate: true,
-                        },
-                      );
-                    }
-                  }}
-                  styles={{
-                    control: (base, state) => ({
-                      ...base,
-                      minHeight: 40,
-                      borderRadius: 10,
-                      borderColor: errors.rakhtId
-                        ? "var(--danger)"
-                        : state.isFocused
-                          ? "var(--primary)"
-                          : "var(--border)",
-                      boxShadow: "none",
-                    }),
-                    menu: (base) => ({ ...base, zIndex: 20 }),
-                  }}
-                />
-              )}
-            />
-          </div>
-        </Field>
-
-        <Field
-          label={t("rakht.requiredMeters", { defaultValue: "Required Meters" })}
-          error={errors.requiredMeters?.message}
-          required
-        >
-          <div className="iw">
-            <LuRuler size={14} className="ico" />
-            <input
-              type="number"
-              min="0.01"
-              step="0.01"
-              className={`inp${errors.requiredMeters ? " err" : ""}`}
-              {...register("requiredMeters")}
-            />
-          </div>
-        </Field>
-
-        <Field
-          label={t("rakht.piecePrice", { defaultValue: "Piece Price" })}
-          error={errors.piecePrice?.message}
-          required
-        >
-          <div className="iw">
-            <LuWallet size={14} className="ico" />
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              className={`inp${errors.piecePrice ? " err" : ""}`}
-              {...register("piecePrice")}
-            />
-          </div>
-        </Field>
-      </div>
-
-      {selectedRakht ? (
-        <div className="info-box ib-gold" style={{ marginTop: 16 }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-              gap: 10,
-            }}
-          >
-            <span>
-              {t("rakht.availableMeters", { defaultValue: "Available" })}:{" "}
-              {Number(selectedRakht.availableMeters || 0).toFixed(2)}
-            </span>
-            <span>
-              {t("rakht.remainingAfterSelection", {
-                defaultValue: "Remaining after selection",
-              })}
-              : {Math.max(0, remainingMeters).toFixed(2)}
-            </span>
-            <span>
-              {t("rakht.companyName", { defaultValue: "Company" })}:{" "}
-              {selectedRakht.companyName}
-            </span>
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-              }}
-            >
-              <span
-                style={{
-                  width: 12,
-                  height: 12,
-                  borderRadius: "50%",
-                  border: "1px solid rgba(15,23,42,0.15)",
-                  background:
-                    resolveRakhtColorHex(
-                      selectedRakht.color,
-                      selectedRakht.colorHex,
-                    ) || "#94A3B8",
-                }}
-              />
-              {t("rakht.color", { defaultValue: "Color" })}:{" "}
-              {selectedRakht.color}
-            </span>
-          </div>
+      {selectionItems.length === 0 ? (
+        <div className="info-box ib-red" style={{ marginBottom: 14 }}>
+          {t("createOrder.selectAtLeastOne", {
+            defaultValue: "Please select at least one order type.",
+          })}
         </div>
-      ) : null}
+      ) : (
+        <div style={{ display: "grid", gap: 14 }}>
+          {selectionItems.map((item) => {
+            const current = selections[item.key] || emptySelection;
+            const companyName = current.companyName || "";
+            const brandName = current.brandName || "";
+            const rakhtTonId = current.rakhtTonId || "";
+            const requiredMeters = Number(current.requiredMeters || 0);
+
+            const filteredByCompany = (rakhtRows || []).filter(
+              (item) => item.companyName === companyName,
+            );
+
+            const brandOptions = (() => {
+              const seen = new Set();
+              return filteredByCompany
+                .filter((item) => {
+                  if (!item?.brandName || seen.has(item.brandName))
+                    return false;
+                  seen.add(item.brandName);
+                  return true;
+                })
+                .map((item) => item.brandName)
+                .sort((left, right) => left.localeCompare(right))
+                .map((brand) => ({ value: brand, label: brand }));
+            })();
+
+            const selectedRakht = (rakhtRows || []).find(
+              (item) =>
+                item.companyName === companyName &&
+                item.brandName === brandName,
+            );
+
+            const tonOptions = (selectedRakht?.tons || []).map((ton, idx) => ({
+              value: ton.id,
+              label: `#${idx + 1} ${ton.name}`,
+              ton,
+            }));
+
+            const selectedTon = (selectedRakht?.tons || []).find(
+              (entry) => entry.id === rakhtTonId,
+            );
+
+            const availableMeters = selectedTon
+              ? Math.round(
+                  Number(
+                    selectedTon.availableMeters ?? selectedTon.totalMeters ?? 0,
+                  ),
+                )
+              : 0;
+
+            const remainingAfter = Math.round(
+              Math.max(0, availableMeters - requiredMeters),
+            );
+
+            const typeLabel = item.label;
+
+            return (
+              <div
+                key={item.key}
+                className="card"
+                style={{ padding: 14, border: "1px solid var(--border)" }}
+              >
+                <p
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: "var(--text2)",
+                    marginBottom: 10,
+                  }}
+                >
+                  {typeLabel}
+                </p>
+
+                <div style={{ display: "grid", gap: 14 }}>
+                  <Field
+                    label={t("rakht.companyName", { defaultValue: "Company" })}
+                    required
+                  >
+                    <Select
+                      classNamePrefix="rs"
+                      options={companyOptions}
+                      placeholder={t("common.select", {
+                        defaultValue: "Select",
+                      })}
+                      value={
+                        companyOptions.find(
+                          (option) => option.value === companyName,
+                        ) || null
+                      }
+                      onChange={(option) => {
+                        updateSelection(item.key, {
+                          companyName: option?.value || "",
+                          brandName: "",
+                          rakhtTonId: "",
+                        });
+                      }}
+                      styles={{
+                        control: (base, state) => ({
+                          ...base,
+                          minHeight: 40,
+                          borderRadius: 10,
+                          borderColor: state.isFocused
+                            ? "var(--primary)"
+                            : "var(--border)",
+                          boxShadow: "none",
+                        }),
+                        menu: (base) => ({ ...base, zIndex: 20 }),
+                      }}
+                    />
+                  </Field>
+
+                  <Field
+                    label={t("rakht.brandName", { defaultValue: "Brand Name" })}
+                    required
+                  >
+                    <Select
+                      classNamePrefix="rs"
+                      options={brandOptions}
+                      isDisabled={!companyName}
+                      placeholder={t("common.select", {
+                        defaultValue: "Select",
+                      })}
+                      value={
+                        brandOptions.find(
+                          (option) => option.value === brandName,
+                        ) || null
+                      }
+                      onChange={(option) => {
+                        updateSelection(item.key, {
+                          brandName: option?.value || "",
+                          rakhtTonId: "",
+                        });
+                      }}
+                      styles={{
+                        control: (base, state) => ({
+                          ...base,
+                          minHeight: 40,
+                          borderRadius: 10,
+                          borderColor: state.isFocused
+                            ? "var(--primary)"
+                            : "var(--border)",
+                          boxShadow: "none",
+                        }),
+                        menu: (base) => ({ ...base, zIndex: 20 }),
+                      }}
+                    />
+                  </Field>
+
+                  <Field
+                    label={t("rakht.chooseColor", {
+                      defaultValue: "Choose Color",
+                    })}
+                    required
+                  >
+                    <Select
+                      classNamePrefix="rs"
+                      options={tonOptions}
+                      isDisabled={!selectedRakht}
+                      placeholder={t("common.select", {
+                        defaultValue: "Select",
+                      })}
+                      value={
+                        tonOptions.find(
+                          (option) => option.value === rakhtTonId,
+                        ) || null
+                      }
+                      onChange={(option) => {
+                        updateSelection(item.key, {
+                          rakhtTonId: option?.value || "",
+                        });
+                      }}
+                      formatOptionLabel={(opt) => (
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
+                          <span
+                            style={{
+                              width: 12,
+                              height: 12,
+                              borderRadius: "50%",
+                              background: opt.ton?.colorHex || "#94A3B8",
+                              border: "1px solid rgba(15,23,42,0.15)",
+                              flexShrink: 0,
+                            }}
+                          />
+                          {opt.label}
+                          {opt.ton && (
+                            <span
+                              style={{ fontSize: 11, color: "var(--text3)" }}
+                            >
+                              &nbsp;-&nbsp;
+                              {Math.round(
+                                Number(
+                                  opt.ton.availableMeters ??
+                                    opt.ton.totalMeters ??
+                                    0,
+                                ),
+                              )}
+                              m
+                            </span>
+                          )}
+                        </span>
+                      )}
+                      styles={{
+                        control: (base, state) => ({
+                          ...base,
+                          minHeight: 40,
+                          borderRadius: 10,
+                          borderColor: state.isFocused
+                            ? "var(--primary)"
+                            : "var(--border)",
+                          boxShadow: "none",
+                        }),
+                        menu: (base) => ({ ...base, zIndex: 20 }),
+                      }}
+                    />
+                  </Field>
+
+                  <Field
+                    label={t("rakht.requiredMeters", {
+                      defaultValue: "Required Meters",
+                    })}
+                    required
+                  >
+                    <div className="iw">
+                      <LuRuler size={14} className="ico" />
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        className="inp"
+                        value={current.requiredMeters || ""}
+                        onChange={(event) =>
+                          updateSelection(item.key, {
+                            requiredMeters: event.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                  </Field>
+
+                  {selectedTon ? (
+                    <div className="info-box ib-gold" style={{ marginTop: 2 }}>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fit, minmax(150px, 1fr))",
+                          gap: 10,
+                        }}
+                      >
+                        <span>
+                          {t("rakht.availableMeters", {
+                            defaultValue: "Available",
+                          })}
+                          : {availableMeters}
+                        </span>
+                        <span>
+                          {t("rakht.remainingAfterSelection", {
+                            defaultValue: "Remaining after selection",
+                          })}
+                          : {remainingAfter}
+                        </span>
+                        <span>
+                          {t("rakht.companyName", { defaultValue: "Company" })}:{" "}
+                          {selectedRakht?.companyName}
+                        </span>
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
+                          <span
+                            style={{
+                              width: 12,
+                              height: 12,
+                              borderRadius: "50%",
+                              border: "1px solid rgba(15,23,42,0.15)",
+                              background: selectedTon.colorHex || "#94A3B8",
+                            }}
+                          />
+                          {t("rakht.tonName", { defaultValue: "Name" })}:{" "}
+                          {selectedTon.name}
+                        </span>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
         <button
