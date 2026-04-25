@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { execSync } from "child_process";
 import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
@@ -17,7 +18,7 @@ import rakhtRoutes from "./routes/rakht.routes.js";
 import { startCronJobs } from "./cron/notifications.cron.js";
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 8000;
 
 app.use(
   cors({
@@ -31,7 +32,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 500,
+    max: 1000,
     message: "Too many requests",
   }),
 );
@@ -58,17 +59,64 @@ app.use(errorHandler);
 
 startCronJobs();
 
-const server = app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
-});
-
-server.on("error", (error) => {
-  if (error.code === "EADDRINUSE") {
-    console.error(
-      `Port ${PORT} is already in use. Stop the other process or set a different PORT in backend/.env.`,
-    );
-    process.exit(1);
+/**
+ * Kill any external process holding the given port.
+ * Silently ignores errors (port already free, PID already dead, etc.).
+ */
+function freePort(port) {
+  try {
+    if (process.platform === "win32") {
+      const out = execSync(
+        `netstat -ano | findstr :${port} | findstr LISTENING`,
+        { encoding: "utf8" },
+      ).trim();
+      const lines = out.split("\n").filter(Boolean);
+      const pids = [
+        ...new Set(
+          lines.map((l) => l.trim().split(/\s+/).at(-1)).filter(Boolean),
+        ),
+      ];
+      for (const pid of pids) {
+        if (pid !== String(process.pid)) {
+          try {
+            execSync(`taskkill /PID ${pid} /F`, { stdio: "ignore" });
+            console.log(`🔧 Freed port ${port} (killed PID ${pid})`);
+          } catch {
+            /* already dead */
+          }
+        }
+      }
+    } else {
+      execSync(`fuser -k ${port}/tcp 2>/dev/null || true`, { stdio: "ignore" });
+    }
+  } catch {
+    /* port already free */
   }
+}
 
-  throw error;
-});
+/**
+ * Try to start the HTTP server. On EADDRINUSE, kill the holder and retry
+ * up to `retries` times with a 700ms gap between attempts.
+ */
+function startServer(retries = 5) {
+  app
+    .listen(PORT, () => {
+      console.log(`✅ Server running on http://localhost:${PORT}`);
+    })
+    .on("error", (err) => {
+      if (err.code === "EADDRINUSE" && retries > 0) {
+        console.warn(
+          `⚠️  Port ${PORT} busy — freeing and retrying (${retries} attempts left)...`,
+        );
+        freePort(PORT);
+        setTimeout(() => startServer(retries - 1), 700);
+      } else {
+        console.error(
+          `❌ Cannot bind port ${PORT}. Set a different PORT in backend/.env.`,
+        );
+        process.exit(1);
+      }
+    });
+}
+
+startServer();

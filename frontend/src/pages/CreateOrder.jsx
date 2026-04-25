@@ -1,14 +1,21 @@
 import { useEffect, useState } from "react";
 import { parseNumberLocale } from "../lib/normalize.js";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
-import { LuCheck } from "react-icons/lu";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { LuCheck, LuFileText, LuCalendarDays } from "react-icons/lu";
 import toast from "react-hot-toast";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import i18n from "../i18n/index.js";
 import { getOrderTypeLabel } from "../lib/orderType.js";
+import {
+  deleteOrderDraft,
+  getOrderDraft,
+  upsertOrderDraft,
+} from "../lib/orderDraftApi.js";
+import { getMonthLabel } from "../lib/months.js";
+import { useAuth } from "../context/AuthContext.jsx";
 import Step1CustomerInfo from "../components/order/Step1CustomerInfo.jsx";
 import Step2RakhtSelection from "../components/order/Step2RakhtSelection.jsx";
 import Step2OrderTypes from "../components/order/Step2OrderTypes.jsx";
@@ -104,17 +111,142 @@ const STEP_FALLBACKS = {
 };
 
 export default function CreateOrder() {
-  const { t } = useTranslation();
+  const { t, i18n: i18nInstance } = useTranslation();
+  const language =
+    i18nInstance.resolvedLanguage || i18nInstance.language || "en";
   const navigate = useNavigate();
+  const qc = useQueryClient();
+  const { isAdmin } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({});
   const [error, setError] = useState("");
+  const [draftId, setDraftId] = useState("");
+  const [draftClientKey, setDraftClientKey] = useState(
+    () => `order_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+  );
+  const [draftSaveLabel, setDraftSaveLabel] = useState("");
+  const [isDraftLoading, setIsDraftLoading] = useState(false);
+  const draftParam = searchParams.get("draft") || "";
 
   const mutation = useMutation({ mutationFn: (d) => api.post("/orders", d) });
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [step]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const requestedId = draftParam;
+
+    if (!requestedId) {
+      setForm({});
+      setStep(0);
+      setDraftId("");
+      setDraftClientKey(
+        `order_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+      );
+      setDraftSaveLabel("");
+      setIsDraftLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setIsDraftLoading(true);
+    const hydrateDraft = async () => {
+      try {
+        const draft = await getOrderDraft(requestedId);
+        if (cancelled || !draft) return;
+
+        setForm({
+          ...(draft.draftData?.customerInfo || {}),
+          orderTypes: draft.draftData?.orderTypes || [],
+          measurements: draft.draftData?.measurements || {},
+        });
+        setStep(Math.max(0, Math.min(Number(draft.step || 0), 2)));
+        setDraftId(draft.id);
+        setDraftClientKey(
+          draft.clientKey ||
+            `order_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+        );
+        setDraftSaveLabel(t("orders.draftLoaded", "Draft restored"));
+      } catch {
+        if (!cancelled) {
+          setForm({});
+          setStep(0);
+          setDraftId("");
+          setDraftSaveLabel("");
+          setSearchParams({}, { replace: true });
+          toast.error(t("orders.draftNotFound", "Draft not found"));
+        }
+      } finally {
+        if (!cancelled) {
+          setIsDraftLoading(false);
+        }
+      }
+    };
+
+    hydrateDraft();
+    return () => {
+      cancelled = true;
+    };
+  }, [draftParam, setSearchParams, t]);
+
+  const saveDraft = async () => {
+    const hasCustomer =
+      Boolean(String(form.firstName || "").trim()) ||
+      Boolean(String(form.phoneNumber || "").trim()) ||
+      Boolean(String(form.customerId || "").trim());
+    const hasOrderTypes =
+      Array.isArray(form.orderTypes) && form.orderTypes.length > 0;
+    const hasMeasurements =
+      form.measurements &&
+      typeof form.measurements === "object" &&
+      Object.keys(form.measurements).length > 0;
+
+    if (!hasCustomer && !hasOrderTypes && !hasMeasurements) {
+      toast.error(t("orders.emptyDraftNotAllowed", "Nothing to save as draft"));
+      return;
+    }
+
+    setDraftSaveLabel(t("orders.savingDraft", "Saving draft..."));
+    const payload = {
+      id: draftId || undefined,
+      clientKey: draftClientKey,
+      step: Math.max(0, Math.min(Number(step || 0), 2)),
+      customerInfo: {
+        customerId: form.customerId || "",
+        firstName: form.firstName || "",
+        phoneNumber: form.phoneNumber || "",
+      },
+      orderTypes: form.orderTypes || [],
+      measurements: form.measurements || {},
+    };
+
+    try {
+      const saved = await upsertOrderDraft(payload);
+      if (!saved) return;
+      setDraftId(saved.id);
+      setDraftClientKey(saved.clientKey || draftClientKey);
+      setDraftSaveLabel(t("orders.draftSaved", "Draft saved"));
+      toast.success(t("orders.draftSaved", "Draft saved"));
+      qc.invalidateQueries({ queryKey: ["order-drafts"] });
+      qc.invalidateQueries({ queryKey: ["order-drafts-navbar"] });
+
+      if (searchParams.get("draft") !== saved.id) {
+        setSearchParams({ draft: saved.id }, { replace: true });
+      }
+    } catch (e) {
+      setDraftSaveLabel("");
+      toast.error(
+        getApiErrorMessage(
+          e,
+          t("orders.draftSaveFailed", "Failed to save draft"),
+        ),
+      );
+    }
+  };
 
   const merge = (d) => setForm((prev) => ({ ...prev, ...d }));
   const next = (d) => {
@@ -230,6 +362,15 @@ export default function CreateOrder() {
     try {
       const res = await mutation.mutateAsync(payload);
       const createdCustomer = res?.data?.customer;
+      if (draftId) {
+        try {
+          await deleteOrderDraft(draftId);
+          qc.invalidateQueries({ queryKey: ["order-drafts"] });
+          qc.invalidateQueries({ queryKey: ["order-drafts-navbar"] });
+        } catch {
+          // Best effort cleanup.
+        }
+      }
       setForm((prev) => ({ ...prev, result: res.data }));
       toast.success(t("createOrder.orderCreatedSuccess"));
       navigate("/print-bills", {
@@ -316,11 +457,40 @@ export default function CreateOrder() {
 
       {/* Card */}
       <div className="card step-shell-card" style={{ padding: 28 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 10,
+            marginBottom: 10,
+          }}
+        >
+          <div style={{ fontSize: 12, color: "var(--text3)" }}>
+            {draftSaveLabel || ""}
+          </div>
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={saveDraft}
+            disabled={isDraftLoading || mutation.isPending}
+          >
+            <LuFileText size={13} />
+            {t("orders.saveDraft", "Save Draft")}
+          </button>
+        </div>
         {error && (
           <div className="info-box ib-red" style={{ marginBottom: 20 }}>
             {error}
           </div>
         )}
+        {isDraftLoading ? (
+          <div
+            style={{ fontSize: 13, color: "var(--text3)", marginBottom: 16 }}
+          >
+            {t("common.loading", "Loading...")}
+          </div>
+        ) : null}
         <div key={step} className="step-panel">
           {step === 0 && <Step1CustomerInfo onNext={next} initial={form} />}
           {step === 1 && (

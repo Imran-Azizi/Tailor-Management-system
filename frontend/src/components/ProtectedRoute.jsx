@@ -1,16 +1,37 @@
-import { Navigate, useLocation } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import { useAuth } from '../context/AuthContext.jsx';
+import { Navigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { useAuth } from "../context/AuthContext.jsx";
 
-const WORKER_ROLES = ['DOKHT', 'QICHIKAR'];
+const WORKER_ROLES = ["DOKHT", "QICHIKAR"];
+const MAIN_PANEL_ROLES = ["ADMIN", "DOKAN", "FINANCE"];
 
-function LoadingSpinner({ color = 'var(--primary)' }) {
+function LoadingSpinner({ color = "var(--primary)" }) {
   const { t } = useTranslation();
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ width: 32, height: 32, border: '3px solid var(--border)', borderTopColor: color, borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 12px' }} />
-        <p style={{ fontSize: 13, color: 'var(--text3)' }}>{t('common.loading')}</p>
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "var(--bg)",
+      }}
+    >
+      <div style={{ textAlign: "center" }}>
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            border: "3px solid var(--border)",
+            borderTopColor: color,
+            borderRadius: "50%",
+            animation: "spin 0.7s linear infinite",
+            margin: "0 auto 12px",
+          }}
+        />
+        <p style={{ fontSize: 13, color: "var(--text3)" }}>
+          {t("common.loading")}
+        </p>
       </div>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
@@ -37,7 +58,7 @@ export function ProtectedRoute({ children }) {
     return <Navigate to="/panel" replace />;
   }
 
-  if (user.accountType !== 'ADMIN') {
+  if (!MAIN_PANEL_ROLES.includes(user.accountType)) {
     return <Navigate to="/login" replace />;
   }
 
@@ -60,7 +81,7 @@ export function WorkerProtectedRoute({ children }) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (user.accountType === 'ADMIN') {
+  if (user.accountType === "ADMIN") {
     return <Navigate to="/dashboard" replace />;
   }
 

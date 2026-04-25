@@ -42,6 +42,8 @@ export const createOrderSchema = z.object({
     firstName: optionalText,
     phoneNumber: optionalText,
   }),
+  entryMonth: z.number().int().min(1).max(12).optional().nullable(),
+  entryYear: z.number().int().min(2000).max(2100).optional().nullable(),
   rakhtSelections: z
     .array(rakhtSelectionSchema)
     .min(1, "At least one Rakht selection is required"),
@@ -65,6 +67,7 @@ export const updateOrderBillSchema = z.object({
     firstName: optionalText,
     phoneNumber: optionalText,
   }),
+  rakhtSelections: z.array(rakhtSelectionSchema).optional(),
   orders: z
     .array(orderBillItemSchema)
     .min(1, "At least one order item required"),

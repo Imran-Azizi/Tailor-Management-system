@@ -1,16 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  LuPlus,
-  LuPencil,
-  LuTrash2,
-  LuFactory,
-  LuBadgeDollarSign,
-  LuCalendar,
-} from "react-icons/lu";
-import Select from "react-select";
-import { z } from "zod";
+import { LuPlus, LuPencil, LuTrash2 } from "react-icons/lu";
 import toast from "react-hot-toast";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
@@ -38,587 +29,7 @@ const MODELS = [
 const TAB_GROUPS = {
   OUTFIT: ["neckoutfit", "astin", "daman", "buttonship", "tenbanship"],
   WASKAT: ["neckwaskat", "shoulderstate"],
-  RAKHT: [],
 };
-
-const TON_QTY_OPTIONS = Array.from({ length: 30 }, (_, i) => ({
-  value: i + 1,
-  label: String(i + 1),
-}));
-
-const emptyTon = () => ({ name: "", colorHex: "#94A3B8", totalMeters: "" });
-
-const rakhtTonSchema = z.object({
-  name: z.string().trim().min(1),
-  colorHex: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
-  totalMeters: z.coerce.number().positive(),
-});
-
-const rakhtSchema = z
-  .object({
-    companyName: z.string().trim().min(1),
-    brandName: z.string().trim().min(1),
-    tonQuantity: z.number().int().min(1).max(30),
-    tons: z.array(rakhtTonSchema),
-    totalPrice: z.coerce.number().min(0),
-    givenMoney: z.coerce.number().min(0),
-  })
-  .refine((d) => d.tons.length === d.tonQuantity, {
-    message: "Ton items count must match Ton Quantity",
-    path: ["tons"],
-  });
-
-function RakhtTab() {
-  const { t } = useTranslation();
-  const qc = useQueryClient();
-  const [modal, setModal] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [deleteItem, setDeleteItem] = useState(null);
-
-  const emptyForm = () => ({
-    companyName: "",
-    brandName: "",
-    tonQuantity: null,
-    tons: [],
-    totalPrice: "",
-    givenMoney: "",
-  });
-
-  const [form, setForm] = useState(emptyForm());
-
-  const { data: rows = [], isLoading } = useQuery({
-    queryKey: ["rakht-list"],
-    queryFn: () => api.get("/rakhts").then((res) => res.data),
-  });
-
-  const saveMut = useMutation({
-    mutationFn: (payload) =>
-      editing
-        ? api.put(`/rakhts/${editing.id}`, payload)
-        : api.post("/rakhts", payload),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["rakht-list"] });
-      setModal(false);
-      setEditing(null);
-      setForm(emptyForm());
-      toast.success(
-        editing
-          ? t("rakht.updated", { defaultValue: "Rakht updated." })
-          : t("rakht.created", { defaultValue: "Rakht created." }),
-      );
-    },
-    onError: (error) =>
-      toast.error(
-        getApiErrorMessage(
-          error,
-          t("rakht.saveFailed", { defaultValue: "Unable to save Rakht." }),
-        ),
-      ),
-  });
-
-  const delMut = useMutation({
-    mutationFn: (id) => api.delete(`/rakhts/${id}`),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["rakht-list"] });
-      toast.success(t("rakht.deleted", { defaultValue: "Rakht deleted." }));
-    },
-    onError: (error) =>
-      toast.error(
-        getApiErrorMessage(
-          error,
-          t("rakht.deleteFailed", { defaultValue: "Unable to delete Rakht." }),
-        ),
-      ),
-  });
-
-  const openCreate = () => {
-    setEditing(null);
-    setForm(emptyForm());
-    setModal(true);
-  };
-
-  const openEdit = (item) => {
-    setEditing(item);
-    setForm({
-      companyName: item.companyName || "",
-      brandName: item.brandName || "",
-      tonQuantity: item.tonQuantity || null,
-      tons: (item.tons || []).map((ton) => ({
-        name: ton.name || "",
-        colorHex: ton.colorHex || "#94A3B8",
-        totalMeters: String(ton.totalMeters ?? ""),
-      })),
-      totalPrice: String(item.totalPrice ?? ""),
-      givenMoney: String(item.givenMoney ?? ""),
-    });
-    setModal(true);
-  };
-
-  const handleTonQtyChange = (option) => {
-    const qty = option?.value || 0;
-    setForm((prev) => {
-      const current = prev.tons || [];
-      const next =
-        qty > current.length
-          ? [
-              ...current,
-              ...Array.from({ length: qty - current.length }, emptyTon),
-            ]
-          : current.slice(0, qty);
-      return { ...prev, tonQuantity: qty, tons: next };
-    });
-  };
-
-  const updateTon = (index, field, value) => {
-    setForm((prev) => {
-      const tons = [...prev.tons];
-      tons[index] = { ...tons[index], [field]: value };
-      return { ...prev, tons };
-    });
-  };
-
-  const remainingMoney = useMemo(() => {
-    const total = parseInt(form.totalPrice, 10) || 0;
-    const given = parseInt(form.givenMoney, 10) || 0;
-    return Math.max(0, total - given);
-  }, [form.totalPrice, form.givenMoney]);
-
-  const todayDisplay = new Date().toLocaleDateString();
-
-  const submit = () => {
-    const parsed = rakhtSchema.safeParse({
-      ...form,
-      tonQuantity: form.tonQuantity,
-    });
-    if (!parsed.success) {
-      toast.error(
-        t("rakht.validationError", {
-          defaultValue: "Please fill all required fields with valid values.",
-        }),
-      );
-      return;
-    }
-    saveMut.mutate(parsed.data);
-  };
-
-  return (
-    <div className="card" style={{ padding: 18 }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 10,
-          flexWrap: "wrap",
-          marginBottom: 14,
-        }}
-      >
-        <div>
-          <p style={{ fontSize: 15, fontWeight: 700 }}>
-            {t("rakht.title", { defaultValue: "Rakht Inventory" })}
-          </p>
-          <p style={{ fontSize: 12, color: "var(--text3)" }}>
-            {t("rakht.subtitle", {
-              defaultValue: "Manage fabric brands, stock meters, and payments.",
-            })}
-          </p>
-        </div>
-        <button
-          onClick={openCreate}
-          className="btn btn-gold"
-          style={{ gap: 6 }}
-        >
-          <LuPlus size={13} /> {t("common.add")}
-        </button>
-      </div>
-
-      {isLoading ? (
-        <p style={{ fontSize: 13, color: "var(--text3)" }}>
-          {t("common.loading")}
-        </p>
-      ) : !rows.length ? (
-        <p style={{ fontSize: 13, color: "var(--text3)", fontStyle: "italic" }}>
-          {t("rakht.empty", { defaultValue: "No Rakht records yet." })}
-        </p>
-      ) : (
-        <div className="tbl-wrap" style={{ overflowX: "auto" }}>
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>{t("rakht.companyName", { defaultValue: "Company" })}</th>
-                <th>{t("rakht.brandName", { defaultValue: "Brand" })}</th>
-                <th>{t("rakht.tonQuantity", { defaultValue: "Tons" })}</th>
-                <th>
-                  {t("rakht.totalPrice", { defaultValue: "Total Price" })}
-                </th>
-                <th>{t("rakht.givenMoney", { defaultValue: "Given" })}</th>
-                <th>
-                  {t("rakht.remainingMoney", { defaultValue: "Remaining" })}
-                </th>
-                <th>{t("rakht.date", { defaultValue: "Date" })}</th>
-                <th>{t("common.actions", "Actions")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((item) => (
-                <tr key={item.id}>
-                  <td>{item.companyName}</td>
-                  <td>{item.brandName}</td>
-                  <td>{item.tonQuantity}</td>
-                  <td>
-                    {Math.round(Number(item.totalPrice || 0)).toLocaleString()}
-                  </td>
-                  <td>
-                    {Math.round(Number(item.givenMoney || 0)).toLocaleString()}
-                  </td>
-                  <td>
-                    {Math.round(
-                      item.remainingMoney ??
-                        Math.max(
-                          0,
-                          (item.totalPrice || 0) - (item.givenMoney || 0),
-                        ),
-                    ).toLocaleString()}
-                  </td>
-                  <td>
-                    {item.date ? new Date(item.date).toLocaleDateString() : "-"}
-                  </td>
-                  <td>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button
-                        className="btn btn-outline btn-sm"
-                        onClick={() => openEdit(item)}
-                      >
-                        <LuPencil size={12} />
-                      </button>
-                      <button
-                        className="btn btn-outline btn-sm"
-                        style={{ color: "#DC2626", borderColor: "#fecaca" }}
-                        onClick={() => setDeleteItem(item)}
-                      >
-                        <LuTrash2 size={12} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <Modal
-        open={modal}
-        onClose={() => {
-          setModal(false);
-          setEditing(null);
-        }}
-        title={
-          editing
-            ? t("rakht.editTitle", { defaultValue: "Edit Rakht" })
-            : t("rakht.addTitle", { defaultValue: "Add Rakht" })
-        }
-      >
-        <div style={{ display: "grid", gap: 14 }}>
-          {/* Company Name */}
-          <div>
-            <label className="lbl">
-              {t("rakht.companyName", { defaultValue: "Company Name" })}
-            </label>
-            <div className="iw">
-              <LuFactory size={14} className="ico" />
-              <input
-                className="inp"
-                value={form.companyName}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, companyName: e.target.value }))
-                }
-              />
-            </div>
-          </div>
-
-          {/* Brand Name */}
-          <div>
-            <label className="lbl">
-              {t("rakht.brandName", { defaultValue: "Brand Name" })}
-            </label>
-            <div className="iw">
-              <LuFactory size={14} className="ico" />
-              <input
-                className="inp"
-                value={form.brandName}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, brandName: e.target.value }))
-                }
-              />
-            </div>
-          </div>
-
-          {/* Ton Quantity */}
-          <div>
-            <label className="lbl">
-              {t("rakht.tonQuantity", { defaultValue: "Ton Quantity" })}
-            </label>
-            <Select
-              classNamePrefix="rs"
-              options={TON_QTY_OPTIONS}
-              value={
-                form.tonQuantity
-                  ? { value: form.tonQuantity, label: String(form.tonQuantity) }
-                  : null
-              }
-              onChange={handleTonQtyChange}
-              placeholder={t("common.select", { defaultValue: "Select" })}
-              styles={{
-                control: (base, state) => ({
-                  ...base,
-                  minHeight: 40,
-                  borderRadius: 10,
-                  borderColor: state.isFocused
-                    ? "var(--primary)"
-                    : "var(--border)",
-                  boxShadow: "none",
-                }),
-                menu: (base) => ({ ...base, zIndex: 20 }),
-              }}
-            />
-          </div>
-
-          {/* Dynamic Ton Groups */}
-          {form.tons.length > 0 && (
-            <div style={{ display: "grid", gap: 12 }}>
-              <p
-                style={{ fontSize: 13, fontWeight: 600, color: "var(--text2)" }}
-              >
-                {t("rakht.tonDetails", { defaultValue: "Ton Details" })}
-              </p>
-              {form.tons.map((ton, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    border: "1px solid var(--border)",
-                    borderRadius: 10,
-                    padding: "12px 14px",
-                    display: "grid",
-                    gap: 10,
-                    background: "var(--surface2)",
-                  }}
-                >
-                  <p
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: "var(--text3)",
-                    }}
-                  >
-                    {t("rakht.ton", { defaultValue: "Ton" })} #{idx + 1}
-                  </p>
-
-                  {/* Name */}
-                  <div>
-                    <label className="lbl">
-                      {t("rakht.tonName", { defaultValue: "Name" })}
-                    </label>
-                    <div className="iw">
-                      <input
-                        className="inp"
-                        value={ton.name}
-                        onChange={(e) => updateTon(idx, "name", e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Color + Total Meters in a row */}
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "auto 1fr",
-                      gap: 10,
-                      alignItems: "end",
-                    }}
-                  >
-                    <div>
-                      <label className="lbl">
-                        {t("rakht.tonColor", { defaultValue: "Color" })}
-                      </label>
-                      <input
-                        type="color"
-                        aria-label={t("rakht.tonColor", {
-                          defaultValue: "Color",
-                        })}
-                        value={ton.colorHex}
-                        onChange={(e) =>
-                          updateTon(idx, "colorHex", e.target.value)
-                        }
-                        style={{
-                          display: "block",
-                          width: 48,
-                          height: 40,
-                          border: "1px solid var(--border)",
-                          borderRadius: 10,
-                          padding: 4,
-                          cursor: "pointer",
-                          background: "transparent",
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label className="lbl">
-                        {t("rakht.tonTotalMeters", {
-                          defaultValue: "Total Meters",
-                        })}
-                      </label>
-                      <div className="iw">
-                        <input
-                          className="inp"
-                          type="number"
-                          min="1"
-                          step="1"
-                          value={ton.totalMeters}
-                          onChange={(e) =>
-                            updateTon(idx, "totalMeters", e.target.value)
-                          }
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Payment Summary */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 12,
-            }}
-          >
-            <div>
-              <label className="lbl">
-                {t("rakht.totalPrice", { defaultValue: "Total Price" })}
-              </label>
-              <div className="iw">
-                <LuBadgeDollarSign size={14} className="ico" />
-                <input
-                  className="inp"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={form.totalPrice}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, totalPrice: e.target.value }))
-                  }
-                />
-              </div>
-            </div>
-            <div>
-              <label className="lbl">
-                {t("rakht.givenMoney", { defaultValue: "Given Money" })}
-              </label>
-              <div className="iw">
-                <LuBadgeDollarSign size={14} className="ico" />
-                <input
-                  className="inp"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={form.givenMoney}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, givenMoney: e.target.value }))
-                  }
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Remaining Money (read-only) */}
-          <div>
-            <label className="lbl">
-              {t("rakht.remainingMoney", { defaultValue: "Remaining Money" })}
-            </label>
-            <div
-              className="iw"
-              style={{ background: "var(--surface2)", opacity: 0.8 }}
-            >
-              <LuBadgeDollarSign size={14} className="ico" />
-              <input
-                className="inp"
-                readOnly
-                value={remainingMoney.toLocaleString()}
-                style={{ cursor: "default" }}
-              />
-            </div>
-          </div>
-
-          {/* Date (auto-generated) */}
-          <div>
-            <label className="lbl">
-              {t("rakht.date", { defaultValue: "Date" })}
-            </label>
-            <div
-              className="iw"
-              style={{ background: "var(--surface2)", opacity: 0.8 }}
-            >
-              <LuCalendar size={14} className="ico" />
-              <input
-                className="inp"
-                readOnly
-                value={
-                  editing?.date
-                    ? new Date(editing.date).toLocaleDateString()
-                    : todayDisplay
-                }
-                style={{ cursor: "default" }}
-              />
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div style={{ display: "flex", gap: 10 }}>
-            <button
-              type="button"
-              onClick={() => setModal(false)}
-              className="btn btn-outline"
-              style={{ flex: 1 }}
-            >
-              {t("common.cancel")}
-            </button>
-            <button
-              type="button"
-              onClick={submit}
-              className="btn btn-gold"
-              style={{ flex: 1 }}
-              disabled={saveMut.isPending}
-            >
-              {saveMut.isPending
-                ? t("customersPage.saving", { defaultValue: "Saving..." })
-                : t("common.save")}
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      <ConfirmDeleteModal
-        open={!!deleteItem}
-        onClose={() => setDeleteItem(null)}
-        onConfirm={() => {
-          if (!deleteItem) return;
-          delMut.mutate(deleteItem.id, {
-            onSettled: () => setDeleteItem(null),
-          });
-        }}
-        title={t("rakht.deleteTitle", { defaultValue: t("common.delete") })}
-        message={t("rakht.deleteConfirm", {
-          defaultValue: `Delete ${deleteItem?.brandName || ""} permanently?`,
-        })}
-        itemName={deleteItem?.brandName || ""}
-        isPending={delMut.isPending}
-      />
-    </div>
-  );
-}
 
 function DesignCard({ model }) {
   const { t } = useTranslation();
@@ -733,7 +144,7 @@ function DesignCard({ model }) {
           <p style={{ fontSize: 12, color: "var(--text3)" }}>
             {t("common.loading")}
           </p>
-        ) : !data.length ? (
+        ) : data.length === 0 ? (
           <p
             style={{ fontSize: 12, color: "var(--text3)", fontStyle: "italic" }}
           >
@@ -882,7 +293,6 @@ export default function Designs() {
     OUTFIT: t("designs.tabs.outfit", { defaultValue: "Outfit" }),
     WASKAT: t("designs.tabs.waskat", { defaultValue: "Waskat" }),
     YAKHANQAQ: t("designs.tabs.yakhanaqq", { defaultValue: "YakhanQaq" }),
-    RAKHT: t("designs.tabs.rakht", { defaultValue: "Rakht" }),
   };
 
   const modelsToShow = (TAB_GROUPS[activeTab] || [])
@@ -898,41 +308,39 @@ export default function Designs() {
         })}
       />
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+      <div
+        style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}
+      >
         {Object.keys(TAB_GROUPS).map((tab) => (
           <button
             key={tab}
             type="button"
             onClick={() => setActiveTab(tab)}
             className={activeTab === tab ? "btn btn-gold" : "btn btn-outline"}
-            style={{ minWidth: 120 }}
+            style={{ minWidth: 100, flex: "1 1 auto" }}
           >
             {tabLabels[tab]}
           </button>
         ))}
       </div>
 
-      {activeTab === "RAKHT" ? (
-        <RakhtTab />
-      ) : (
-        <div className="g-designs">
-          {modelsToShow.length === 0 ? (
-            <p
-              style={{
-                fontSize: 12,
-                color: "var(--text3)",
-                fontStyle: "italic",
-              }}
-            >
-              {t("designs.noStyles", {
-                defaultValue: "No style groups configured for this tab.",
-              })}
-            </p>
-          ) : (
-            modelsToShow.map((m) => <DesignCard key={m.key} model={m} />)
-          )}
-        </div>
-      )}
+      <div className="g-designs">
+        {modelsToShow.length === 0 ? (
+          <p
+            style={{
+              fontSize: 12,
+              color: "var(--text3)",
+              fontStyle: "italic",
+            }}
+          >
+            {t("designs.noStyles", {
+              defaultValue: "No style groups configured for this tab.",
+            })}
+          </p>
+        ) : (
+          modelsToShow.map((m) => <DesignCard key={m.key} model={m} />)
+        )}
+      </div>
     </div>
   );
 }

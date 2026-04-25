@@ -404,6 +404,9 @@ export const getAllOrders = async ({
   workerId,
   workerAccountType,
   workerRoleType,
+  month,
+  year,
+  financeUserId,
 } = {}) => {
   const skip = (Number(page) - 1) * Number(limit);
   const where = {};
@@ -414,6 +417,32 @@ export const getAllOrders = async ({
     where.isCompleted = false;
   }
   if (type) where.type = type;
+
+  // Month/year filter — filter by explicit entryMonth/entryYear stored on the order
+  const parsedMonth =
+    month !== undefined && month !== null ? Number(month) : null;
+  const parsedYear = year !== undefined && year !== null ? Number(year) : null;
+  if (
+    parsedMonth &&
+    parsedYear &&
+    Number.isFinite(parsedMonth) &&
+    Number.isFinite(parsedYear)
+  ) {
+    const monthStart = new Date(parsedYear, parsedMonth - 1, 1, 0, 0, 0, 0);
+    const monthEnd = new Date(parsedYear, parsedMonth, 0, 23, 59, 59, 999);
+    // Match orders with explicit entryMonth/Year OR (for legacy orders) by createdAt range
+    where.OR = [
+      ...(where.OR || []),
+      { entryMonth: parsedMonth, entryYear: parsedYear },
+      { entryMonth: null, createdAt: { gte: monthStart, lte: monthEnd } },
+    ];
+  }
+
+  // Finance user data isolation — scope orders to the Finance user who created them
+  if (financeUserId) {
+    where.createdByFinanceId = String(financeUserId);
+  }
+
   if (search)
     where.customer = { firstName: { contains: search, mode: "insensitive" } };
   if (
@@ -545,6 +574,34 @@ export const getAllOrders = async ({
   };
 };
 
+export const getMonthlyReportOrders = async ({ month, year }) => {
+  const m = Number(month);
+  const y = Number(year);
+  if (!Number.isFinite(m) || !Number.isFinite(y) || m < 1 || m > 12) {
+    throw Object.assign(new Error("Valid month (1-12) and year are required"), {
+      status: 400,
+    });
+  }
+
+  const monthStart = new Date(y, m - 1, 1, 0, 0, 0, 0);
+  const monthEnd = new Date(y, m, 0, 23, 59, 59, 999);
+
+  const orders = await prisma.order.findMany({
+    where: {
+      OR: [
+        { entryMonth: m, entryYear: y },
+        { entryMonth: null, createdAt: { gte: monthStart, lte: monthEnd } },
+      ],
+    },
+    include: {
+      customer: { select: { id: true, firstName: true, billNumber: true } },
+    },
+    orderBy: [{ customer: { billNumber: "asc" } }, { createdAt: "asc" }],
+  });
+
+  return orders;
+};
+
 export const lookupOrdersByBillOrPhone = async ({
   billNumber,
   phoneNumber,
@@ -637,6 +694,8 @@ export const getCompletedOrdersFromWorkers = async ({
   qichikarUserId,
   dokhtUserId,
   orderId,
+  month = null,
+  year = null,
 } = {}) => {
   const skip = (Number(page) - 1) * Number(limit);
   const where = {
@@ -657,6 +716,17 @@ export const getCompletedOrdersFromWorkers = async ({
       },
     ],
   };
+
+  const parsedMonth = month != null ? Number(month) : null;
+  const parsedYear = year != null ? Number(year) : null;
+  if (
+    parsedMonth &&
+    parsedYear &&
+    Number.isFinite(parsedMonth) &&
+    Number.isFinite(parsedYear)
+  ) {
+    where.AND.push({ entryMonth: parsedMonth, entryYear: parsedYear });
+  }
 
   if (search && String(search).trim()) {
     const q = String(search).trim();
@@ -1053,6 +1123,9 @@ export const createOrder = async ({
   customerInfo,
   rakhtSelections,
   orders: orderItems,
+  entryMonth,
+  entryYear,
+  createdByFinanceId,
 }) => {
   return prisma.$transaction(async (tx) => {
     let customer;
@@ -1183,6 +1256,13 @@ export const createOrder = async ({
           emergencyExpiry: emergencyExpiry ? new Date(emergencyExpiry) : null,
           quantity,
           boxId: autoBox.boxId,
+          // Auto-fill entryMonth/entryYear from current date if not explicitly provided
+          // This ensures all orders are visible when filtering by month
+          entryMonth: entryMonth
+            ? Number(entryMonth)
+            : new Date().getMonth() + 1,
+          entryYear: entryYear ? Number(entryYear) : new Date().getFullYear(),
+          createdByFinanceId: createdByFinanceId || null,
         },
         include: { box: true },
       });
@@ -1369,7 +1449,7 @@ const upsertMeasurementsForType = async (tx, type, orderId, measurements) => {
 
 export const updateOrderBill = async (
   orderId,
-  { customerInfo, orders: items },
+  { customerInfo, rakhtSelections, orders: items },
 ) => {
   const seed = await prisma.order.findUnique({
     where: { id: orderId },
@@ -1414,6 +1494,90 @@ export const updateOrderBill = async (
     });
     const existingById = new Map(existingOrders.map((o) => [o.id, o]));
 
+    const resolveRakhtSnapshot = async (selection) => {
+      const requiredMeters = Number(selection?.requiredMeters || 0);
+      const piecePrice = Number(selection?.piecePrice || 0);
+
+      if (!selection?.rakhtId) {
+        throw Object.assign(new Error("Rakht selection is required"), {
+          status: 400,
+        });
+      }
+
+      if (!selection?.rakhtTonId) {
+        throw Object.assign(new Error("Rakht ton selection is required"), {
+          status: 400,
+        });
+      }
+
+      if (!Number.isFinite(requiredMeters) || requiredMeters <= 0) {
+        throw Object.assign(
+          new Error("Required meters must be a positive number"),
+          {
+            status: 400,
+          },
+        );
+      }
+
+      if (!Number.isFinite(piecePrice) || piecePrice < 0) {
+        throw Object.assign(new Error("Piece price must be a valid number"), {
+          status: 400,
+        });
+      }
+
+      const rakht = await tx.rakht.findUnique({
+        where: { id: selection.rakhtId },
+      });
+      if (!rakht) {
+        throw Object.assign(new Error("Selected Rakht not found"), {
+          status: 404,
+        });
+      }
+
+      const ton = await tx.rakhtTon.findUnique({
+        where: { id: selection.rakhtTonId },
+      });
+      if (!ton || ton.rakhtId !== rakht.id) {
+        throw Object.assign(new Error("Selected Rakht ton not found"), {
+          status: 404,
+        });
+      }
+
+      return {
+        rakhtId: rakht.id,
+        rakhtTonId: ton.id,
+        rakhtCompanyName: rakht.companyName,
+        rakhtBrandName: rakht.brandName,
+        rakhtColor: ton.name,
+        rakhtColorHex: ton.colorHex,
+        rakhtRequiredMeters: requiredMeters,
+        rakhtPiecePrice: piecePrice,
+      };
+    };
+
+    const rakhtSnapshotByOrderItemKey = new Map();
+    const rakhtSnapshotQueueByType = new Map();
+    for (const selection of rakhtSelections || []) {
+      if (!selection?.type) continue;
+      const snapshot = await resolveRakhtSnapshot(selection);
+
+      if (selection?.orderItemKey) {
+        const key = String(selection.orderItemKey);
+        if (rakhtSnapshotByOrderItemKey.has(key)) {
+          throw Object.assign(
+            new Error(`Duplicate Rakht selection for order item ${key}.`),
+            { status: 400 },
+          );
+        }
+        rakhtSnapshotByOrderItemKey.set(key, snapshot);
+        continue;
+      }
+
+      const queue = rakhtSnapshotQueueByType.get(selection.type) || [];
+      queue.push(snapshot);
+      rakhtSnapshotQueueByType.set(selection.type, queue);
+    }
+
     const hasEmergency = (items || []).some((i) => !!i?.isEmergency);
     const emergencyExpiry = hasEmergency
       ? ((items || []).find((i) => !!i?.isEmergency)?.emergencyExpiry ?? null)
@@ -1423,6 +1587,7 @@ export const updateOrderBill = async (
 
     for (const item of items || []) {
       const {
+        orderItemKey,
         id,
         type,
         orderName,
@@ -1433,6 +1598,19 @@ export const updateOrderBill = async (
         boxId,
         measurements,
       } = item;
+
+      const itemKey =
+        orderItemKey !== undefined && orderItemKey !== null
+          ? String(orderItemKey)
+          : "";
+      const rakhtSnapshotFromItem = itemKey
+        ? rakhtSnapshotByOrderItemKey.get(itemKey)
+        : null;
+      const typeQueue = rakhtSnapshotQueueByType.get(type) || [];
+      const rakhtSnapshot = rakhtSnapshotFromItem || typeQueue.shift() || null;
+      if (typeQueue.length >= 0) {
+        rakhtSnapshotQueueByType.set(type, typeQueue);
+      }
 
       // enforce bill-level emergency settings
       const isEmergency = hasEmergency;
@@ -1488,6 +1666,7 @@ export const updateOrderBill = async (
             remaining,
             quantity,
             ...(boxId !== undefined ? { boxId: boxId ?? null } : {}),
+            ...(rakhtSnapshot || {}),
           },
         });
 
@@ -1508,13 +1687,21 @@ export const updateOrderBill = async (
           customerId: seed.customerId,
           type,
           orderName: orderName || null,
-          rakhtId: seed.rakhtId ?? null,
-          rakhtCompanyName: seed.rakhtCompanyName ?? null,
-          rakhtBrandName: seed.rakhtBrandName ?? null,
-          rakhtColor: seed.rakhtColor ?? null,
-          rakhtColorHex: seed.rakhtColorHex ?? null,
-          rakhtRequiredMeters: seed.rakhtRequiredMeters ?? null,
-          rakhtPiecePrice: seed.rakhtPiecePrice ?? null,
+          rakhtId: rakhtSnapshot?.rakhtId ?? seed.rakhtId ?? null,
+          rakhtTonId: rakhtSnapshot?.rakhtTonId ?? seed.rakhtTonId ?? null,
+          rakhtCompanyName:
+            rakhtSnapshot?.rakhtCompanyName ?? seed.rakhtCompanyName ?? null,
+          rakhtBrandName:
+            rakhtSnapshot?.rakhtBrandName ?? seed.rakhtBrandName ?? null,
+          rakhtColor: rakhtSnapshot?.rakhtColor ?? seed.rakhtColor ?? null,
+          rakhtColorHex:
+            rakhtSnapshot?.rakhtColorHex ?? seed.rakhtColorHex ?? null,
+          rakhtRequiredMeters:
+            rakhtSnapshot?.rakhtRequiredMeters ??
+            seed.rakhtRequiredMeters ??
+            null,
+          rakhtPiecePrice:
+            rakhtSnapshot?.rakhtPiecePrice ?? seed.rakhtPiecePrice ?? null,
           totalPrice,
           discount,
           paidAmount,

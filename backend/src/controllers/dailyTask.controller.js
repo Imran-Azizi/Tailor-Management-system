@@ -23,11 +23,13 @@ function ensureTaskIsEditable(task) {
 /** GET /api/daily-tasks */
 export const listDailyTasks = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, search = "" } = req.query;
+    const { page = 1, limit = 20, search = "", month, year } = req.query;
     const result = await service.getDailyTasks({
       page: Number(page),
       limit: Number(limit),
       search,
+      month: month != null ? Number(month) : null,
+      year: year != null ? Number(year) : null,
     });
     res.json(result);
   } catch (err) {
@@ -55,7 +57,12 @@ export const dailyTaskReport = async (req, res, next) => {
 export const dailyTaskReportPdf = async (req, res, next) => {
   try {
     const { reportType = "daily", date, from, to } = req.query;
-    const report = await service.getDailyTaskReport({ reportType, date, from, to });
+    const report = await service.getDailyTaskReport({
+      reportType,
+      date,
+      from,
+      to,
+    });
     const pdfBuffer = await buildDailyTaskReportPdf(report);
 
     const safeType = String(report.filters.reportType || "daily").toLowerCase();

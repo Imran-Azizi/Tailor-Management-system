@@ -11,6 +11,7 @@ import i18n from "../i18n/index.js";
 import { getOrderTypeLabel } from "../lib/orderType.js";
 import { Spinner } from "../components/ui/index.jsx";
 import Step1CustomerInfo from "../components/order/Step1CustomerInfo.jsx";
+import Step2RakhtSelection from "../components/order/Step2RakhtSelection.jsx";
 import Step2OrderTypes from "../components/order/Step2OrderTypes.jsx";
 import Step3Measurements from "../components/order/Step3Measurements.jsx";
 import Step4Billing from "../components/order/Step4Billing.jsx";
@@ -84,14 +85,24 @@ const STEPS = [
   { label: "Customer" },
   { label: "Order Types" },
   { label: "Measurements" },
+  { label: "Rakht" },
   { label: "Billing" },
 ];
 
 const STEP_I18N = {
   Customer: "createOrder.customerInfo",
+  Rakht: "createOrder.rakhtSelection",
   "Order Types": "createOrder.orderTypes",
   Measurements: "createOrder.measurements",
   Billing: "createOrder.billing",
+};
+
+const STEP_FALLBACKS = {
+  Customer: "Customer Information",
+  Rakht: "Rakht Selection",
+  "Order Types": "Order Types",
+  Measurements: "Measurements",
+  Billing: "Billing",
 };
 
 export default function EditOrder() {
@@ -125,8 +136,7 @@ export default function EditOrder() {
 
   useEffect(() => {
     if (!data?.customer || !Array.isArray(data?.orders)) return;
-    const customer = data.customer;
-    const orders = data.orders;
+    const { customer, orders } = data;
     const byType = new Map();
 
     orders.forEach((order) => {
@@ -181,12 +191,41 @@ export default function EditOrder() {
       });
     });
 
+    const orderItems = buildOrderItems(orderTypes, measurements);
+    const orderById = new Map(orders.map((order) => [order.id, order]));
+    const rakhtSelections = orderItems
+      .map((item) => {
+        const source =
+          orderById.get(item.orderId) ||
+          orders.find((order) => order.type === item.type) ||
+          null;
+        if (!source) return null;
+        return {
+          type: item.type,
+          orderItemKey: item.billingKey,
+          rakhtId: source.rakhtId || "",
+          rakhtTonId: source.rakhtTonId || "",
+          rakhtCompanyName: source.rakhtCompanyName || "",
+          rakhtBrandName: source.rakhtBrandName || "",
+          rakhtColor: source.rakhtColor || "",
+          rakhtColorHex: source.rakhtColorHex || "",
+          requiredMeters:
+            source.rakhtRequiredMeters != null
+              ? Number(source.rakhtRequiredMeters)
+              : "",
+          piecePrice: 0,
+        };
+      })
+      .filter(Boolean);
+
     setForm({
       customerId: customer.id,
       firstName: customer.firstName || "",
       phoneNumber: customer.phoneNumber || "",
       orderTypes,
       measurements,
+      orderItems,
+      rakhtSelections,
       billing,
       existingBill: data,
     });
@@ -229,6 +268,14 @@ export default function EditOrder() {
         firstName: merged.firstName,
         phoneNumber: merged.phoneNumber,
       },
+      rakhtSelections: (merged?.rakhtSelections || []).map((selection) => ({
+        type: selection.type,
+        orderItemKey: selection.orderItemKey,
+        rakhtId: selection.rakhtId,
+        rakhtTonId: selection.rakhtTonId,
+        requiredMeters: parseNumberLocale(selection.requiredMeters || 0),
+        piecePrice: 0,
+      })),
       orders: orderItems.map((item) => {
         const b = merged.billing?.[item.billingKey] || {};
         const meas = sanitize(item.measurements);
@@ -305,7 +352,9 @@ export default function EditOrder() {
                 }}
                 className="step-lbl"
               >
-                {t(STEP_I18N[s.label] || s.label)}
+                {t(STEP_I18N[s.label] || s.label, {
+                  defaultValue: STEP_FALLBACKS[s.label] || s.label,
+                })}
               </span>
             </div>
             {i < STEPS.length - 1 && (
@@ -358,6 +407,15 @@ export default function EditOrder() {
             />
           )}
           {step === 3 && (
+            <Step2RakhtSelection
+              onNext={next}
+              onBack={back}
+              initial={form}
+              orderTypes={form.orderTypes}
+              orderItems={form.orderItems}
+            />
+          )}
+          {step === 4 && (
             <Step4Billing
               onNext={(d) => {
                 const merged = { ...form, ...d };

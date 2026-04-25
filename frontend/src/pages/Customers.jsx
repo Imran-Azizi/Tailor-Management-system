@@ -108,12 +108,14 @@ export default function Customers({ openCreate = false }) {
           data ? t("customersPage.registered", { count: data.total }) : ""
         }
         action={
-          <div style={{ display: "flex", gap: 8 }}>
+          <div className="search-bar">
             <div
               style={{
                 position: "relative",
                 display: "flex",
                 alignItems: "center",
+                flex: 1,
+                minWidth: 140,
               }}
             >
               <LuSearch
@@ -127,7 +129,7 @@ export default function Customers({ openCreate = false }) {
               />
               <input
                 className="inp"
-                style={{ paddingLeft: 32, width: 180, height: 36 }}
+                style={{ paddingLeft: 32, height: 36 }}
                 placeholder={t("customersPage.searchPlaceholder")}
                 value={search}
                 onChange={(e) => {

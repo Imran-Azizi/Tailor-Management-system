@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
+import { MonthProvider } from "./context/MonthContext.jsx";
+import { useAuth } from "./context/AuthContext.jsx";
 import {
   ProtectedRoute,
   RoleRoute,
@@ -33,227 +35,263 @@ import CompletedWorkerOrders from "./pages/CompletedWorkerOrders.jsx";
 import DailyTasks from "./pages/DailyTasks.jsx";
 import AllDailyTasks from "./pages/AllDailyTasks.jsx";
 import DailyTaskDetails from "./pages/DailyTaskDetails.jsx";
+import CreateRakht from "./pages/CreateRakht.jsx";
+import AllRakhts from "./pages/AllRakhts.jsx";
+import PaymentHistory from "./pages/PaymentHistory.jsx";
+
+function RoleBasedRedirect() {
+  const { user } = useAuth();
+  if (user?.accountType === "FINANCE")
+    return <Navigate to="/dashboard" replace />;
+  return <Navigate to="/dashboard" replace />;
+}
 
 export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <BrowserRouter
-          future={{
-            v7_startTransition: true,
-            v7_relativeSplatPath: true,
-          }}
-        >
-          <ScrollToTop />
-          <Routes>
-            {/* Public */}
-            <Route path="/login" element={<Login />} />
+        <MonthProvider>
+          <BrowserRouter
+            future={{
+              v7_startTransition: true,
+              v7_relativeSplatPath: true,
+            }}
+          >
+            <ScrollToTop />
+            <Routes>
+              {/* Public */}
+              <Route path="/login" element={<Login />} />
 
-            {/* Admin system — requires ADMIN role */}
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <Layout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="my-tasks" element={<MyTasks />} />
+              {/* Admin system — requires ADMIN role */}
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <Layout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<RoleBasedRedirect />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="my-tasks" element={<MyTasks />} />
 
-              <Route
-                path="orders/create"
-                element={
-                  <RoleRoute roles={["ADMIN", "DOKAN"]}>
-                    <CreateOrder />
-                  </RoleRoute>
-                }
-              />
-              <Route
-                path="orders/:id/edit"
-                element={
-                  <RoleRoute roles={["ADMIN", "DOKAN"]}>
-                    <EditOrder />
-                  </RoleRoute>
-                }
-              />
-              <Route path="orders" element={<AllOrders />} />
-              <Route
-                path="orders/pending"
-                element={<AllOrders filter="pending" />}
-              />
-              <Route
-                path="orders/completed"
-                element={<AllOrders filter="completed" />}
-              />
-              <Route
-                path="orders/assignments"
-                element={
-                  <RoleRoute roles={["ADMIN"]}>
-                    <Navigate to="/orders/assignments/clothes" replace />
-                  </RoleRoute>
-                }
-              />
-              <Route
-                path="orders/assignments/clothes"
-                element={
-                  <RoleRoute roles={["ADMIN"]}>
-                    <AssignOrders />
-                  </RoleRoute>
-                }
-              />
-              <Route
-                path="orders/assignments/report"
-                element={
-                  <RoleRoute roles={["ADMIN"]}>
-                    <AssignOrdersReport />
-                  </RoleRoute>
-                }
-              />
-              <Route
-                path="orders/completed-workers"
-                element={
-                  <RoleRoute roles={["ADMIN"]}>
-                    <CompletedWorkerOrders />
-                  </RoleRoute>
-                }
-              />
-              <Route
-                path="delivery"
-                element={
-                  <RoleRoute roles={["ADMIN", "DOKAN"]}>
-                    <ClothesDeliveryToCustomer />
-                  </RoleRoute>
-                }
-              />
+                <Route
+                  path="orders/create"
+                  element={
+                    <RoleRoute roles={["ADMIN", "DOKAN", "FINANCE"]}>
+                      <CreateOrder />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="orders/:id/edit"
+                  element={
+                    <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <EditOrder />
+                    </RoleRoute>
+                  }
+                />
+                <Route path="orders" element={<AllOrders />} />
+                <Route
+                  path="orders/pending"
+                  element={<AllOrders filter="pending" />}
+                />
+                <Route
+                  path="orders/completed"
+                  element={<AllOrders filter="completed" />}
+                />
+                <Route
+                  path="orders/assignments"
+                  element={
+                    <RoleRoute roles={["ADMIN"]}>
+                      <Navigate to="/orders/assignments/clothes" replace />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="orders/assignments/clothes"
+                  element={
+                    <RoleRoute roles={["ADMIN"]}>
+                      <AssignOrders />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="orders/assignments/report"
+                  element={
+                    <RoleRoute roles={["ADMIN"]}>
+                      <AssignOrdersReport />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="orders/completed-workers"
+                  element={
+                    <RoleRoute roles={["ADMIN"]}>
+                      <CompletedWorkerOrders />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="delivery"
+                  element={
+                    <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <ClothesDeliveryToCustomer />
+                    </RoleRoute>
+                  }
+                />
 
-              <Route
-                path="customers"
-                element={
-                  <RoleRoute roles={["ADMIN", "DOKAN"]}>
-                    <Customers />
-                  </RoleRoute>
-                }
-              />
-              <Route
-                path="customers/create"
-                element={
-                  <RoleRoute roles={["ADMIN", "DOKAN"]}>
-                    <Customers openCreate />
-                  </RoleRoute>
-                }
-              />
-              <Route
-                path="customers/transactions"
-                element={
-                  <RoleRoute roles={["ADMIN", "DOKAN"]}>
-                    <CustomerTransactions />
-                  </RoleRoute>
-                }
-              />
-              <Route
-                path="customers/report"
-                element={
-                  <RoleRoute roles={["ADMIN", "DOKAN"]}>
-                    <CustomerReport />
-                  </RoleRoute>
-                }
-              />
-              <Route
-                path="boxes"
-                element={
-                  <RoleRoute roles={["ADMIN", "DOKAN"]}>
-                    <Boxes />
-                  </RoleRoute>
-                }
-              />
-              <Route
-                path="designs"
-                element={
-                  <RoleRoute roles={["ADMIN", "DOKAN"]}>
-                    <Designs />
-                  </RoleRoute>
-                }
-              />
-              <Route
-                path="print-bills"
-                element={
-                  <RoleRoute roles={["ADMIN", "DOKAN"]}>
-                    <PrintBills />
-                  </RoleRoute>
-                }
-              />
-              <Route path="notifications" element={<Notifications />} />
+                <Route
+                  path="customers"
+                  element={
+                    <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <Customers />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="customers/create"
+                  element={
+                    <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <Customers openCreate />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="customers/transactions"
+                  element={
+                    <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <CustomerTransactions />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="customers/report"
+                  element={
+                    <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <CustomerReport />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="boxes"
+                  element={
+                    <RoleRoute roles={["ADMIN", "DOKAN", "FINANCE"]}>
+                      <Boxes />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="designs"
+                  element={
+                    <RoleRoute roles={["ADMIN", "DOKAN", "FINANCE"]}>
+                      <Designs />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="print-bills"
+                  element={
+                    <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <PrintBills />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="rakht/create"
+                  element={
+                    <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <CreateRakht />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="rakhts"
+                  element={
+                    <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <AllRakhts />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="rakhts/payment-history"
+                  element={
+                    <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <PaymentHistory />
+                    </RoleRoute>
+                  }
+                />
+                <Route path="notifications" element={<Notifications />} />
 
-              <Route
-                path="users"
-                element={
-                  <RoleRoute roles={["ADMIN"]}>
-                    <UserManagement />
-                  </RoleRoute>
-                }
-              />
+                <Route
+                  path="users"
+                  element={
+                    <RoleRoute roles={["ADMIN"]}>
+                      <UserManagement />
+                    </RoleRoute>
+                  }
+                />
 
-              <Route
-                path="transactions/create"
-                element={
-                  <RoleRoute roles={["ADMIN", "DOKAN"]}>
-                    <MakeTransaction />
-                  </RoleRoute>
-                }
-              />
-              <Route
-                path="transactions"
-                element={
-                  <RoleRoute roles={["ADMIN", "DOKAN"]}>
-                    <AllTransactions />
-                  </RoleRoute>
-                }
-              />
+                <Route
+                  path="transactions/create"
+                  element={
+                    <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <MakeTransaction />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="transactions"
+                  element={
+                    <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <AllTransactions />
+                    </RoleRoute>
+                  }
+                />
 
-              <Route
-                path="daily-tasks"
-                element={
-                  <RoleRoute roles={["ADMIN", "DOKAN"]}>
-                    <DailyTasks />
-                  </RoleRoute>
-                }
-              />
-              <Route
-                path="daily-tasks/all"
-                element={
-                  <RoleRoute roles={["ADMIN", "DOKAN"]}>
-                    <AllDailyTasks />
-                  </RoleRoute>
-                }
-              />
-              <Route
-                path="daily-tasks/:id"
-                element={
-                  <RoleRoute roles={["ADMIN", "DOKAN"]}>
-                    <DailyTaskDetails />
-                  </RoleRoute>
-                }
-              />
-            </Route>
+                <Route
+                  path="daily-tasks"
+                  element={
+                    <RoleRoute roles={["ADMIN", "DOKAN", "FINANCE"]}>
+                      <DailyTasks />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="daily-tasks/all"
+                  element={
+                    <RoleRoute roles={["ADMIN", "DOKAN", "FINANCE"]}>
+                      <AllDailyTasks />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="daily-tasks/:id"
+                  element={
+                    <RoleRoute roles={["ADMIN", "DOKAN", "FINANCE"]}>
+                      <DailyTaskDetails />
+                    </RoleRoute>
+                  }
+                />
+              </Route>
 
-            {/* Worker panel — Dokht and Qichikar */}
-            <Route
-              path="/panel"
-              element={
-                <WorkerProtectedRoute>
-                  <WorkerLayout />
-                </WorkerProtectedRoute>
-              }
-            >
-              <Route index element={<WorkerPanel />} />
-            </Route>
+              {/* Worker panel — Dokht and Qichikar */}
+              <Route
+                path="/panel"
+                element={
+                  <WorkerProtectedRoute>
+                    <WorkerLayout />
+                  </WorkerProtectedRoute>
+                }
+              >
+                <Route index element={<WorkerPanel />} />
+              </Route>
 
-            {/* Fallback */}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-        </BrowserRouter>
+              {/* Fallback */}
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </BrowserRouter>
+        </MonthProvider>
       </AuthProvider>
     </ThemeProvider>
   );

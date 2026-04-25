@@ -487,12 +487,6 @@ function OrderDetailsModal({ order, language, t, onClose }) {
                       ? Number(order.rakhtRequiredMeters).toFixed(2)
                       : "-",
                   ],
-                  [
-                    t("rakht.piecePrice", { defaultValue: "Piece Price" }),
-                    order?.rakhtPiecePrice != null
-                      ? Number(order.rakhtPiecePrice).toLocaleString()
-                      : "-",
-                  ],
                 ].map(([field, value], index, arr) => (
                   <tr key={field}>
                     <td style={tdStyle}>{field}</td>

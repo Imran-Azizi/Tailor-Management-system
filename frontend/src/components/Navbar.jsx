@@ -19,9 +19,16 @@ import {
   LuX,
   LuArrowRight,
   LuCircleDollarSign,
+  LuFileText,
+  LuEye,
+  LuPencil,
+  LuTrash2,
+  LuCalendarCheck,
+  LuDownload,
 } from "react-icons/lu";
 import { useTheme } from "../context/ThemeContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useMonth } from "../context/MonthContext.jsx";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import {
@@ -29,7 +36,9 @@ import {
   formatUserNotificationMessage,
 } from "../lib/notifications.js";
 import { formatDateTimeLocale } from "../lib/locale.js";
-import { NotificationText } from "./ui/index.jsx";
+import { deleteOrderDraft, listOrderDrafts } from "../lib/orderDraftApi.js";
+import { getMonthLabel, MONTHS } from "../lib/months.js";
+import { EmptyState, Modal, NotificationText, Spinner } from "./ui/index.jsx";
 
 function useOutside(ref, fn) {
   useEffect(() => {
@@ -148,9 +157,7 @@ function SystemNotifPanel({ onClose }) {
         </div>
       </div>
 
-      {!hasAny ? (
-        <div className="notif-panel-empty">{t("navbar.allCaughtUp")}</div>
-      ) : (
+      {hasAny ? (
         <div className="notif-panel-scroll">
           {/* Worker status updates */}
           {workerNotifs.length > 0 && (
@@ -165,7 +172,7 @@ function SystemNotifPanel({ onClose }) {
                   borderBottom: "1px solid var(--border)",
                 }}
               >
-                <LuBell size={12} style={{ color: "#2563EB" }} />
+                <LuBell size={12} style={{ color: "var(--primary)" }} />
                 <span
                   style={{
                     fontSize: 11,
@@ -200,7 +207,11 @@ function SystemNotifPanel({ onClose }) {
                   >
                     <LuBell
                       size={13}
-                      style={{ color: "#2563EB", flexShrink: 0, marginTop: 2 }}
+                      style={{
+                        color: "var(--primary)",
+                        flexShrink: 0,
+                        marginTop: 2,
+                      }}
                     />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <NotificationText
@@ -269,12 +280,12 @@ function SystemNotifPanel({ onClose }) {
                   borderBottom: "1px solid var(--border)",
                 }}
               >
-                <LuTriangleAlert size={12} style={{ color: "#EF4444" }} />
+                <LuTriangleAlert size={12} style={{ color: "var(--danger)" }} />
                 <span
                   style={{
                     fontSize: 11,
                     fontWeight: 700,
-                    color: "#EF4444",
+                    color: "var(--danger)",
                     textTransform: "uppercase",
                     letterSpacing: ".06em",
                   }}
@@ -290,7 +301,11 @@ function SystemNotifPanel({ onClose }) {
                 >
                   <LuTriangleAlert
                     size={14}
-                    style={{ color: "#EF4444", flexShrink: 0, marginTop: 2 }}
+                    style={{
+                      color: "var(--danger)",
+                      flexShrink: 0,
+                      marginTop: 2,
+                    }}
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <NotificationText
@@ -326,6 +341,8 @@ function SystemNotifPanel({ onClose }) {
             </>
           )}
         </div>
+      ) : (
+        <div className="notif-panel-empty">{t("navbar.allCaughtUp")}</div>
       )}
     </>
   );
@@ -415,12 +432,15 @@ function UserNotifPanel({ onClose }) {
                   borderBottom: "1px solid var(--border)",
                 }}
               >
-                <LuCircleDollarSign size={12} style={{ color: "#16A34A" }} />
+                <LuCircleDollarSign
+                  size={12}
+                  style={{ color: "var(--success)" }}
+                />
                 <span
                   style={{
                     fontSize: 11,
                     fontWeight: 700,
-                    color: "#16A34A",
+                    color: "var(--success)",
                     textTransform: "uppercase",
                     letterSpacing: ".06em",
                   }}
@@ -432,7 +452,11 @@ function UserNotifPanel({ onClose }) {
                 <div key={n.id} className="notif-panel-item">
                   <LuCircleDollarSign
                     size={14}
-                    style={{ color: "#16A34A", flexShrink: 0, marginTop: 2 }}
+                    style={{
+                      color: "var(--success)",
+                      flexShrink: 0,
+                      marginTop: 2,
+                    }}
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <NotificationText
@@ -583,8 +607,165 @@ function NotificationSidebar({ open, onClose, isWorker }) {
   );
 }
 
+// ─── Month Selection ──────────────────────────────────────────────────────────
+
+function MonthDropdown({ onClose }) {
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language || "en";
+  const { viewMonth, viewYear, setViewMonth, setViewYear } = useMonth();
+  const { isAdmin } = useAuth();
+
+  const [reportLoading, setReportLoading] = useState(false);
+
+  const activeMonth = viewMonth;
+  const activeYear = viewYear;
+  const setMonth = setViewMonth;
+  const setYear = setViewYear;
+
+  const currentYear = new Date().getFullYear();
+  const years = [currentYear - 1, currentYear, currentYear + 1];
+
+  const handleGenerateReport = async () => {
+    if (reportLoading) return;
+    setReportLoading(true);
+    try {
+      const response = await api.get("/orders/report/monthly", {
+        params: { month: viewMonth, year: viewYear },
+        responseType: "blob",
+      });
+      const MONTH_NAMES = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+      ];
+      const monthLabel = MONTH_NAMES[(viewMonth - 1) % 12] || String(viewMonth);
+      const filename = `Monthly_Report_${monthLabel}_${viewYear}.pdf`;
+      const url = URL.createObjectURL(
+        new Blob([response.data], { type: "application/pdf" }),
+      );
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      onClose();
+    } catch (e) {
+      toast.error(t("report.generateFailed", "Failed to generate report"));
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  return (
+    <div
+      className="dd-menu month-dd"
+      style={{ minWidth: 230, insetInlineStart: 0, insetInlineEnd: "auto" }}
+    >
+      <div
+        className="dd-hd"
+        style={{ display: "flex", alignItems: "center", gap: 6 }}
+      >
+        <LuCalendarCheck size={12} />
+        {t("navbar.viewDataByMonth", "View Data by Month")}
+      </div>
+
+      <div className="month-year-row">
+        {years.map((y) => (
+          <button
+            key={y}
+            type="button"
+            className={`month-year-btn${activeYear === y ? " on" : ""}`}
+            onClick={() => setYear(y)}
+          >
+            {y}
+          </button>
+        ))}
+      </div>
+
+      <div className="month-grid">
+        {MONTHS.map((m) => (
+          <button
+            key={m.value}
+            type="button"
+            className={`month-cell${activeMonth === m.value ? " on" : ""}`}
+            onClick={() => {
+              setMonth(m.value);
+              onClose();
+            }}
+          >
+            {getMonthLabel(m.value, language)}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ padding: "8px 10px 4px" }}>
+        {isAdmin && (
+          <button
+            type="button"
+            className="month-report-btn"
+            disabled={reportLoading}
+            onClick={handleGenerateReport}
+          >
+            {reportLoading ? <Spinner size={12} /> : <LuDownload size={12} />}
+            {reportLoading
+              ? t("report.generating", "Generating...")
+              : t("report.generate", "Generate Report")}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MonthSelector() {
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language || "en";
+  const { viewMonth, viewYear } = useMonth();
+
+  const [viewOpen, setViewOpen] = useState(false);
+  const viewRef = useRef();
+
+  useOutside(viewRef, () => setViewOpen(false));
+
+  const viewLabel = `${getMonthLabel(viewMonth, language)} ${viewYear}`;
+
+  return (
+    <div className="month-selector-wrap">
+      <div className="dd-wrap" ref={viewRef}>
+        <button
+          type="button"
+          className="month-pill view-pill"
+          onClick={() => {
+            setViewOpen((o) => !o);
+          }}
+          title={t("navbar.viewDataByMonth", "View Data by Month")}
+        >
+          <LuCalendarCheck size={13} />
+          <span className="month-pill-label">{viewLabel}</span>
+          <LuChevronDown
+            size={11}
+            className={`month-chevron${viewOpen ? " open" : ""}`}
+          />
+        </button>
+        {viewOpen && <MonthDropdown onClose={() => setViewOpen(false)} />}
+      </div>
+    </div>
+  );
+}
+
 function LangDropdown({ onClose }) {
-  const { i18n, t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const langs = [
     { code: "en", label: t("common.english"), flag: "EN" },
     { code: "dari", label: t("common.dari"), flag: "DR" },
@@ -620,7 +801,7 @@ function UserDropdown({ onClose }) {
   const { t } = useTranslation();
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
-  const roleColor = ROLE_COLORS[user?.accountType] || "#888";
+  const roleColor = ROLE_COLORS[user?.accountType] || "var(--text3)";
 
   const handleLogout = async () => {
     await logout();
@@ -672,7 +853,7 @@ function UserDropdown({ onClose }) {
       <div
         className="dd-item"
         onClick={handleLogout}
-        style={{ color: "#EF4444" }}
+        style={{ color: "var(--danger)" }}
       >
         <LuLogOut size={14} />
         <span>{t("auth.logout")}</span>
@@ -684,8 +865,11 @@ function UserDropdown({ onClose }) {
 export default function Navbar({ onHamburger, pageTitle }) {
   const { t, i18n } = useTranslation();
   const { dark, toggle } = useTheme();
-  const { user, isWorker } = useAuth();
+  const { user, isWorker, isAdmin, isFinance, canManageOrders } = useAuth();
+  const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  const [draftListOpen, setDraftListOpen] = useState(false);
+  const [selectedDraft, setSelectedDraft] = useState(null);
   const [notifOpen, setNotifOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
@@ -723,6 +907,34 @@ export default function Navbar({ onHamburger, pageTitle }) {
     enabled: !!isWorker,
   });
 
+  const {
+    data: drafts = [],
+    isLoading: isDraftsLoading,
+    refetch: refetchDrafts,
+  } = useQuery({
+    queryKey: ["order-drafts-navbar", user?.id],
+    queryFn: listOrderDrafts,
+    enabled: canManageOrders,
+  });
+
+  const deleteDraftMut = useMutation({
+    mutationFn: (draftId) => deleteOrderDraft(draftId),
+    onSuccess: () => {
+      toast.success(t("orders.draftDeleted", "Draft deleted"));
+      qc.invalidateQueries({ queryKey: ["order-drafts"] });
+      qc.invalidateQueries({ queryKey: ["order-drafts-navbar"] });
+      refetchDrafts();
+      setSelectedDraft(null);
+    },
+    onError: (error) =>
+      toast.error(
+        getApiErrorMessage(
+          error,
+          t("orders.draftDeleteFailed", "Failed to delete draft"),
+        ),
+      ),
+  });
+
   const unreadCount = isWorker
     ? unreadUser.length
     : unreadSystem.length + unreadAdminWorker.length;
@@ -734,15 +946,20 @@ export default function Navbar({ onHamburger, pageTitle }) {
     }
   };
 
-  const roleColor = ROLE_COLORS[user?.accountType] || "#888";
+  const resumeDraft = (draftId) => {
+    navigate(`/orders/create?draft=${draftId}`);
+    setDraftListOpen(false);
+    setSelectedDraft(null);
+  };
+
+  const roleColor = ROLE_COLORS[user?.accountType] || "var(--text3)";
 
   return (
     <>
       <header className="navbar no-print">
         <button
-          className="nav-btn md:hidden"
+          className="nav-btn nav-ham-btn"
           onClick={onHamburger}
-          id="ham-btn"
           aria-label={t("common.menu", "Menu")}
         >
           <LuMenu size={20} />
@@ -750,6 +967,8 @@ export default function Navbar({ onHamburger, pageTitle }) {
 
         <span className="nav-title">{pageTitle}</span>
         <div className="nav-spacer" />
+
+        {(isAdmin || isFinance) && <MonthSelector />}
 
         <div className="nav-search">
           <LuSearch size={14} className="ns-ico" />
@@ -761,6 +980,31 @@ export default function Navbar({ onHamburger, pageTitle }) {
             onKeyDown={onSearch}
           />
         </div>
+
+        {canManageOrders && (
+          <button
+            type="button"
+            className="nav-btn"
+            onClick={() => {
+              setDraftListOpen(true);
+              setNotifOpen(false);
+              setLangOpen(false);
+              setUserOpen(false);
+            }}
+            disabled={isDraftsLoading}
+            title={t("orders.drafts", "Drafts")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              paddingInline: 10,
+              minWidth: 86,
+            }}
+          >
+            <LuFileText size={16} />
+            <span className="nbl">{drafts.length}</span>
+          </button>
+        )}
 
         <div className="dd-wrap" ref={langRef}>
           <button
@@ -840,6 +1084,7 @@ export default function Navbar({ onHamburger, pageTitle }) {
               <LuUser size={14} style={{ color: roleColor }} />
             </div>
             <span
+              className="nav-user-name"
               style={{
                 fontSize: 13,
                 fontWeight: 600,
@@ -855,14 +1100,152 @@ export default function Navbar({ onHamburger, pageTitle }) {
           </button>
           {userOpen && <UserDropdown onClose={() => setUserOpen(false)} />}
         </div>
-
-        <style>{`#ham-btn{display:flex!important}@media(min-width:769px){#ham-btn{display:none!important}}`}</style>
       </header>
       <NotificationSidebar
         open={notifOpen}
         onClose={() => setNotifOpen(false)}
         isWorker={isWorker}
       />
+
+      <Modal
+        open={draftListOpen}
+        onClose={() => setDraftListOpen(false)}
+        title={t("orders.drafts", "Drafts")}
+        maxW={920}
+      >
+        {isDraftsLoading ? (
+          <Spinner />
+        ) : drafts.length === 0 ? (
+          <EmptyState message={t("orders.noDrafts", "No saved drafts")} />
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>{t("common.customer", "Customer")}</th>
+                  <th>{t("orders.orderTypes", "Order Types")}</th>
+                  <th>{t("orders.lastUpdated", "Last Updated")}</th>
+                  <th>{t("common.actions", "Actions")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {drafts.map((draft) => (
+                  <tr key={draft.id}>
+                    <td>
+                      {draft.customerName ||
+                        t("orders.unknownCustomer", "Unnamed")}
+                    </td>
+                    <td>{(draft.orderTypes || []).join(", ") || "-"}</td>
+                    <td>{new Date(draft.updatedAt).toLocaleString()}</td>
+                    <td>
+                      <div
+                        style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
+                      >
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          onClick={() => setSelectedDraft(draft)}
+                        >
+                          <LuEye size={13} />
+                          {t("common.view", "View")}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          onClick={() => resumeDraft(draft.id)}
+                        >
+                          <LuFileText size={13} />
+                          {t("orders.resume", "Resume")}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          onClick={() => resumeDraft(draft.id)}
+                        >
+                          <LuPencil size={13} />
+                          {t("common.edit", "Edit")}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          style={{
+                            color: "var(--danger)",
+                            borderColor: "var(--danger-soft-border)",
+                          }}
+                          onClick={() => deleteDraftMut.mutate(draft.id)}
+                          disabled={deleteDraftMut.isPending}
+                        >
+                          <LuTrash2 size={13} />
+                          {t("common.delete", "Delete")}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={!!selectedDraft}
+        onClose={() => setSelectedDraft(null)}
+        title={t("orders.draftDetails", "Draft Details")}
+        maxW={700}
+      >
+        {selectedDraft && (
+          <div style={{ display: "grid", gap: 12 }}>
+            <div style={{ fontSize: 13, color: "var(--text2)" }}>
+              <b>{t("common.customer", "Customer")}:</b>{" "}
+              {selectedDraft.customerName || "-"}
+            </div>
+            <div style={{ fontSize: 13, color: "var(--text2)" }}>
+              <b>{t("orders.orderTypes", "Order Types")}:</b>{" "}
+              {(selectedDraft.orderTypes || []).join(", ") || "-"}
+            </div>
+            <div style={{ fontSize: 13, color: "var(--text2)" }}>
+              <b>{t("orders.lastUpdated", "Last Updated")}:</b>{" "}
+              {new Date(selectedDraft.updatedAt).toLocaleString()}
+            </div>
+            <div
+              style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}
+            >
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setSelectedDraft(null)}
+              >
+                <LuEye size={14} />
+                {t("common.close", "Close")}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  resumeDraft(selectedDraft.id);
+                }}
+              >
+                <LuFileText size={14} />
+                {t("orders.resume", "Resume")}
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline"
+                style={{
+                  color: "var(--danger)",
+                  borderColor: "var(--danger-soft-border)",
+                }}
+                onClick={() => deleteDraftMut.mutate(selectedDraft.id)}
+                disabled={deleteDraftMut.isPending}
+              >
+                <LuTrash2 size={14} />
+                {t("common.delete", "Delete")}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </>
   );
 }

@@ -103,52 +103,10 @@ const POCKETS = {
 };
 
 const REQUIRED_LABELS = {
-  OUTFIT: {
-    height: "height",
-    shoulder: "shoulder",
-    sleeve: "sleeve",
-    neck: "neck",
-    chest: "chest",
-    armpit: "armpit",
-    waist: "waist",
-    skirt: "skirt",
-    tenban: "tenban",
-    pantLeg: "pantLeg",
-    arm: "arm",
-    calf: "calf",
-  },
-  WASKAT: {
-    height: "height",
-    shoulder: "shoulder",
-    neck: "neck",
-    chest: "chest",
-    waist: "waist",
-    sorain: "sorain",
-  },
-  KORTY: {
-    height: "height",
-    arm: "arm",
-    shoulder: "shoulder",
-    neck: "neck",
-    sleeve: "sleeve",
-    patlonHeight: "patlonHeight",
-    kamerPatlon: "kamerPatlon",
-    doroBaghlePatlon: "doroBaghlePatlon",
-    waist: "waist",
-    sorainPatlon: "sorainPatlon",
-    sorain: "sorain",
-    patPatlon: "patPatlon",
-    pachaPatlon: "pachaPatlon",
-  },
-  YAKHANQAQ: {
-    height: "height",
-    sleeve: "sleeve",
-    shoulder: "shoulder",
-    neck: "neck",
-    armpit: "armpit",
-    sorain: "sorain",
-    chest: "chest",
-  },
+  OUTFIT: {},
+  WASKAT: {},
+  KORTY: {},
+  YAKHANQAQ: {},
 };
 
 const selStyles = {
@@ -314,13 +272,12 @@ function MeasureBlock({
               <LuRuler size={14} />
               {t("createOrder.measurements")}
             </span>
-            <span>{t("createOrder.requiredFieldHint")}</span>
           </div>
 
           <div className="measure-grid">
             {fields.map(([key, label]) => (
               <div key={key} className="measure-field">
-                <label className="lbl lbl-r" style={{ fontSize: 11 }}>
+                <label className="lbl" style={{ fontSize: 11 }}>
                   {t(`createOrder.fields.${label}`)}
                 </label>
                 <input
@@ -463,7 +420,8 @@ export default function Step3Measurements({
 
       const normalized = (source.length ? source : [{}]).map(
         (setValue, setIndex) => {
-          const safeSet = setValue && typeof setValue === "object" ? setValue : {};
+          const safeSet =
+            setValue && typeof setValue === "object" ? setValue : {};
           if (safeSet.__name?.trim()) return safeSet;
           if (setIndex === 0 && entry.name?.trim()) {
             return { ...safeSet, __name: entry.name.trim() };
@@ -677,7 +635,13 @@ export default function Step3Measurements({
               })}
             </div>
 
-            <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
+            <div
+              style={{
+                marginTop: 12,
+                display: "flex",
+                justifyContent: "flex-end",
+              }}
+            >
               <button
                 type="button"
                 className="btn btn-outline btn-sm"

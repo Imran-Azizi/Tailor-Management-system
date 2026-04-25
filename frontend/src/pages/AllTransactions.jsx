@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
   LuArrowRightLeft,
   LuBadgeDollarSign,
   LuBuilding2,
+  LuCalendarCheck,
   LuCalendarDays,
   LuFilter,
   LuRefreshCcw,
@@ -14,6 +15,9 @@ import {
   LuX,
 } from "react-icons/lu";
 import api from "../lib/api.js";
+import { useAuth } from "../context/AuthContext.jsx";
+import { useMonth } from "../context/MonthContext.jsx";
+import { getMonthLabel } from "../lib/months.js";
 import {
   Badge,
   Card,
@@ -61,17 +65,38 @@ function getAmountColor(kind) {
 }
 
 export default function AllTransactions() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language;
+  const { isAdmin } = useAuth();
+  const { viewMonth, viewYear } = useMonth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
 
+  useEffect(() => {
+    setPage(1);
+  }, [viewMonth, viewYear]);
+
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ["transactions", page, search, typeFilter],
+    queryKey: [
+      "transactions",
+      page,
+      search,
+      typeFilter,
+      isAdmin ? viewMonth : null,
+      isAdmin ? viewYear : null,
+    ],
     queryFn: () =>
       api
         .get("/transactions", {
-          params: { page, limit: 20, search, accountType: typeFilter },
+          params: {
+            page,
+            limit: 20,
+            search,
+            accountType: typeFilter,
+            month: isAdmin ? viewMonth : undefined,
+            year: isAdmin ? viewYear : undefined,
+          },
         })
         .then((r) => r.data),
   });
@@ -126,6 +151,39 @@ export default function AllTransactions() {
           </button>
         }
       />
+
+      {isAdmin && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "8px 14px",
+            marginBottom: 4,
+            borderRadius: "var(--r)",
+            background: "var(--success-soft, #F0FDF4)",
+            border: "1px solid var(--success-soft-border, #BBF7D0)",
+            fontSize: 13,
+            color: "var(--success, #16A34A)",
+            fontWeight: 500,
+          }}
+        >
+          <LuCalendarCheck size={14} />
+          <span>
+            {t("common.viewingMonth", "Viewing data for")}:{" "}
+            <strong style={{ fontWeight: 700 }}>
+              {getMonthLabel(viewMonth, language)} {viewYear}
+            </strong>
+          </span>
+          {data?.total === 0 && !isLoading && (
+            <span
+              style={{ marginInlineStart: "auto", fontSize: 11, opacity: 0.75 }}
+            >
+              {t("common.noDataThisMonth", "No data found for this month")}
+            </span>
+          )}
+        </div>
+      )}
 
       <Card>
         <div
@@ -287,12 +345,14 @@ export default function AllTransactions() {
             Icon={LuArrowRightLeft}
           />
         ) : (
-          <div style={{ overflowX: "auto" }}>
+          <div className="tbl-wrap">
             <table
+              className="tbl"
               style={{
                 width: "100%",
                 borderCollapse: "separate",
                 borderSpacing: 0,
+                minWidth: 760,
               }}
             >
               <thead>

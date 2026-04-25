@@ -116,15 +116,18 @@ export default function Login() {
     setLoading(true);
     try {
       const user = await login(phone.trim(), password);
-      if (user.accountType === "ADMIN") {
-        toast.success(t("auth.welcomeBack", { name: user.name }));
-        navigate(from === "/login" ? "/dashboard" : from, { replace: true });
-      } else if (
-        user.accountType === "DOKHT" ||
-        user.accountType === "QICHIKAR"
-      ) {
+      if (user.accountType === "DOKHT" || user.accountType === "QICHIKAR") {
         toast.success(t("auth.welcomeBack", { name: user.name }));
         navigate("/panel", { replace: true });
+      } else if (["ADMIN", "DOKAN", "FINANCE"].includes(user.accountType)) {
+        toast.success(t("auth.welcomeBack", { name: user.name }));
+        const dest =
+          user.accountType === "FINANCE"
+            ? "/orders"
+            : from === "/login"
+              ? "/dashboard"
+              : from;
+        navigate(dest, { replace: true });
       } else {
         await logout();
         toast.error(t("auth.adminOnly", "Access denied. Admin accounts only."));

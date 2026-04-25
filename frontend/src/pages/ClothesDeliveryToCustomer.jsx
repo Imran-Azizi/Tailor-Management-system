@@ -258,7 +258,7 @@ export default function ClothesDeliveryToCustomer() {
           </Card>
         ) : (
           <div className="grid gap-4">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div
                   className={`text-xs font-semibold text-slate-500 ${isRtl ? "tracking-normal" : "uppercase tracking-wide"}`}
@@ -356,8 +356,11 @@ export default function ClothesDeliveryToCustomer() {
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="min-w-full border-separate border-spacing-0">
+              <div className="tbl-wrap">
+                <table
+                  className="min-w-full border-separate border-spacing-0"
+                  style={{ minWidth: 640 }}
+                >
                   <thead>
                     <tr
                       className={`text-xs font-semibold text-slate-500 ${

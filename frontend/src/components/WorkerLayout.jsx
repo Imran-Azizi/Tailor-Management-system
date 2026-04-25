@@ -156,12 +156,15 @@ function WorkerNotifDrawer({ open, roleColor, onClose }) {
                     borderBottom: "1px solid var(--border)",
                   }}
                 >
-                  <LuCircleDollarSign size={12} style={{ color: "#16A34A" }} />
+                  <LuCircleDollarSign
+                    size={12}
+                    style={{ color: "var(--success)" }}
+                  />
                   <span
                     style={{
                       fontSize: 11,
                       fontWeight: 700,
-                      color: "#16A34A",
+                      color: "var(--success)",
                       textTransform: "uppercase",
                       letterSpacing: ".06em",
                     }}
@@ -173,7 +176,11 @@ function WorkerNotifDrawer({ open, roleColor, onClose }) {
                   <div key={n.id} className="notif-panel-item">
                     <LuCircleDollarSign
                       size={14}
-                      style={{ color: "#16A34A", flexShrink: 0, marginTop: 2 }}
+                      style={{
+                        color: "var(--success)",
+                        flexShrink: 0,
+                        marginTop: 2,
+                      }}
                     />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <NotificationText
@@ -394,7 +401,7 @@ function UserMenu({ roleColor, onClose }) {
           alignItems: "center",
           gap: 9,
           cursor: "pointer",
-          color: "#EF4444",
+          color: "var(--danger)",
           fontSize: 13,
           fontWeight: 500,
         }}
@@ -541,8 +548,8 @@ export default function WorkerLayout() {
                 minWidth: 17,
                 height: 17,
                 borderRadius: 99,
-                background: "#EF4444",
-                color: "#fff",
+                background: "var(--notif-dot-bg)",
+                color: "var(--notif-dot-text)",
                 fontSize: 10,
                 fontWeight: 700,
                 display: "flex",

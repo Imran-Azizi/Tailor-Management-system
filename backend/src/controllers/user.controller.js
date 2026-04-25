@@ -70,18 +70,18 @@ export async function createUser(req, res, next) {
         .status(400)
         .json({ error: "name, phoneNumber and accountType are required." });
     }
-    if (!["ADMIN", "DOKAN", "DOKHT", "QICHIKAR"].includes(accountType)) {
+    if (
+      !["ADMIN", "DOKAN", "DOKHT", "QICHIKAR", "FINANCE"].includes(accountType)
+    ) {
       return res.status(400).json({ error: "Invalid accountType." });
     }
     // Default password is the phone number if not explicitly provided
     const rawPassword = password || phoneNumber.trim();
     if (rawPassword.length < 6) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Phone number must be at least 6 characters to use as default password.",
-        });
+      return res.status(400).json({
+        error:
+          "Phone number must be at least 6 characters to use as default password.",
+      });
     }
     const hashed = await bcrypt.hash(rawPassword, SALT_ROUNDS);
     const user = await prisma.user.create({
@@ -115,7 +115,11 @@ export async function updateUser(req, res, next) {
     if (name !== undefined) data.name = name.trim();
     if (phoneNumber !== undefined) data.phoneNumber = phoneNumber.trim();
     if (accountType !== undefined) {
-      if (!["ADMIN", "DOKAN", "DOKHT", "QICHIKAR"].includes(accountType)) {
+      if (
+        !["ADMIN", "DOKAN", "DOKHT", "QICHIKAR", "FINANCE"].includes(
+          accountType,
+        )
+      ) {
         return res.status(400).json({ error: "Invalid accountType." });
       }
       data.accountType = accountType;

@@ -161,16 +161,36 @@ export const createDailyTask = async (data, createdById) => {
   });
 };
 
-export const getDailyTasks = async ({ page = 1, limit = 20, search = "" }) => {
-  const where = search
-    ? {
-        OR: [
-          { fromName: { contains: search, mode: "insensitive" } },
-          { recipientName: { contains: search, mode: "insensitive" } },
-          { note: { contains: search, mode: "insensitive" } },
-        ],
-      }
-    : {};
+export const getDailyTasks = async ({
+  page = 1,
+  limit = 20,
+  search = "",
+  month = null,
+  year = null,
+}) => {
+  const where = {};
+
+  if (search) {
+    where.OR = [
+      { fromName: { contains: search, mode: "insensitive" } },
+      { recipientName: { contains: search, mode: "insensitive" } },
+      { note: { contains: search, mode: "insensitive" } },
+    ];
+  }
+
+  const parsedMonth = month != null ? Number(month) : null;
+  const parsedYear = year != null ? Number(year) : null;
+
+  if (
+    parsedMonth &&
+    parsedYear &&
+    Number.isFinite(parsedMonth) &&
+    Number.isFinite(parsedYear)
+  ) {
+    const monthStart = new Date(parsedYear, parsedMonth - 1, 1, 0, 0, 0, 0);
+    const monthEnd = new Date(parsedYear, parsedMonth, 0, 23, 59, 59, 999);
+    where.taskDate = { gte: monthStart, lte: monthEnd };
+  }
 
   const [total, data] = await Promise.all([
     prisma.dailyTask.count({ where }),

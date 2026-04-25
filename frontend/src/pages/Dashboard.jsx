@@ -23,12 +23,16 @@ import {
   LuCalendar,
   LuTrendingUp,
   LuBanknote,
+  LuCalendarCheck,
 } from "react-icons/lu";
 import { useTranslation } from "react-i18next";
 import api from "../lib/api.js";
 import { formatCurrency } from "../lib/currency.js";
 import { formatDateLocale } from "../lib/locale.js";
 import { getOrderTypeLabel } from "../lib/orderType.js";
+import { useAuth } from "../context/AuthContext.jsx";
+import { useMonth } from "../context/MonthContext.jsx";
+import { getMonthLabel } from "../lib/months.js";
 import {
   StatCard,
   Spinner,
@@ -81,10 +85,20 @@ const Tip = ({ active, payload, label, language, t }) => {
 export default function Dashboard() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
+  const { isAdmin, isFinance, user } = useAuth();
+  const { viewMonth, viewYear } = useMonth();
 
   const { data: d, isLoading } = useQuery({
-    queryKey: ["analytics"],
-    queryFn: () => api.get("/analytics/dashboard").then((r) => r.data),
+    queryKey: ["analytics", viewMonth, viewYear, isFinance ? user?.id : null],
+    queryFn: () =>
+      api
+        .get("/analytics/dashboard", {
+          params: {
+            month: viewMonth,
+            year: viewYear,
+          },
+        })
+        .then((r) => r.data),
     refetchInterval: 60_000,
   });
 
@@ -105,6 +119,32 @@ export default function Dashboard() {
   return (
     <div className="page">
       <PageHeader title={t("dashboardPage.title")} subtitle={todayLabel} />
+
+      {(isAdmin || isFinance) && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "8px 14px",
+            marginBottom: 16,
+            borderRadius: "var(--r)",
+            background: "var(--success-soft, #F0FDF4)",
+            border: "1px solid var(--success-soft-border, #BBF7D0)",
+            fontSize: 13,
+            color: "var(--success, #16A34A)",
+            fontWeight: 500,
+          }}
+        >
+          <LuCalendarCheck size={14} />
+          <span>
+            {t("common.viewingMonth", "Viewing data for")}:{" "}
+            <strong style={{ fontWeight: 700 }}>
+              {getMonthLabel(viewMonth, language)} {viewYear}
+            </strong>
+          </span>
+        </div>
+      )}
 
       <div className="g-stats" style={{ marginBottom: 20 }}>
         <StatCard

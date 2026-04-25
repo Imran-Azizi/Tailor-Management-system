@@ -25,12 +25,21 @@ export const listUsersByType = async (req, res, next) => {
 /** GET /api/transactions */
 export const listTransactions = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, search = "", accountType = "" } = req.query;
+    const {
+      page = 1,
+      limit = 20,
+      search = "",
+      accountType = "",
+      month,
+      year,
+    } = req.query;
     const result = await service.getTransactions({
       page: Number(page),
       limit: Number(limit),
       search,
       accountType,
+      month: month != null ? Number(month) : null,
+      year: year != null ? Number(year) : null,
     });
     res.json(result);
   } catch (err) {

@@ -6,7 +6,7 @@ const hexColor = z.string().regex(/^#[0-9A-Fa-f]{6}$/);
 const rakhtTonSchema = z.object({
   name: nonEmpty,
   colorHex: hexColor,
-  totalMeters: z.number().positive(),
+  totalMeters: z.number().int().positive(),
 });
 
 export const createRakhtSchema = z
@@ -15,8 +15,8 @@ export const createRakhtSchema = z
     brandName: nonEmpty,
     tonQuantity: z.number().int().min(1).max(30),
     tons: z.array(rakhtTonSchema),
-    totalPrice: z.number().min(0),
-    givenMoney: z.number().min(0),
+    totalPrice: z.number().int().min(0),
+    givenMoney: z.number().int().min(0),
   })
   .refine((data) => data.tons.length === data.tonQuantity, {
     message: "Number of ton items must match tonQuantity",
@@ -28,6 +28,11 @@ export const updateRakhtSchema = z.object({
   brandName: nonEmpty.optional(),
   tonQuantity: z.number().int().min(1).max(30).optional(),
   tons: z.array(rakhtTonSchema).optional(),
-  totalPrice: z.number().min(0).optional(),
-  givenMoney: z.number().min(0).optional(),
+  totalPrice: z.number().int().min(0).optional(),
+  givenMoney: z.number().int().min(0).optional(),
+});
+
+export const payRemainingMoneySchema = z.object({
+  companyName: nonEmpty,
+  amount: z.number().int().positive(),
 });

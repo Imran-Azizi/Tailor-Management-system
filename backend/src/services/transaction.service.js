@@ -125,6 +125,8 @@ export const getTransactions = async ({
   limit = 20,
   search = "",
   accountType = "",
+  month = null,
+  year = null,
 }) => {
   const skip = (page - 1) * limit;
 
@@ -137,6 +139,19 @@ export const getTransactions = async ({
   if (accountType) where.accountType = accountType;
   if (search) {
     where.user = { name: { contains: search, mode: "insensitive" } };
+  }
+
+  const parsedMonth = month != null ? Number(month) : null;
+  const parsedYear = year != null ? Number(year) : null;
+  if (
+    parsedMonth &&
+    parsedYear &&
+    Number.isFinite(parsedMonth) &&
+    Number.isFinite(parsedYear)
+  ) {
+    const monthStart = new Date(parsedYear, parsedMonth - 1, 1, 0, 0, 0, 0);
+    const monthEnd = new Date(parsedYear, parsedMonth, 0, 23, 59, 59, 999);
+    where.transactionDate = { gte: monthStart, lte: monthEnd };
   }
 
   const [data, total] = await Promise.all([

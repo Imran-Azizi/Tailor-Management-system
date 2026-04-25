@@ -7,6 +7,7 @@ import {
 import { prisma } from "../lib/prisma.js";
 import { parseNumberLocale } from "../lib/normalize.js";
 import { sendCustomerCompletionSMS } from "../services/sms.service.js";
+import { buildMonthlyReportPdf } from "../lib/monthlyReportPdf.js";
 
 const WORKER_ACCOUNT_TYPES = ["QICHIKAR", "DOKHT"];
 const SAME_ROLE_CLAIM_CONFLICT_MESSAGE =
@@ -132,6 +133,10 @@ export const getAll = async (req, res, next) => {
         query.roleType = user.accountType;
       }
     }
+    // Finance users only see the orders they created
+    if (user && user.accountType === "FINANCE") {
+      query.financeUserId = user.id;
+    }
     res.json(await service.getAllOrders(query));
   } catch (error) {
     next(error);
@@ -142,6 +147,14 @@ export const getOne = async (req, res, next) => {
   try {
     const data = await service.getOrderById(req.params.id);
     if (!data) return res.status(404).json({ error: "Order not found" });
+    // Finance users may only access orders they created
+    if (req.user?.accountType === "FINANCE") {
+      if (data.createdByFinanceId !== req.user.id) {
+        return res
+          .status(403)
+          .json({ error: "You do not have permission to access this order." });
+      }
+    }
     res.json(data);
   } catch (error) {
     next(error);
@@ -228,7 +241,11 @@ export const getCompletedFromWorkers = async (req, res, next) => {
 export const create = async (req, res, next) => {
   try {
     const body = createOrderSchema.parse(req.body);
-    res.status(201).json(await service.createOrder(body));
+    const createdByFinanceId =
+      req.user?.accountType === "FINANCE" ? req.user.id : null;
+    res
+      .status(201)
+      .json(await service.createOrder({ ...body, createdByFinanceId }));
   } catch (error) {
     next(error);
   }
@@ -403,6 +420,34 @@ export const markComplete = async (req, res, next) => {
           }),
         ),
       );
+
+      // ── Customer SMS notification (async, non-blocking) ───────────────────
+      // Only send if not already sent for this order (deduplication via smsSentAt)
+      if (!order.smsSentAt && order.customer?.phoneNumber) {
+        // Fire-and-forget: stamp smsSentAt first to prevent race-condition duplicates,
+        // then send the SMS. If SMS fails, smsSentAt is already set — admin can resend
+        // manually but the customer won't receive double messages on retry.
+        prisma.order
+          .update({
+            where: { id: req.params.id },
+            data: { smsSentAt: new Date() },
+          })
+          .then(() =>
+            sendCustomerCompletionSMS(order.customer, order).catch((smsErr) => {
+              console.error(
+                `[SMS] Failed to send completion SMS for order ${req.params.id}:`,
+                smsErr.message,
+              );
+            }),
+          )
+          .catch((dbErr) => {
+            console.error(
+              `[SMS] Failed to stamp smsSentAt for order ${req.params.id}:`,
+              dbErr.message,
+            );
+          });
+        smsSent = true;
+      }
 
       return res.json({ ...result, smsSent });
     }
@@ -862,6 +907,46 @@ export const remove = async (req, res, next) => {
   try {
     await service.deleteOrder(req.params.id);
     res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** GET /api/orders/report/monthly?month=4&year=2026 — PDF report for a specific month/year */
+export const getMonthlyReport = async (req, res, next) => {
+  try {
+    const month = Number(req.query.month);
+    const year = Number(req.query.year);
+
+    if (!month || !year || month < 1 || month > 12) {
+      return res
+        .status(400)
+        .json({ error: "Valid month (1-12) and year are required" });
+    }
+
+    const orders = await service.getMonthlyReportOrders({ month, year });
+    const pdfBuffer = await buildMonthlyReportPdf({ month, year, orders });
+
+    const MONTH_NAMES = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ];
+    const monthLabel = MONTH_NAMES[(month - 1) % 12] || String(month);
+    const filename = `Monthly_Report_${monthLabel}_${year}.pdf`;
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(pdfBuffer);
   } catch (error) {
     next(error);
   }

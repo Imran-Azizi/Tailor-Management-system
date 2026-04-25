@@ -14,6 +14,7 @@ import {
   LuEllipsisVertical,
   LuX,
   LuPencil,
+  LuCalendarCheck,
 } from "react-icons/lu";
 import toast from "react-hot-toast";
 import api from "../lib/api.js";
@@ -28,11 +29,12 @@ import {
   Pagination,
   Card,
   EmptyState,
-  Modal,
   ConfirmDeleteModal,
 } from "../components/ui/index.jsx";
 import { OrderDocumentPack } from "../components/order/OrderDocumentPack.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useMonth } from "../context/MonthContext.jsx";
+import { getMonthLabel } from "../lib/months.js";
 
 const ROLE_COLORS = { QICHIKAR: "#D97706", DOKHT: "#DB2777" };
 const COMPLETED_REASSIGN_BLOCK_MESSAGE =
@@ -315,7 +317,7 @@ function OrderViewModal({ orderId, open, onClose }) {
     >
       {isLoading ? (
         <Spinner />
-      ) : !data ? (
+      ) : data == null ? (
         <EmptyState message="Order not found" />
       ) : (
         <div style={{ display: "grid", gap: 18 }}>
@@ -548,7 +550,8 @@ const ORDER_TYPE_FILTER_VALUES = [
 export default function AllOrders({ filter, mode = "orders" }) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
-  const { isAdmin } = useAuth();
+  const { isAdmin, isFinance } = useAuth();
+  const { viewMonth, viewYear } = useMonth();
   const qc = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();
@@ -581,6 +584,11 @@ export default function AllOrders({ filter, mode = "orders" }) {
     setPage(1);
   }, [statusFilter]);
 
+  // Reset to page 1 when month/year selection changes
+  useEffect(() => {
+    setPage(1);
+  }, [viewMonth, viewYear]);
+
   useEffect(() => {
     const incomingSearch = location.state?.search;
     if (!incomingSearch) return;
@@ -593,7 +601,15 @@ export default function AllOrders({ filter, mode = "orders" }) {
   }, [location.pathname, location.state, navigate]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["orders", statusFilter, page, searchFilter, typeFilter],
+    queryKey: [
+      "orders",
+      statusFilter,
+      page,
+      searchFilter,
+      typeFilter,
+      viewMonth,
+      viewYear,
+    ],
     queryFn: () =>
       api
         .get("/orders", {
@@ -603,6 +619,8 @@ export default function AllOrders({ filter, mode = "orders" }) {
             limit: 20,
             search: searchFilter,
             type: typeFilter === "ALL" ? undefined : typeFilter,
+            month: isAdmin || isFinance ? viewMonth : undefined,
+            year: isAdmin || isFinance ? viewYear : undefined,
           },
         })
         .then((r) => r.data),
@@ -681,6 +699,43 @@ export default function AllOrders({ filter, mode = "orders" }) {
     <div className="page">
       <PageHeader title={title} subtitle={subtitle} />
 
+      {(isAdmin || isFinance) && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "8px 14px",
+            marginBottom: 16,
+            borderRadius: "var(--r)",
+            background: "var(--success-soft)",
+            border: "1px solid var(--success-soft-border)",
+            fontSize: 13,
+            color: "var(--success)",
+            fontWeight: 500,
+          }}
+        >
+          <LuCalendarCheck size={14} />
+          <span>
+            {t("orders.viewingMonth", "Viewing data for")}:{" "}
+            <strong style={{ fontWeight: 700 }}>
+              {getMonthLabel(viewMonth, language)} {viewYear}
+            </strong>
+          </span>
+          {data?.total === 0 && (
+            <span
+              style={{
+                marginInlineStart: "auto",
+                fontSize: 11,
+                opacity: 0.75,
+              }}
+            >
+              {t("orders.noDataThisMonth", "No orders found for this month")}
+            </span>
+          )}
+        </div>
+      )}
+
       <Card style={{ marginBottom: 16 }}>
         <div className="all-orders-toolbar">
           <div className="all-orders-search">
@@ -691,13 +746,14 @@ export default function AllOrders({ filter, mode = "orders" }) {
               placeholder={t("orders.searchCustomers")}
               value={search}
               onChange={(e) => {
-                const value = e.target.value;
+                const { value } = e.target;
                 setSearch(value);
                 setSearchFilter(value);
                 setPage(1);
               }}
             />
           </div>
+
           <select
             className="inp all-orders-type-select"
             aria-label={t("orders.allTypes")}
@@ -787,7 +843,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {!orders.length ? (
+                    {orders.length === 0 ? (
                       <tr>
                         <td colSpan={10}>
                           <EmptyState
@@ -913,7 +969,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
             </div>
 
             <div className="all-orders-mobile">
-              {!orders.length ? (
+              {orders.length === 0 ? (
                 <EmptyState
                   message={t("orders.noOrders")}
                   Icon={LuClipboardList}

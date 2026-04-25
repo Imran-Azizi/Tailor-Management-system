@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import {
+  LuCalendarCheck,
   LuCircleDollarSign,
   LuRefreshCcw,
   LuSearch,
@@ -16,6 +17,9 @@ import { getApiErrorMessage } from "../lib/feedback.js";
 import { parseNumberLocale } from "../lib/normalize.js";
 import { getOrderTypeLabel } from "../lib/orderType.js";
 import { formatDateTimeLocale } from "../lib/locale.js";
+import { useAuth } from "../context/AuthContext.jsx";
+import { useMonth } from "../context/MonthContext.jsx";
+import { getMonthLabel } from "../lib/months.js";
 import {
   Badge,
   Card,
@@ -48,6 +52,8 @@ export default function CompletedWorkerOrders() {
   const { t, i18n } = useTranslation();
   const qc = useQueryClient();
   const language = i18n.resolvedLanguage || i18n.language || "en";
+  const { isAdmin } = useAuth();
+  const { viewMonth, viewYear } = useMonth();
   const [searchParams, setSearchParams] = useSearchParams();
   const highlightOrderId = searchParams.get("orderId") || "";
 
@@ -64,6 +70,11 @@ export default function CompletedWorkerOrders() {
   useEffect(() => {
     if (highlightOrderId) setPage(1);
   }, [highlightOrderId]);
+
+  // Reset page when month/year changes
+  useEffect(() => {
+    setPage(1);
+  }, [viewMonth, viewYear]);
 
   // Refs for auto-scrolling to the highlighted row
   const rowRefs = useRef({});
@@ -84,14 +95,21 @@ export default function CompletedWorkerOrders() {
     if (qichikarUserId) next.qichikarUserId = qichikarUserId;
     if (dokhtUserId) next.dokhtUserId = dokhtUserId;
     if (highlightOrderId) next.orderId = highlightOrderId;
+    if (isAdmin) {
+      next.month = viewMonth;
+      next.year = viewYear;
+    }
     return next;
   }, [
     dokhtUserId,
     highlightOrderId,
+    isAdmin,
     page,
     paymentStatus,
     qichikarUserId,
     search,
+    viewMonth,
+    viewYear,
   ]);
 
   const { data: workerOptions = [], isLoading: isWorkersLoading } = useQuery({
@@ -247,6 +265,39 @@ export default function CompletedWorkerOrders() {
         )}
       />
 
+      {isAdmin && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "8px 14px",
+            marginBottom: 4,
+            borderRadius: "var(--r)",
+            background: "var(--success-soft, #F0FDF4)",
+            border: "1px solid var(--success-soft-border, #BBF7D0)",
+            fontSize: 13,
+            color: "var(--success, #16A34A)",
+            fontWeight: 500,
+          }}
+        >
+          <LuCalendarCheck size={14} />
+          <span>
+            {t("common.viewingMonth", "Viewing data for")}:{" "}
+            <strong style={{ fontWeight: 700 }}>
+              {getMonthLabel(viewMonth, language)} {viewYear}
+            </strong>
+          </span>
+          {data?.total === 0 && !isLoading && (
+            <span
+              style={{ marginInlineStart: "auto", fontSize: 11, opacity: 0.75 }}
+            >
+              {t("common.noDataThisMonth", "No data found for this month")}
+            </span>
+          )}
+        </div>
+      )}
+
       {highlightOrderId && (
         <div
           style={{
@@ -297,37 +348,24 @@ export default function CompletedWorkerOrders() {
         <StatCard
           label={t("completedWorkerOrders.totalOrders", "Matching Orders")}
           value={stats.totalOrders}
-          sub={filterSummary}
           Icon={LuSquareCheckBig}
           accent="#2563EB"
         />
         <StatCard
           label={t("completedWorkerOrders.paidOrders", "Paid Orders")}
           value={stats.paidOrders}
-          sub={t(
-            "completedWorkerOrders.paidOrdersHint",
-            "Orders already recorded as paid to workers",
-          )}
           Icon={LuCircleDollarSign}
           accent="#15803D"
         />
         <StatCard
           label={t("completedWorkerOrders.unpaidOrders", "Unpaid Orders")}
           value={stats.unpaidOrders}
-          sub={t(
-            "completedWorkerOrders.unpaidOrdersHint",
-            "Completed orders still waiting for worker payment",
-          )}
           Icon={LuUser}
           accent="#B45309"
         />
         <StatCard
           label={t("completedWorkerOrders.totalPaid", "Total Paid")}
           value={`$${Number(stats.totalPaidAmount || 0).toLocaleString()}`}
-          sub={t(
-            "completedWorkerOrders.totalPaidHint",
-            "Tracked directly from completed worker orders",
-          )}
           Icon={LuCircleDollarSign}
           accent="#7C3AED"
         />
@@ -544,12 +582,6 @@ export default function CompletedWorkerOrders() {
                   <th>
                     {t("completedWorkerOrders.paymentAmount", "Payment Amount")}
                   </th>
-                  <th>
-                    {t(
-                      "completedWorkerOrders.paymentRecorded",
-                      "Payment Recorded",
-                    )}
-                  </th>
                   <th>{t("common.actions", "Actions")}</th>
                 </tr>
               </thead>
@@ -627,35 +659,6 @@ export default function CompletedWorkerOrders() {
                             style={{ minWidth: 140 }}
                           />
                         </div>
-                      </td>
-                      <td>
-                        {isAlreadyPaid ? (
-                          <div
-                            style={{ display: "grid", gap: 3, minWidth: 160 }}
-                          >
-                            <strong
-                              style={{ color: "var(--text1)", fontSize: 13 }}
-                            >
-                              {order.workerPaidBy?.name ||
-                                t("common.saved", "Saved")}
-                            </strong>
-                            <span
-                              style={{ fontSize: 12, color: "var(--text3)" }}
-                            >
-                              {formatDateTimeLocale(
-                                order.workerPaidAt || order.updatedAt,
-                                language,
-                              )}
-                            </span>
-                          </div>
-                        ) : (
-                          <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                            {t(
-                              "completedWorkerOrders.notRecordedYet",
-                              "Not recorded yet",
-                            )}
-                          </span>
-                        )}
                       </td>
                       <td>
                         <button

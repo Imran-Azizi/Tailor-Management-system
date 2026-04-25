@@ -3,6 +3,7 @@ import {
   LuArrowRightLeft,
   LuBell,
   LuClipboardList,
+  LuFactory,
   LuLayoutDashboard,
   LuList,
   LuListChecks,
@@ -23,6 +24,7 @@ const ROLE_ACCENT = {
   DOKAN: "#0D9488",
   QICHIKAR: "#D97706",
   DOKHT: "#DB2777",
+  FINANCE: "#059669",
 };
 
 const ADMIN_SECTIONS = [
@@ -141,6 +143,35 @@ const ADMIN_SECTIONS = [
         fallback: "Print Bills",
         path: "/print-bills",
         icon: LuPrinter,
+      },
+      {
+        key: "rakht",
+        label: "rakht.title",
+        fallback: "Rakht",
+        icon: LuFactory,
+        children: [
+          {
+            key: "createRakht",
+            label: "rakht.addTitle",
+            fallback: "Create Rakht",
+            path: "/rakht/create",
+            icon: LuPackagePlus,
+          },
+          {
+            key: "allRakhts",
+            label: "rakht.allTitle",
+            fallback: "All Rakhts",
+            path: "/rakhts",
+            icon: LuList,
+          },
+          {
+            key: "rakhtPaymentHistory",
+            label: "rakht.paymentHistory",
+            fallback: "Payment History",
+            path: "/rakhts/payment-history",
+            icon: LuFileText,
+          },
+        ],
       },
     ],
   },
@@ -312,6 +343,35 @@ const DOKAN_SECTIONS = [
         path: "/print-bills",
         icon: LuPrinter,
       },
+      {
+        key: "rakht",
+        label: "rakht.title",
+        fallback: "Rakht",
+        icon: LuFactory,
+        children: [
+          {
+            key: "createRakht",
+            label: "rakht.addTitle",
+            fallback: "Create Rakht",
+            path: "/rakht/create",
+            icon: LuPackagePlus,
+          },
+          {
+            key: "allRakhts",
+            label: "rakht.allTitle",
+            fallback: "All Rakhts",
+            path: "/rakhts",
+            icon: LuList,
+          },
+          {
+            key: "rakhtPaymentHistory",
+            label: "rakht.paymentHistory",
+            fallback: "Payment History",
+            path: "/rakhts/payment-history",
+            icon: LuFileText,
+          },
+        ],
+      },
     ],
   },
   {
@@ -473,11 +533,117 @@ const WORKER_SECTIONS = [
   },
 ];
 
+const FINANCE_SECTIONS = [
+  {
+    key: "overview",
+    label: "sidebar.overview",
+    fallback: "Overview",
+    items: [
+      {
+        key: "dashboard",
+        label: "common.dashboard",
+        fallback: "Dashboard",
+        path: "/dashboard",
+        icon: LuLayoutDashboard,
+        end: true,
+      },
+      {
+        key: "dailyTasks",
+        label: "sidebar.dailyTasks",
+        fallback: "Daily Expenses",
+        icon: LuClipboardList,
+        children: [
+          {
+            key: "todayTasks",
+            label: "dailyTasks.title",
+            fallback: "Today Expenses",
+            path: "/daily-tasks",
+            icon: LuClipboardList,
+          },
+          {
+            key: "allTasks",
+            label: "dailyTasks.allTitle",
+            fallback: "All Expenses",
+            path: "/daily-tasks/all",
+            icon: LuList,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    key: "orders",
+    label: "sidebar.orders",
+    fallback: "Orders",
+    items: [
+      {
+        key: "manageOrders",
+        label: "sidebar.orders",
+        fallback: "Orders",
+        icon: LuList,
+        children: [
+          {
+            key: "createOrder",
+            label: "common.createOrder",
+            fallback: "Create Order",
+            path: "/orders/create",
+            icon: LuPackagePlus,
+          },
+          {
+            key: "allOrders",
+            label: "common.allOrders",
+            fallback: "All Orders",
+            path: "/orders",
+            icon: LuList,
+          },
+          {
+            key: "pendingOrders",
+            label: "common.pendingOrders",
+            fallback: "Pending Orders",
+            path: "/orders/pending",
+            icon: LuListTodo,
+            badge: "pendingOrders",
+          },
+          {
+            key: "completedOrders",
+            label: "common.completedOrders",
+            fallback: "Completed Orders",
+            path: "/orders/completed",
+            icon: LuListChecks,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    key: "management",
+    label: "sidebar.management",
+    fallback: "Management",
+    items: [
+      {
+        key: "boxes",
+        label: "common.boxManagement",
+        fallback: "Box Management",
+        path: "/boxes",
+        icon: LuArchive,
+      },
+      {
+        key: "designs",
+        label: "sidebar.settings",
+        fallback: "Settings",
+        path: "/designs",
+        icon: LuPalette,
+      },
+    ],
+  },
+];
+
 const ROLE_SECTIONS = {
   ADMIN: ADMIN_SECTIONS,
   DOKAN: DOKAN_SECTIONS,
   QICHIKAR: WORKER_SECTIONS,
   DOKHT: WORKER_SECTIONS,
+  FINANCE: FINANCE_SECTIONS,
 };
 
 export function getRoleAccent(role) {

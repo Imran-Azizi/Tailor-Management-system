@@ -68,6 +68,7 @@ const BILL_TEXT = {
     customerName: "Customer Name",
     billNo: "Bill #",
     qty: "Qty",
+    value: "Val.",
     financialSummary: "Financial Summary",
     totalPrice: "Total Price",
     discount: "Discount",
@@ -94,6 +95,7 @@ const BILL_TEXT = {
     customerName: "نام مشتری",
     billNo: "شماره بل",
     qty: "تعداد",
+    value: "مقدار",
     financialSummary: "خلاصه مالی",
     totalPrice: "قیمت مجموعی",
     discount: "تخفیف",
@@ -120,6 +122,7 @@ const BILL_TEXT = {
     customerName: "د مشتری نوم",
     billNo: "د بل شمېره",
     qty: "تعداد",
+    value: "ارزښت",
     financialSummary: "مالي لنډيز",
     totalPrice: "ټوله بيه",
     discount: "تخفیف",
@@ -386,49 +389,20 @@ export function CustomerBill({ customer, order }) {
     order?.createdAt || Date.now(),
   );
   const txt = settings.text;
+  const extraTxt = BILL_EXTRA_TEXT[settings.langCode] || BILL_EXTRA_TEXT.en;
   const alignClass = settings.isRtl ? "text-right" : "text-left";
-  const summaryBorderClass = settings.isRtl ? "sm:border-r-2" : "sm:border-l-2";
-  const summaryOrderClass = settings.isRtl ? "sm:order-1" : "sm:order-2";
-  const contentOrderClass = settings.isRtl ? "sm:order-2" : "sm:order-1";
-  const headClass = settings.isRtl
-    ? "text-[10px] font-bold text-slate-500"
-    : "text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500";
-  const summaryHeadClass = settings.isRtl
-    ? "text-[10px] font-extrabold text-blue-800"
-    : "text-[10px] font-extrabold uppercase tracking-[0.12em] text-blue-800";
-
-  const moneyCells = [
-    {
-      label: txt.totalPrice,
-      value: formatMoney(total, settings.langCode),
-      tone: "text-slate-900",
-    },
-    {
-      label: txt.discount,
-      value:
-        discount > 0 ? `-${formatMoney(discount, settings.langCode)}` : "-",
-      tone: "text-rose-600",
-    },
-    {
-      label: txt.paidAmount,
-      value: formatMoney(paid, settings.langCode),
-      tone: "text-emerald-700",
-    },
-    {
-      label: txt.remaining,
-      value:
-        remaining > 0
-          ? formatMoney(remaining, settings.langCode)
-          : txt.paidInFull,
-      tone: remaining > 0 ? "text-amber-600" : "text-emerald-700",
-    },
-  ];
+  const rowDirClass = settings.isRtl ? "flex-row-reverse" : "flex-row";
+  const tableHeadClass = settings.isRtl
+    ? "text-[9px] font-extrabold text-slate-700"
+    : "text-[9px] font-extrabold uppercase tracking-[0.06em] text-slate-700";
+  const billNo = toEnglishDigits(customer?.billNumber);
+  const isEmergency = order?.isEmergency;
 
   return (
     <div
       lang={settings.htmlLang}
       dir={settings.dir}
-      className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+      className="print-a6-sheet overflow-hidden rounded-[6px] border-2 border-slate-800 bg-white"
       style={{ fontFamily: settings.fontFamily }}
     >
       <PrintBillHeader
@@ -438,70 +412,134 @@ export function CustomerBill({ customer, order }) {
         time={time}
       />
 
-      <div className="grid border-t border-slate-200 sm:grid-cols-[1fr_170px]">
-        <div className={`${contentOrderClass} flex flex-col`}>
-          <table className="w-full border-collapse text-xs">
-            <thead className="bg-slate-50">
-              <tr>
-                {[txt.billNo, t("orders.orderType"), txt.qty].map((header) => (
-                  <th
-                    key={header}
-                    className={`border-b border-slate-200 px-3 py-2 ${headClass} ${alignClass}`}
-                  >
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td className="px-3 py-3 text-sm font-black text-sky-700 [direction:ltr] [unicode-bidi:embed]">
-                  #{toEnglishDigits(customer?.billNumber)}
-                </td>
-                <td className={`px-3 py-3 ${alignClass}`}>
-                  <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-bold text-blue-800">
-                    {orderTypeLabel}
-                  </span>
-                </td>
-                <td className="px-3 py-3 text-sm font-bold [direction:ltr] [unicode-bidi:embed]">
-                  {formatNumber(qty)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-          <div
-            className={`flex flex-1 items-center gap-3 border-t border-slate-100 px-4 py-3 ${settings.isRtl ? "flex-row-reverse" : "flex-row"}`}
-          >
-            <Barcode value={customer?.billNumber} />
-            <div className="text-xs text-slate-500 [direction:ltr] [unicode-bidi:embed]">
-              {toEnglishDigits(customer?.phoneNumber)}
-            </div>
+      {isEmergency && (
+        <div
+          className={`border-b border-slate-800 bg-rose-50 px-2 py-1.5 text-[10px] font-bold text-rose-700 ${alignClass}`}
+        >
+          {t("createOrder.emergencyOrder")}
+        </div>
+      )}
+
+      {/* Customer info strip — 4 columns */}
+      <div className="grid grid-cols-4 bg-slate-100 text-[9px] text-slate-800">
+        <div
+          className={`border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
+        >
+          <p className={tableHeadClass}>{txt.billNo}</p>
+          <p className="mt-0.5 font-black text-sky-700 [direction:ltr] [unicode-bidi:embed]">
+            #{billNo}
+          </p>
+        </div>
+        <div
+          className={`border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
+        >
+          <p className={tableHeadClass}>{txt.name}</p>
+          <p className="mt-0.5 font-semibold text-slate-900">
+            {customer?.firstName || "-"}
+          </p>
+        </div>
+        <div
+          className={`border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
+        >
+          <p className={tableHeadClass}>{txt.phone}</p>
+          <p className="mt-0.5 font-semibold text-slate-900 [direction:ltr] [unicode-bidi:embed]">
+            {toEnglishDigits(customer?.phoneNumber)}
+          </p>
+        </div>
+        <div className={`border-b border-slate-800 px-2 py-1.5 ${alignClass}`}>
+          <p className={tableHeadClass}>{t("orders.orderType")}</p>
+          <p className="mt-0.5 font-semibold text-slate-900">
+            {orderTypeLabel}
+          </p>
+        </div>
+      </div>
+
+      {/* Financial summary table */}
+      <table className="w-full border-collapse table-fixed text-[9px] text-slate-800">
+        <thead className="bg-slate-100">
+          <tr>
+            <th
+              className={`border-b border-r border-slate-800 px-2 py-1.5 ${tableHeadClass} ${alignClass}`}
+            >
+              {txt.totalPrice}
+            </th>
+            <th
+              className={`border-b border-r border-slate-800 px-2 py-1.5 ${tableHeadClass} ${alignClass}`}
+            >
+              {txt.discount}
+            </th>
+            <th
+              className={`border-b border-r border-slate-800 px-2 py-1.5 ${tableHeadClass} ${alignClass}`}
+            >
+              {txt.paidAmount}
+            </th>
+            <th
+              className={`border-b border-slate-800 px-2 py-1.5 ${tableHeadClass} ${alignClass}`}
+            >
+              {txt.remaining}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr className="bg-white">
+            <td className="border-b border-r border-slate-800 px-2 py-3 text-center text-[11px] font-black text-blue-900 [direction:ltr] [unicode-bidi:embed]">
+              {formatMoney(total, settings.langCode)}
+            </td>
+            <td className="border-b border-r border-slate-800 px-2 py-3 text-center text-[11px] font-black text-rose-700 [direction:ltr] [unicode-bidi:embed]">
+              {discount > 0 ? formatMoney(discount, settings.langCode) : "-"}
+            </td>
+            <td className="border-b border-r border-slate-800 px-2 py-3 text-center text-[11px] font-black text-emerald-700 [direction:ltr] [unicode-bidi:embed]">
+              {formatMoney(paid, settings.langCode)}
+            </td>
+            <td
+              className={`border-b border-slate-800 px-2 py-3 text-center text-[11px] font-black [direction:ltr] [unicode-bidi:embed] ${
+                remaining > 0 ? "text-amber-700" : "text-emerald-700"
+              }`}
+            >
+              {remaining > 0
+                ? formatMoney(remaining, settings.langCode)
+                : txt.paidInFull}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* Barcode + Qty row */}
+      <div className="grid grid-cols-2 border-b border-slate-800">
+        <div className={`border-r border-slate-800 px-2 py-1.5 ${alignClass}`}>
+          <Barcode value={customer?.billNumber} />
+        </div>
+        <div
+          className={`flex flex-col justify-center gap-2 px-2 py-1.5 ${alignClass}`}
+        >
+          <div>
+            <p className={`${tableHeadClass}`}>{txt.qty}</p>
+            <p className="mt-0.5 text-[13px] font-black text-slate-900 [direction:ltr] [unicode-bidi:embed]">
+              {formatNumber(qty)}
+            </p>
+          </div>
+          <div>
+            <p className={`${tableHeadClass}`}>{extraTxt.box}</p>
+            <p className="mt-0.5 font-semibold text-slate-800">
+              {order?.box?.boxName || extraTxt.notAssigned}
+            </p>
           </div>
         </div>
+      </div>
 
+      {/* Footer */}
+      <div
+        className={`grid grid-cols-2 bg-slate-100 text-[9px] text-slate-800`}
+      >
+        <div className={`border-r border-slate-800 px-2 py-1.5 ${alignClass}`}>
+          <span className="font-extrabold">{txt.date}</span>: {date} | {time}
+        </div>
         <div
-          className={`${summaryOrderClass} ${summaryBorderClass} flex flex-col border-blue-200 bg-blue-50`}
+          className={`px-2 py-1.5 ${rowDirClass === "flex-row-reverse" ? "text-left" : "text-right"}`}
         >
-          <div
-            className={`border-b border-blue-200 bg-blue-100 px-3 py-2 ${summaryHeadClass} ${alignClass}`}
-          >
-            {txt.financialSummary}
-          </div>
-          {moneyCells.map((cell, index) => (
-            <div
-              key={cell.label}
-              className={`flex-1 px-3 py-2.5 ${alignClass} ${index < moneyCells.length - 1 ? "border-b border-blue-200" : ""}`}
-            >
-              <p className="mb-1 text-[10px] font-semibold text-slate-500">
-                {cell.label}
-              </p>
-              <p
-                className={`text-base font-extrabold [direction:ltr] [unicode-bidi:embed] ${cell.tone}`}
-              >
-                {cell.value}
-              </p>
-            </div>
-          ))}
+          <span className="font-black text-slate-700 [direction:ltr] [unicode-bidi:embed]">
+            #{billNo}
+          </span>
         </div>
       </div>
     </div>
@@ -889,36 +927,40 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
   const styleEntries = allEntries.filter(
     ([key, value]) => !NUMERIC_FIELDS.has(key) && value !== false,
   );
-  const rakhtRows = [
-    [
-      t("rakht.brandName", { defaultValue: "Rakht Brand" }),
-      order?.rakhtBrandName || "-",
-    ],
-    [
-      t("rakht.color", { defaultValue: "Rakht Color" }),
-      renderRakhtColorValue(order?.rakhtColor, order?.rakhtColorHex),
-    ],
-    [
-      t("rakht.requiredMeters", { defaultValue: "Required Meters" }),
-      order?.rakhtRequiredMeters != null
-        ? formatMeasurementValue(order.rakhtRequiredMeters)
-        : "-",
-    ],
-    [
-      t("rakht.piecePrice", { defaultValue: "Piece Price" }),
-      order?.rakhtPiecePrice != null
-        ? formatMeasurementValue(order.rakhtPiecePrice)
-        : "-",
-    ],
-  ];
-  const rows = [
-    ...getOrderedMeasurementRows(numericEntries, t),
-    ...styleEntries.map(([key, value]) => [
-      formatFieldKey(key, t),
-      typeof value === "boolean" ? txt.yes : toEnglishDigits(value),
-    ]),
-    ...rakhtRows,
-  ];
+
+  // Build separate measurement rows (with formatted values)
+  const measRows = getOrderedMeasurementRows(numericEntries, t).map(
+    ([label, value]) => [label, formatMeasurementValue(value)],
+  );
+
+  // Build separate style rows
+  const styleRows = styleEntries.map(([key, value]) => [
+    formatFieldKey(key, t),
+    typeof value === "boolean" ? txt.yes : toEnglishDigits(String(value)),
+  ]);
+
+  // Zip measurement and style rows, padding the shorter array with empty entries
+  const maxRows = Math.max(measRows.length, styleRows.length, 1);
+  const zippedRows = Array.from({ length: maxRows }, (_, i) => ({
+    mLabel: measRows[i]?.[0] ?? "",
+    mValue: measRows[i]?.[1] ?? "",
+    sLabel: styleRows[i]?.[0] ?? "",
+    sValue: styleRows[i]?.[1] ?? "",
+  }));
+
+  // Rakht (fabric) details
+  const rakhtColor = order?.rakhtColor || "-";
+  const rakhtColorHex = order?.rakhtColorHex || null;
+  const rakhtBrandName = order?.rakhtBrandName || "-";
+  const rakhtMetersDisplay =
+    order?.rakhtRequiredMeters != null
+      ? `${formatMeasurementValue(order.rakhtRequiredMeters)}m`
+      : "-";
+  const swatchHex = resolveRakhtColorHex(rakhtColor, rakhtColorHex);
+
+  const sectionHeadClass = settings.isRtl
+    ? "text-[8px] font-extrabold text-white"
+    : "text-[8px] font-extrabold uppercase tracking-[0.1em] text-white";
 
   return (
     <div
@@ -934,90 +976,190 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
         time={time}
       />
 
-      <div className="grid grid-cols-3 bg-slate-100 text-[11px] font-semibold text-slate-800">
+      {/* Customer info strip — 4 columns: Bill# | Name | Order Type | Qty */}
+      <div className="grid grid-cols-4 bg-slate-100 text-[9px] text-slate-800">
         <div
-          className={`border-b border-r border-slate-800 px-2.5 py-2 ${alignClass}`}
+          className={`border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
         >
-          <span className="font-extrabold">{txt.billNo}</span>: #
-          {toEnglishDigits(customer?.billNumber)}
+          <p className={tableHeadClass}>{txt.billNo}</p>
+          <p className="mt-0.5 font-black text-sky-700 [direction:ltr] [unicode-bidi:embed]">
+            #{toEnglishDigits(customer?.billNumber)}
+          </p>
         </div>
         <div
-          className={`border-b border-r border-slate-800 px-2.5 py-2 ${alignClass}`}
+          className={`border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
         >
-          <span className="font-extrabold">{txt.customerName}</span>:{" "}
-          {customer?.firstName || "-"}
+          <p className={tableHeadClass}>{txt.name}</p>
+          <p className="mt-0.5 font-semibold text-slate-900">
+            {customer?.firstName || "-"}
+          </p>
         </div>
-        <div className={`border-b border-slate-800 px-2.5 py-2 ${alignClass}`}>
-          <span className="font-extrabold">{t("orders.orderType")}</span>:{" "}
-          {billLabel}
+        <div
+          className={`border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
+        >
+          <p className={tableHeadClass}>{t("orders.orderType")}</p>
+          <p className="mt-0.5 font-semibold text-slate-900">{billLabel}</p>
+        </div>
+        <div className={`border-b border-slate-800 px-2 py-1.5 ${alignClass}`}>
+          <p className={tableHeadClass}>{txt.qty}</p>
+          <p className="mt-0.5 font-extrabold text-slate-900 [direction:ltr] [unicode-bidi:embed]">
+            {formatNumber(order?.quantity || 1)}
+          </p>
         </div>
       </div>
 
-      <table className="w-full border-collapse table-fixed text-[11px]">
-        <thead className="bg-slate-100">
+      {/* Measurements + Styles table — 4 columns */}
+      <table className="w-full border-collapse table-fixed">
+        <thead>
+          {/* Section group header */}
           <tr>
             <th
-              className={`border-b border-r border-slate-800 px-2.5 py-1.5 ${tableHeadClass} ${alignClass}`}
+              colSpan={2}
+              className={`border-b border-r-2 border-slate-800 bg-slate-700 px-2 py-1 ${sectionHeadClass} ${alignClass}`}
+            >
+              {txt.measurementInformation}
+            </th>
+            <th
+              colSpan={2}
+              className={`border-b border-slate-800 bg-slate-600 px-2 py-1 ${sectionHeadClass} ${alignClass}`}
+            >
+              {txt.stylesInformation}
+            </th>
+          </tr>
+          {/* Column labels */}
+          <tr className="bg-slate-100">
+            <th
+              className={`w-[30%] border-b border-r border-dashed border-slate-400 px-2 py-1 ${tableHeadClass} ${alignClass}`}
             >
               {t("createOrder.measurements")}
             </th>
             <th
-              className={`border-b border-slate-800 px-2.5 py-1.5 ${tableHeadClass} ${alignClass}`}
+              className={`w-[12%] border-b border-r-2 border-slate-800 px-2 py-1 text-center ${tableHeadClass}`}
+            >
+              {txt.value}
+            </th>
+            <th
+              className={`w-[34%] border-b border-r border-dashed border-slate-400 px-2 py-1 ${tableHeadClass} ${alignClass}`}
             >
               {t("createOrder.styleOptions")}
+            </th>
+            <th
+              className={`w-[24%] border-b border-slate-800 px-2 py-1 ${tableHeadClass} ${alignClass}`}
+            >
+              {txt.value}
             </th>
           </tr>
         </thead>
         <tbody>
-          {(rows.length ? rows : [[t("common.noData"), "-"]]).map(
-            ([label, value], index) => (
-              <tr key={`${label}-${index}`}>
-                <td
-                  className={`border-b border-r border-dashed border-slate-500 px-2.5 py-1.5 align-middle ${alignClass}`}
-                >
-                  {label}
-                </td>
-                <td
-                  className={`border-b border-dashed border-slate-500 px-2.5 py-1.5 align-middle font-bold ${alignClass}`}
-                >
-                  {value}
-                </td>
-              </tr>
-            ),
-          )}
-          <tr>
-            <td
-              colSpan={2}
-              className={`border-b border-dashed border-slate-500 px-2.5 py-1.5 align-top ${alignClass} min-h-[110px]`}
-            >
-              {order?.orderName?.trim() || "-"}
-            </td>
-          </tr>
+          {zippedRows.map(({ mLabel, mValue, sLabel, sValue }, i) => (
+            <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-slate-50/40"}>
+              <td
+                className={`border-b border-r border-dashed border-slate-300 px-2 py-1 text-[10px] ${alignClass} text-slate-700`}
+              >
+                {mLabel}
+              </td>
+              <td className="border-b border-r-2 border-slate-800 px-2 py-1 text-center text-[10px] font-bold text-slate-900 [direction:ltr] [unicode-bidi:embed]">
+                {mValue}
+              </td>
+              <td
+                className={`border-b border-r border-dashed border-slate-300 px-2 py-1 text-[10px] ${alignClass} text-slate-700`}
+              >
+                {sLabel}
+              </td>
+              <td
+                className={`border-b border-dashed border-slate-300 px-2 py-1 text-[10px] font-bold text-slate-900 ${alignClass}`}
+              >
+                {sValue}
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
 
-      <div className="grid grid-cols-2">
-        <div className="border-r border-b border-slate-800 px-2.5 py-2">
-          <div className="max-w-[180px]">
-            <Barcode value={customerBarcode} />
-          </div>
+      {/* Rakht (Fabric) section */}
+      <div className="border-t-2 border-slate-800">
+        <div
+          className={`bg-slate-800 px-2 py-1 ${sectionHeadClass} ${alignClass}`}
+        >
+          {t("createOrder.rakhtSelection", { defaultValue: "Rakht / Fabric" })}
         </div>
-        <div className="border-b border-slate-800 px-2.5 py-2">
-          <div className="max-w-[180px]">
-            <Barcode value={orderBarcode} />
+        <div className="grid grid-cols-3 bg-slate-50 text-[10px]">
+          <div
+            className={`border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
+          >
+            <p className="text-[8px] font-extrabold uppercase tracking-wide text-slate-500">
+              {t("rakht.color", { defaultValue: "Color" })}
+            </p>
+            <p className="mt-0.5 flex items-center gap-1 font-bold text-slate-900">
+              {swatchHex && (
+                <span
+                  style={{
+                    width: 9,
+                    height: 9,
+                    borderRadius: "50%",
+                    border: "1px solid rgba(15,23,42,0.2)",
+                    background: swatchHex,
+                    flexShrink: 0,
+                    display: "inline-block",
+                  }}
+                />
+              )}
+              <span>{rakhtColor}</span>
+            </p>
+          </div>
+          <div
+            className={`border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
+          >
+            <p className="text-[8px] font-extrabold uppercase tracking-wide text-slate-500">
+              {t("rakht.brandName", { defaultValue: "Brand" })}
+            </p>
+            <p className="mt-0.5 font-bold text-slate-900">{rakhtBrandName}</p>
+          </div>
+          <div
+            className={`border-b border-slate-800 px-2 py-1.5 ${alignClass}`}
+          >
+            <p className="text-[8px] font-extrabold uppercase tracking-wide text-slate-500">
+              {t("rakht.requiredMeters", { defaultValue: "Meters" })}
+            </p>
+            <p className="mt-0.5 font-bold text-slate-900 [direction:ltr] [unicode-bidi:embed]">
+              {rakhtMetersDisplay}
+            </p>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 bg-slate-100 text-[11px] text-slate-800">
+      {/* Order notes (optional) */}
+      {order?.orderName?.trim() && (
         <div
-          className={`border-r border-slate-800 px-2.5 py-1.5 ${alignClass}`}
+          className={`border-b border-slate-800 bg-amber-50 px-2 py-1.5 text-[10px] ${alignClass}`}
         >
+          <span className="font-extrabold text-amber-700">
+            {t("createOrder.additionalStyleInfo", { defaultValue: "Notes" })}
+            :{" "}
+          </span>
+          <span className="text-slate-800">{order.orderName.trim()}</span>
+        </div>
+      )}
+
+      {/* Barcodes */}
+      <div className="grid grid-cols-2 border-b border-slate-800">
+        <div className="border-r border-slate-800 px-2 py-1.5">
+          <Barcode value={customerBarcode} />
+        </div>
+        <div className="px-2 py-1.5">
+          <Barcode value={orderBarcode} />
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="grid grid-cols-2 bg-slate-100 text-[9px] text-slate-800">
+        <div className={`border-r border-slate-800 px-2 py-1.5 ${alignClass}`}>
           <span className="font-extrabold">{txt.date}</span>: {date}
         </div>
-        <div className={`px-2.5 py-1.5 ${alignClass}`}>
-          <span className="font-extrabold">{txt.qty}</span>:{" "}
-          {formatNumber(order?.quantity || 1)} | {time}
+        <div className={`px-2 py-1.5 text-right`}>
+          <span className="font-extrabold [direction:ltr] [unicode-bidi:embed]">
+            {time}
+          </span>
         </div>
       </div>
     </div>

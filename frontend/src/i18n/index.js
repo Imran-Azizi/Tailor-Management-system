@@ -77,6 +77,7 @@ const resources = {
         viewAll: "View all",
         allCaughtUp: "All caught up!",
         markAllRead: "Mark all read",
+        viewDataByMonth: "View Data by Month",
       },
       auth: {
         signIn: "Sign In",
@@ -129,6 +130,10 @@ const resources = {
         ordersByType: "Orders by Type",
         topCustomers: "Customer List",
         orderCount: "Orders",
+        generate: "Generate Report",
+        generating: "Generating...",
+        generateFailed: "Failed to generate report",
+        noData: "No data available for this month",
       },
       assignment: {
         assignOrder: "Assign Order",
@@ -213,6 +218,8 @@ const resources = {
         tailorBillCopy:
           "Includes measurements and style details for production.",
         orderType: "Order Type",
+        viewingMonth: "Viewing data for",
+        noDataThisMonth: "No orders found for this month",
       },
       createOrder: {
         customerInfo: "Customer Info",
@@ -534,6 +541,7 @@ const resources = {
         viewAll: "مشاهده همه",
         allCaughtUp: "همه اعلان‌ها بررسی شده‌اند!",
         markAllRead: "همه را خوانده علامت بزن",
+        viewDataByMonth: "مشاهده داده‌ها بر اساس ماه",
       },
       auth: {
         signIn: "ورود",
@@ -585,6 +593,10 @@ const resources = {
         ordersByType: "سفارش‌ها بر اساس نوع",
         topCustomers: "فهرست مشتریان",
         orderCount: "سفارش‌ها",
+        generate: "گزارش بگیر",
+        generating: "در حال ساخت‌...",
+        generateFailed: "ساختن گزارش انجام نشد",
+        noData: "داده‌ای برای این ماه موجود نیست",
       },
       assignment: {
         assignOrder: "واگذاری سفارش",
@@ -668,6 +680,8 @@ const resources = {
         customerBillCopy: "بل مشتری را چاپ یا PDF بگیرید.",
         tailorBillCopy: "اندازه‌ها و جزئیات استایل برای تولید.",
         orderType: "نوع سفارش",
+        viewingMonth: "مشاهده داده‌های ماه",
+        noDataThisMonth: "هیچ سفارشی برای این ماه یافت نشد",
       },
       createOrder: {
         customerInfo: "معلومات مشتری",
@@ -974,6 +988,7 @@ const resources = {
         viewAll: "ټول وګورئ",
         allCaughtUp: "ټولې خبرتیاوې کتل شوې دي!",
         markAllRead: "ټولې لوستل شوې",
+        viewDataByMonth: "د میاشتې پہ میاشت ډیړا لیدل",
       },
       auth: {
         signIn: "ننوتل",
@@ -1092,6 +1107,8 @@ const resources = {
         customerBillCopy: "د پیرودونکي بل چاپ یا PDF کړئ.",
         tailorBillCopy: "د تولید لپاره اندازې او د سټایل معلومات.",
         orderType: "د فرمایش ډول",
+        viewingMonth: "د میاشتې ډیټا لیدل",
+        noDataThisMonth: "د دې میاشتې لپاره هیڅ فرمایش ونه موندل شو",
       },
       createOrder: {
         customerInfo: "د پیرودونکي معلومات",
@@ -1226,6 +1243,10 @@ const resources = {
         ordersByType: "د ډول له مخې فرمایشونه",
         topCustomers: "د مشتریانو لیست",
         orderCount: "فرمایشونه",
+        generate: "راپور جوړؤ",
+        generating: "جوړېږي...",
+        generateFailed: "د راپور جوړول ناکام شو",
+        noData: "د دې میاشتې لپاره هیڅ ډیړا نشته",
       },
       transaction: {
         title: "لیږد ثبت کړئ",

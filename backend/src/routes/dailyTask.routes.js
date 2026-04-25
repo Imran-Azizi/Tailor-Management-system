@@ -14,11 +14,11 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get("/", authorize("ADMIN", "DOKAN"), listDailyTasks);
+router.get("/", authorize("ADMIN", "DOKAN", "FINANCE"), listDailyTasks);
 router.get("/report", authorize("ADMIN"), dailyTaskReport);
 router.get("/report/pdf", authorize("ADMIN"), dailyTaskReportPdf);
-router.get("/:id", authorize("ADMIN", "DOKAN"), getDailyTask);
-router.post("/", authorize("ADMIN", "DOKAN"), createDailyTask);
+router.get("/:id", authorize("ADMIN", "DOKAN", "FINANCE"), getDailyTask);
+router.post("/", authorize("ADMIN", "DOKAN", "FINANCE"), createDailyTask);
 router.put("/:id", authorize("ADMIN"), updateDailyTask);
 router.delete("/:id", authorize("ADMIN"), deleteDailyTask);
 

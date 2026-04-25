@@ -7,6 +7,7 @@ import Select from "react-select";
 import {
   LuBadgeCheck,
   LuBadgeDollarSign,
+  LuCalendarCheck,
   LuCalendarDays,
   LuChevronDown,
   LuClipboardList,
@@ -28,6 +29,7 @@ import {
   LuTrash2,
 } from "react-icons/lu";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useMonth } from "../context/MonthContext.jsx";
 import api from "../lib/api.js";
 import {
   buildSelectStyles,
@@ -35,6 +37,7 @@ import {
   isDailyTaskEditable,
 } from "../lib/dailyTasks.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
+import { getMonthLabel } from "../lib/months.js";
 import {
   ConfirmDeleteModal,
   Field,
@@ -692,7 +695,9 @@ function TaskCard({
 
 export default function AllDailyTasks() {
   const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language;
   const { isAdmin } = useAuth();
+  const { viewMonth, viewYear } = useMonth();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
@@ -702,7 +707,6 @@ export default function AllDailyTasks() {
   const [reportMenuOpen, setReportMenuOpen] = useState(false);
   const [editTask, setEditTask] = useState(null);
   const [deleteTask, setDeleteTask] = useState(null);
-  const [reportDate, setReportDate] = useState("");
   const reportMenuRef = useRef(null);
   const [editForm, setEditForm] = useState({
     fromName: "",
@@ -807,11 +811,24 @@ export default function AllDailyTasks() {
     });
   };
 
+  // Reset to page 1 when the selected month/year changes
+  useEffect(() => {
+    setPage(1);
+  }, [viewMonth, viewYear]);
+
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ["daily-tasks", page, search],
+    queryKey: ["daily-tasks", page, search, viewMonth, viewYear],
     queryFn: () =>
       api
-        .get("/daily-tasks", { params: { page, limit: 20, search } })
+        .get("/daily-tasks", {
+          params: {
+            page,
+            limit: 20,
+            search,
+            month: isAdmin ? viewMonth : undefined,
+            year: isAdmin ? viewYear : undefined,
+          },
+        })
         .then((r) => r.data),
   });
 
@@ -824,16 +841,37 @@ export default function AllDailyTasks() {
   const isRtlNote = isRtlTextLanguage(i18n.language);
   const summaryTotalTasks = total;
   const summaryTotalAmount = totalAmount;
+
+  // Derive the anchor date for monthly/yearly reports from the currently viewed month
+  const reportMonthDate = `${viewYear}-${String(viewMonth).padStart(2, "0")}-01`;
+  const reportMonthLabel = `${getMonthLabel(viewMonth, language)} ${viewYear}`;
+
   const reportTypeOptions = [
-    { value: "daily", label: t("dailyTasks.reportDailyFull", "Daily Report") },
-    { value: "weekly", label: t("dailyTasks.reportWeeklyFull", "Weekly Report") },
-    { value: "monthly", label: t("dailyTasks.reportMonthlyFull", "Monthly Report") },
-    { value: "yearly", label: t("dailyTasks.reportYearlyFull", "Yearly Report") },
+    {
+      value: "daily",
+      label: t("dailyTasks.reportDailyFull", "Daily Report"),
+      date: undefined,
+    },
+    {
+      value: "weekly",
+      label: t("dailyTasks.reportWeeklyFull", "Weekly Report"),
+      date: undefined,
+    },
+    {
+      value: "monthly",
+      label: `${t("dailyTasks.reportMonthlyFull", "Monthly Report")} — ${reportMonthLabel}`,
+      date: reportMonthDate,
+    },
+    {
+      value: "yearly",
+      label: `${t("dailyTasks.reportYearlyFull", "Yearly Report")} — ${viewYear}`,
+      date: `${viewYear}-01-01`,
+    },
   ];
 
   const reportMutation = useMutation({
-    mutationFn: ({ reportType }) =>
-      downloadDailyTaskReportPdf({ reportType, date: reportDate }),
+    mutationFn: ({ reportType, date }) =>
+      downloadDailyTaskReportPdf({ reportType, date }),
     onSuccess: (_, vars) => {
       toast.success(
         t("dailyTasks.reportGenerated", "Report PDF generated successfully."),
@@ -862,8 +900,8 @@ export default function AllDailyTasks() {
     setPage(1);
   };
 
-  const handleReportDownload = (reportType) => {
-    reportMutation.mutate({ reportType });
+  const handleReportDownload = (reportType, date) => {
+    reportMutation.mutate({ reportType, date });
   };
 
   useEffect(() => {
@@ -909,45 +947,44 @@ export default function AllDailyTasks() {
             </button>
 
             {reportMenuOpen && isAdmin && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "calc(100% + 6px)",
-                  right: 0,
-                  minWidth: 248,
-                  borderRadius: "var(--r)",
-                  border: "1px solid var(--border)",
-                  background: "var(--surface)",
-                  boxShadow: "var(--sh-lg)",
-                  zIndex: 30,
-                  padding: 10,
-                  display: "grid",
-                  gap: 8,
-                }}
-              >
-                <Field
-                  label={t(
-                    "dailyTasks.selectedDate",
-                    "Selected Date (optional)",
-                  )}
+              <div className="dt-report-dropdown">
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "6px 8px",
+                    borderRadius: "var(--r)",
+                    background: "var(--success-soft, #F0FDF4)",
+                    border: "1px solid var(--success-soft-border, #BBF7D0)",
+                    fontSize: 12.5,
+                    color: "var(--success, #16A34A)",
+                    fontWeight: 500,
+                  }}
                 >
-                  <input
-                    type="date"
-                    className="inp"
-                    value={reportDate}
-                    onChange={(e) => setReportDate(e.target.value)}
-                    style={{ height: 36 }}
-                  />
-                </Field>
+                  <LuCalendarCheck size={13} />
+                  <span>
+                    {t("dailyTasks.viewingMonth", "Viewing")}:{" "}
+                    <strong>{reportMonthLabel}</strong>
+                  </span>
+                </div>
 
                 {reportTypeOptions.map((option) => (
                   <button
                     key={option.value}
                     type="button"
                     className="btn btn-outline btn-sm"
-                    style={{ justifyContent: "flex-start", gap: 6, height: 36 }}
+                    style={{
+                      justifyContent: "flex-start",
+                      gap: 6,
+                      height: 36,
+                      fontSize: 13,
+                      width: "100%",
+                    }}
                     disabled={reportMutation.isPending}
-                    onClick={() => handleReportDownload(option.value)}
+                    onClick={() =>
+                      handleReportDownload(option.value, option.date)
+                    }
                   >
                     <LuFileText size={13} />
                     {option.label}
@@ -958,6 +995,46 @@ export default function AllDailyTasks() {
           </div>
         }
       />
+
+      {isAdmin && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "8px 14px",
+            marginBottom: 16,
+            borderRadius: "var(--r)",
+            background: "var(--success-soft, #F0FDF4)",
+            border: "1px solid var(--success-soft-border, #BBF7D0)",
+            fontSize: 13,
+            color: "var(--success, #16A34A)",
+            fontWeight: 500,
+          }}
+        >
+          <LuCalendarCheck size={14} />
+          <span>
+            {t("dailyTasks.viewingMonth", "Viewing data for")}:{" "}
+            <strong style={{ fontWeight: 700 }}>
+              {getMonthLabel(viewMonth, language)} {viewYear}
+            </strong>
+          </span>
+          {data?.total === 0 && !isLoading && (
+            <span
+              style={{
+                marginInlineStart: "auto",
+                fontSize: 11,
+                opacity: 0.75,
+              }}
+            >
+              {t(
+                "dailyTasks.noDataThisMonth",
+                "No expenses found for this month",
+              )}
+            </span>
+          )}
+        </div>
+      )}
 
       <div
         className="dt-summary-grid"

@@ -1,4 +1,46 @@
 import PDFDocument from "pdfkit";
+import fs from "fs";
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
+const reshaper = require("arabic-persian-reshaper");
+const ARABIC_SCRIPT_REGEX =
+  /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+
+function hasArabicScript(value) {
+  return ARABIC_SCRIPT_REGEX.test(String(value || ""));
+}
+
+function resolveArabicFontPath() {
+  const candidates = [
+    process.env.PDF_ARABIC_FONT_PATH,
+    "C:/Windows/Fonts/tahoma.ttf",
+    "C:/Windows/Fonts/arial.ttf",
+    "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+
+  try {
+    return require.resolve("@fontsource/noto-naskh-arabic/files/noto-naskh-arabic-arabic-400-normal.woff");
+  } catch (_error) {
+    return null;
+  }
+}
+
+function toPdfArabicText(value) {
+  const text = String(value || "");
+  if (!hasArabicScript(text)) return text;
+
+  try {
+    return reshaper.ArabicShaper.convertArabic(text);
+  } catch (_error) {
+    return text;
+  }
+}
 
 function formatReportType(type) {
   const value = String(type || "daily");
@@ -70,6 +112,16 @@ export function buildDailyTaskReportPdf(report) {
       },
     });
 
+    let arabicFontName = null;
+    try {
+      const arabicFontPath = resolveArabicFontPath();
+      if (!arabicFontPath) throw new Error("Arabic font not found");
+      arabicFontName = "ArabicScript";
+      doc.registerFont(arabicFontName, arabicFontPath);
+    } catch (_error) {
+      arabicFontName = null;
+    }
+
     const chunks = [];
     doc.on("data", (chunk) => chunks.push(chunk));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
@@ -137,7 +189,9 @@ export function buildDailyTaskReportPdf(report) {
     y += 10;
     y = drawTableHeader(doc, y + 6);
 
-    const rowHeight = 20;
+    const baseRowHeight = 20;
+    const noteColumnWidth = 56;
+    const noteVerticalPadding = 12;
     const footerThreshold = doc.page.height - 52;
 
     if (tasks.length === 0) {
@@ -145,9 +199,30 @@ export function buildDailyTaskReportPdf(report) {
         .font("Helvetica")
         .fontSize(10)
         .fillColor("#64748B")
-        .text("No daily task records found for the selected period.", 44, y + 10);
+        .text(
+          "No daily task records found for the selected period.",
+          44,
+          y + 10,
+        );
     } else {
       tasks.forEach((task, index) => {
+        const noteText = String(task.note || "-");
+        const noteTextForPdf = toPdfArabicText(noteText);
+        const useArabicFont = Boolean(
+          arabicFontName && hasArabicScript(noteText),
+        );
+        const noteAlign = useArabicFont ? "right" : "left";
+
+        doc.font(useArabicFont ? arabicFontName : "Helvetica").fontSize(9);
+        const noteHeight = doc.heightOfString(noteTextForPdf, {
+          width: noteColumnWidth,
+          align: noteAlign,
+        });
+        const rowHeight = Math.max(
+          baseRowHeight,
+          Math.ceil(noteHeight) + noteVerticalPadding,
+        );
+
         if (y + rowHeight > footerThreshold) {
           doc.addPage();
           y = 40;
@@ -170,8 +245,16 @@ export function buildDailyTaskReportPdf(report) {
         doc.text(formatDate(task.taskDate), 72, y + 6, { width: 104 });
         doc.text(truncate(task.fromName, 18), 182, y + 6, { width: 110 });
         doc.text(truncate(task.recipientName, 18), 298, y + 6, { width: 110 });
-        doc.text(formatMoney(task.amount), 414, y + 6, { width: 70, align: "right" });
-        doc.text(truncate(task.note || "-", 12), 492, y + 6, { width: 56 });
+        doc.text(formatMoney(task.amount), 414, y + 6, {
+          width: 70,
+          align: "right",
+        });
+        doc
+          .font(useArabicFont ? arabicFontName : "Helvetica")
+          .text(noteTextForPdf, 492, y + 6, {
+            width: noteColumnWidth,
+            align: noteAlign,
+          });
 
         y += rowHeight;
       });

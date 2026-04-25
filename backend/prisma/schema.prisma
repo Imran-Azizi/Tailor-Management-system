@@ -14,6 +14,7 @@ enum AccountType {
   DOKAN
   DOKHT
   QICHIKAR
+  FINANCE
 }
 
 enum TransactionKind {
@@ -25,6 +26,10 @@ enum WorkerPaymentStatus {
   PAID_TO_WORKER
 }
 
+enum DraftStatus {
+  DRAFT
+}
+
 model User {
   id           String      @id @default(uuid())
   name         String
@@ -34,20 +39,23 @@ model User {
   isActive     Boolean     @default(true)
   refreshToken String?
 
-  assignedOrders         Order[]            @relation("AssignedOrders")
-  assignedByOrders       Order[]            @relation("AssignedByOrders")
-  receivedOrders         Order[]            @relation("ReceivedOrders")
-  qichikarAssignedOrders Order[]            @relation("QichikarAssignedOrders")
-  dokhtAssignedOrders    Order[]            @relation("DokhtAssignedOrders")
-  qichikarReceivedOrders Order[]            @relation("QichikarReceivedOrders")
-  dokhtReceivedOrders    Order[]            @relation("DokhtReceivedOrders")
-  workerPaidOrders       Order[]            @relation("WorkerPaidByOrders")
-  qichikarPaidOrders     Order[]            @relation("QichikarPaidByOrders")
-  dokhtPaidOrders        Order[]            @relation("DokhtPaidByOrders")
+  assignedOrders         Order[]               @relation("AssignedOrders")
+  assignedByOrders       Order[]               @relation("AssignedByOrders")
+  receivedOrders         Order[]               @relation("ReceivedOrders")
+  qichikarAssignedOrders Order[]               @relation("QichikarAssignedOrders")
+  dokhtAssignedOrders    Order[]               @relation("DokhtAssignedOrders")
+  qichikarReceivedOrders Order[]               @relation("QichikarReceivedOrders")
+  dokhtReceivedOrders    Order[]               @relation("DokhtReceivedOrders")
+  workerPaidOrders       Order[]               @relation("WorkerPaidByOrders")
+  qichikarPaidOrders     Order[]               @relation("QichikarPaidByOrders")
+  dokhtPaidOrders        Order[]               @relation("DokhtPaidByOrders")
   notifications          UserNotification[]
-  transactions           Transaction[]      @relation("UserTransactions")
-  createdTransactions    Transaction[]      @relation("CreatedTransactions")
-  createdDailyTasks      DailyTask[]        @relation("CreatedDailyTasks")
+  transactions           Transaction[]         @relation("UserTransactions")
+  createdTransactions    Transaction[]         @relation("CreatedTransactions")
+  createdDailyTasks      DailyTask[]           @relation("CreatedDailyTasks")
+  orderDrafts            OrderDraft[]
+  rakhtPaymentHistories  RakhtPaymentHistory[]
+  financeCreatedOrders   Order[]               @relation("FinanceCreatedOrders")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -109,8 +117,16 @@ model Order {
   isCompleted         Boolean   @default(false)
   inProgress          Boolean   @default(false)
 
+  // Entry month/year — set by admin at order creation time
+  entryMonth Int?
+  entryYear  Int?
+
+  // Finance user who created this order (null for orders created by ADMIN/DOKAN)
+  createdByFinanceId String?
+
   // Assignment fields
-  assignedToId    String?
+  assignedToId String?
+
   assignedById    String?
   assignedAt      DateTime?
   assignmentNote  String?
@@ -136,6 +152,9 @@ model Order {
   qichikarCompletedAt DateTime?
   // When Dokht completes, order becomes fully completed
   dokhtCompletedAt    DateTime?
+
+  // SMS notification tracking — set when customer completion SMS is sent (prevents duplicates)
+  smsSentAt DateTime?
 
   workerPaymentStatus WorkerPaymentStatus @default(UNPAID)
   workerPaymentAmount Float?
@@ -163,6 +182,7 @@ model Order {
   workerPaidBy       User? @relation("WorkerPaidByOrders", fields: [workerPaidById], references: [id])
   qichikarPaidBy     User? @relation("QichikarPaidByOrders", fields: [qichikarPaidById], references: [id])
   dokhtPaidBy        User? @relation("DokhtPaidByOrders", fields: [dokhtPaidById], references: [id])
+  createdByFinance   User? @relation("FinanceCreatedOrders", fields: [createdByFinanceId], references: [id])
 
   customer      Customer       @relation(fields: [customerId], references: [id])
   rakht         Rakht?         @relation(fields: [rakhtId], references: [id], onDelete: SetNull)
@@ -197,6 +217,27 @@ model Order {
   @@index([dokhtPaidById])
   @@index([qichikarCompletedAt])
   @@index([dokhtCompletedAt])
+  @@index([entryMonth])
+  @@index([entryYear])
+  @@index([createdByFinanceId])
+}
+
+model OrderDraft {
+  id           String      @id @default(uuid())
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientKey    String
+  customerName String?
+  orderTypes   String[]    @default([])
+  step         Int         @default(0)
+  status       DraftStatus @default(DRAFT)
+  draftData    Json
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@unique([userId, clientKey])
+  @@index([userId, status])
+  @@index([updatedAt])
 }
 
 model Rakht {
@@ -215,6 +256,26 @@ model Rakht {
 
   @@index([companyName])
   @@index([brandName])
+}
+
+model RakhtPaymentHistory {
+  id               String   @id @default(uuid())
+  companyName      String
+  paidAmount       Float
+  totalPriceBefore Float
+  totalPaidBefore  Float
+  remainingBefore  Float
+  totalPriceAfter  Float
+  totalPaidAfter   Float
+  remainingAfter   Float
+  paidAt           DateTime @default(now())
+  paidById         String
+  paidBy           User     @relation(fields: [paidById], references: [id], onDelete: Restrict)
+  createdAt        DateTime @default(now())
+
+  @@index([companyName])
+  @@index([paidAt])
+  @@index([paidById])
 }
 
 model RakhtTon {

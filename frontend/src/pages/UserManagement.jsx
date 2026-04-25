@@ -27,9 +27,10 @@ const ROLE_COLORS = {
   DOKAN: "#7C3AED",
   DOKHT: "#DB2777",
   QICHIKAR: "#D97706",
+  FINANCE: "#059669",
 };
 
-const ROLES = ["ADMIN", "DOKAN", "DOKHT", "QICHIKAR"];
+const ROLES = ["ADMIN", "DOKAN", "DOKHT", "QICHIKAR", "FINANCE"];
 
 function RoleBadge({ role }) {
   return (
@@ -60,12 +61,13 @@ function UserModal({ user, onClose, onSaved }) {
   });
   const [showPw, setShowPw] = useState(false);
   const [saving, setSaving] = useState(false);
+  const isDokan = form.accountType === "DOKAN";
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (form.password && form.password.length < 6) {
+    if (!isDokan && form.password && form.password.length < 6) {
       toast.error(t("users.passwordMin"));
       return;
     }
@@ -77,7 +79,7 @@ function UserModal({ user, onClose, onSaved }) {
         accountType: form.accountType,
         isActive: form.isActive,
       };
-      if (form.password) payload.password = form.password;
+      if (!isDokan && form.password) payload.password = form.password;
       if (user) {
         const { data } = await api.put(`/users/${user.id}`, payload);
         onSaved(data);
@@ -125,9 +127,11 @@ function UserModal({ user, onClose, onSaved }) {
           background: "var(--surface)",
           border: "1px solid var(--border)",
           borderRadius: 16,
-          padding: 28,
+          padding: "clamp(16px, 4vw, 28px)",
           width: "100%",
           maxWidth: 440,
+          maxHeight: "90vh",
+          overflowY: "auto",
           boxShadow: "var(--sh-lg)",
         }}
       >
@@ -228,7 +232,14 @@ function UserModal({ user, onClose, onSaved }) {
             <select
               style={inputStyle}
               value={form.accountType}
-              onChange={(e) => set("accountType", e.target.value)}
+              onChange={(e) => {
+                const nextRole = e.target.value;
+                set("accountType", nextRole);
+                if (nextRole === "DOKAN") {
+                  set("password", "");
+                  setShowPw(false);
+                }
+              }}
             >
               {ROLES.map((r) => (
                 <option key={r} value={r}>
@@ -238,64 +249,71 @@ function UserModal({ user, onClose, onSaved }) {
             </select>
           </div>
           {/* Password */}
-          <div>
-            <label
-              style={{
-                fontSize: 13,
-                fontWeight: 500,
-                color: "var(--text2)",
-                display: "block",
-                marginBottom: 5,
-              }}
-            >
-              {t("auth.password")}{" "}
-              <span style={{ color: "var(--text3)", fontWeight: 400 }}>
-                ({user ? t("users.leaveBlank") : t("users.defaultPasswordHint")}
-                )
-              </span>
-            </label>
-            <div style={{ position: "relative" }}>
-              <LuLock
-                size={14}
+          {!isDokan && (
+            <div>
+              <label
                 style={{
-                  position: "absolute",
-                  left: 10,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "var(--text3)",
-                }}
-              />
-              <input
-                style={{ ...inputStyle, paddingLeft: 32, paddingRight: 36 }}
-                type={showPw ? "text" : "password"}
-                value={form.password}
-                onChange={(e) => set("password", e.target.value)}
-                placeholder="••••••"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPw((s) => !s)}
-                style={{
-                  position: "absolute",
-                  right: 8,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "var(--text3)",
-                  display: "flex",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: "var(--text2)",
+                  display: "block",
+                  marginBottom: 5,
                 }}
               >
-                {showPw ? <LuEyeOff size={14} /> : <LuEye size={14} />}
-              </button>
+                {t("auth.password")}{" "}
+                <span style={{ color: "var(--text3)", fontWeight: 400 }}>
+                  (
+                  {user
+                    ? t("users.leaveBlank")
+                    : t("users.defaultPasswordHint")}
+                  )
+                </span>
+              </label>
+              <div style={{ position: "relative" }}>
+                <LuLock
+                  size={14}
+                  style={{
+                    position: "absolute",
+                    left: 10,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: "var(--text3)",
+                  }}
+                />
+                <input
+                  style={{ ...inputStyle, paddingLeft: 32, paddingRight: 36 }}
+                  type={showPw ? "text" : "password"}
+                  value={form.password}
+                  onChange={(e) => set("password", e.target.value)}
+                  placeholder="••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw((s) => !s)}
+                  style={{
+                    position: "absolute",
+                    right: 8,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "var(--text3)",
+                    display: "flex",
+                  }}
+                >
+                  {showPw ? <LuEyeOff size={14} /> : <LuEye size={14} />}
+                </button>
+              </div>
+              {form.password.length > 0 && form.password.length < 6 && (
+                <p
+                  style={{ fontSize: 11, color: "#DC2626", margin: "4px 0 0" }}
+                >
+                  {t("users.passwordMin")}
+                </p>
+              )}
             </div>
-            {form.password.length > 0 && form.password.length < 6 && (
-              <p style={{ fontSize: 11, color: "#DC2626", margin: "4px 0 0" }}>
-                {t("users.passwordMin")}
-              </p>
-            )}
-          </div>
+          )}
           {/* Active toggle */}
           {user && (
             <label
@@ -468,19 +486,11 @@ export default function UserManagement() {
           {t("common.loading")}
         </p>
       ) : (
-        <div
-          style={{
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: 12,
-            overflow: "hidden",
-            boxShadow: "var(--sh)",
-          }}
-        >
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <div className="card" style={{ overflow: "hidden" }}>
+          <div className="tbl-wrap">
+            <table className="tbl" style={{ minWidth: 560 }}>
               <thead>
-                <tr style={{ background: "var(--surface2)" }}>
+                <tr className="" style={{ background: "var(--surface2)" }}>
                   {[
                     t("users.name", "Full Name"),
                     t("common.phone", "Phone"),
@@ -489,29 +499,14 @@ export default function UserManagement() {
                     t("common.status", "Status"),
                     t("common.actions", "Actions"),
                   ].map((h) => (
-                    <th
-                      key={h}
-                      style={{
-                        padding: "11px 16px",
-                        textAlign: "left",
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: "var(--text3)",
-                        borderBottom: "1px solid var(--border)",
-                      }}
-                    >
-                      {h}
-                    </th>
+                    <th key={h}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {users.map((u) => (
-                  <tr
-                    key={u.id}
-                    style={{ borderBottom: "1px solid var(--border)" }}
-                  >
-                    <td style={{ padding: "13px 16px" }}>
+                  <tr key={u.id}>
+                    <td>
                       <div
                         style={{
                           display: "flex",
@@ -570,28 +565,16 @@ export default function UserManagement() {
                         </div>
                       </div>
                     </td>
-                    <td
-                      style={{
-                        padding: "13px 16px",
-                        fontSize: 13,
-                        color: "var(--text2)",
-                      }}
-                    >
+                    <td style={{ fontSize: 13, color: "var(--text2)" }}>
                       {u.phoneNumber}
                     </td>
-                    <td style={{ padding: "13px 16px" }}>
+                    <td>
                       <RoleBadge role={u.accountType} />
                     </td>
-                    <td
-                      style={{
-                        padding: "13px 16px",
-                        fontSize: 13,
-                        color: "var(--text2)",
-                      }}
-                    >
+                    <td style={{ fontSize: 13, color: "var(--text2)" }}>
                       {u._count?.assignedOrders ?? 0}
                     </td>
-                    <td style={{ padding: "13px 16px" }}>
+                    <td>
                       <span
                         style={{
                           fontSize: 12,
@@ -605,7 +588,7 @@ export default function UserManagement() {
                         {u.isActive ? t("users.active") : t("users.inactive")}
                       </span>
                     </td>
-                    <td style={{ padding: "13px 16px" }}>
+                    <td>
                       <div style={{ display: "flex", gap: 6 }}>
                         <button
                           onClick={() => setModal(u)}
