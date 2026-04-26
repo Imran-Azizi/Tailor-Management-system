@@ -24,6 +24,8 @@ import {
   LuTrendingUp,
   LuBanknote,
   LuCalendarCheck,
+  LuUser,
+  LuUsers,
 } from "react-icons/lu";
 import { useTranslation } from "react-i18next";
 import api from "../lib/api.js";
@@ -176,16 +178,51 @@ export default function Dashboard() {
           sub={t("dashboardPage.remainingBalance")}
         />
         <StatCard
-          label={t("dashboardPage.completed")}
-          value={d.completedOrders}
+          label={t(
+            "dashboardPage.totalDailyExpenses",
+            "Total Amount of All Daily Expenses",
+          )}
+          value={formatCurrency(d.totalDailyExpenses ?? 0, language)}
           Icon={LuSquareCheck}
           accent="#16A34A"
+          sub={t("sidebar.dailyTasks", "Daily Expenses")}
         />
         <StatCard
-          label={t("dashboardPage.pending")}
-          value={d.pendingOrders}
+          label={t(
+            "dashboardPage.totalRakhtPrice",
+            "Total Price of All Rakhts",
+          )}
+          value={formatCurrency(d.totalRakhtPrice ?? 0, language)}
           Icon={LuClock}
           accent="#2563EB"
+          sub={t("common.total", "Total")}
+        />
+        <StatCard
+          label={t("dashboardPage.totalLoan", "Total Loan")}
+          value={formatCurrency(d.totalLoan ?? 0, language)}
+          Icon={LuDollarSign}
+          accent="#D97706"
+          sub={t("transaction.loanOption", "Loan")}
+        />
+        <StatCard
+          label={t(
+            "dashboardPage.totalQichikarUsersMoney",
+            "Total Money for Qichikar Users",
+          )}
+          value={formatCurrency(d.totalQichikarUsersMoney ?? 0, language)}
+          Icon={LuUser}
+          accent="#D97706"
+          sub={t("assignment.qichikarLabel", "Qichikar")}
+        />
+        <StatCard
+          label={t(
+            "dashboardPage.totalDokhtUsersMoney",
+            "Total Money for Dokht Users",
+          )}
+          value={formatCurrency(d.totalDokhtUsersMoney ?? 0, language)}
+          Icon={LuUsers}
+          accent="#DB2777"
+          sub={t("assignment.dokhtLabel", "Dokht")}
         />
         <StatCard
           label={t("dashboardPage.emergency")}

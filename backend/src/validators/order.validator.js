@@ -33,7 +33,7 @@ const rakhtSelectionSchema = z.object({
   rakhtId: z.string().min(1, "Rakht is required"),
   rakhtTonId: z.string().min(1, "Rakht ton is required"),
   requiredMeters: z.number().positive("Required meters must be positive"),
-  piecePrice: z.number().min(0, "Piece price cannot be negative"),
+  piecePrice: z.number().positive("Piece price must be positive"),
 });
 
 export const createOrderSchema = z.object({

@@ -13,6 +13,14 @@ export const getAll = async (req, res, next) => {
   }
 };
 
+export const getRevenueSummary = async (req, res, next) => {
+  try {
+    res.json(await service.getRakhtRevenueSummary());
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getPaymentHistory = async (req, res, next) => {
   try {
     const companyName =

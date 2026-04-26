@@ -14,6 +14,13 @@ export const getDashboardStats = async ({
     Number.isFinite(parsedMonth) &&
     Number.isFinite(parsedYear);
 
+  const monthStart = hasMonthFilter
+    ? new Date(parsedYear, parsedMonth - 1, 1, 0, 0, 0, 0)
+    : null;
+  const monthEnd = hasMonthFilter
+    ? new Date(parsedYear, parsedMonth, 0, 23, 59, 59, 999)
+    : null;
+
   // Finance user data isolation — scope all order queries to their created orders
   const financeWhere = financeUserId
     ? { createdByFinanceId: String(financeUserId) }
@@ -23,8 +30,6 @@ export const getDashboardStats = async ({
   // Use OR to handle legacy orders (entryMonth=null) via createdAt fallback
   let monthWhere;
   if (hasMonthFilter) {
-    const monthStart = new Date(parsedYear, parsedMonth - 1, 1, 0, 0, 0, 0);
-    const monthEnd = new Date(parsedYear, parsedMonth, 0, 23, 59, 59, 999);
     monthWhere = {
       ...financeWhere,
       OR: [
@@ -84,29 +89,106 @@ export const getDashboardStats = async ({
     }),
   ]);
 
-  // Daily task totals — Finance users do not have daily tasks, skip for them
-  const dailyTaskWhere =
-    hasMonthFilter && !financeUserId
+  // Daily expense and rakht totals are month-scoped when filters are active.
+  const dailyTaskWhere = hasMonthFilter
+    ? {
+        taskDate: {
+          gte: monthStart,
+          lte: monthEnd,
+        },
+      }
+    : {};
+
+  const rakhtWhere = hasMonthFilter
+    ? {
+        date: {
+          gte: monthStart,
+          lte: monthEnd,
+        },
+      }
+    : {};
+
+  const loanWhere = {
+    source: "MANUAL",
+    kind: "LOAN",
+    ...(financeUserId ? { createdById: String(financeUserId) } : {}),
+    ...(hasMonthFilter
       ? {
-          taskDate: {
-            gte: new Date(parsedYear, parsedMonth - 1, 1, 0, 0, 0, 0),
-            lte: new Date(parsedYear, parsedMonth, 0, 23, 59, 59, 999),
+          transactionDate: {
+            gte: monthStart,
+            lte: monthEnd,
           },
         }
-      : financeUserId
-        ? null // Finance users don't own daily tasks
-        : {};
+      : {}),
+  };
 
-  const [dailyTaskTotal, dailyTaskAmount] =
-    dailyTaskWhere !== null
-      ? await Promise.all([
-          prisma.dailyTask.count({ where: dailyTaskWhere }),
-          prisma.dailyTask.aggregate({
-            where: dailyTaskWhere,
-            _sum: { amount: true },
-          }),
-        ])
-      : [0, { _sum: { amount: 0 } }];
+  const [dailyTaskTotal, dailyTaskAmount, rakhtPriceAggregate, loanAggregate] =
+    await Promise.all([
+      prisma.dailyTask.count({ where: dailyTaskWhere }),
+      prisma.dailyTask.aggregate({
+        where: dailyTaskWhere,
+        _sum: { amount: true },
+      }),
+      prisma.rakht.aggregate({
+        where: rakhtWhere,
+        _sum: { totalPrice: true },
+      }),
+      prisma.transaction.aggregate({
+        where: loanWhere,
+        _sum: { amount: true },
+      }),
+    ]);
+
+  const paidDateRange = hasMonthFilter
+    ? {
+        gte: monthStart,
+        lte: monthEnd,
+      }
+    : undefined;
+
+  const [
+    qichikarPaidAggregate,
+    dokhtPaidAggregate,
+    legacyQichikarPaidAggregate,
+    legacyDokhtPaidAggregate,
+  ] = await Promise.all([
+    prisma.order.aggregate({
+      where: {
+        ...(financeUserId ? { createdByFinanceId: String(financeUserId) } : {}),
+        qichikarPaymentStatus: "PAID_TO_WORKER",
+        qichikarPaidAt: paidDateRange || { not: null },
+      },
+      _sum: { qichikarPaymentAmount: true },
+    }),
+    prisma.order.aggregate({
+      where: {
+        ...(financeUserId ? { createdByFinanceId: String(financeUserId) } : {}),
+        dokhtPaymentStatus: "PAID_TO_WORKER",
+        dokhtPaidAt: paidDateRange || { not: null },
+      },
+      _sum: { dokhtPaymentAmount: true },
+    }),
+    prisma.order.aggregate({
+      where: {
+        ...(financeUserId ? { createdByFinanceId: String(financeUserId) } : {}),
+        workerPaymentStatus: "PAID_TO_WORKER",
+        workerPaidAt: paidDateRange || { not: null },
+        qichikarPaymentStatus: "UNPAID",
+        assignedTo: { accountType: "QICHIKAR" },
+      },
+      _sum: { workerPaymentAmount: true },
+    }),
+    prisma.order.aggregate({
+      where: {
+        ...(financeUserId ? { createdByFinanceId: String(financeUserId) } : {}),
+        workerPaymentStatus: "PAID_TO_WORKER",
+        workerPaidAt: paidDateRange || { not: null },
+        dokhtPaymentStatus: "UNPAID",
+        assignedTo: { accountType: "DOKHT" },
+      },
+      _sum: { workerPaymentAmount: true },
+    }),
+  ]);
 
   const monthlyRevenue = await getMonthlyRevenue(financeUserId);
 
@@ -131,6 +213,15 @@ export const getDashboardStats = async ({
     })),
     dailyTaskTotal,
     dailyTaskAmount: dailyTaskAmount._sum?.amount || 0,
+    totalDailyExpenses: dailyTaskAmount._sum?.amount || 0,
+    totalRakhtPrice: rakhtPriceAggregate._sum?.totalPrice || 0,
+    totalLoan: loanAggregate._sum?.amount || 0,
+    totalQichikarUsersMoney:
+      (qichikarPaidAggregate._sum?.qichikarPaymentAmount || 0) +
+      (legacyQichikarPaidAggregate._sum?.workerPaymentAmount || 0),
+    totalDokhtUsersMoney:
+      (dokhtPaidAggregate._sum?.dokhtPaymentAmount || 0) +
+      (legacyDokhtPaidAggregate._sum?.workerPaymentAmount || 0),
     isFiltered: hasMonthFilter,
     filteredMonth: hasMonthFilter ? parsedMonth : null,
     filteredYear: hasMonthFilter ? parsedYear : null,

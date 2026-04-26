@@ -44,6 +44,13 @@ export default function CreateRakht() {
     return Math.max(0, total - given);
   }, [form.totalPrice, form.givenMoney]);
 
+  const tonPrice = useMemo(() => {
+    const total = Number(form.totalPrice || 0);
+    const qty = Number(form.tonQuantity || 0);
+    if (!Number.isFinite(total) || !Number.isFinite(qty) || qty <= 0) return 0;
+    return total / qty;
+  }, [form.totalPrice, form.tonQuantity]);
+
   const handleTonQtyChange = (option) => {
     const qty = option?.value || 0;
     setForm((prev) => {
@@ -279,6 +286,38 @@ export default function CreateRakht() {
                         />
                       </div>
                     </div>
+                  </div>
+
+                  <div
+                    className="info-box ib-gold"
+                    style={{
+                      marginTop: 2,
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fit, minmax(180px, 1fr))",
+                      gap: 8,
+                    }}
+                  >
+                    <span>
+                      {t("rakht.tonTotalPrice", {
+                        defaultValue: "Total price of this ton",
+                      })}
+                      : {tonPrice > 0 ? tonPrice.toLocaleString() : "-"}
+                    </span>
+                    <span>
+                      {t("rakht.purchasePricePerMeter", {
+                        defaultValue: "Price per meter (cost)",
+                      })}
+                      :{" "}
+                      {tonPrice > 0 && Number(ton.totalMeters || 0) > 0
+                        ? (
+                            tonPrice / Number(ton.totalMeters || 0)
+                          ).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })
+                        : "-"}
+                    </span>
                   </div>
                 </div>
               ))}

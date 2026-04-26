@@ -761,6 +761,7 @@ export default function WorkerPanel() {
     mutationFn: (id) => api.patch(`/orders/${id}/complete`).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["worker-panel-orders"] });
+      qc.invalidateQueries({ queryKey: ["worker-panel-transaction-summary"] });
       toast.success(
         t(
           "workerPanel.orderCompletedAdminNotified",

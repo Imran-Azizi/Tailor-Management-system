@@ -4,6 +4,7 @@ import {
   normalizeText,
   normalizePhone,
 } from "../lib/normalize.js";
+import { createCustomerWithSequentialBill } from "../lib/billNumber.js";
 
 const NUMERIC_MEASUREMENT_FIELDS = new Set([
   "height",
@@ -819,6 +820,12 @@ export const getCompletedOrdersFromWorkers = async ({
       );
     })
     .sort((left, right) => {
+      const leftPriority = left.workerPaymentStatus === "UNPAID" ? 0 : 1;
+      const rightPriority = right.workerPaymentStatus === "UNPAID" ? 0 : 1;
+      if (leftPriority !== rightPriority) {
+        return leftPriority - rightPriority;
+      }
+
       const leftTime = new Date(
         left.completedAt || left.updatedAt || left.createdAt || 0,
       ).getTime();
@@ -1055,8 +1062,8 @@ const reserveRakhtStock = async (tx, selection) => {
     );
   }
 
-  if (!Number.isFinite(piecePrice) || piecePrice < 0) {
-    throw Object.assign(new Error("Piece price must be a valid number"), {
+  if (!Number.isFinite(piecePrice) || piecePrice <= 0) {
+    throw Object.assign(new Error("Piece price must be a positive number"), {
       status: 400,
     });
   }
@@ -1157,18 +1164,9 @@ export const createOrder = async ({
           );
         }
 
-        const lastBill = await tx.customer.findFirst({
-          orderBy: { billNumber: "desc" },
-          select: { billNumber: true },
-        });
-        const billNumber = lastBill ? lastBill.billNumber + 1 : 1;
-
-        customer = await tx.customer.create({
-          data: {
-            firstName: normalizedFirstName,
-            phoneNumber: normalizedPhone,
-            billNumber,
-          },
+        customer = await createCustomerWithSequentialBill(tx, {
+          firstName: normalizedFirstName,
+          phoneNumber: normalizedPhone,
         });
       }
     }
@@ -1857,12 +1855,34 @@ export const deleteOrder = async (id) =>
   prisma.$transaction(async (tx) => {
     const existing = await tx.order.findUnique({
       where: { id },
-      select: { id: true, customerId: true },
+      select: {
+        id: true,
+        type: true,
+        customerId: true,
+        customer: { select: { billNumber: true } },
+      },
     });
 
     if (!existing) {
       throw Object.assign(new Error("Order not found"), { status: 404 });
     }
+
+    // Remove linked transactions explicitly (and also handled by FK cascade).
+    await tx.transaction.deleteMany({ where: { orderId: id } });
+
+    // Cleanup legacy system-generated order transactions created before orderId existed.
+    // These rows were stored as note-based entries (bill/type text), so we remove only
+    // non-manual sources to avoid touching real admin-created manual transactions.
+    await tx.transaction.deleteMany({
+      where: {
+        orderId: null,
+        source: { in: ["SYSTEM_ORDER_ASSIGNMENT", "SYSTEM_WORKER_COMPLETION"] },
+        AND: [
+          { note: { contains: `Bill #${existing.customer.billNumber}` } },
+          { note: { contains: `(${existing.type})` } },
+        ],
+      },
+    });
 
     await tx.userNotification.deleteMany({ where: { orderId: id } });
     await tx.order.delete({ where: { id } });

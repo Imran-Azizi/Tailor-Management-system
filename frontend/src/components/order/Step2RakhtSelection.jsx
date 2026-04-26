@@ -13,6 +13,7 @@ const emptySelection = {
   brandName: "",
   rakhtTonId: "",
   requiredMeters: "",
+  piecePrice: "",
 };
 
 export default function Step2RakhtSelection({
@@ -70,6 +71,10 @@ export default function Step2RakhtSelection({
             existing?.requiredMeters !== undefined
               ? String(existing.requiredMeters)
               : fallback.requiredMeters || "",
+          piecePrice:
+            existing?.piecePrice !== undefined
+              ? String(existing.piecePrice)
+              : fallback.piecePrice || "",
         };
       });
       return next;
@@ -116,11 +121,19 @@ export default function Step2RakhtSelection({
       const brandName = current.brandName || "";
       const rakhtTonId = current.rakhtTonId || "";
       const requiredMeters = Math.round(Number(current.requiredMeters || 0));
+      const piecePrice = Number(current.piecePrice || 0);
 
       const orderTypeLabel =
         item.label || getOrderTypeLabel(item.type, language);
 
-      if (!companyName || !brandName || !rakhtTonId || requiredMeters <= 0) {
+      if (
+        !companyName ||
+        !brandName ||
+        !rakhtTonId ||
+        requiredMeters <= 0 ||
+        !Number.isFinite(piecePrice) ||
+        piecePrice <= 0
+      ) {
         toast.error(
           t("createOrder.completeRakhtSelectionForItem", {
             type: orderTypeLabel,
@@ -180,7 +193,7 @@ export default function Step2RakhtSelection({
         rakhtColor: ton.name,
         rakhtColorHex: ton.colorHex,
         requiredMeters,
-        piecePrice: 0,
+        piecePrice,
       });
     }
 
@@ -219,6 +232,7 @@ export default function Step2RakhtSelection({
             const brandName = current.brandName || "";
             const rakhtTonId = current.rakhtTonId || "";
             const requiredMeters = Number(current.requiredMeters || 0);
+            const piecePrice = Number(current.piecePrice || 0);
 
             const filteredByCompany = (rakhtRows || []).filter(
               (item) => item.companyName === companyName,
@@ -265,6 +279,13 @@ export default function Step2RakhtSelection({
             const remainingAfter = Math.round(
               Math.max(0, availableMeters - requiredMeters),
             );
+            const purchasePricePerMeter = Number(
+              selectedTon?.purchasePricePerMeter || 0,
+            );
+            const computedTotalPrice =
+              Number.isFinite(piecePrice) && Number.isFinite(requiredMeters)
+                ? piecePrice * Math.max(0, requiredMeters)
+                : 0;
 
             const typeLabel = item.label;
 
@@ -306,6 +327,7 @@ export default function Step2RakhtSelection({
                           companyName: option?.value || "",
                           brandName: "",
                           rakhtTonId: "",
+                          piecePrice: "",
                         });
                       }}
                       styles={{
@@ -343,6 +365,7 @@ export default function Step2RakhtSelection({
                         updateSelection(item.key, {
                           brandName: option?.value || "",
                           rakhtTonId: "",
+                          piecePrice: "",
                         });
                       }}
                       styles={{
@@ -381,6 +404,11 @@ export default function Step2RakhtSelection({
                       onChange={(option) => {
                         updateSelection(item.key, {
                           rakhtTonId: option?.value || "",
+                          piecePrice:
+                            current.piecePrice ||
+                            String(
+                              Number(option?.ton?.purchasePricePerMeter || 0),
+                            ),
                         });
                       }}
                       formatOptionLabel={(opt) => (
@@ -457,53 +485,126 @@ export default function Step2RakhtSelection({
                     </div>
                   </Field>
 
+                  <Field
+                    label={t("rakht.sellingPricePerMeter", {
+                      defaultValue: "Selling Price per Meter",
+                    })}
+                    required
+                  >
+                    <div className="iw">
+                      <LuRuler size={14} className="ico" />
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="inp"
+                        value={current.piecePrice || ""}
+                        onChange={(event) =>
+                          updateSelection(item.key, {
+                            piecePrice: event.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                  </Field>
+
                   {selectedTon ? (
-                    <div className="info-box ib-gold" style={{ marginTop: 2 }}>
+                    <>
                       <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns:
-                            "repeat(auto-fit, minmax(150px, 1fr))",
-                          gap: 10,
-                        }}
+                        className={`info-box ${requiredMeters > 0 && requiredMeters > availableMeters ? "ib-red" : "ib-gold"}`}
+                        style={{ marginTop: 2 }}
                       >
-                        <span>
-                          {t("rakht.availableMeters", {
-                            defaultValue: "Available",
-                          })}
-                          : {availableMeters}
-                        </span>
-                        <span>
-                          {t("rakht.remainingAfterSelection", {
-                            defaultValue: "Remaining after selection",
-                          })}
-                          : {remainingAfter}
-                        </span>
-                        <span>
-                          {t("rakht.companyName", { defaultValue: "Company" })}:{" "}
-                          {selectedRakht?.companyName}
-                        </span>
-                        <span
+                        <div
                           style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 8,
+                            display: "grid",
+                            gridTemplateColumns:
+                              "repeat(auto-fit, minmax(150px, 1fr))",
+                            gap: 10,
                           }}
                         >
+                          <span>
+                            {t("rakht.availableMeters", {
+                              defaultValue: "Available",
+                            })}
+                            : {availableMeters}
+                          </span>
+                          <span>
+                            {t("rakht.purchasePricePerMeter", {
+                              defaultValue: "Price per meter",
+                            })}
+                            :{" "}
+                            {purchasePricePerMeter > 0
+                              ? purchasePricePerMeter.toLocaleString(
+                                  undefined,
+                                  {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  },
+                                )
+                              : "-"}
+                          </span>
+                          <span>
+                            {t("rakht.remainingAfterSelection", {
+                              defaultValue: "Remaining after selection",
+                            })}
+                            : {remainingAfter}
+                          </span>
+                          <span>
+                            {t("rakht.selectionTotalPrice", {
+                              defaultValue: "Total price",
+                            })}
+                            :{" "}
+                            {computedTotalPrice > 0
+                              ? computedTotalPrice.toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })
+                              : "0.00"}
+                          </span>
+                          <span>
+                            {t("rakht.companyName", {
+                              defaultValue: "Company",
+                            })}
+                            : {selectedRakht?.companyName}
+                          </span>
                           <span
                             style={{
-                              width: 12,
-                              height: 12,
-                              borderRadius: "50%",
-                              border: "1px solid rgba(15,23,42,0.15)",
-                              background: selectedTon.colorHex || "#94A3B8",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 8,
                             }}
-                          />
-                          {t("rakht.tonName", { defaultValue: "Name" })}:{" "}
-                          {selectedTon.name}
-                        </span>
+                          >
+                            <span
+                              style={{
+                                width: 12,
+                                height: 12,
+                                borderRadius: "50%",
+                                border: "1px solid rgba(15,23,42,0.15)",
+                                background: selectedTon.colorHex || "#94A3B8",
+                              }}
+                            />
+                            {t("rakht.tonName", { defaultValue: "Name" })}:{" "}
+                            {selectedTon.name}
+                          </span>
+                        </div>
                       </div>
-                    </div>
+                      {requiredMeters > 0 &&
+                      requiredMeters > availableMeters ? (
+                        <div
+                          style={{
+                            marginTop: 6,
+                            fontSize: 12,
+                            color: "var(--danger, #ef4444)",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {t("createOrder.insufficientRakhtMeters", {
+                            available: availableMeters,
+                            defaultValue: `Insufficient meters. Available: ${availableMeters}`,
+                          })}
+                        </div>
+                      ) : null}
+                    </>
                   ) : null}
                 </div>
               </div>

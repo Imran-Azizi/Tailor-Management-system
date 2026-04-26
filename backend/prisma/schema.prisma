@@ -21,6 +21,12 @@ enum TransactionKind {
   LOAN
 }
 
+enum TransactionSource {
+  MANUAL
+  SYSTEM_ORDER_ASSIGNMENT
+  SYSTEM_WORKER_COMPLETION
+}
+
 enum WorkerPaymentStatus {
   UNPAID
   PAID_TO_WORKER
@@ -194,6 +200,7 @@ model Order {
   korty         Korty?
   yakhanQaq     YakhanQaq?
   notifications Notification[]
+  transactions  Transaction[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
@@ -528,7 +535,10 @@ model Transaction {
   accountType     AccountType
   userId          String
   user            User            @relation("UserTransactions", fields: [userId], references: [id])
+  orderId         String?
+  order           Order?          @relation(fields: [orderId], references: [id], onDelete: Cascade)
   kind            TransactionKind @default(LOAN)
+  source          TransactionSource @default(MANUAL)
   amount          Float
   transactionDate DateTime
   note            String?
@@ -538,7 +548,10 @@ model Transaction {
   updatedAt       DateTime        @updatedAt
 
   @@index([userId])
+  @@index([orderId])
   @@index([accountType])
   @@index([kind])
+  @@index([source])
   @@index([createdById])
+  @@index([userId, source, kind])
 }

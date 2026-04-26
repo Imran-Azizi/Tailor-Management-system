@@ -338,7 +338,7 @@ export default function CreateOrder() {
         rakhtId: selection.rakhtId,
         rakhtTonId: selection.rakhtTonId,
         requiredMeters: parseNumberLocale(selection.requiredMeters || 0),
-        piecePrice: 0,
+        piecePrice: parseNumberLocale(selection.piecePrice || 0),
       })),
       orders: orderItems.map((item) => {
         const b = merged.billing?.[item.billingKey] || {};

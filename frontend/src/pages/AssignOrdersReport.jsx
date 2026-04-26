@@ -14,119 +14,48 @@ import {
   Spinner,
 } from "../components/ui/index.jsx";
 
-function resolveOrderState(order, t, lang) {
-  const receivedBy = order?.receivedBy;
-  const assignedTo = order?.assignedTo;
-  const completedBy = receivedBy || assignedTo;
-
-  const isDari = lang === "fa";
-  const isPashto = lang === "ps";
-
+function resolveOrderState(order) {
   if (order?.isCompleted) {
-    if (completedBy?.accountType === "QICHIKAR") {
-      const name = completedBy?.name || "Qichikar";
-      if (isPashto || isDari) {
-        return {
-          label: `قیچی کار ${name} این سفارش را تکمیل کرد است`,
-          tone: "success",
-        };
-      }
-      return {
-        label: `Qichikar ${name} completed this order`,
-        tone: "success",
-      };
-    }
-    if (completedBy?.accountType === "DOKHT" || assignedTo?.accountType === "DOKHT") {
-      if (isPashto || isDari) {
-        return {
-          label: "فرمایش دوخته شد",
-          tone: "success",
-        };
-      }
-      return {
-        label: "Order completed",
-        tone: "success",
-      };
-    }
-    if (isPashto || isDari) {
-      return {
-        label: "فرمایش دوخته شد",
-        tone: "success",
-      };
-    }
-    return {
-      label: "Order completed",
-      tone: "success",
-    };
+    return { key: "COMPLETED", tone: "success", workerName: "" };
   }
 
-  if (receivedBy?.accountType) {
-    const isDokht = receivedBy.accountType === "DOKHT";
-    const name = receivedBy?.name || "";
-
-    if (isPashto || isDari) {
-      if (isDokht) {
-        return {
-          label: name ? `دوخته ${name} پذیرفته` : `دوخته پذیرفته`,
-          tone: "info",
-        };
-      }
-      return {
-        label: name ? `قیچی کار ${name} پذیرفته` : `قیچی کار پذیرفته`,
-        tone: "info",
-      };
-    }
-
-    const roleLabel = isDokht
-      ? t("assignment.dokhtLabel", "Dokht")
-      : t("assignment.qichikarLabel", "Qichikar");
+  const assignedWorker = order?.assignedTo;
+  if (assignedWorker?.accountType === "QICHIKAR") {
     return {
-      label: name ? `With ${name} (${roleLabel})` : `With ${roleLabel}`,
+      key: "WITH_QICHIKAR",
       tone: "info",
+      workerName: assignedWorker.name || "Qichikar",
     };
   }
 
-  if (assignedTo?.accountType) {
-    const isDokht = assignedTo.accountType === "DOKHT";
-    const name = assignedTo?.name || "";
-
-    if (isPashto || isDari) {
-      if (isDokht) {
-        return {
-          label: name
-            ? `به دوخته ${name} فرستاده شده`
-            : `به دوخته فرستاده شده`,
-          tone: "warning",
-        };
-      }
-      return {
-        label: name
-          ? `به قیچی کار ${name} فرستاده شده`
-          : `به قیچی کار فرستاده شده`,
-        tone: "warning",
-      };
-    }
-
-    const roleLabel = isDokht
-      ? t("assignment.dokhtLabel", "Dokht")
-      : t("assignment.qichikarLabel", "Qichikar");
+  if (assignedWorker?.accountType === "DOKHT") {
     return {
-      label: name ? `Sent to ${name} (${roleLabel})` : `Sent to ${roleLabel}`,
-      tone: "warning",
+      key: "WITH_DOKHT",
+      tone: "info",
+      workerName: assignedWorker.name || "Dokht",
     };
   }
 
-  if (isPashto || isDari) {
-    return {
-      label: "تخصیص نداده",
-      tone: "muted",
-    };
-  }
+  return { key: "PENDING", tone: "warning", workerName: "" };
+}
 
-  return {
-    label: t("workerPanel.notAssigned", "Not assigned"),
-    tone: "muted",
-  };
+function getLocalizedStatusMessage(t, state) {
+  if (state.key === "WITH_QICHIKAR") {
+    return t("assignment.statusWithQichikar", {
+      defaultValue: "With Qichikar {{name}}",
+      name: state.workerName || "-",
+    });
+  }
+  if (state.key === "WITH_DOKHT") {
+    return t("assignment.statusWithDokht", {
+      defaultValue: "With Dokht {{name}}",
+      name: state.workerName || "-",
+    });
+  }
+  if (state.key === "COMPLETED") {
+    return t("assignment.statusCompleted", "Order completed");
+  }
+  return t("assignment.statusPending", "Order is pending");
 }
 
 function stateStyle(tone) {
@@ -160,69 +89,42 @@ function stateStyle(tone) {
 
 export default function AssignOrdersReport() {
   const { t, i18n } = useTranslation();
-  const language = i18n.resolvedLanguage || i18n.language;
+  const language = i18n.resolvedLanguage || i18n.language || "en";
 
   const [billNumber, setBillNumber] = useState("");
   const [loading, setLoading] = useState(false);
   const [lookupResult, setLookupResult] = useState(null);
-
-  const getErrorMessage = (key, fallback) => {
-      const isPashto = language === "ps";
-      const isDari = language === "fa";
-
-      const translations = {
-        invalidBillNumber: {
-          ps: "یو正确的 بل نمبر entered کړئ",
-          fa: "لطفاً یک شماره بل صحیح وارد کنید",
-        },
-        noOrdersFound: {
-          ps: "د دې بل لپاره هیڅ سفارش ونه موندل شو",
-          fa: "هیچ سفارشی برای این بل یافت نشد",
-        },
-        searchFailed: {
-          ps: "لټون ناکام شو",
-          fa: "جستجو ناموفق بود",
-        },
-      };
-
-      if (isPashto || isDari) {
-        return translations[key]?.[isPashto ? "ps" : "fa"] || fallback;
-      }
-      return fallback;
-    };
+  const [isOrderNotFound, setIsOrderNotFound] = useState(false);
 
   const searchByBill = async () => {
     const parsedBill = parseNumberLocale(billNumber);
 
     if (!Number.isFinite(parsedBill) || parsedBill <= 0) {
       toast.error(
-        getErrorMessage("invalidBillNumber", t("assignment.invalidBillNumber", "Enter a valid bill number.")),
+        t("assignment.invalidBillNumber", "Enter a valid bill number."),
       );
       return;
     }
 
     setLoading(true);
+    setIsOrderNotFound(false);
     try {
       const { data } = await api.get("/orders/lookup", {
         params: { billNumber: Math.trunc(parsedBill) },
       });
       setLookupResult(data);
       if (!data?.orders?.length) {
-        toast.error(
-          getErrorMessage("noOrdersFound", t("assignment.noOrdersFound", "No orders found for this bill.")),
-        );
+        setIsOrderNotFound(true);
       }
     } catch (err) {
       setLookupResult(null);
       if (err?.response?.status === 404) {
-        toast.error(
-          getErrorMessage("noOrdersFound", t("assignment.noOrdersFound", "No orders found for this bill.")),
-        );
+        setIsOrderNotFound(true);
       } else {
         toast.error(
           getApiErrorMessage(
             err,
-            getErrorMessage("searchFailed", t("assignment.searchFailed", "Search failed.")),
+            t("assignment.searchFailed", "Search failed."),
           ),
         );
       }
@@ -231,51 +133,21 @@ export default function AssignOrdersReport() {
     }
   };
 
-  const getLocalizedStrings = () => {
-    const isPashto = language === "ps";
-    const isDari = language === "fa";
-
-    if (isPashto || isDari) {
-      return {
-        pageTitle: "راپور",
-        pageSubtitle: "د بل نمبر سره search کړئ ترڅو وینئ چې دا سفارشlach کومې کس ته تخصیص شوی.",
-        billLabel: "بل نمبر",
-        searchPlaceholder: "د بل نمبر سره search کړئ",
-        searchButton: "لټون",
-        searchResultTitle: "د لټون نتیجه",
-        emptyMessage: "د بل نمبر سره search کړئ ترڅو وینئ چې دا سفارش کومې کس ته تخصیص شوی.",
-        allOrdersTitle: "ټول سفارشونه",
-      };
-    }
-
-    return {
-      pageTitle: t("sidebar.report", "Report"),
-      pageSubtitle: t(
-        "assignment.reportSubtitle",
-        "Search by bill number and track where each order is (Dokht or Qichikar).",
-      ),
-      billLabel: t("orders.billNumber", "Bill Number"),
-      searchPlaceholder: t(
-        "assignment.billSearchPlaceholder",
-        "Search by bill number",
-      ),
-      searchButton: t("common.search", "Search"),
-      searchResultTitle: t("assignment.searchResult", "Search Result"),
-      emptyMessage: t(
-        "assignment.reportEmpty",
-        "Search by bill number to see where this order is currently assigned.",
-      ),
-      allOrdersTitle: t("common.allOrders", "All Orders"),
-    };
-  };
-
-  const localizedStrings = getLocalizedStrings();
-
   return (
-    <div className="page">
+    <div
+      className="page"
+      style={{
+        maxWidth: 920,
+        margin: "0 auto",
+        width: "100%",
+      }}
+    >
       <PageHeader
-        title={localizedStrings.pageTitle}
-        subtitle={localizedStrings.pageSubtitle}
+        title={t("assignment.reportTitle", "Order Tracking")}
+        subtitle={t(
+          "assignment.reportSubtitle",
+          "Search by bill number to quickly see where each order currently is.",
+        )}
       />
 
       <Card>
@@ -287,12 +159,15 @@ export default function AssignOrdersReport() {
             alignItems: "end",
           }}
         >
-          <Field label={localizedStrings.billLabel} required>
+          <Field label={t("orders.billNumber", "Bill Number")} required>
             <input
               className="inp"
               value={billNumber}
               onChange={(e) => setBillNumber(e.target.value)}
-              placeholder={localizedStrings.searchPlaceholder}
+              placeholder={t(
+                "assignment.billSearchPlaceholder",
+                "Search by bill number",
+              )}
               inputMode="numeric"
               onKeyDown={(e) => {
                 if (e.key === "Enter") searchByBill();
@@ -308,7 +183,7 @@ export default function AssignOrdersReport() {
             style={{ minWidth: 120, justifyContent: "center" }}
           >
             <LuSearch size={14} />
-            {localizedStrings.searchButton}
+            {t("common.search", "Search")}
           </button>
         </div>
       </Card>
@@ -316,19 +191,24 @@ export default function AssignOrdersReport() {
       <div style={{ marginTop: 16 }}>
         {loading ? (
           <Spinner />
-        ) : !lookupResult ? (
-          <Card title={localizedStrings.searchResultTitle} noPad>
-            <EmptyState
-              message={localizedStrings.emptyMessage}
-              Icon={LuReceipt}
-            />
+        ) : isOrderNotFound ? (
+          <Card title={t("assignment.searchResult", "Search Result")} noPad>
+            <div style={{ padding: 16, display: "grid", gap: 8 }}>
+              <div className="badge bg-gray">
+                {t(
+                  "assignment.orderNotFoundSystem",
+                  "Order not found in the system",
+                )}
+              </div>
+            </div>
           </Card>
-        ) : (
+        ) : lookupResult ? (
           <div style={{ display: "grid", gap: 16 }}>
-            <Card title={localizedStrings.allOrdersTitle}>
+            <Card title={t("common.allOrders", "All Orders")}>
               <div style={{ display: "grid", gap: 10 }}>
                 {(lookupResult.orders || []).map((order) => {
-                  const state = resolveOrderState(order, t, language);
+                  const state = resolveOrderState(order);
+                  const localizedStatus = getLocalizedStatusMessage(t, state);
                   return (
                     <div
                       key={order.id}
@@ -338,9 +218,7 @@ export default function AssignOrdersReport() {
                         padding: "12px 14px",
                         background: "var(--surface)",
                         display: "grid",
-                        gridTemplateColumns: "1fr auto",
                         gap: 12,
-                        alignItems: "center",
                       }}
                     >
                       <div
@@ -348,6 +226,7 @@ export default function AssignOrdersReport() {
                           display: "flex",
                           alignItems: "center",
                           gap: 8,
+                          flexWrap: "wrap",
                         }}
                       >
                         <span
@@ -359,6 +238,9 @@ export default function AssignOrdersReport() {
                         >
                           {getOrderTypeLabel(order.type, language)}
                         </span>
+                        <span className="badge bg-gray">
+                          #{order?.customer?.billNumber ?? "-"}
+                        </span>
                       </div>
 
                       <div
@@ -366,13 +248,12 @@ export default function AssignOrdersReport() {
                           ...stateStyle(state.tone),
                           borderRadius: 8,
                           padding: "6px 10px",
-                          display: "flex",
-                          alignItems: "center",
+                          display: "grid",
                           gap: 6,
                         }}
                       >
                         <span style={{ fontSize: 12, fontWeight: 700 }}>
-                          {state.label}
+                          {localizedStatus}
                         </span>
                       </div>
                     </div>
@@ -381,6 +262,16 @@ export default function AssignOrdersReport() {
               </div>
             </Card>
           </div>
+        ) : (
+          <Card title={t("assignment.searchResult", "Search Result")} noPad>
+            <EmptyState
+              message={t(
+                "assignment.reportEmpty",
+                "Search by bill number to see where this order is currently assigned.",
+              )}
+              Icon={LuReceipt}
+            />
+          </Card>
         )}
       </div>
     </div>

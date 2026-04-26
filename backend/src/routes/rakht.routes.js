@@ -7,6 +7,11 @@ const router = Router();
 router.use(authenticate);
 router.get("/", ctrl.getAll);
 router.get(
+  "/revenue/summary",
+  authorize("ADMIN", "DOKAN", "FINANCE"),
+  ctrl.getRevenueSummary,
+);
+router.get(
   "/payment-history",
   authorize("ADMIN", "DOKAN"),
   ctrl.getPaymentHistory,

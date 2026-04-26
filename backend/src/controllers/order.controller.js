@@ -344,6 +344,11 @@ export const markComplete = async (req, res, next) => {
           });
         }
 
+        const qichikarPaymentAmount = Number(order.qichikarPaymentAmount ?? 0);
+        const shouldPayQichikar =
+          Number.isFinite(qichikarPaymentAmount) && qichikarPaymentAmount > 0;
+        const qichikarPaidAt = shouldPayQichikar ? new Date() : null;
+
         result = await prisma.order.update({
           where: { id: req.params.id },
           data: {
@@ -351,6 +356,23 @@ export const markComplete = async (req, res, next) => {
             qichikarInProgress: false,
             qichikarReceivedById: null,
             qichikarReceivedAt: null,
+            qichikarPaymentStatus: shouldPayQichikar
+              ? "PAID_TO_WORKER"
+              : "UNPAID",
+            qichikarPaymentAmount: shouldPayQichikar
+              ? qichikarPaymentAmount
+              : null,
+            qichikarPaidAt,
+            qichikarPaidById: null,
+            // Keep legacy payment fields aligned for fallback screens.
+            workerPaymentStatus: shouldPayQichikar
+              ? "PAID_TO_WORKER"
+              : "UNPAID",
+            workerPaymentAmount: shouldPayQichikar
+              ? qichikarPaymentAmount
+              : null,
+            workerPaidAt: qichikarPaidAt,
+            workerPaidById: null,
             inProgress: false,
             receivedById: null,
             receivedAt: null,
@@ -387,6 +409,11 @@ export const markComplete = async (req, res, next) => {
         });
       }
 
+      const dokhtPaymentAmount = Number(order.dokhtPaymentAmount ?? 0);
+      const shouldPayDokht =
+        Number.isFinite(dokhtPaymentAmount) && dokhtPaymentAmount > 0;
+      const dokhtPaidAt = shouldPayDokht ? new Date() : null;
+
       result = await prisma.order.update({
         where: { id: req.params.id },
         data: {
@@ -394,6 +421,15 @@ export const markComplete = async (req, res, next) => {
           dokhtInProgress: false,
           dokhtReceivedById: null,
           dokhtReceivedAt: null,
+          dokhtPaymentStatus: shouldPayDokht ? "PAID_TO_WORKER" : "UNPAID",
+          dokhtPaymentAmount: shouldPayDokht ? dokhtPaymentAmount : null,
+          dokhtPaidAt,
+          dokhtPaidById: null,
+          // Keep legacy payment fields aligned for fallback screens.
+          workerPaymentStatus: shouldPayDokht ? "PAID_TO_WORKER" : "UNPAID",
+          workerPaymentAmount: shouldPayDokht ? dokhtPaymentAmount : null,
+          workerPaidAt: dokhtPaidAt,
+          workerPaidById: null,
           inProgress: false,
           receivedById: null,
           receivedAt: null,
@@ -421,32 +457,22 @@ export const markComplete = async (req, res, next) => {
         ),
       );
 
-      // ── Customer SMS notification (async, non-blocking) ───────────────────
-      // Only send if not already sent for this order (deduplication via smsSentAt)
+      // ── Customer SMS notification ──────────────────────────────────────────
+      // Send only once per order and stamp smsSentAt after a confirmed send.
       if (!order.smsSentAt && order.customer?.phoneNumber) {
-        // Fire-and-forget: stamp smsSentAt first to prevent race-condition duplicates,
-        // then send the SMS. If SMS fails, smsSentAt is already set — admin can resend
-        // manually but the customer won't receive double messages on retry.
-        prisma.order
-          .update({
+        try {
+          await sendCustomerCompletionSMS(order.customer, order);
+          await prisma.order.update({
             where: { id: req.params.id },
             data: { smsSentAt: new Date() },
-          })
-          .then(() =>
-            sendCustomerCompletionSMS(order.customer, order).catch((smsErr) => {
-              console.error(
-                `[SMS] Failed to send completion SMS for order ${req.params.id}:`,
-                smsErr.message,
-              );
-            }),
-          )
-          .catch((dbErr) => {
-            console.error(
-              `[SMS] Failed to stamp smsSentAt for order ${req.params.id}:`,
-              dbErr.message,
-            );
           });
-        smsSent = true;
+          smsSent = true;
+        } catch (smsErr) {
+          console.error(
+            `[SMS] Failed to send completion SMS for order ${req.params.id}:`,
+            smsErr.message,
+          );
+        }
       }
 
       return res.json({ ...result, smsSent });
@@ -454,11 +480,17 @@ export const markComplete = async (req, res, next) => {
 
     try {
       result = await service.markComplete(req.params.id);
-      try {
-        await sendCustomerCompletionSMS(order.customer, order);
-        smsSent = true;
-      } catch (smsError) {
-        console.error("Failed to send completion SMS:", smsError);
+      if (!order.smsSentAt && order.customer?.phoneNumber) {
+        try {
+          await sendCustomerCompletionSMS(order.customer, order);
+          await prisma.order.update({
+            where: { id: req.params.id },
+            data: { smsSentAt: new Date() },
+          });
+          smsSent = true;
+        } catch (smsError) {
+          console.error("Failed to send completion SMS:", smsError);
+        }
       }
     } catch (error) {
       if (
@@ -962,7 +994,6 @@ export const assign = async (req, res, next) => {
       where: { id: orderId },
       select: {
         id: true,
-        type: true,
         isCompleted: true,
         qichikarCompletedAt: true,
         dokhtCompletedAt: true,
@@ -975,7 +1006,6 @@ export const assign = async (req, res, next) => {
         qichikarInProgress: true,
         dokhtInProgress: true,
         assignedTo: { select: { id: true, accountType: true } },
-        customer: { select: { firstName: true, billNumber: true } },
       },
     });
     if (!existingOrder)
@@ -1047,11 +1077,6 @@ export const assign = async (req, res, next) => {
         ? assignmentNote.trim() || null
         : null;
     const nextAssignedToId = assignedToId || null;
-    const nextAssignmentPrice = nextAssignedToId
-      ? Number(normalizedAssignmentPrice || 0)
-      : 0;
-    const assignmentPaidAt = nextAssignmentPrice > 0 ? new Date() : null;
-
     const order = await prisma.$transaction(async (tx) => {
       const currentOrder = await tx.order.findUnique({
         where: { id: orderId },
@@ -1084,20 +1109,11 @@ export const assign = async (req, res, next) => {
           assignedAt: nextAssignedToId ? new Date() : null,
           assignmentNote: storedAssignmentNote,
           assignmentPrice: nextAssignedToId ? normalizedAssignmentPrice : null,
-          workerPaymentStatus:
-            nextAssignedToId && nextAssignmentPrice > 0
-              ? "PAID_TO_WORKER"
-              : "UNPAID",
-          workerPaymentAmount:
-            nextAssignedToId && nextAssignmentPrice > 0
-              ? normalizedAssignmentPrice
-              : null,
-          workerPaidAt:
-            nextAssignedToId && nextAssignmentPrice > 0
-              ? assignmentPaidAt
-              : null,
-          workerPaidById:
-            nextAssignedToId && nextAssignmentPrice > 0 ? req.user.id : null,
+          // Deferred worker payment: assignment keeps payment pending until completion.
+          workerPaymentStatus: "UNPAID",
+          workerPaymentAmount: null,
+          workerPaidAt: null,
+          workerPaidById: null,
           receivedById: nextAssignedToId ? null : currentOrder.receivedById,
           receivedAt: nextAssignedToId ? null : currentOrder.receivedAt,
           qichikarAssignedToId: isAssigningQichikar
@@ -1115,28 +1131,12 @@ export const assign = async (req, res, next) => {
           qichikarInProgress: isAssigningQichikar
             ? false
             : currentOrder.qichikarInProgress,
-          qichikarPaymentStatus: isAssigningQichikar
-            ? nextAssignmentPrice > 0
-              ? "PAID_TO_WORKER"
-              : "UNPAID"
-            : currentOrder.qichikarAssignedToId
-              ? undefined
-              : undefined,
+          qichikarPaymentStatus: isAssigningQichikar ? "UNPAID" : undefined,
           qichikarPaymentAmount: isAssigningQichikar
-            ? nextAssignmentPrice > 0
-              ? normalizedAssignmentPrice
-              : null
+            ? normalizedAssignmentPrice
             : undefined,
-          qichikarPaidAt: isAssigningQichikar
-            ? nextAssignmentPrice > 0
-              ? assignmentPaidAt
-              : null
-            : undefined,
-          qichikarPaidById: isAssigningQichikar
-            ? nextAssignmentPrice > 0
-              ? req.user.id
-              : null
-            : undefined,
+          qichikarPaidAt: isAssigningQichikar ? null : undefined,
+          qichikarPaidById: isAssigningQichikar ? null : undefined,
           dokhtAssignedToId: isAssigningDokht
             ? nextAssignedToId
             : currentOrder.dokhtAssignedToId,
@@ -1152,28 +1152,12 @@ export const assign = async (req, res, next) => {
           dokhtInProgress: isAssigningDokht
             ? false
             : currentOrder.dokhtInProgress,
-          dokhtPaymentStatus: isAssigningDokht
-            ? nextAssignmentPrice > 0
-              ? "PAID_TO_WORKER"
-              : "UNPAID"
-            : currentOrder.dokhtAssignedToId
-              ? undefined
-              : undefined,
+          dokhtPaymentStatus: isAssigningDokht ? "UNPAID" : undefined,
           dokhtPaymentAmount: isAssigningDokht
-            ? nextAssignmentPrice > 0
-              ? normalizedAssignmentPrice
-              : null
+            ? normalizedAssignmentPrice
             : undefined,
-          dokhtPaidAt: isAssigningDokht
-            ? nextAssignmentPrice > 0
-              ? assignmentPaidAt
-              : null
-            : undefined,
-          dokhtPaidById: isAssigningDokht
-            ? nextAssignmentPrice > 0
-              ? req.user.id
-              : null
-            : undefined,
+          dokhtPaidAt: isAssigningDokht ? null : undefined,
+          dokhtPaidById: isAssigningDokht ? null : undefined,
         },
         include: {
           customer: {
@@ -1189,25 +1173,6 @@ export const assign = async (req, res, next) => {
           receivedBy: { select: { id: true, name: true, accountType: true } },
         },
       });
-
-      if (
-        nextAssignedToId &&
-        nextAssignmentPrice > 0 &&
-        worker &&
-        ["QICHIKAR", "DOKHT"].includes(worker.accountType)
-      ) {
-        await tx.transaction.create({
-          data: {
-            accountType: worker.accountType,
-            userId: nextAssignedToId,
-            kind: "LOAN",
-            amount: nextAssignmentPrice,
-            transactionDate: new Date(),
-            note: `Order assignment (${worker.accountType}) - Bill #${existingOrder.customer.billNumber} (${existingOrder.type})`,
-            createdById: req.user.id,
-          },
-        });
-      }
 
       return updated;
     });

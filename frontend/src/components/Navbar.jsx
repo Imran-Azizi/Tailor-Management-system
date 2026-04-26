@@ -865,7 +865,10 @@ function UserDropdown({ onClose }) {
 export default function Navbar({ onHamburger, pageTitle }) {
   const { t, i18n } = useTranslation();
   const { dark, toggle } = useTheme();
-  const { user, isWorker, isAdmin, isFinance, canManageOrders } = useAuth();
+  const { user, isWorker, isAdmin, isDokan, isFinance, canManageOrders } =
+    useAuth();
+  const canViewAdminNotifications = isAdmin || isDokan;
+  const showNotifications = isWorker || canViewAdminNotifications;
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [draftListOpen, setDraftListOpen] = useState(false);
@@ -884,7 +887,7 @@ export default function Navbar({ onHamburger, pageTitle }) {
     queryKey: ["notifs-count"],
     queryFn: () => api.get("/notifications?unread=true").then((r) => r.data),
     refetchInterval: 60_000,
-    enabled: !isWorker,
+    enabled: canViewAdminNotifications,
   });
 
   // Worker status notifications sent to this admin (work-started, work-completed)
@@ -895,7 +898,7 @@ export default function Navbar({ onHamburger, pageTitle }) {
         .get("/users/me/notifications", { params: { unread: true } })
         .then((r) => r.data),
     refetchInterval: 30_000,
-    enabled: !isWorker,
+    enabled: isAdmin,
   });
 
   // Assignment notifications for workers (Dokht / Qichikar)
@@ -937,7 +940,9 @@ export default function Navbar({ onHamburger, pageTitle }) {
 
   const unreadCount = isWorker
     ? unreadUser.length
-    : unreadSystem.length + unreadAdminWorker.length;
+    : canViewAdminNotifications
+      ? unreadSystem.length + (isAdmin ? unreadAdminWorker.length : 0)
+      : 0;
 
   const onSearch = (e) => {
     if (e.key === "Enter" && search.trim()) {
@@ -1031,28 +1036,30 @@ export default function Navbar({ onHamburger, pageTitle }) {
           {dark ? <LuSun size={17} /> : <LuMoon size={17} />}
         </button>
 
-        <div className="dd-wrap">
-          <button
-            className="nav-btn"
-            style={{ position: "relative" }}
-            onClick={() => {
-              setNotifOpen((o) => !o);
-              setLangOpen(false);
-              setUserOpen(false);
-            }}
-          >
-            <LuBell size={18} />
-            {unreadCount > 0 && (
-              <span className="notif-dot">
-                {unreadCount > 99
-                  ? "99+"
-                  : unreadCount > 9
-                    ? "9+"
-                    : unreadCount}
-              </span>
-            )}
-          </button>
-        </div>
+        {showNotifications && (
+          <div className="dd-wrap">
+            <button
+              className="nav-btn"
+              style={{ position: "relative" }}
+              onClick={() => {
+                setNotifOpen((o) => !o);
+                setLangOpen(false);
+                setUserOpen(false);
+              }}
+            >
+              <LuBell size={18} />
+              {unreadCount > 0 && (
+                <span className="notif-dot">
+                  {unreadCount > 99
+                    ? "99+"
+                    : unreadCount > 9
+                      ? "9+"
+                      : unreadCount}
+                </span>
+              )}
+            </button>
+          </div>
+        )}
 
         {/* User avatar + dropdown */}
         <div className="dd-wrap" ref={userRef}>
@@ -1101,11 +1108,13 @@ export default function Navbar({ onHamburger, pageTitle }) {
           {userOpen && <UserDropdown onClose={() => setUserOpen(false)} />}
         </div>
       </header>
-      <NotificationSidebar
-        open={notifOpen}
-        onClose={() => setNotifOpen(false)}
-        isWorker={isWorker}
-      />
+      {showNotifications && (
+        <NotificationSidebar
+          open={notifOpen}
+          onClose={() => setNotifOpen(false)}
+          isWorker={isWorker}
+        />
+      )}
 
       <Modal
         open={draftListOpen}

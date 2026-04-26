@@ -15,6 +15,8 @@ import {
   LuX,
   LuPencil,
   LuCalendarCheck,
+  LuSquareCheck,
+  LuClock,
 } from "react-icons/lu";
 import toast from "react-hot-toast";
 import api from "../lib/api.js";
@@ -28,6 +30,7 @@ import {
   Badge,
   Pagination,
   Card,
+  StatCard,
   EmptyState,
   ConfirmDeleteModal,
 } from "../components/ui/index.jsx";
@@ -733,6 +736,26 @@ export default function AllOrders({ filter, mode = "orders" }) {
               {t("orders.noDataThisMonth", "No orders found for this month")}
             </span>
           )}
+        </div>
+      )}
+
+      {(statusFilter === "completed" || statusFilter === "pending") && (
+        <div className="g-stats" style={{ marginBottom: 16 }}>
+          <StatCard
+            label={
+              statusFilter === "completed"
+                ? t("orders.titleCompleted")
+                : t("orders.titlePending")
+            }
+            value={data?.total || 0}
+            Icon={statusFilter === "completed" ? LuSquareCheck : LuClock}
+            accent={statusFilter === "completed" ? "#16A34A" : "#2563EB"}
+            sub={t("ui.pageSummary", {
+              page,
+              pages: totalPages,
+              total: data?.total || 0,
+            })}
+          />
         </div>
       )}
 

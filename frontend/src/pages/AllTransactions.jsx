@@ -11,7 +11,6 @@ import {
   LuRefreshCcw,
   LuSearch,
   LuUser,
-  LuWallet,
   LuX,
 } from "react-icons/lu";
 import api from "../lib/api.js";
@@ -104,14 +103,6 @@ export default function AllTransactions() {
   const transactions = data?.data || [];
   const totalAmount = useMemo(
     () => transactions.reduce((s, tx) => s + Number(tx.amount || 0), 0),
-    [transactions],
-  );
-
-  const totalLoan = useMemo(
-    () =>
-      transactions
-        .filter((tx) => tx.kind === "LOAN")
-        .reduce((s, tx) => s + Number(tx.amount || 0), 0),
     [transactions],
   );
 
@@ -316,13 +307,6 @@ export default function AllTransactions() {
           sub={t("transaction.currentPageTotal", "Current page total")}
           Icon={LuBadgeDollarSign}
           accent="#0F766E"
-        />
-        <StatCard
-          label={t("transaction.loanOption", "Is Loan")}
-          value={formatMoney(totalLoan)}
-          sub={t("transaction.currentPageLoan", "Current page loan total")}
-          Icon={LuWallet}
-          accent="#B45309"
         />
       </div>
 

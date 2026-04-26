@@ -16,7 +16,7 @@ import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { parseNumberLocale } from "../lib/normalize.js";
 import { getOrderTypeLabel } from "../lib/orderType.js";
-import { formatDateTimeLocale } from "../lib/locale.js";
+import { formatDateLocale } from "../lib/locale.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
 import { getMonthLabel } from "../lib/months.js";
@@ -628,7 +628,7 @@ export default function CompletedWorkerOrders() {
                       </td>
                       <td>{getOrderTypeLabel(order.type, language)}</td>
                       <td>
-                        {formatDateTimeLocale(
+                        {formatDateLocale(
                           order.completedAt || order.updatedAt,
                           language,
                         )}

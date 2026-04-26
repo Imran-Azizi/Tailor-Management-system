@@ -38,6 +38,7 @@ import DailyTaskDetails from "./pages/DailyTaskDetails.jsx";
 import CreateRakht from "./pages/CreateRakht.jsx";
 import AllRakhts from "./pages/AllRakhts.jsx";
 import PaymentHistory from "./pages/PaymentHistory.jsx";
+import RakhtRevenue from "./pages/RakhtRevenue.jsx";
 
 function RoleBasedRedirect() {
   const { user } = useAuth();
@@ -221,7 +222,22 @@ export default function App() {
                     </RoleRoute>
                   }
                 />
-                <Route path="notifications" element={<Notifications />} />
+                <Route
+                  path="rakhts/revenue"
+                  element={
+                    <RoleRoute roles={["ADMIN", "DOKAN", "FINANCE"]}>
+                      <RakhtRevenue />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="notifications"
+                  element={
+                    <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <Notifications />
+                    </RoleRoute>
+                  }
+                />
 
                 <Route
                   path="users"

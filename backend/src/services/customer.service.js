@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { normalizeText, normalizePhone } from "../lib/normalize.js";
+import { createCustomerWithSequentialBill } from "../lib/billNumber.js";
 
 const toPhoneDigits = (value) =>
   (normalizePhone(value || "") || "").replace(/[^0-9]/g, "");
@@ -23,7 +24,10 @@ const phoneMatchScore = (storedPhone, inputDigits) => {
   const storedDigits = toPhoneDigits(storedPhone);
   if (!storedDigits || !inputDigits) return 0;
   if (storedDigits === inputDigits) return 100;
-  if (storedDigits.endsWith(inputDigits) || inputDigits.endsWith(storedDigits)) {
+  if (
+    storedDigits.endsWith(inputDigits) ||
+    inputDigits.endsWith(storedDigits)
+  ) {
     return 90;
   }
   if (
@@ -79,7 +83,9 @@ export const findByPhone = async (phoneNumber) => {
   const tokens = getPhoneSearchTokens(inputDigits);
   if (tokens.length) {
     const fuzzyCandidates = await prisma.customer.findMany({
-      where: { OR: tokens.map((token) => ({ phoneNumber: { contains: token } })) },
+      where: {
+        OR: tokens.map((token) => ({ phoneNumber: { contains: token } })),
+      },
       orderBy: { createdAt: "desc" },
       take: 100,
     });
@@ -144,11 +150,6 @@ export const getCustomerById = (id) =>
   });
 
 export const createCustomer = async (body) => {
-  const lastBill = await prisma.customer.findFirst({
-    orderBy: { billNumber: "desc" },
-    select: { billNumber: true },
-  });
-  const billNumber = lastBill ? lastBill.billNumber + 1 : 1;
   const normalized = {
     ...body,
     firstName: body.firstName ? normalizeText(body.firstName) : body.firstName,
@@ -156,7 +157,7 @@ export const createCustomer = async (body) => {
       ? normalizePhone(body.phoneNumber)
       : body.phoneNumber,
   };
-  return prisma.customer.create({ data: { ...normalized, billNumber } });
+  return createCustomerWithSequentialBill(prisma, normalized);
 };
 
 export const updateCustomer = (id, body) =>

@@ -5,17 +5,43 @@
 
 const PHONE_REGEX = /^[0-9+\s\-().]{7,20}$/;
 
+const E164_REGEX = /^\+[1-9]\d{7,14}$/;
+
+function toDigits(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
 /**
  * Normalize a phone number to E.164 format (+XXXXXXXXXXX).
  * Strips whitespace/dashes/parens, prepends + if missing.
  */
 function normalizePhone(raw) {
   if (!raw) return null;
-  const stripped = String(raw).replace(/[\s\-().]/g, "");
-  if (!stripped) return null;
-  // Reject obviously invalid strings
-  if (!/^[+0-9]{7,20}$/.test(stripped)) return null;
-  return stripped.startsWith("+") ? stripped : `+${stripped}`;
+  const input = String(raw).trim();
+  if (!PHONE_REGEX.test(input)) return null;
+
+  // Keep already-correct E.164 numbers untouched.
+  if (input.startsWith("+")) {
+    const normalized = `+${toDigits(input)}`;
+    return E164_REGEX.test(normalized) ? normalized : null;
+  }
+
+  const digits = toDigits(input);
+  if (!digits) return null;
+
+  // Local Afghanistan formats:
+  // 07XXXXXXXX -> +93XXXXXXXXX
+  // 7XXXXXXXX  -> +93XXXXXXXXX
+  if (/^0\d{9}$/.test(digits)) {
+    return `+93${digits.slice(1)}`;
+  }
+  if (/^\d{9}$/.test(digits)) {
+    return `+93${digits}`;
+  }
+
+  // International number without + prefix.
+  const fallback = `+${digits}`;
+  return E164_REGEX.test(fallback) ? fallback : null;
 }
 
 /**

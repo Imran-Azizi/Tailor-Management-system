@@ -35,6 +35,30 @@ export function formatDateTimeLocale(value, language = "en", options = {}) {
   });
 }
 
+export function formatDateThenTimeLocale(
+  value,
+  language = "en",
+  { dateOptions = {}, timeOptions = {}, separator = " - " } = {},
+) {
+  if (!value) return "-";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+
+  const datePart = formatDateLocale(date, language, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    ...dateOptions,
+  });
+  const timePart = formatDateLocale(date, language, {
+    hour: "2-digit",
+    minute: "2-digit",
+    ...timeOptions,
+  });
+
+  return `${datePart}${separator}${timePart}`;
+}
+
 export function formatNumberLocale(value, language = "en", options = {}) {
   const num = Number(value || 0);
   return new Intl.NumberFormat(getLocaleTag(language), options).format(num);

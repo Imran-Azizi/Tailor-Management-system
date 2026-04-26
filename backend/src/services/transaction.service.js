@@ -7,8 +7,6 @@ const USER_SELECT = {
   accountType: true,
 };
 
-const WORKER_PAYMENT_NOTE_PREFIX = "Worker completion payment -";
-
 export const createTransaction = async (data, createdById) => {
   // Fetch the target user's accountType so we know whether to notify them
   const targetUser = await prisma.user.findUnique({
@@ -21,6 +19,7 @@ export const createTransaction = async (data, createdById) => {
       accountType: data.accountType,
       userId: data.userId,
       kind: "LOAN",
+      source: "MANUAL",
       amount: data.amount,
       transactionDate: data.transactionDate,
       note: data.note || null,
@@ -62,15 +61,18 @@ export const getTransactionSummaryForUser = async (userId, accountType) => {
     accountType === "DOKHT"
       ? {
           dokhtAssignedToId: userId,
+          dokhtCompletedAt: { not: null },
           dokhtPaymentStatus: "PAID_TO_WORKER",
         }
       : accountType === "QICHIKAR"
         ? {
             qichikarAssignedToId: userId,
+            qichikarCompletedAt: { not: null },
             qichikarPaymentStatus: "PAID_TO_WORKER",
           }
         : {
             assignedToId: userId,
+            isCompleted: true,
             workerPaymentStatus: "PAID_TO_WORKER",
           };
 
@@ -81,15 +83,12 @@ export const getTransactionSummaryForUser = async (userId, accountType) => {
         ? "qichikarPaymentAmount"
         : "workerPaymentAmount";
 
-  const [grouped, completedPayments] = await Promise.all([
-    prisma.transaction.groupBy({
-      by: ["kind"],
+  const [loanAggregate, completedPayments] = await Promise.all([
+    prisma.transaction.aggregate({
       where: {
         userId,
-        OR: [
-          { note: null },
-          { NOT: { note: { startsWith: WORKER_PAYMENT_NOTE_PREFIX } } },
-        ],
+        kind: "LOAN",
+        source: "MANUAL",
       },
       _sum: { amount: true },
     }),
@@ -99,25 +98,10 @@ export const getTransactionSummaryForUser = async (userId, accountType) => {
     }),
   ]);
 
-  const summary = grouped.reduce(
-    (summary, row) => {
-      const total = Number(row._sum.amount || 0);
-      if (row.kind === "LOAN") {
-        summary.loanTotal = total;
-      }
-      return summary;
-    },
-    {
-      loanTotal: 0,
-      totalCompletedPayments: 0,
-    },
-  );
-
-  summary.totalCompletedPayments = Number(
-    completedPayments._sum?.[paymentSumField] || 0,
-  );
-
-  return summary;
+  return {
+    loanTotal: Number(loanAggregate._sum.amount || 0),
+    totalCompletedPayments: Number(completedPayments._sum?.[paymentSumField] || 0),
+  };
 };
 
 export const getTransactions = async ({
@@ -130,12 +114,7 @@ export const getTransactions = async ({
 }) => {
   const skip = (page - 1) * limit;
 
-  const where = {
-    OR: [
-      { note: null },
-      { NOT: { note: { startsWith: WORKER_PAYMENT_NOTE_PREFIX } } },
-    ],
-  };
+  const where = { source: "MANUAL" };
   if (accountType) where.accountType = accountType;
   if (search) {
     where.user = { name: { contains: search, mode: "insensitive" } };

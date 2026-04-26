@@ -20,20 +20,115 @@ const toPositiveInt = (value) => {
   return normalized > 0 ? normalized : 1;
 };
 
+const toPositiveNumber = (value) => {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric)) return 0;
+  return numeric > 0 ? numeric : 0;
+};
+
+const round2 = (value) => {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.round(numeric * 100) / 100;
+};
+
+const safeDivide = (num, den) => {
+  const a = Number(num || 0);
+  const b = Number(den || 0);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || b <= 0) return 0;
+  return a / b;
+};
+
 const withComputedFields = (rakht) => ({
   ...rakht,
+  tonPrice: round2(safeDivide(rakht.totalPrice, rakht.tonQuantity)),
   remainingMoney: Math.max(
     0,
     toNonNegativeInt(rakht.totalPrice) - toNonNegativeInt(rakht.givenMoney),
   ),
   tons: (rakht.tons || []).map((ton) => ({
     ...ton,
+    tonTotalPrice: round2(safeDivide(rakht.totalPrice, rakht.tonQuantity)),
+    purchasePricePerMeter: round2(
+      safeDivide(
+        safeDivide(rakht.totalPrice, rakht.tonQuantity),
+        toPositiveNumber(ton.totalMeters),
+      ),
+    ),
     availableMeters: Math.max(
       0,
       toNonNegativeInt(ton.totalMeters) - toNonNegativeInt(ton.usedMeters),
     ),
   })),
 });
+
+export const getRakhtRevenueSummary = async () => {
+  const orders = await prisma.order.findMany({
+    where: {
+      rakhtId: { not: null },
+      rakhtRequiredMeters: { gt: 0 },
+      rakhtPiecePrice: { gt: 0 },
+    },
+    select: {
+      id: true,
+      rakhtCompanyName: true,
+      rakhtBrandName: true,
+      rakhtRequiredMeters: true,
+      rakhtPiecePrice: true,
+      createdAt: true,
+    },
+  });
+
+  let totalMetersSold = 0;
+  let totalRevenue = 0;
+  const byCompanyMap = new Map();
+
+  for (const order of orders) {
+    const meters = Number(order.rakhtRequiredMeters || 0);
+    const pricePerMeter = Number(order.rakhtPiecePrice || 0);
+    if (!Number.isFinite(meters) || !Number.isFinite(pricePerMeter)) continue;
+
+    const lineTotal = meters * pricePerMeter;
+    totalMetersSold += meters;
+    totalRevenue += lineTotal;
+
+    const companyName = String(order.rakhtCompanyName || "Unknown");
+    const existing = byCompanyMap.get(companyName) || {
+      companyName,
+      orderCount: 0,
+      metersSold: 0,
+      revenue: 0,
+      avgSellingPricePerMeter: 0,
+    };
+
+    existing.orderCount += 1;
+    existing.metersSold += meters;
+    existing.revenue += lineTotal;
+    existing.avgSellingPricePerMeter = safeDivide(
+      existing.revenue,
+      existing.metersSold,
+    );
+
+    byCompanyMap.set(companyName, existing);
+  }
+
+  const byCompany = Array.from(byCompanyMap.values())
+    .map((row) => ({
+      ...row,
+      metersSold: round2(row.metersSold),
+      revenue: round2(row.revenue),
+      avgSellingPricePerMeter: round2(row.avgSellingPricePerMeter),
+    }))
+    .sort((a, b) => b.revenue - a.revenue);
+
+  return {
+    totalOrders: orders.length,
+    totalMetersSold: round2(totalMetersSold),
+    totalRevenue: round2(totalRevenue),
+    avgSellingPricePerMeter: round2(safeDivide(totalRevenue, totalMetersSold)),
+    byCompany,
+  };
+};
 
 export const getAllRakht = async () => {
   const rows = await prisma.rakht.findMany({
