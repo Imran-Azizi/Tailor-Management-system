@@ -37,7 +37,9 @@ import {
   isDailyTaskEditable,
 } from "../lib/dailyTasks.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
-import { getMonthLabel } from "../lib/months.js";
+import { formatCurrency } from "../lib/currency.js";
+import { formatMonthYearLabel } from "../lib/months.js";
+import { formatSystemDateTime } from "../lib/locale.js";
 import {
   ConfirmDeleteModal,
   Field,
@@ -48,20 +50,14 @@ import {
 } from "../components/ui/index.jsx";
 
 function formatMoney(v) {
-  return `$${Number(v || 0).toLocaleString(undefined, {
+  return formatCurrency(v, "en", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  })}`;
+  });
 }
 
-function formatDateTime(iso) {
-  return new Date(iso).toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function formatDateTime(iso, language) {
+  return formatSystemDateTime(iso, language);
 }
 
 function isRtlTextLanguage(language = "") {
@@ -428,10 +424,12 @@ function TaskRow({
   openMenu,
   setOpenMenu,
   canManage,
+  isMonthEditable = true,
   disabledReason,
 }) {
-  const { t } = useTranslation();
-  const isEditable = isDailyTaskEditable(task);
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language;
+  const isEditable = isMonthEditable && isDailyTaskEditable(task);
 
   return (
     <tr
@@ -480,7 +478,7 @@ function TaskRow({
       </td>
       <td style={{ textAlign: "center" }}>
         <p style={{ fontSize: 13, color: "var(--text1)", fontWeight: 600 }}>
-          {formatDateTime(task.taskDate)}
+          {formatDateTime(task.taskDate, language)}
         </p>
       </td>
       <td
@@ -529,10 +527,11 @@ function TaskCard({
   openMenu,
   setOpenMenu,
   canManage,
+  isMonthEditable = true,
   disabledReason,
 }) {
   const { t } = useTranslation();
-  const isEditable = isDailyTaskEditable(task);
+  const isEditable = isMonthEditable && isDailyTaskEditable(task);
 
   return (
     <div
@@ -697,7 +696,7 @@ export default function AllDailyTasks() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
   const { isAdmin } = useAuth();
-  const { viewMonth, viewYear } = useMonth();
+  const { viewMonth, viewYear, getMonthAccessMode } = useMonth();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
@@ -720,6 +719,16 @@ export default function AllDailyTasks() {
     "Editing time expired",
   );
 
+  const isMonthEditable =
+    getMonthAccessMode(viewMonth, viewYear) === "editable";
+  const monthReadOnlyReason = t(
+    "navbar.pastMonthReadOnly",
+    "Past months are read-only. No editing allowed.",
+  );
+  const effectiveDisabledReason = isMonthEditable
+    ? expiredActionMessage
+    : monthReadOnlyReason;
+
   const toLocalInput = (iso) => {
     const d = new Date(iso);
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -728,6 +737,10 @@ export default function AllDailyTasks() {
 
   const openEdit = (task) => {
     if (!isAdmin) return;
+    if (!isMonthEditable) {
+      toast.error(monthReadOnlyReason);
+      return;
+    }
     if (!isDailyTaskEditable(task)) {
       toast.error(expiredActionMessage);
       return;
@@ -745,6 +758,10 @@ export default function AllDailyTasks() {
 
   const requestDelete = (task) => {
     if (!isAdmin) return;
+    if (!isMonthEditable) {
+      toast.error(monthReadOnlyReason);
+      return;
+    }
     if (!isDailyTaskEditable(task)) {
       toast.error(expiredActionMessage);
       return;
@@ -844,7 +861,7 @@ export default function AllDailyTasks() {
 
   // Derive the anchor date for monthly/yearly reports from the currently viewed month
   const reportMonthDate = `${viewYear}-${String(viewMonth).padStart(2, "0")}-01`;
-  const reportMonthLabel = `${getMonthLabel(viewMonth, language)} ${viewYear}`;
+  const reportMonthLabel = formatMonthYearLabel(viewMonth, viewYear, language);
 
   const reportTypeOptions = [
     {
@@ -871,7 +888,7 @@ export default function AllDailyTasks() {
 
   const reportMutation = useMutation({
     mutationFn: ({ reportType, date }) =>
-      downloadDailyTaskReportPdf({ reportType, date }),
+      downloadDailyTaskReportPdf({ reportType, date, language }),
     onSuccess: (_, vars) => {
       toast.success(
         t("dailyTasks.reportGenerated", "Report PDF generated successfully."),
@@ -1016,7 +1033,7 @@ export default function AllDailyTasks() {
           <span>
             {t("dailyTasks.viewingMonth", "Viewing data for")}:{" "}
             <strong style={{ fontWeight: 700 }}>
-              {getMonthLabel(viewMonth, language)} {viewYear}
+              {formatMonthYearLabel(viewMonth, viewYear, language)}
             </strong>
           </span>
           {data?.total === 0 && !isLoading && (
@@ -1137,6 +1154,8 @@ export default function AllDailyTasks() {
             type="button"
             className="btn btn-outline btn-sm dt-toolbar-btn"
             style={{ gap: 6, minWidth: 132, height: 38 }}
+            disabled={!isMonthEditable}
+            title={isMonthEditable ? undefined : monthReadOnlyReason}
             onClick={() => navigate("/daily-tasks")}
           >
             <LuPlus size={14} />
@@ -1245,7 +1264,8 @@ export default function AllDailyTasks() {
                       openMenu={openMenu}
                       setOpenMenu={setOpenMenu}
                       canManage={isAdmin}
-                      disabledReason={expiredActionMessage}
+                      isMonthEditable={isMonthEditable}
+                      disabledReason={effectiveDisabledReason}
                       onEdit={openEdit}
                       onDelete={requestDelete}
                       onClick={(id) => navigate(`/daily-tasks/${id}`)}
@@ -1271,7 +1291,8 @@ export default function AllDailyTasks() {
                   openMenu={openMenu}
                   setOpenMenu={setOpenMenu}
                   canManage={isAdmin}
-                  disabledReason={expiredActionMessage}
+                  isMonthEditable={isMonthEditable}
+                  disabledReason={effectiveDisabledReason}
                   onEdit={openEdit}
                   onDelete={requestDelete}
                   onClick={(id) => navigate(`/daily-tasks/${id}`)}

@@ -23,11 +23,12 @@ import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { parseNumberLocale } from "../lib/normalize.js";
 import { formatCurrency } from "../lib/currency.js";
-import { getOrderTypeLabel } from "../lib/orderType.js";
+import { getOrderDisplayName, getOrderTypeLabel } from "../lib/orderType.js";
 import {
   PageHeader,
   Spinner,
   Badge,
+  Modal,
   Pagination,
   Card,
   StatCard,
@@ -37,7 +38,8 @@ import {
 import { OrderDocumentPack } from "../components/order/OrderDocumentPack.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
-import { getMonthLabel } from "../lib/months.js";
+import { formatMonthYearLabel } from "../lib/months.js";
+import { formatSystemDate, formatSystemDateTime } from "../lib/locale.js";
 
 const ROLE_COLORS = { QICHIKAR: "#D97706", DOKHT: "#DB2777" };
 const COMPLETED_REASSIGN_BLOCK_MESSAGE =
@@ -159,10 +161,7 @@ function AssignModal({ order, onClose, onAssigned }) {
         <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 16 }}>
           <strong>{order.customer?.firstName}</strong> - Bill #
           {order.customer?.billNumber} |{" "}
-          {getOrderTypeLabel(
-            order.type,
-            i18n.resolvedLanguage || i18n.language,
-          )}
+          {getOrderDisplayName(order, i18n.resolvedLanguage || i18n.language)}
         </div>
         <div style={{ marginBottom: 14 }}>
           <label
@@ -310,6 +309,7 @@ function OrderViewModal({ orderId, open, onClose }) {
     queryFn: () => api.get(`/orders/${orderId}`).then((r) => r.data),
     enabled: open && !!orderId,
   });
+  const benefitDetails = data?.benefitDetails;
 
   return (
     <Modal
@@ -324,7 +324,10 @@ function OrderViewModal({ orderId, open, onClose }) {
         <EmptyState message="Order not found" />
       ) : (
         <div style={{ display: "grid", gap: 18 }}>
-          <div className="order-view-top-grid">
+          <div
+            className="order-view-top-grid"
+            style={{ gridTemplateColumns: "1fr" }}
+          >
             <div className="order-view-spotlight">
               <div
                 style={{
@@ -346,7 +349,7 @@ function OrderViewModal({ orderId, open, onClose }) {
                     }}
                   >
                     <Badge v={TV[data.type] || "gold"}>
-                      {getOrderTypeLabel(data.type, language)}
+                      {getOrderDisplayName(data, language)}
                     </Badge>
                     {data.isEmergency && (
                       <Badge v="red">{t("orders.emergencyBadge")}</Badge>
@@ -363,7 +366,7 @@ function OrderViewModal({ orderId, open, onClose }) {
                     }}
                   >
                     {t("orders.createdOn", {
-                      date: new Date(data.createdAt).toLocaleString(),
+                      date: formatSystemDateTime(data.createdAt, language),
                     })}
                   </p>
                 </div>
@@ -382,61 +385,187 @@ function OrderViewModal({ orderId, open, onClose }) {
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className="order-view-summary-card">
-              <div className="order-view-summary-row">
-                <span>{t("common.phone", "Phone")}</span>
-                <strong>{data.customer?.phoneNumber || "-"}</strong>
-              </div>
-              <div className="order-view-summary-row">
-                <span>
-                  {t("createOrder.rakhtSelection", { defaultValue: "Rakht" })}
-                </span>
-                <strong>
-                  {data.rakhtBrandName
-                    ? `${data.rakhtBrandName} / ${data.rakhtColor || "-"}`
-                    : "-"}
-                </strong>
-              </div>
-              <div className="order-view-summary-row">
-                <span>
-                  {t("rakht.requiredMeters", {
-                    defaultValue: "Required Meters",
-                  })}
-                </span>
-                <strong>
-                  {data.rakhtRequiredMeters != null
-                    ? Number(data.rakhtRequiredMeters).toFixed(2)
-                    : "-"}
-                </strong>
-              </div>
-              <div className="order-view-summary-row">
-                <span>{t("common.total", "Total")}</span>
-                <strong>{formatMoney(data.totalPrice, language)}</strong>
-              </div>
-              <div className="order-view-summary-row">
-                <span>{t("common.paid", "Paid")}</span>
-                <strong style={{ color: "#15803D" }}>
-                  {formatMoney(data.paidAmount, language)}
-                </strong>
-              </div>
-              <div className="order-view-summary-row">
-                <span>{t("common.remaining", "Remaining")}</span>
-                <strong
-                  style={{ color: data.remaining > 0 ? "#DC2626" : "#15803D" }}
-                >
-                  {formatMoney(data.remaining, language)}
-                </strong>
+              <div style={{ marginTop: 14 }}>
+                <div className="order-view-kpi-grid">
+                  <div className="order-view-kpi-item">
+                    <span>{t("common.phone", "Phone")}</span>
+                    <strong>{data.customer?.phoneNumber || "-"}</strong>
+                  </div>
+                  <div className="order-view-kpi-item">
+                    <span>
+                      {t("createOrder.rakhtSelection", {
+                        defaultValue: "Rakht",
+                      })}
+                    </span>
+                    <strong>
+                      {data.rakhtBrandName
+                        ? `${data.rakhtBrandName} / ${data.rakhtColor || "-"}`
+                        : "-"}
+                    </strong>
+                  </div>
+                  <div className="order-view-kpi-item">
+                    <span>
+                      {t("rakht.requiredMeters", {
+                        defaultValue: "Required Meters",
+                      })}
+                    </span>
+                    <strong>
+                      {data.rakhtRequiredMeters != null
+                        ? Number(data.rakhtRequiredMeters).toFixed(2)
+                        : "-"}
+                    </strong>
+                  </div>
+                  <div className="order-view-kpi-item">
+                    <span>{t("common.total", "Total")}</span>
+                    <strong>{formatMoney(data.totalPrice, language)}</strong>
+                  </div>
+                  <div className="order-view-kpi-item">
+                    <span>{t("common.paid", "Paid")}</span>
+                    <strong style={{ color: "#15803D" }}>
+                      {formatMoney(data.paidAmount, language)}
+                    </strong>
+                  </div>
+                  <div className="order-view-kpi-item">
+                    <span>{t("common.remaining", "Remaining")}</span>
+                    <strong
+                      style={{
+                        color: data.remaining > 0 ? "#DC2626" : "#15803D",
+                      }}
+                    >
+                      {formatMoney(data.remaining, language)}
+                    </strong>
+                  </div>
+                  <div className="order-view-kpi-item order-view-kpi-item--benefit">
+                    <span>{t("orders.totalBenefit", "Total Benefit")}</span>
+                    <strong
+                      style={{
+                        color:
+                          Number(
+                            benefitDetails?.totalBenefit ||
+                              data.totalBenefit ||
+                              0,
+                          ) >= 0
+                            ? "#15803D"
+                            : "#DC2626",
+                      }}
+                    >
+                      {formatMoney(
+                        benefitDetails?.totalBenefit ?? data.totalBenefit ?? 0,
+                        language,
+                      )}
+                    </strong>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          <OrderDocumentPack
-            customer={data.customer}
-            order={data}
-            previewId={`order-view-${data.id}`}
-          />
+          <div
+            className="card"
+            style={{
+              border: "1px solid var(--border)",
+              borderRadius: 12,
+              padding: 14,
+              background: "var(--surface2)",
+            }}
+          >
+            <h4 style={{ fontSize: 15, fontWeight: 800, marginBottom: 10 }}>
+              {t("orders.benefitDetails", "Benefit Details")}
+            </h4>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: 10,
+                marginBottom: 12,
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 11, color: "var(--text3)" }}>
+                  {t("common.total", "Total Order Price")}
+                </div>
+                <strong>
+                  {formatMoney(
+                    benefitDetails?.totalOrderPrice ?? data.totalPrice ?? 0,
+                    language,
+                  )}
+                </strong>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: "var(--text3)" }}>
+                  {t("orders.totalExpenses", "Total Expenses")}
+                </div>
+                <strong>
+                  {formatMoney(benefitDetails?.totalExpenses ?? 0, language)}
+                </strong>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: "var(--text3)" }}>
+                  {t("orders.finalBenefit", "Final Total Benefit")}
+                </div>
+                <strong
+                  style={{
+                    color:
+                      Number(
+                        benefitDetails?.totalBenefit || data.totalBenefit || 0,
+                      ) >= 0
+                        ? "#15803D"
+                        : "#DC2626",
+                  }}
+                >
+                  {formatMoney(
+                    benefitDetails?.totalBenefit ?? data.totalBenefit ?? 0,
+                    language,
+                  )}
+                </strong>
+              </div>
+            </div>
+
+            <div className="tbl-wrap" style={{ overflowX: "auto" }}>
+              <table className="tbl" style={{ minWidth: 620 }}>
+                <thead>
+                  <tr>
+                    <th>{t("common.description", "Description")}</th>
+                    <th>{t("common.user", "User")}</th>
+                    <th>{t("common.type", "Order Type")}</th>
+                    <th>{t("common.source", "Source")}</th>
+                    <th>{t("common.amount", "Amount")}</th>
+                    <th>{t("common.date", "Date")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(benefitDetails?.expenses || []).length === 0 ? (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: "center" }}>
+                        {t("orders.noExpenses", "No expenses recorded yet.")}
+                      </td>
+                    </tr>
+                  ) : (
+                    (benefitDetails?.expenses || []).map((entry) => (
+                      <tr key={entry.key}>
+                        <td>{entry.label || "-"}</td>
+                        <td>{entry.userName || "-"}</td>
+                        <td>
+                          {entry.orderType
+                            ? getOrderTypeLabel(entry.orderType, language)
+                            : "-"}
+                        </td>
+                        <td>{entry.source || "-"}</td>
+                        <td>{formatMoney(entry.amount || 0, language)}</td>
+                        <td>
+                          {entry.paidAt
+                            ? formatSystemDate(entry.paidAt, language)
+                            : "-"}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
     </Modal>
@@ -447,9 +576,12 @@ function RowDropdown({
   order,
   isAdmin,
   showAssign = false,
+  onView,
   onAssign,
   onEdit,
   onDelete,
+  isReadOnly = false,
+  readOnlyReason = "",
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -481,10 +613,18 @@ function RowDropdown({
 
   const items = [
     isAdmin && {
+      label: t("common.details", "Details"),
+      icon: <LuClipboardList size={13} />,
+      onClick: onView,
+      cls: "",
+    },
+    isAdmin && {
       label: t("common.edit"),
       icon: <LuPencil size={13} />,
-      onClick: onEdit,
-      cls: "",
+      onClick: isReadOnly ? null : onEdit,
+      cls: isReadOnly ? "disabled" : "",
+      disabled: isReadOnly,
+      title: isReadOnly ? readOnlyReason : undefined,
     },
     showAssign &&
       isAdmin && {
@@ -498,8 +638,10 @@ function RowDropdown({
     isAdmin && {
       label: t("common.delete"),
       icon: <LuTrash2 size={13} />,
-      onClick: onDelete,
-      cls: "danger",
+      onClick: isReadOnly ? null : onDelete,
+      cls: isReadOnly ? "disabled" : "danger",
+      disabled: isReadOnly,
+      title: isReadOnly ? readOnlyReason : undefined,
     },
   ].filter(Boolean);
 
@@ -526,7 +668,10 @@ function RowDropdown({
                 key={i}
                 type="button"
                 className={`order-dropdown-item${item.cls ? ` order-dropdown-item--${item.cls}` : ""}`}
+                disabled={item.disabled}
+                title={item.title}
                 onClick={() => {
+                  if (item.disabled) return;
                   item.onClick();
                   setOpen(false);
                 }}
@@ -554,7 +699,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
   const { isAdmin, isFinance } = useAuth();
-  const { viewMonth, viewYear } = useMonth();
+  const { viewMonth, viewYear, getMonthAccessMode } = useMonth();
   const qc = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();
@@ -566,6 +711,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
         ? "completed"
         : "all";
   const [assignModal, setAssignModal] = useState(null);
+  const [viewOrderId, setViewOrderId] = useState("");
   const [deleteOrderTarget, setDeleteOrderTarget] = useState(null);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -633,6 +779,11 @@ export default function AllOrders({ filter, mode = "orders" }) {
     qc.invalidateQueries({ queryKey: ["orders"] });
     qc.invalidateQueries({ queryKey: ["order-detail"] });
     qc.invalidateQueries({ queryKey: ["assignable-workers"] });
+    qc.invalidateQueries({ queryKey: ["rakht-list"] });
+    qc.invalidateQueries({ queryKey: ["rakht-detail"] });
+    qc.invalidateQueries({ queryKey: ["rakht-revenue-summary"] });
+    qc.invalidateQueries({ queryKey: ["analytics"] });
+    qc.invalidateQueries({ queryKey: ["analytics-dashboard"] });
     setTimeout(() => {
       qc.refetchQueries({ queryKey: ["orders"] });
     }, 100);
@@ -722,7 +873,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
           <span>
             {t("orders.viewingMonth", "Viewing data for")}:{" "}
             <strong style={{ fontWeight: 700 }}>
-              {getMonthLabel(viewMonth, language)} {viewYear}
+              {formatMonthYearLabel(viewMonth, viewYear, language)}
             </strong>
           </span>
           {data?.total === 0 && (
@@ -854,6 +1005,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
                         t("common.customer", "Customer"),
                         t("common.type", "Type"),
                         t("common.total", "Total"),
+                        t("orders.totalBenefit", "Total Benefit"),
                         t("createOrder.discount", "Discount"),
                         t("common.paid", "Paid"),
                         t("common.remaining", "Remaining"),
@@ -868,7 +1020,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
                   <tbody>
                     {orders.length === 0 ? (
                       <tr>
-                        <td colSpan={10}>
+                        <td colSpan={11}>
                           <EmptyState
                             message={t("orders.noOrders")}
                             Icon={LuClipboardList}
@@ -917,11 +1069,16 @@ export default function AllOrders({ filter, mode = "orders" }) {
                             </td>
                             <td>
                               <Badge v={TV[o.type] || "gold"}>
-                                {getOrderTypeLabel(o.type, language)}
+                                {getOrderDisplayName(o, language)}
                               </Badge>
                             </td>
                             <td className="order-money-cell order-money-cell--total">
                               {formatMoney(o.totalPrice, language)}
+                            </td>
+                            <td
+                              className={`order-money-cell ${Number(o.totalBenefit || 0) >= 0 ? "order-money-cell--paid" : "order-money-cell--remaining"}`}
+                            >
+                              {formatMoney(o.totalBenefit || 0, language)}
                             </td>
                             <td className="order-money-cell order-money-cell--discount">
                               {formatMoney(o.discount, language)}
@@ -964,23 +1121,54 @@ export default function AllOrders({ filter, mode = "orders" }) {
                               </div>
                             </td>
                             <td className="order-date-text">
-                              {new Date(o.createdAt).toLocaleDateString()}
+                              {formatSystemDate(o.createdAt, language)}
                             </td>
                             <td>
-                              <RowDropdown
-                                order={o}
-                                isAdmin={isAdmin}
-                                showAssign={canManageAssignments}
-                                onAssign={() => setAssignModal(o)}
-                                onEdit={() => navigate(`/orders/${o.id}/edit`)}
-                                onDelete={() =>
-                                  setDeleteOrderTarget({
-                                    id: o.id,
-                                    customerName: o.customer?.firstName || "",
-                                    billNumber: o.customer?.billNumber,
-                                  })
-                                }
-                              />
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 8,
+                                  justifyContent: "flex-end",
+                                }}
+                              >
+                                {isAdmin && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline btn-sm"
+                                    onClick={() => setViewOrderId(o.id)}
+                                  >
+                                    {t("common.details", "Details")}
+                                  </button>
+                                )}
+                                <RowDropdown
+                                  order={o}
+                                  isAdmin={isAdmin}
+                                  showAssign={canManageAssignments}
+                                  onView={() => setViewOrderId(o.id)}
+                                  onAssign={() => setAssignModal(o)}
+                                  onEdit={() =>
+                                    navigate(`/orders/${o.id}/edit`)
+                                  }
+                                  onDelete={() =>
+                                    setDeleteOrderTarget({
+                                      id: o.id,
+                                      customerName: o.customer?.firstName || "",
+                                      billNumber: o.customer?.billNumber,
+                                    })
+                                  }
+                                  isReadOnly={
+                                    getMonthAccessMode(
+                                      o.entryMonth ?? viewMonth,
+                                      o.entryYear ?? viewYear,
+                                    ) !== "editable"
+                                  }
+                                  readOnlyReason={t(
+                                    "navbar.pastMonthReadOnly",
+                                    "Past months are read-only. No editing allowed.",
+                                  )}
+                                />
+                              </div>
                             </td>
                           </tr>
                         );
@@ -1012,20 +1200,38 @@ export default function AllOrders({ filter, mode = "orders" }) {
                         <span className="order-mobile-bill">
                           #{o.customer?.billNumber}
                         </span>
-                        <RowDropdown
-                          order={o}
-                          isAdmin={isAdmin}
-                          showAssign={canManageAssignments}
-                          onAssign={() => setAssignModal(o)}
-                          onEdit={() => navigate(`/orders/${o.id}/edit`)}
-                          onDelete={() =>
-                            setDeleteOrderTarget({
-                              id: o.id,
-                              customerName: o.customer?.firstName || "",
-                              billNumber: o.customer?.billNumber,
-                            })
-                          }
-                        />
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              className="btn btn-outline btn-sm"
+                              onClick={() => setViewOrderId(o.id)}
+                            >
+                              {t("common.details", "Details")}
+                            </button>
+                          )}
+                          <RowDropdown
+                            order={o}
+                            isAdmin={isAdmin}
+                            showAssign={canManageAssignments}
+                            onView={() => setViewOrderId(o.id)}
+                            onAssign={() => setAssignModal(o)}
+                            onEdit={() => navigate(`/orders/${o.id}/edit`)}
+                            onDelete={() =>
+                              setDeleteOrderTarget({
+                                id: o.id,
+                                customerName: o.customer?.firstName || "",
+                                billNumber: o.customer?.billNumber,
+                              })
+                            }
+                          />
+                        </div>
                       </div>
 
                       <div className="order-mobile-name">
@@ -1053,7 +1259,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
 
                       <div className="order-mobile-badges">
                         <Badge v={TV[o.type] || "gold"}>
-                          {getOrderTypeLabel(o.type, language)}
+                          {getOrderDisplayName(o, language)}
                         </Badge>
                         {showBillEmergencyBadge && (
                           <Badge v="red">
@@ -1084,6 +1290,16 @@ export default function AllOrders({ filter, mode = "orders" }) {
                           </div>
                           <div className="order-mobile-value">
                             {formatMoney(o.totalPrice, language)}
+                          </div>
+                        </div>
+                        <div className="order-mobile-metric">
+                          <div className="order-mobile-label">
+                            {t("orders.totalBenefit", "Total Benefit")}
+                          </div>
+                          <div
+                            className={`order-mobile-value${Number(o.totalBenefit || 0) < 0 ? " order-mobile-value--remaining" : " order-mobile-value--paid"}`}
+                          >
+                            {formatMoney(o.totalBenefit || 0, language)}
                           </div>
                         </div>
                         <div className="order-mobile-metric">
@@ -1122,7 +1338,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
 
                       <div className="order-mobile-foot">
                         <span className="order-mobile-date">
-                          {new Date(o.createdAt).toLocaleDateString()}
+                          {formatSystemDate(o.createdAt, language)}
                         </span>
                       </div>
                     </div>
@@ -1180,6 +1396,12 @@ export default function AllOrders({ filter, mode = "orders" }) {
             : ""
         }
         isPending={deleteMut.isPending}
+      />
+
+      <OrderViewModal
+        orderId={viewOrderId}
+        open={!!viewOrderId}
+        onClose={() => setViewOrderId("")}
       />
     </div>
   );

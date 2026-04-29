@@ -1,32 +1,241 @@
-import { prisma } from '../lib/prisma.js';
+import { prisma } from "../lib/prisma.js";
 
-export const getAllBoxes = () =>
-  prisma.box.findMany({
-    orderBy: { createdAt: 'desc' },
+const ORDER_TYPE_LABELS_EN = {
+  OUTFIT: "Outfit",
+  WASKAT: "Waskat",
+  KORTY: "Korty",
+  YAKHANQAQ: "YakhanQaq",
+};
+
+const getOrderTypeLabelEn = (type) => ORDER_TYPE_LABELS_EN[type] || type || "-";
+const BOX_TYPE_VALUES = new Set([
+  "OUTFIT",
+  "WASKAT",
+  "KORTY",
+  "YAKHANQAQ",
+  "FOREIGN_COUNTRY",
+]);
+
+const normalizeNameForCompare = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+
+const escapeRegex = (value) =>
+  String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const stripRepeatedBasePrefix = (customName, baseLabel) => {
+  const escapedBase = escapeRegex(baseLabel);
+  const matcher = new RegExp(`^${escapedBase}(?:\\s*[-:|]\\s*|\\s+)(.+)$`, "i");
+  const match = String(customName || "").match(matcher);
+  return match?.[1]?.trim() || "";
+};
+
+const buildOrderDisplayName = ({
+  type,
+  orderName,
+  sequence = 1,
+  total = 1,
+}) => {
+  const typeLabel = getOrderTypeLabelEn(type);
+  const normalizedTotal =
+    Number.isFinite(Number(total)) && Number(total) > 0 ? Number(total) : 1;
+  const normalizedSequence =
+    Number.isFinite(Number(sequence)) && Number(sequence) > 0
+      ? Number(sequence)
+      : 1;
+  const baseLabel =
+    normalizedTotal > 1 ? `${typeLabel} ${normalizedSequence}` : typeLabel;
+  const customName = typeof orderName === "string" ? orderName.trim() : "";
+
+  if (!customName) return baseLabel;
+
+  const normalizedBase = normalizeNameForCompare(baseLabel);
+  const normalizedCustom = normalizeNameForCompare(customName);
+  if (!normalizedCustom || normalizedCustom === normalizedBase) {
+    return baseLabel;
+  }
+
+  const strippedCustom = stripRepeatedBasePrefix(customName, baseLabel);
+  if (strippedCustom) {
+    const normalizedStripped = normalizeNameForCompare(strippedCustom);
+    if (normalizedStripped && normalizedStripped !== normalizedBase) {
+      return `${baseLabel} - ${strippedCustom}`;
+    }
+    return baseLabel;
+  }
+
+  if (normalizedCustom === normalizeNameForCompare(typeLabel)) {
+    return baseLabel;
+  }
+
+  return `${baseLabel} - ${customName}`;
+};
+
+const enrichOrdersWithDisplayMeta = async (orders = [], tx = prisma) => {
+  if (!Array.isArray(orders) || !orders.length) return orders;
+
+  const customerIds = Array.from(
+    new Set(
+      orders
+        .map((order) => order?.customerId)
+        .filter((customerId) => typeof customerId === "string" && customerId),
+    ),
+  );
+
+  if (!customerIds.length) {
+    return orders.map((order) => ({
+      ...order,
+      orderTypeSequence: 1,
+      orderTypeTotal: 1,
+      orderDisplayName: buildOrderDisplayName({
+        type: order?.type,
+        orderName: order?.orderName,
+      }),
+    }));
+  }
+
+  const siblingOrders = await tx.order.findMany({
+    where: { customerId: { in: customerIds } },
+    select: {
+      id: true,
+      customerId: true,
+      type: true,
+    },
+    orderBy: [
+      { customerId: "asc" },
+      { type: "asc" },
+      { createdAt: "asc" },
+      { id: "asc" },
+    ],
+  });
+
+  const totalsByKey = new Map();
+  for (const sibling of siblingOrders) {
+    const key = `${sibling.customerId}:${sibling.type}`;
+    totalsByKey.set(key, (totalsByKey.get(key) || 0) + 1);
+  }
+
+  const sequenceByKey = new Map();
+  const metaByOrderId = new Map();
+  for (const sibling of siblingOrders) {
+    const key = `${sibling.customerId}:${sibling.type}`;
+    const nextSequence = (sequenceByKey.get(key) || 0) + 1;
+    sequenceByKey.set(key, nextSequence);
+    metaByOrderId.set(sibling.id, {
+      sequence: nextSequence,
+      total: totalsByKey.get(key) || 1,
+    });
+  }
+
+  return orders.map((order) => {
+    const meta = metaByOrderId.get(order?.id) || { sequence: 1, total: 1 };
+    return {
+      ...order,
+      orderTypeSequence: meta.sequence,
+      orderTypeTotal: meta.total,
+      orderDisplayName: buildOrderDisplayName({
+        type: order?.type,
+        orderName: order?.orderName,
+        sequence: meta.sequence,
+        total: meta.total,
+      }),
+    };
+  });
+};
+
+export const getAllBoxes = async ({ type } = {}) => {
+  const requestedType =
+    typeof type === "string" && type.trim() ? type.trim().toUpperCase() : null;
+  const normalizedType =
+    requestedType && BOX_TYPE_VALUES.has(requestedType) ? requestedType : null;
+
+  const boxes = await prisma.box.findMany({
+    ...(normalizedType ? { where: { boxType: normalizedType } } : {}),
+    orderBy: { createdAt: "desc" },
     include: {
-      _count: { select: { orders: true } },
+      _count: { select: { orders: true, foreignOrders: true } },
       orders: {
         include: {
           customer: true,
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
+      },
+      foreignOrders: {
+        include: {
+          customer: true,
+        },
+        orderBy: { createdAt: "desc" },
       },
     },
   });
 
-export const getBoxById = (id) =>
-  prisma.box.findUnique({
+  const allOrders = boxes.flatMap((box) => [
+    ...(box.orders || []),
+    ...(box.foreignOrders || []),
+  ]);
+  const enrichedOrders = await enrichOrdersWithDisplayMeta(allOrders);
+  const enrichedById = new Map(
+    enrichedOrders.map((order) => [order.id, order]),
+  );
+
+  return boxes.map((box) => {
+    const sourceOrders =
+      box.boxType === "FOREIGN_COUNTRY"
+        ? (box.foreignOrders || []).filter((order) => order?.isForeignOrder)
+        : (box.orders || []).filter((order) => !order?.isForeignOrder);
+    const mappedOrders = sourceOrders.map(
+      (order) => enrichedById.get(order.id) || order,
+    );
+    const normalizedCount = mappedOrders.length;
+
+    return {
+      ...box,
+      orders: mappedOrders,
+      _count: {
+        ...(box._count || {}),
+        orders: normalizedCount,
+      },
+    };
+  });
+};
+
+export const getBoxById = async (id) => {
+  const box = await prisma.box.findUnique({
     where: { id: Number(id) },
     include: {
+      _count: { select: { orders: true, foreignOrders: true } },
       orders: {
         include: { customer: true },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
+      },
+      foreignOrders: {
+        include: { customer: true },
+        orderBy: { createdAt: "desc" },
       },
     },
   });
 
-export const createBox = (body) =>
-  prisma.box.create({ data: body });
+  if (!box) return null;
+
+  const sourceOrders =
+    box.boxType === "FOREIGN_COUNTRY"
+      ? (box.foreignOrders || []).filter((order) => order?.isForeignOrder)
+      : (box.orders || []).filter((order) => !order?.isForeignOrder);
+  const normalizedCount = sourceOrders.length;
+
+  return {
+    ...box,
+    orders: await enrichOrdersWithDisplayMeta(sourceOrders || []),
+    _count: {
+      ...(box._count || {}),
+      orders: normalizedCount,
+    },
+  };
+};
+
+export const createBox = (body) => prisma.box.create({ data: body });
 
 export const updateBox = (id, body) =>
   prisma.box.update({ where: { id: Number(id) }, data: body });
@@ -60,10 +269,9 @@ export const assignOrderToBox = async (orderId, boxId) => {
   }
 
   if (box.boxType !== order.type) {
-    throw Object.assign(
-      new Error("Order type and box type do not match."),
-      { status: 400 },
-    );
+    throw Object.assign(new Error("Order type and box type do not match."), {
+      status: 400,
+    });
   }
 
   const isAlreadyInBox = order.boxId === numericBoxId;

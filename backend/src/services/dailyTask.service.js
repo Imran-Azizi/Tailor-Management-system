@@ -1,6 +1,40 @@
 import { prisma } from "../lib/prisma.js";
+import { recalculateOrderBenefit } from "./order.service.js";
 
 const CREATOR_SELECT = { id: true, name: true, accountType: true };
+
+const getCurrentGregorianMonthYear = () => ({
+  month: new Date().getMonth() + 1,
+  year: new Date().getFullYear(),
+});
+
+const assertTaskDateCurrentMonth = (taskDate) => {
+  const current = getCurrentGregorianMonthYear();
+  const d = new Date(taskDate);
+  const taskMonth = d.getMonth() + 1;
+  const taskYear = d.getFullYear();
+  if (taskMonth !== current.month || taskYear !== current.year) {
+    throw Object.assign(
+      new Error("New entries are allowed only in the current month."),
+      { status: 403, code: "MONTH_ENTRY_MUST_BE_CURRENT" },
+    );
+  }
+};
+
+const assertTaskDateReadOnly = (taskDate) => {
+  const current = getCurrentGregorianMonthYear();
+  const d = new Date(taskDate);
+  const taskMonth = d.getMonth() + 1;
+  const taskYear = d.getFullYear();
+  if (taskMonth !== current.month || taskYear !== current.year) {
+    throw Object.assign(
+      new Error(
+        "Past and future months are read-only. Edits only allowed for the current month.",
+      ),
+      { status: 403, code: "MONTH_READONLY" },
+    );
+  }
+};
 
 function startOfDay(date) {
   const d = new Date(date);
@@ -148,16 +182,75 @@ function buildBreakdown(tasks, granularity) {
 }
 
 export const createDailyTask = async (data, createdById) => {
-  return prisma.dailyTask.create({
+  assertTaskDateCurrentMonth(data.taskDate);
+  const task = await prisma.dailyTask.create({
     data: {
       fromName: data.fromName,
       recipientName: data.recipientName,
       amount: data.amount,
       taskDate: data.taskDate,
+      orderId: data.orderId || null,
       note: data.note || null,
       createdById,
     },
-    include: { createdBy: { select: CREATOR_SELECT } },
+    include: {
+      createdBy: { select: CREATOR_SELECT },
+      order: {
+        select: {
+          id: true,
+          type: true,
+          customer: { select: { firstName: true, billNumber: true } },
+        },
+      },
+    },
+  });
+
+  if (task.orderId) {
+    await recalculateOrderBenefit(task.orderId);
+  }
+
+  return task;
+};
+
+export const createDailyTaskBatch = async (data, createdById) => {
+  assertTaskDateCurrentMonth(data.taskDate);
+  return prisma.$transaction(async (tx) => {
+    const createdTasks = [];
+
+    for (const allocation of data.allocations) {
+      const task = await tx.dailyTask.create({
+        data: {
+          fromName: data.fromName,
+          recipientName: data.recipientName,
+          amount: allocation.amount,
+          taskDate: data.taskDate,
+          orderId: allocation.orderId,
+          note: data.note || null,
+          createdById,
+        },
+        include: {
+          createdBy: { select: CREATOR_SELECT },
+          order: {
+            select: {
+              id: true,
+              type: true,
+              customer: { select: { firstName: true, billNumber: true } },
+            },
+          },
+        },
+      });
+
+      createdTasks.push(task);
+    }
+
+    const orderIds = [
+      ...new Set(createdTasks.map((task) => task.orderId).filter(Boolean)),
+    ];
+    for (const orderId of orderIds) {
+      await recalculateOrderBenefit(orderId, tx);
+    }
+
+    return createdTasks;
   });
 };
 
@@ -199,7 +292,16 @@ export const getDailyTasks = async ({
       skip: (page - 1) * limit,
       take: limit,
       orderBy: { taskDate: "desc" },
-      include: { createdBy: { select: CREATOR_SELECT } },
+      include: {
+        createdBy: { select: CREATOR_SELECT },
+        order: {
+          select: {
+            id: true,
+            type: true,
+            customer: { select: { firstName: true, billNumber: true } },
+          },
+        },
+      },
     }),
   ]);
 
@@ -209,26 +311,80 @@ export const getDailyTasks = async ({
 export const getDailyTaskById = async (id) => {
   return prisma.dailyTask.findUnique({
     where: { id },
-    include: { createdBy: { select: CREATOR_SELECT } },
+    include: {
+      createdBy: { select: CREATOR_SELECT },
+      order: {
+        select: {
+          id: true,
+          type: true,
+          customer: { select: { firstName: true, billNumber: true } },
+        },
+      },
+    },
   });
 };
 
 export const updateDailyTask = async (id, data) => {
-  return prisma.dailyTask.update({
-    where: { id },
-    data: {
-      fromName: data.fromName,
-      recipientName: data.recipientName,
-      amount: data.amount,
-      taskDate: data.taskDate,
-      note: data.note || null,
-    },
-    include: { createdBy: { select: CREATOR_SELECT } },
+  return prisma.$transaction(async (tx) => {
+    const before = await tx.dailyTask.findUnique({
+      where: { id },
+      select: { orderId: true, taskDate: true },
+    });
+    if (!before)
+      throw Object.assign(new Error("Task not found"), { status: 404 });
+    assertTaskDateReadOnly(before.taskDate);
+
+    const updated = await tx.dailyTask.update({
+      where: { id },
+      data: {
+        fromName: data.fromName,
+        recipientName: data.recipientName,
+        amount: data.amount,
+        taskDate: data.taskDate,
+        orderId: data.orderId || null,
+        note: data.note || null,
+      },
+      include: {
+        createdBy: { select: CREATOR_SELECT },
+        order: {
+          select: {
+            id: true,
+            type: true,
+            customer: { select: { firstName: true, billNumber: true } },
+          },
+        },
+      },
+    });
+
+    if (before?.orderId && before.orderId !== updated.orderId) {
+      await recalculateOrderBenefit(before.orderId, tx);
+    }
+    if (updated.orderId) {
+      await recalculateOrderBenefit(updated.orderId, tx);
+    }
+
+    return updated;
   });
 };
 
 export const deleteDailyTask = async (id) => {
-  return prisma.dailyTask.delete({ where: { id } });
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.dailyTask.findUnique({
+      where: { id },
+      select: { id: true, orderId: true, taskDate: true },
+    });
+    if (!existing)
+      throw Object.assign(new Error("Task not found"), { status: 404 });
+    assertTaskDateReadOnly(existing.taskDate);
+
+    const deleted = await tx.dailyTask.delete({ where: { id } });
+
+    if (existing?.orderId) {
+      await recalculateOrderBenefit(existing.orderId, tx);
+    }
+
+    return deleted;
+  });
 };
 
 export const getDailyTaskReport = async ({ reportType, date, from, to }) => {

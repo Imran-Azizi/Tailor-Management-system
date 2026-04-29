@@ -184,8 +184,14 @@ export async function listAssignable(req, res, next) {
 /** GET /api/users/dokan  — list active Dokan users for daily task sender dropdowns */
 export async function listDokanUsers(req, res, next) {
   try {
+    const includeAdmins = String(req.query.includeAdmins || "").toLowerCase();
+    const accountTypes =
+      includeAdmins === "1" || includeAdmins === "true"
+        ? ["DOKAN", "ADMIN"]
+        : ["DOKAN"];
+
     const users = await prisma.user.findMany({
-      where: { accountType: "DOKAN", isActive: true },
+      where: { accountType: { in: accountTypes }, isActive: true },
       select: { id: true, name: true, phoneNumber: true, accountType: true },
       orderBy: { name: "asc" },
     });

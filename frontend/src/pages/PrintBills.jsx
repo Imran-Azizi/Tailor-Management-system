@@ -6,9 +6,9 @@ import toast from "react-hot-toast";
 import {
   CustomerCombinedBill,
   TailorBill,
+  getOrderDisplayName,
   getBillLanguageSettings,
   getMeasurementsFromOrder,
-  getOrderTypeLabel,
   printElement,
 } from "../components/order/OrderDocumentPack.jsx";
 import {
@@ -221,9 +221,7 @@ export default function PrintBills() {
   const orderMeta = buildOrderItemMeta(orders, currentLanguage);
   const isBillEmergency = orders.some((order) => order.isEmergency);
   const emergencyTypes = Array.from(
-    new Set(
-      orders.map((order) => getOrderTypeLabel(order.type, currentLanguage)),
-    ),
+    new Set(orders.map((order) => getOrderDisplayName(order, currentLanguage))),
   );
   const emergencyAnchorOrder = orders[0] || null;
 
@@ -632,16 +630,16 @@ function buildOrderItemMeta(orders = [], language) {
   return (orders || []).map((order, index) => {
     const typeKey = order?.type || "ITEM";
     typeCounts[typeKey] = (typeCounts[typeKey] || 0) + 1;
-    const typeLabel = getOrderTypeLabel(typeKey, language);
     const itemNumber = typeCounts[typeKey];
-    const showItemNumber = (totalByType[typeKey] || 0) > 1;
 
     return {
       order,
       index,
-      typeLabel,
       itemNumber,
-      itemLabel: showItemNumber ? `${typeLabel} ${itemNumber}` : typeLabel,
+      itemLabel: getOrderDisplayName(order, language, {
+        totalByType: totalByType[typeKey],
+        sequenceByType: itemNumber,
+      }),
     };
   });
 }

@@ -15,3 +15,11 @@ export const getDashboard = async (req, res, next) => {
     next(e);
   }
 };
+
+export const getMonthPolicy = async (req, res, next) => {
+  try {
+    res.json(await service.getMonthPolicy());
+  } catch (e) {
+    next(e);
+  }
+};

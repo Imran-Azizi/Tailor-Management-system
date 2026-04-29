@@ -213,7 +213,14 @@ export default function EditOrder() {
             source.rakhtRequiredMeters != null
               ? Number(source.rakhtRequiredMeters)
               : "",
-          piecePrice: 0,
+          piecePrice:
+            source.rakhtPiecePrice != null
+              ? Number(source.rakhtPiecePrice)
+              : "",
+          priceForCustomer:
+            source.rakhtCustomerPricePerMeter != null
+              ? Number(source.rakhtCustomerPricePerMeter)
+              : "",
         };
       })
       .filter(Boolean);
@@ -465,7 +472,7 @@ function resolveBillEmergency(orderTypes) {
 function toWholeAmount(value) {
   const normalized = Number(value || 0);
   if (!Number.isFinite(normalized)) return 0;
-  return Math.max(0, Math.round(normalized));
+  return Math.max(0, Math.round((normalized + Number.EPSILON) * 100) / 100);
 }
 
 function sanitize(m) {

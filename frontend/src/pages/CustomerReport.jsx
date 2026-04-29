@@ -27,10 +27,15 @@ import {
 } from "recharts";
 import api from "../lib/api.js";
 import { getOrderTypeLabel } from "../lib/orderType.js";
+import { formatSystemDate } from "../lib/locale.js";
+import { formatCurrency } from "../lib/currency.js";
 import { Spinner, Badge } from "../components/ui/index.jsx";
 
 function formatMoney(v) {
-  return `$${Number(v || 0).toLocaleString()}`;
+  return formatCurrency(v, "en", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
 }
 
 const ORDER_COLORS = {
@@ -489,7 +494,7 @@ export default function CustomerReport() {
                           }}
                         >
                           <LuCalendar size={11} />{" "}
-                          {new Date(c.createdAt).toLocaleDateString()}
+                          {formatSystemDate(c.createdAt, language)}
                         </span>
                       </td>
                     </tr>

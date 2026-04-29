@@ -62,71 +62,333 @@ const withComputedFields = (rakht) => ({
   })),
 });
 
-export const getRakhtRevenueSummary = async () => {
-  const orders = await prisma.order.findMany({
-    where: {
-      rakhtId: { not: null },
-      rakhtRequiredMeters: { gt: 0 },
-      rakhtPiecePrice: { gt: 0 },
-    },
-    select: {
-      id: true,
-      rakhtCompanyName: true,
-      rakhtBrandName: true,
-      rakhtRequiredMeters: true,
-      rakhtPiecePrice: true,
-      createdAt: true,
-    },
-  });
+export const getRakhtRevenueSummary = async (options = {}) => {
+  return getRakhtRevenueSummaryWithFilters(options);
+};
 
+const buildRakhtRevenueBaseWhere = (financeUserId) => ({
+  ...(financeUserId ? { createdByFinanceId: String(financeUserId) } : {}),
+  rakhtId: { not: null },
+  rakhtRequiredMeters: { gt: 0 },
+  rakhtPiecePrice: { gt: 0 },
+});
+
+const ORDER_TYPE_VALUES = ["OUTFIT", "WASKAT", "KORTY", "YAKHANQAQ"];
+
+const deriveRakhtOrderFinancials = (order) => {
+  const meters = Number(order.rakhtRequiredMeters || 0);
+  const costPerMeter = Number(order.rakhtPiecePrice || 0);
+  const sellingPerMeterRaw = Number(order.rakhtCustomerPricePerMeter || 0);
+  const sellingTotalRaw = Number(order.rakhtTotalCustomerPrice || 0);
+
+  const totalCost = meters * costPerMeter;
+  const totalSelling =
+    sellingTotalRaw > 0
+      ? sellingTotalRaw
+      : sellingPerMeterRaw > 0
+        ? sellingPerMeterRaw * meters
+        : totalCost;
+
+  const sellingPerMeter =
+    sellingPerMeterRaw > 0
+      ? sellingPerMeterRaw
+      : meters > 0
+        ? safeDivide(totalSelling, meters)
+        : 0;
+
+  const benefit = totalSelling - totalCost;
+
+  return {
+    meters: round2(meters),
+    costPerMeter: round2(costPerMeter),
+    sellingPerMeter: round2(sellingPerMeter),
+    totalCost: round2(totalCost),
+    totalSelling: round2(totalSelling),
+    benefit: round2(benefit),
+  };
+};
+
+const toRevenueRow = (order) => {
+  const financials = deriveRakhtOrderFinancials(order);
+
+  return {
+    orderId: order.id,
+    orderType: order.type,
+    customerName: order.customer?.firstName || "-",
+    customerPhone: order.customer?.phoneNumber || "-",
+    companyName: order.rakhtCompanyName || "Unknown",
+    brandName: order.rakhtBrandName || "Unknown",
+    tonId: order.rakhtTon?.id || null,
+    tonName: order.rakhtTon?.name || "Unknown",
+    ...financials,
+    createdAt: order.createdAt,
+  };
+};
+
+export const getRakhtRevenueSummaryWithFilters = async ({
+  financeUserId,
+  search = "",
+  companyName,
+  brandName,
+  tonName,
+  orderType,
+  fromDate,
+  toDate,
+  minMeters,
+  maxMeters,
+  page = 1,
+  limit = 25,
+} = {}) => {
+  const normalizedSearch = normalizeText(search || "");
+  const safePage = Math.max(1, Number(page) || 1);
+  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 25));
+  const skip = (safePage - 1) * safeLimit;
+
+  const where = buildRakhtRevenueBaseWhere(financeUserId);
+
+  if (companyName) where.rakhtCompanyName = normalizeText(companyName);
+  if (brandName) where.rakhtBrandName = normalizeText(brandName);
+  if (tonName) where.rakhtTon = { is: { name: normalizeText(tonName) } };
+  if (orderType && ORDER_TYPE_VALUES.includes(orderType))
+    where.type = orderType;
+
+  const metersFilter = {};
+  const minMetersNumber = Number(minMeters);
+  const maxMetersNumber = Number(maxMeters);
+  if (Number.isFinite(minMetersNumber) && minMetersNumber > 0) {
+    metersFilter.gte = minMetersNumber;
+  }
+  if (Number.isFinite(maxMetersNumber) && maxMetersNumber > 0) {
+    metersFilter.lte = maxMetersNumber;
+  }
+  if (Object.keys(metersFilter).length) {
+    where.rakhtRequiredMeters = {
+      ...(where.rakhtRequiredMeters || {}),
+      ...metersFilter,
+    };
+  }
+
+  const createdAtFilter = {};
+  if (fromDate) {
+    const parsedFrom = new Date(fromDate);
+    if (!Number.isNaN(parsedFrom.getTime())) {
+      parsedFrom.setHours(0, 0, 0, 0);
+      createdAtFilter.gte = parsedFrom;
+    }
+  }
+  if (toDate) {
+    const parsedTo = new Date(toDate);
+    if (!Number.isNaN(parsedTo.getTime())) {
+      parsedTo.setHours(23, 59, 59, 999);
+      createdAtFilter.lte = parsedTo;
+    }
+  }
+  if (Object.keys(createdAtFilter).length) {
+    where.createdAt = createdAtFilter;
+  }
+
+  if (normalizedSearch) {
+    where.AND = [
+      ...(where.AND || []),
+      {
+        OR: [
+          { id: { contains: normalizedSearch, mode: "insensitive" } },
+          {
+            rakhtCompanyName: {
+              contains: normalizedSearch,
+              mode: "insensitive",
+            },
+          },
+          {
+            rakhtBrandName: {
+              contains: normalizedSearch,
+              mode: "insensitive",
+            },
+          },
+          {
+            customer: {
+              firstName: { contains: normalizedSearch, mode: "insensitive" },
+            },
+          },
+          {
+            customer: {
+              phoneNumber: {
+                contains: normalizedSearch,
+                mode: "insensitive",
+              },
+            },
+          },
+          {
+            rakhtTon: {
+              is: { name: { contains: normalizedSearch, mode: "insensitive" } },
+            },
+          },
+        ],
+      },
+    ];
+  }
+
+  const selectClause = {
+    id: true,
+    type: true,
+    rakhtCompanyName: true,
+    rakhtBrandName: true,
+    rakhtRequiredMeters: true,
+    rakhtPiecePrice: true,
+    rakhtCustomerPricePerMeter: true,
+    rakhtTotalCustomerPrice: true,
+    createdAt: true,
+    customer: {
+      select: {
+        firstName: true,
+        phoneNumber: true,
+      },
+    },
+    rakhtTon: {
+      select: {
+        id: true,
+        name: true,
+      },
+    },
+  };
+
+  const [allRowsRaw, paginatedRowsRaw, totalRows, companies, brands, tons] =
+    await Promise.all([
+      prisma.order.findMany({ where, select: selectClause }),
+      prisma.order.findMany({
+        where,
+        select: selectClause,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: safeLimit,
+      }),
+      prisma.order.count({ where }),
+      prisma.order.findMany({
+        where: buildRakhtRevenueBaseWhere(financeUserId),
+        select: { rakhtCompanyName: true },
+        distinct: ["rakhtCompanyName"],
+        orderBy: { rakhtCompanyName: "asc" },
+      }),
+      prisma.order.findMany({
+        where: buildRakhtRevenueBaseWhere(financeUserId),
+        select: { rakhtBrandName: true },
+        distinct: ["rakhtBrandName"],
+        orderBy: { rakhtBrandName: "asc" },
+      }),
+      prisma.rakhtTon.findMany({
+        where: {
+          orders: {
+            some: buildRakhtRevenueBaseWhere(financeUserId),
+          },
+        },
+        select: { name: true },
+        distinct: ["name"],
+        orderBy: { name: "asc" },
+      }),
+    ]);
+
+  const allRows = allRowsRaw.map(toRevenueRow);
+  const details = paginatedRowsRaw.map(toRevenueRow);
+
+  const byCompanyMap = new Map();
+  const byTonMap = new Map();
   let totalMetersSold = 0;
   let totalRevenue = 0;
-  const byCompanyMap = new Map();
+  let totalSelling = 0;
+  let totalCost = 0;
 
-  for (const order of orders) {
-    const meters = Number(order.rakhtRequiredMeters || 0);
-    const pricePerMeter = Number(order.rakhtPiecePrice || 0);
-    if (!Number.isFinite(meters) || !Number.isFinite(pricePerMeter)) continue;
+  for (const row of allRows) {
+    totalMetersSold += row.meters;
+    totalRevenue += row.benefit;
+    totalSelling += row.totalSelling;
+    totalCost += row.totalCost;
 
-    const lineTotal = meters * pricePerMeter;
-    totalMetersSold += meters;
-    totalRevenue += lineTotal;
-
-    const companyName = String(order.rakhtCompanyName || "Unknown");
-    const existing = byCompanyMap.get(companyName) || {
-      companyName,
+    const companyExisting = byCompanyMap.get(row.companyName) || {
+      companyName: row.companyName,
       orderCount: 0,
       metersSold: 0,
+      totalSelling: 0,
+      totalCost: 0,
       revenue: 0,
       avgSellingPricePerMeter: 0,
     };
-
-    existing.orderCount += 1;
-    existing.metersSold += meters;
-    existing.revenue += lineTotal;
-    existing.avgSellingPricePerMeter = safeDivide(
-      existing.revenue,
-      existing.metersSold,
+    companyExisting.orderCount += 1;
+    companyExisting.metersSold += row.meters;
+    companyExisting.totalSelling += row.totalSelling;
+    companyExisting.totalCost += row.totalCost;
+    companyExisting.revenue += row.benefit;
+    companyExisting.avgSellingPricePerMeter = safeDivide(
+      companyExisting.totalSelling,
+      companyExisting.metersSold,
     );
+    byCompanyMap.set(row.companyName, companyExisting);
 
-    byCompanyMap.set(companyName, existing);
+    const tonExisting = byTonMap.get(row.tonName) || {
+      tonName: row.tonName,
+      orderCount: 0,
+      metersSold: 0,
+      totalSelling: 0,
+      totalCost: 0,
+      revenue: 0,
+      avgSellingPricePerMeter: 0,
+    };
+    tonExisting.orderCount += 1;
+    tonExisting.metersSold += row.meters;
+    tonExisting.totalSelling += row.totalSelling;
+    tonExisting.totalCost += row.totalCost;
+    tonExisting.revenue += row.benefit;
+    tonExisting.avgSellingPricePerMeter = safeDivide(
+      tonExisting.totalSelling,
+      tonExisting.metersSold,
+    );
+    byTonMap.set(row.tonName, tonExisting);
   }
 
   const byCompany = Array.from(byCompanyMap.values())
     .map((row) => ({
       ...row,
       metersSold: round2(row.metersSold),
+      totalSelling: round2(row.totalSelling),
+      totalCost: round2(row.totalCost),
+      revenue: round2(row.revenue),
+      avgSellingPricePerMeter: round2(row.avgSellingPricePerMeter),
+    }))
+    .sort((a, b) => b.revenue - a.revenue);
+
+  const byTon = Array.from(byTonMap.values())
+    .map((row) => ({
+      ...row,
+      metersSold: round2(row.metersSold),
+      totalSelling: round2(row.totalSelling),
+      totalCost: round2(row.totalCost),
       revenue: round2(row.revenue),
       avgSellingPricePerMeter: round2(row.avgSellingPricePerMeter),
     }))
     .sort((a, b) => b.revenue - a.revenue);
 
   return {
-    totalOrders: orders.length,
+    totalOrders: allRows.length,
     totalMetersSold: round2(totalMetersSold),
     totalRevenue: round2(totalRevenue),
-    avgSellingPricePerMeter: round2(safeDivide(totalRevenue, totalMetersSold)),
+    totalSelling: round2(totalSelling),
+    totalCost: round2(totalCost),
+    avgSellingPricePerMeter: round2(safeDivide(totalSelling, totalMetersSold)),
+    avgBenefitPerMeter: round2(safeDivide(totalRevenue, totalMetersSold)),
     byCompany,
+    byTon,
+    details,
+    pagination: {
+      page: safePage,
+      limit: safeLimit,
+      total: totalRows,
+      totalPages: Math.max(1, Math.ceil(totalRows / safeLimit)),
+    },
+    filters: {
+      companies: companies.map((item) => item.rakhtCompanyName).filter(Boolean),
+      brands: brands.map((item) => item.rakhtBrandName).filter(Boolean),
+      tons: tons.map((item) => item.name).filter(Boolean),
+      orderTypes: ORDER_TYPE_VALUES,
+    },
   };
 };
 
@@ -136,6 +398,113 @@ export const getAllRakht = async () => {
     orderBy: [{ brandName: "asc" }, { createdAt: "desc" }],
   });
   return rows.map(withComputedFields);
+};
+
+export const getRakhtDetailById = async (id) => {
+  const rakht = await prisma.rakht.findUnique({
+    where: { id },
+    include: { tons: { orderBy: { createdAt: "asc" } } },
+  });
+
+  if (!rakht) {
+    throw Object.assign(new Error("Rakht not found"), { status: 404 });
+  }
+
+  const rakhtWithComputed = withComputedFields(rakht);
+
+  const orders = await prisma.order.findMany({
+    where: { rakhtId: id },
+    select: {
+      id: true,
+      rakhtTonId: true,
+      rakhtRequiredMeters: true,
+      rakhtPiecePrice: true,
+      rakhtCustomerPricePerMeter: true,
+      rakhtTotalCustomerPrice: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const byTon = new Map();
+  let totalProfitGenerated = 0;
+
+  for (const order of orders) {
+    const financials = deriveRakhtOrderFinancials(order);
+    totalProfitGenerated += Number(financials.benefit || 0);
+
+    const tonKey = order.rakhtTonId || "UNASSIGNED";
+    const current = byTon.get(tonKey) || {
+      profitGenerated: 0,
+      metersSold: 0,
+      orderCount: 0,
+    };
+    current.profitGenerated += Number(financials.benefit || 0);
+    current.metersSold += Number(financials.meters || 0);
+    current.orderCount += 1;
+    byTon.set(tonKey, current);
+  }
+
+  const tonsDetailed = (rakhtWithComputed.tons || []).map((ton, index) => {
+    const tonPrice = round2(
+      safeDivide(rakhtWithComputed.totalPrice, rakhtWithComputed.tonQuantity),
+    );
+    const consumedMeters = toNonNegativeInt(ton.usedMeters);
+    const totalMeters = toNonNegativeInt(ton.totalMeters);
+    const remainingMeters = Math.max(0, totalMeters - consumedMeters);
+    const sales = byTon.get(ton.id) || {
+      profitGenerated: 0,
+      metersSold: 0,
+      orderCount: 0,
+    };
+
+    return {
+      ...ton,
+      tonIdentifier: `Ton ${index + 1}`,
+      tonIndex: index + 1,
+      tonPrice,
+      pricePerMeter: round2(
+        safeDivide(tonPrice, toPositiveNumber(totalMeters)),
+      ),
+      consumedMeters,
+      remainingMeters,
+      profitGenerated: round2(sales.profitGenerated),
+      metersSoldFromOrders: round2(sales.metersSold),
+      orderCount: sales.orderCount,
+    };
+  });
+
+  const totalConsumedMeters = tonsDetailed.reduce(
+    (sum, ton) => sum + Number(ton.consumedMeters || 0),
+    0,
+  );
+  const totalRemainingMeters = tonsDetailed.reduce(
+    (sum, ton) => sum + Number(ton.remainingMeters || 0),
+    0,
+  );
+
+  return {
+    id: rakhtWithComputed.id,
+    companyName: rakhtWithComputed.companyName,
+    brandName: rakhtWithComputed.brandName,
+    tonQuantity: rakhtWithComputed.tonQuantity,
+    totalPrice: rakhtWithComputed.totalPrice,
+    givenMoney: rakhtWithComputed.givenMoney,
+    remainingMoney: rakhtWithComputed.remainingMoney,
+    date: rakhtWithComputed.date,
+    createdAt: rakhtWithComputed.createdAt,
+    updatedAt: rakhtWithComputed.updatedAt,
+    tons: tonsDetailed,
+    summary: {
+      totalConsumedMeters,
+      totalRemainingMeters,
+      totalProfitGenerated: round2(totalProfitGenerated),
+      unassignedTonProfitGenerated: round2(
+        Number(byTon.get("UNASSIGNED")?.profitGenerated || 0),
+      ),
+      linkedOrderCount: orders.length,
+    },
+  };
 };
 
 export const getRakhtPaymentHistory = async ({

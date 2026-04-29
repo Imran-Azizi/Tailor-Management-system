@@ -26,15 +26,16 @@ import {
   LuCalendarCheck,
   LuUser,
   LuUsers,
+  LuBadgeDollarSign,
 } from "react-icons/lu";
 import { useTranslation } from "react-i18next";
 import api from "../lib/api.js";
 import { formatCurrency } from "../lib/currency.js";
 import { formatDateLocale } from "../lib/locale.js";
-import { getOrderTypeLabel } from "../lib/orderType.js";
+import { getOrderDisplayName, getOrderTypeLabel } from "../lib/orderType.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
-import { getMonthLabel } from "../lib/months.js";
+import { formatMonthYearLabel } from "../lib/months.js";
 import {
   StatCard,
   Spinner,
@@ -118,6 +119,14 @@ export default function Dashboard() {
     day: "numeric",
   });
 
+  const monthlyChartData = (d.monthlyRevenue || []).map((item) => ({
+    ...item,
+    monthLabel:
+      item.monthNumber && item.monthYear
+        ? formatMonthYearLabel(item.monthNumber, item.monthYear, language)
+        : item.month,
+  }));
+
   return (
     <div className="page">
       <PageHeader title={t("dashboardPage.title")} subtitle={todayLabel} />
@@ -142,11 +151,34 @@ export default function Dashboard() {
           <span>
             {t("common.viewingMonth", "Viewing data for")}:{" "}
             <strong style={{ fontWeight: 700 }}>
-              {getMonthLabel(viewMonth, language)} {viewYear}
+              {formatMonthYearLabel(viewMonth, viewYear, language)}
             </strong>
           </span>
         </div>
       )}
+
+      <div className="dashboard-top-stats" style={{ marginBottom: 14 }}>
+        <StatCard
+          label={t("dashboardPage.totalRakhtRevenue", "Total Rakht Revenue")}
+          value={formatCurrency(d.totalRakhtRevenue ?? 0, language)}
+          Icon={LuBadgeDollarSign}
+          accent="#0F766E"
+          sub={t(
+            "dashboardPage.totalRakhtRevenueSub",
+            "Aggregated from Rakht Benefit across all stored orders.",
+          )}
+        />
+        <StatCard
+          label={t("dashboardPage.totalOrderBenefit", "Total Order Benefit")}
+          value={formatCurrency(d.totalOrderBenefit ?? 0, language)}
+          Icon={LuTrendingUp}
+          accent="#1D4ED8"
+          sub={t(
+            "dashboardPage.totalOrderBenefitSub",
+            "Sum of persisted order benefit based on profit calculation logic.",
+          )}
+        />
+      </div>
 
       <div className="g-stats" style={{ marginBottom: 20 }}>
         <StatCard
@@ -243,12 +275,12 @@ export default function Dashboard() {
         <Card title={t("dashboardPage.revenueTrend")}>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart
-              data={d.monthlyRevenue}
+              data={monthlyChartData}
               margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis
-                dataKey="month"
+                dataKey="monthLabel"
                 tick={{ fontSize: 11, fill: "var(--text3)" }}
                 axisLine={false}
                 tickLine={false}
@@ -319,7 +351,7 @@ export default function Dashboard() {
       >
         <ResponsiveContainer width="100%" height={140}>
           <BarChart
-            data={d.monthlyRevenue}
+            data={monthlyChartData}
             barSize={20}
             margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
           >
@@ -329,7 +361,7 @@ export default function Dashboard() {
               vertical={false}
             />
             <XAxis
-              dataKey="month"
+              dataKey="monthLabel"
               tick={{ fontSize: 11, fill: "var(--text3)" }}
               axisLine={false}
               tickLine={false}
@@ -391,7 +423,7 @@ export default function Dashboard() {
                   </td>
                   <td>
                     <span className={`badge bg-${TV[o.type] || "gold"}`}>
-                      {getOrderTypeLabel(o.type, language)}
+                      {getOrderDisplayName(o, language)}
                     </span>
                   </td>
                   <td style={{ fontWeight: 500 }}>

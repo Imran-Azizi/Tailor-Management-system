@@ -61,6 +61,9 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
     normalizeEmergencyHour(initialEmergencyEntry?.emergencyHour),
   );
   const [billEmergencyError, setBillEmergencyError] = useState("");
+  const [isForeignOrder, setIsForeignOrder] = useState(
+    initialEntries.some((entry) => entry?.isForeignOrder),
+  );
 
   const selectedTypes = useMemo(
     () => new Set(entries.map((entry) => entry.type)),
@@ -81,6 +84,7 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
         isEmergency: billEmergency,
         emergencyExpiry: billEmergency ? billEmergencyExpiry : "",
         emergencyHour: billEmergency ? billEmergencyHour : "08",
+        isForeignOrder,
       },
     ]);
   };
@@ -103,6 +107,15 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
         isEmergency,
         emergencyExpiry: isEmergency ? expiry : "",
         emergencyHour: isEmergency ? normalizedHour : "08",
+      })),
+    );
+  };
+
+  const syncForeignFlagToEntries = (isForeign) => {
+    setEntries((current) =>
+      current.map((entry) => ({
+        ...entry,
+        isForeignOrder: isForeign,
       })),
     );
   };
@@ -133,6 +146,7 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
       isEmergency: billEmergency,
       emergencyExpiry: billEmergency ? billEmergencyExpiry : "",
       emergencyHour: billEmergency ? billEmergencyHour : "08",
+      isForeignOrder,
     }));
 
     setBillEmergencyError("");
@@ -195,103 +209,168 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
       {entries.length > 0 && (
         <div className="selected-order-stack" style={{ marginBottom: 18 }}>
           <div className="selected-order-card">
-            <div className="selected-order-head" style={{ marginBottom: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span className="badge bg-red" style={{ fontSize: 10 }}>
-                  {t("createOrder.priority")}
-                </span>
-                <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                  {t("createOrder.emergencyOrder")}
-                </span>
-              </div>
-            </div>
-
-            <label className="order-toggle">
-              <input
-                type="checkbox"
-                checked={billEmergency}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  setBillEmergency(checked);
-                  setBillEmergencyError("");
-                  syncEmergencyToEntries(
-                    checked,
-                    billEmergencyExpiry,
-                    billEmergencyHour,
-                  );
-                }}
-              />
-              <span
-                className={`order-toggle-pill${billEmergency ? " on" : ""}`}
-              >
-                <LuTriangleAlert size={12} />
-                {t("createOrder.emergencyOrder")}
-              </span>
-            </label>
-
-            {billEmergency && (
-              <div className="order-expiry-wrap">
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 16,
+                marginBottom: 16,
+              }}
+            >
+              {/* Emergency Order */}
+              <div>
                 <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 12,
-                  }}
+                  className="selected-order-head"
+                  style={{ marginBottom: 10 }}
                 >
-                  <div>
-                    <label className="lbl lbl-r" style={{ fontSize: 11 }}>
-                      {t("createOrder.emergencyExpiryDate")}
-                    </label>
-                    <input
-                      type="date"
-                      className={`inp${billEmergencyError ? " err" : ""}`}
-                      style={{ height: 38, fontSize: 13, width: "100%" }}
-                      value={billEmergencyExpiry}
-                      min={new Date().toISOString().split("T")[0]}
-                      onChange={(e) => {
-                        const nextValue = e.target.value;
-                        setBillEmergencyExpiry(nextValue);
-                        setBillEmergencyError("");
-                        syncEmergencyToEntries(
-                          true,
-                          nextValue,
-                          billEmergencyHour,
-                        );
-                      }}
-                    />
-                    {billEmergencyError && (
-                      <p className="err-msg">{billEmergencyError}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="lbl" style={{ fontSize: 11 }}>
-                      {t("createOrder.emergencyExpiryHour")}
-                    </label>
-                    <select
-                      className="inp"
-                      style={{ height: 38, fontSize: 13, width: "100%" }}
-                      value={billEmergencyHour}
-                      onChange={(e) => {
-                        const nextHour = normalizeEmergencyHour(e.target.value);
-                        setBillEmergencyHour(nextHour);
-                        syncEmergencyToEntries(
-                          true,
-                          billEmergencyExpiry,
-                          nextHour,
-                        );
-                      }}
-                    >
-                      {HOUR_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                  >
+                    <span className="badge bg-red" style={{ fontSize: 10 }}>
+                      {t("createOrder.priority")}
+                    </span>
+                    <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                      {t("createOrder.emergencyOrder")}
+                    </span>
                   </div>
                 </div>
+
+                <label className="order-toggle">
+                  <input
+                    type="checkbox"
+                    checked={billEmergency}
+                    onChange={(e) => {
+                      const { checked } = e.target;
+                      setBillEmergency(checked);
+                      setBillEmergencyError("");
+                      syncEmergencyToEntries(
+                        checked,
+                        billEmergencyExpiry,
+                        billEmergencyHour,
+                      );
+                    }}
+                  />
+                  <span
+                    className={`order-toggle-pill${billEmergency ? " on" : ""}`}
+                  >
+                    <LuTriangleAlert size={12} />
+                    {t("createOrder.emergencyOrder")}
+                  </span>
+                </label>
+
+                {billEmergency && (
+                  <div className="order-expiry-wrap">
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: 12,
+                      }}
+                    >
+                      <div>
+                        <label className="lbl lbl-r" style={{ fontSize: 11 }}>
+                          {t("createOrder.emergencyExpiryDate")}
+                        </label>
+                        <input
+                          type="date"
+                          className={`inp${billEmergencyError ? " err" : ""}`}
+                          style={{ height: 38, fontSize: 13, width: "100%" }}
+                          value={billEmergencyExpiry}
+                          min={new Date().toISOString().split("T")[0]}
+                          onChange={(e) => {
+                            const nextValue = e.target.value;
+                            setBillEmergencyExpiry(nextValue);
+                            setBillEmergencyError("");
+                            syncEmergencyToEntries(
+                              true,
+                              nextValue,
+                              billEmergencyHour,
+                            );
+                          }}
+                        />
+                        {billEmergencyError && (
+                          <p className="err-msg">{billEmergencyError}</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="lbl" style={{ fontSize: 11 }}>
+                          {t("createOrder.emergencyExpiryHour")}
+                        </label>
+                        <select
+                          className="inp"
+                          style={{ height: 38, fontSize: 13, width: "100%" }}
+                          value={billEmergencyHour}
+                          onChange={(e) => {
+                            const nextHour = normalizeEmergencyHour(
+                              e.target.value,
+                            );
+                            setBillEmergencyHour(nextHour);
+                            syncEmergencyToEntries(
+                              true,
+                              billEmergencyExpiry,
+                              nextHour,
+                            );
+                          }}
+                        >
+                          {HOUR_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+
+              {/* Foreign Order */}
+              <div>
+                <div
+                  className="selected-order-head"
+                  style={{ marginBottom: 10 }}
+                >
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                  >
+                    <span className="badge bg-blue" style={{ fontSize: 10 }}>
+                      {t("createOrder.shipping", { defaultValue: "SHIPPING" })}
+                    </span>
+                    <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                      {t("createOrder.sendToForeignCountry", {
+                        defaultValue: "Send to Foreign Country",
+                      })}
+                    </span>
+                  </div>
+                </div>
+
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    fontSize: 14,
+                    color: "var(--text2)",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isForeignOrder}
+                    onChange={(e) => {
+                      const { checked } = e.target;
+                      setIsForeignOrder(checked);
+                      syncForeignFlagToEntries(checked);
+                    }}
+                  />
+                  <span>
+                    {t("createOrder.sendToForeignCountry", {
+                      defaultValue: "Send to Foreign Country",
+                    })}
+                  </span>
+                </label>
+              </div>
+            </div>
           </div>
 
           <p
@@ -328,6 +407,13 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
                     {billEmergency && (
                       <span className="badge bg-red" style={{ fontSize: 10 }}>
                         {t("createOrder.emergencyShort")}
+                      </span>
+                    )}
+                    {isForeignOrder && (
+                      <span className="badge bg-blue" style={{ fontSize: 10 }}>
+                        {t("createOrder.foreignShort", {
+                          defaultValue: "FOREIGN",
+                        })}
                       </span>
                     )}
                   </div>

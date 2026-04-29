@@ -64,6 +64,7 @@ function normalizeInitial(entries, initial) {
   const normalized = {};
   entries.forEach((entry, index) => {
     const sourceEntry = source[entry.billingKey] || source[index] || {};
+
     normalized[entry.billingKey] = {
       ...DEFAULT_BILLING,
       ...sourceEntry,

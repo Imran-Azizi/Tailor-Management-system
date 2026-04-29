@@ -7,7 +7,10 @@ import {
   LuBuilding2,
   LuCalendarCheck,
   LuCalendarDays,
+  LuDownload,
   LuFilter,
+  LuFileSpreadsheet,
+  LuFileText,
   LuRefreshCcw,
   LuSearch,
   LuUser,
@@ -16,7 +19,9 @@ import {
 import api from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
-import { getMonthLabel } from "../lib/months.js";
+import { formatMonthYearLabel } from "../lib/months.js";
+import { formatSystemDate } from "../lib/locale.js";
+import { formatCurrency } from "../lib/currency.js";
 import {
   Badge,
   Card,
@@ -42,15 +47,14 @@ const BADGE_V = {
 };
 
 function formatMoney(v) {
-  return `$${Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return formatCurrency(v, "en", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
 }
 
-function formatDate(iso) {
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+function formatDate(iso, language) {
+  return formatSystemDate(iso, language);
 }
 
 function formatTransactionKind(kind, t) {
@@ -71,6 +75,7 @@ export default function AllTransactions() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
+  const [exporting, setExporting] = useState("");
 
   useEffect(() => {
     setPage(1);
@@ -118,6 +123,130 @@ export default function AllTransactions() {
     setPage(1);
   };
 
+  const exportRows = async () => {
+    const exportLimit = Math.min(Math.max(data?.total || 20, 20), 5000);
+    const response = await api.get("/transactions", {
+      params: {
+        page: 1,
+        limit: exportLimit,
+        search,
+        accountType: typeFilter,
+        month: isAdmin ? viewMonth : undefined,
+        year: isAdmin ? viewYear : undefined,
+      },
+    });
+    return Array.isArray(response.data?.data) ? response.data.data : [];
+  };
+
+  const handleExportCsv = async () => {
+    try {
+      setExporting("csv");
+      const rows = await exportRows();
+      const header = [
+        "User",
+        "Account Type",
+        "Type",
+        "Amount",
+        "Transaction Date",
+        "Note",
+        "Created By",
+        "Created At",
+      ];
+      const csv = [header.join(",")];
+      rows.forEach((row) => {
+        const values = [
+          row.user?.name || "-",
+          row.accountType || "-",
+          formatTransactionKind(row.kind, t),
+          formatMoney(row.amount),
+          formatDate(row.transactionDate, language),
+          String(row.note || "-").replaceAll('"', '""'),
+          row.createdBy?.name || "-",
+          formatDate(row.createdAt, language),
+        ];
+        csv.push(values.map((value) => `"${String(value)}"`).join(","));
+      });
+      const blob = new Blob([csv.join("\n")], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "all-transactions-report.csv";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting("");
+    }
+  };
+
+  const handleExportPdf = async () => {
+    try {
+      setExporting("pdf");
+      const rows = await exportRows();
+      const { default: jsPDF } = await import("jspdf");
+      const doc = new jsPDF({ unit: "pt", format: "a4" });
+      const width = doc.internal.pageSize.getWidth();
+      let y = 40;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.text("All Transactions Report", 40, y);
+      y += 22;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.text(
+        `Filters: search=${search || "-"}, type=${typeFilter || "ALL"}`,
+        40,
+        y,
+        { maxWidth: width - 80 },
+      );
+      y += 18;
+      doc.text(
+        `Totals: ${formatMoney(totalAmount)} (current page), records=${data?.total || 0}`,
+        40,
+        y,
+        { maxWidth: width - 80 },
+      );
+      y += 20;
+
+      rows.forEach((row, index) => {
+        if (y > 760) {
+          doc.addPage();
+          y = 40;
+        }
+        doc.setFont("helvetica", "bold");
+        doc.text(
+          `${index + 1}. ${row.user?.name || "-"} (${row.accountType || "-"})`,
+          40,
+          y,
+          { maxWidth: width - 80 },
+        );
+        y += 14;
+        doc.setFont("helvetica", "normal");
+        doc.text(
+          `${formatTransactionKind(row.kind, t)} | ${formatMoney(row.amount)} | ${formatDate(row.transactionDate, language)}`,
+          40,
+          y,
+          { maxWidth: width - 80 },
+        );
+        y += 14;
+        doc.text(
+          `Note: ${row.note || "-"} | By: ${row.createdBy?.name || "-"} | Created: ${formatDate(row.createdAt, language)}`,
+          40,
+          y,
+          { maxWidth: width - 80 },
+        );
+        y += 16;
+      });
+
+      doc.save("all-transactions-report.pdf");
+    } finally {
+      setExporting("");
+    }
+  };
+
   return (
     <div
       className="page"
@@ -130,16 +259,38 @@ export default function AllTransactions() {
           "View and search all recorded transactions",
         )}
         action={
-          <button
-            className="btn btn-outline btn-sm"
-            onClick={() => refetch()}
-            disabled={isFetching}
-          >
-            <LuRefreshCcw size={14} />
-            {isFetching
-              ? t("common.loading", "Loading...")
-              : t("common.refresh", "Refresh")}
-          </button>
+          <div className="page-hd-action">
+            <button
+              className="btn btn-outline btn-sm"
+              onClick={() => refetch()}
+              disabled={isFetching}
+            >
+              <LuRefreshCcw size={14} />
+              {isFetching
+                ? t("common.loading", "Loading...")
+                : t("common.refresh", "Refresh")}
+            </button>
+            <button
+              className="btn btn-outline btn-sm"
+              onClick={handleExportCsv}
+              disabled={exporting === "csv" || !transactions.length}
+            >
+              <LuFileSpreadsheet size={14} />
+              {exporting === "csv"
+                ? t("common.loading", "Loading...")
+                : t("common.exportCsv", "Export CSV")}
+            </button>
+            <button
+              className="btn btn-outline btn-sm"
+              onClick={handleExportPdf}
+              disabled={exporting === "pdf" || !transactions.length}
+            >
+              <LuFileText size={14} />
+              {exporting === "pdf"
+                ? t("common.loading", "Loading...")
+                : t("common.exportPdf", "Export PDF")}
+            </button>
+          </div>
         }
       />
 
@@ -163,7 +314,7 @@ export default function AllTransactions() {
           <span>
             {t("common.viewingMonth", "Viewing data for")}:{" "}
             <strong style={{ fontWeight: 700 }}>
-              {getMonthLabel(viewMonth, language)} {viewYear}
+              {formatMonthYearLabel(viewMonth, viewYear, language)}
             </strong>
           </span>
           {data?.total === 0 && !isLoading && (
@@ -177,6 +328,15 @@ export default function AllTransactions() {
       )}
 
       <Card>
+        <div style={{ marginBottom: 12 }}>
+          <span className="badge bg-gray">
+            {t("common.filters", "Filters")}: {activeFilterCount}
+          </span>
+          <span className="badge bg-gold" style={{ marginInlineStart: 8 }}>
+            {t("transaction.totalAmount", "Total Amount")}:{" "}
+            {formatMoney(totalAmount)}
+          </span>
+        </div>
         <div
           style={{
             display: "grid",
@@ -477,7 +637,7 @@ export default function AllTransactions() {
                         }}
                       >
                         <LuCalendarDays size={13} />
-                        {formatDate(tx.transactionDate)}
+                        {formatDate(tx.transactionDate, language)}
                       </div>
                     </td>
 
@@ -513,7 +673,7 @@ export default function AllTransactions() {
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {formatDate(tx.createdAt)}
+                      {formatDate(tx.createdAt, language)}
                     </td>
                   </tr>
                 ))}

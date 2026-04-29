@@ -1,7 +1,8 @@
 import { getOrderTypeLabel } from "./orderType.js";
+import { formatSystemDate } from "./locale.js";
 
 const ASSIGNMENT_REGEX =
-  /^New order assigned by (.+?): (.+?) - Bill #(\d+) \((.+?)\)(?: - Price: \$([\d,]+(?:\.\d+)?))?(?:\. Note: (.+))?\.?$/i;
+  /^New order assigned by (.+?): (.+?) - Bill #(\d+) \((.+?)\)(?: - Price: (?:\$\s*|AF\s*)?([\d,]+(?:\.\d+)?)(?:\s*AF)?)?(?:\. Note: (.+))?\.?$/i;
 const WORK_STARTED_REGEX =
   /^(.+?) started working on order for (.+?) - Bill #(\d+) \((.+?)\)\.?$/i;
 const WORK_STARTED_PIPE_REGEX =
@@ -21,7 +22,7 @@ const BOX_CAPACITY_FULL_REGEX =
 const BOX_NOT_FOUND_REGEX =
   /^No box found for (.+?) orders - (.+?) - Bill #(\d+) - (.+?)\.?$/i;
 const ADMIN_PAYMENT_REGEX =
-  /^Admin has given you ([\d.]+) on (\d{4}-\d{2}-\d{2})\.?$/i;
+  /^Admin has given you ([\d.]+)(?:\s*AF)? on (\d{4}-\d{2}-\d{2})\.?$/i;
 
 const normalizeOrderTypeFromText = (typeText) => {
   const raw = String(typeText || "")
@@ -255,10 +256,7 @@ export function formatUserNotificationMessage(
 
   if (parsed.kind === "ADMIN_PAYMENT") {
     const formattedDate = parsed.date
-      ? new Date(parsed.date).toLocaleDateString(
-          language === "dari" || language === "pashto" ? "fa" : "en-US",
-          { year: "numeric", month: "long", day: "numeric" },
-        )
+      ? formatSystemDate(parsed.date, language)
       : parsed.date;
     return t("notificationMessages.adminPayment", {
       amount: parsed.amount,

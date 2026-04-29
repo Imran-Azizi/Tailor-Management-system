@@ -16,6 +16,7 @@ router.get(
   authorize("ADMIN", "DOKAN"),
   ctrl.getPaymentHistory,
 );
+router.get("/:id", ctrl.getOne);
 router.delete("/company/:companyName", authorize("ADMIN"), ctrl.removeCompany);
 router.post("/pay-remaining", authorize("ADMIN"), ctrl.payRemaining);
 router.post("/", authorize("ADMIN"), ctrl.create);

@@ -1,4 +1,67 @@
 import { prisma } from "../lib/prisma.js";
+import { getMonthPolicy as getMonthPolicyCore } from "../lib/monthPolicy.js";
+import { getCurrentAfghanMonthYear } from "../lib/monthPolicy.js";
+
+const AFGHAN_MONTH_LABELS_EN = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+const round2 = (value) => {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.round(numeric * 100) / 100;
+};
+
+const computeRakhtBenefitRevenue = async (where) => {
+  const rows = await prisma.order.findMany({
+    where: {
+      ...where,
+      rakhtRequiredMeters: { gt: 0 },
+      rakhtPiecePrice: { gt: 0 },
+    },
+    select: {
+      rakhtRequiredMeters: true,
+      rakhtPiecePrice: true,
+      rakhtCustomerPricePerMeter: true,
+      rakhtTotalCustomerPrice: true,
+    },
+  });
+
+  let total = 0;
+  for (const row of rows) {
+    const meters = Number(row.rakhtRequiredMeters || 0);
+    const costPerMeter = Number(row.rakhtPiecePrice || 0);
+    const sellingPerMeter = Number(row.rakhtCustomerPricePerMeter || 0);
+    const sellingTotal = Number(row.rakhtTotalCustomerPrice || 0);
+
+    if (!Number.isFinite(meters) || !Number.isFinite(costPerMeter)) continue;
+
+    const totalCost = meters * costPerMeter;
+    const totalSelling =
+      sellingTotal > 0
+        ? sellingTotal
+        : sellingPerMeter > 0
+          ? sellingPerMeter * meters
+          : totalCost;
+
+    total += totalSelling - totalCost;
+  }
+
+  return round2(total);
+};
+
+export const getMonthPolicy = async () => getMonthPolicyCore({ tx: prisma });
 
 export const getDashboardStats = async ({
   month,
@@ -151,6 +214,8 @@ export const getDashboardStats = async ({
     dokhtPaidAggregate,
     legacyQichikarPaidAggregate,
     legacyDokhtPaidAggregate,
+    allOrdersBenefitAggregate,
+    totalRakhtRevenue,
   ] = await Promise.all([
     prisma.order.aggregate({
       where: {
@@ -188,6 +253,13 @@ export const getDashboardStats = async ({
       },
       _sum: { workerPaymentAmount: true },
     }),
+    prisma.order.aggregate({
+      where: {
+        ...financeWhere,
+      },
+      _sum: { totalBenefit: true },
+    }),
+    computeRakhtBenefitRevenue(financeWhere),
   ]);
 
   const monthlyRevenue = await getMonthlyRevenue(financeUserId);
@@ -222,6 +294,10 @@ export const getDashboardStats = async ({
     totalDokhtUsersMoney:
       (dokhtPaidAggregate._sum?.dokhtPaymentAmount || 0) +
       (legacyDokhtPaidAggregate._sum?.workerPaymentAmount || 0),
+    totalOrderBenefit: Number(
+      allOrdersBenefitAggregate._sum?.totalBenefit || 0,
+    ),
+    totalRakhtRevenue: Number(totalRakhtRevenue || 0),
     isFiltered: hasMonthFilter,
     filteredMonth: hasMonthFilter ? parsedMonth : null,
     filteredYear: hasMonthFilter ? parsedYear : null,
@@ -245,8 +321,15 @@ const getMonthlyRevenue = async (financeUserId) => {
       _count: true,
     });
 
+    const afghan = getCurrentAfghanMonthYear(start);
+    const afghanLabel =
+      AFGHAN_MONTH_LABELS_EN[(Number(afghan.month) || 1) - 1] ||
+      String(afghan.month);
+
     months.push({
-      month: start.toLocaleString("default", { month: "short" }),
+      month: `${afghanLabel} ${afghan.year}`,
+      monthNumber: afghan.month,
+      monthYear: afghan.year,
       revenue: result._sum.totalPrice || 0,
       paid: result._sum.paidAmount || 0,
       count: result._count,

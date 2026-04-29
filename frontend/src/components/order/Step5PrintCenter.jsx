@@ -2,10 +2,10 @@ import { LuBadgeCheck, LuPrinter, LuScissors } from "react-icons/lu";
 import { useTranslation } from "react-i18next";
 import {
   CustomerBill,
+  getOrderDisplayName,
   TailorBill,
   getBillLanguageSettings,
   getMeasurementsFromOrder,
-  getOrderTypeLabel,
   printElement,
 } from "./OrderDocumentPack.jsx";
 
@@ -139,7 +139,9 @@ export default function Step5PrintCenter({ data }) {
                 background: "var(--surface)",
               }}
             >
-              {(orders.length > 1 || order.orderName) && (
+              {(orders.length > 1 ||
+                order.orderName ||
+                Number(order.orderTypeTotal || 0) > 1) && (
                 <div
                   style={{
                     padding: "10px 18px",
@@ -151,17 +153,8 @@ export default function Step5PrintCenter({ data }) {
                   }}
                 >
                   <span className="badge bg-gold" style={{ fontSize: 11 }}>
-                    {getOrderTypeLabel(order.type, currentLanguage)}
+                    {getOrderDisplayName(order, currentLanguage)}
                   </span>
-                  {order.orderName ? (
-                    <span style={{ fontSize: 13, fontWeight: 600 }}>
-                      {order.orderName}
-                    </span>
-                  ) : (
-                    <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                      {t("createOrder.orderLabel", { number: index + 1 })}
-                    </span>
-                  )}
                 </div>
               )}
 
@@ -206,7 +199,9 @@ export default function Step5PrintCenter({ data }) {
                     <LuPrinter size={20} />
                   </div>
                   <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.2 }}>
+                    <div
+                      style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.2 }}
+                    >
                       {t("createOrder.printBill")}
                     </div>
                     <div style={{ fontSize: 12, opacity: 0.82, marginTop: 2 }}>
@@ -256,7 +251,9 @@ export default function Step5PrintCenter({ data }) {
                     <LuScissors size={20} />
                   </div>
                   <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.2 }}>
+                    <div
+                      style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.2 }}
+                    >
                       {t("createOrder.printBill")}
                     </div>
                     <div style={{ fontSize: 12, opacity: 0.82, marginTop: 2 }}>

@@ -6,7 +6,7 @@ function normalizeLanguage(language) {
 }
 
 export function getCurrencyToken(language) {
-  return normalizeLanguage(language) === "en" ? "$" : "AF";
+  return "AF";
 }
 
 export function formatCurrency(
@@ -16,12 +16,11 @@ export function formatCurrency(
 ) {
   const amount = Number(value || 0);
   const safeAmount = Number.isFinite(amount) ? amount : 0;
-  const rounded = Math.round(safeAmount);
   const number = new Intl.NumberFormat("en-US", {
     minimumFractionDigits,
     maximumFractionDigits,
-  }).format(rounded);
+  }).format(safeAmount);
   const token = getCurrencyToken(language);
 
-  return token === "$" ? `${token}${number}` : `${number} ${token}`;
+  return `${number} ${token}`;
 }

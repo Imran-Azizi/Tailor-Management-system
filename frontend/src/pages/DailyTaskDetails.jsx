@@ -12,13 +12,13 @@ import {
   LuClipboardList,
   LuTrash2,
   LuArrowUpRight,
-  LuShield,
-  LuClock,
 } from "react-icons/lu";
 import { useAuth } from "../context/AuthContext.jsx";
 import api from "../lib/api.js";
 import { isDailyTaskEditable } from "../lib/dailyTasks.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
+import { formatSystemDate, formatSystemDateTime } from "../lib/locale.js";
+import { formatCurrency } from "../lib/currency.js";
 import {
   ConfirmDeleteModal,
   PageHeader,
@@ -28,28 +28,18 @@ import { useState } from "react";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function formatMoney(v) {
-  return `$${Number(v || 0).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
+  return formatCurrency(v, "en", {
+    minimumFractionDigits: 0,
     maximumFractionDigits: 2,
-  })}`;
-}
-
-function formatDateTime(iso) {
-  return new Date(iso).toLocaleString(undefined, {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
   });
 }
 
-function formatDateShort(iso) {
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+function formatDateTime(iso, language) {
+  return formatSystemDateTime(iso, language);
+}
+
+function formatDateShort(iso, language) {
+  return formatSystemDate(iso, language);
 }
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
@@ -201,7 +191,8 @@ function SectionCard({
 export default function DailyTaskDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language || "en";
   const { isAdmin } = useAuth();
   const qc = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -440,7 +431,7 @@ export default function DailyTaskDetails() {
               style={{ color: "rgba(255,255,255,.5)" }}
             />
             <span style={{ fontSize: 12.5, color: "rgba(255,255,255,.6)" }}>
-              {formatDateTime(task.taskDate)}
+              {formatDateTime(task.taskDate, language)}
             </span>
           </div>
           {task.note && (
@@ -499,12 +490,12 @@ export default function DailyTaskDetails() {
           <DetailField
             Icon={LuCalendarDays}
             label={t("dailyTasks.taskDate")}
-            value={formatDateTime(task.taskDate)}
+            value={formatDateTime(task.taskDate, language)}
             accent="#D97706"
           />
         </SectionCard>
 
-        {/* Note + Meta */}
+        {/* Note */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <SectionCard
             title={t("dailyTasks.note")}
@@ -513,37 +504,20 @@ export default function DailyTaskDetails() {
           >
             <div
               style={{
-                padding: "14px 0 10px",
-                fontSize: 14,
+                padding: "16px 0 14px",
+                fontSize: 15,
                 color: task.note ? "var(--text1)" : "var(--text3)",
-                lineHeight: 1.75,
-                minHeight: 56,
+                lineHeight: 1.9,
+                minHeight: 180,
                 whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                overflowWrap: "anywhere",
               }}
             >
               {task.note || (
                 <span style={{ opacity: 0.5 }}>{t("dailyTasks.noNote")}</span>
               )}
             </div>
-          </SectionCard>
-
-          <SectionCard
-            title={t("dailyTasks.meta")}
-            icon={LuShield}
-            accent="#6B7280"
-          >
-            <DetailField
-              Icon={LuUser}
-              label={t("dailyTasks.createdBy")}
-              value={task.createdBy?.name || "—"}
-              accent="#2563EB"
-            />
-            <DetailField
-              Icon={LuClock}
-              label={t("dailyTasks.createdAt")}
-              value={formatDateTime(task.createdAt)}
-              accent="#6B7280"
-            />
           </SectionCard>
         </div>
       </div>

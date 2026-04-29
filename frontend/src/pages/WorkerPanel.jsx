@@ -19,9 +19,10 @@ import {
 import api from "../lib/api.js";
 import { parseNumberLocale } from "../lib/normalize.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
-import { getOrderTypeLabel } from "../lib/orderType.js";
+import { getOrderDisplayName } from "../lib/orderType.js";
 import { formatUserNotificationMessage } from "../lib/notifications.js";
-import { formatDateTimeLocale } from "../lib/locale.js";
+import { formatDateTimeLocale, formatSystemDate } from "../lib/locale.js";
+import { formatCurrency } from "../lib/currency.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { NotificationText } from "../components/ui/index.jsx";
 
@@ -175,9 +176,9 @@ function statusLabel(status, t) {
   return t("workerPanel.statusAssigned", "Assigned");
 }
 
-function fmtDate(value) {
+function fmtDate(value, language) {
   if (!value) return "-";
-  return new Date(value).toLocaleDateString();
+  return formatSystemDate(value, language);
 }
 
 function getRolePaymentState(order, accountType) {
@@ -415,7 +416,7 @@ function OrderDetailsModal({ order, language, t, onClose }) {
               style={{ margin: "6px 0 0", fontSize: 13, color: "var(--text3)" }}
             >
               #{order.customer?.billNumber || "-"} -{" "}
-              {getOrderTypeLabel(order.type, language)}
+              {getOrderDisplayName(order, language)}
             </p>
           </div>
           <button className="btn btn-outline btn-sm" onClick={onClose}>
@@ -440,7 +441,7 @@ function OrderDetailsModal({ order, language, t, onClose }) {
                     ${priceValue.toLocaleString()}
                   </td>
                   <td style={{ ...tdStyle, borderBottom: "none" }}>
-                    {fmtDate(payment.paidAt || order.updatedAt)}
+                    {fmtDate(payment.paidAt || order.updatedAt, language)}
                   </td>
                 </tr>
               </tbody>
@@ -1107,7 +1108,7 @@ export default function WorkerPanel() {
           </div>
           <div>
             <b>{t("workerPanel.orderType", "Order Type")}:</b>{" "}
-            {getOrderTypeLabel(order.type, language)}
+            {getOrderDisplayName(order, language)}
           </div>
           <div>
             <b>{t("common.customer", "Customer")}:</b>{" "}
@@ -1165,7 +1166,7 @@ export default function WorkerPanel() {
               flexShrink: 0,
             }}
           >
-            {getOrderTypeLabel(order.type, language)}
+            {getOrderDisplayName(order, language)}
           </span>
           {order.orderName && (
             <div
@@ -1222,14 +1223,14 @@ export default function WorkerPanel() {
         {receivedByCurrentUser && roleState.receivedAt ? (
           <div style={{ fontSize: 12, color: "var(--text3)" }}>
             {t("workerPanel.receivedOn", "Received on")}:{" "}
-            {fmtDate(roleState.receivedAt)}
+            {fmtDate(roleState.receivedAt, language)}
           </div>
         ) : (
           order.assignedBy && (
             <div style={{ fontSize: 12, color: "var(--text3)" }}>
               {t("workerPanel.assignedBy", "Assigned by")}:{" "}
               {order.assignedBy.name} {t("workerPanel.on", "on")}{" "}
-              {fmtDate(order.assignedAt)}
+              {fmtDate(order.assignedAt, language)}
             </div>
           )
         )}
@@ -1243,9 +1244,9 @@ export default function WorkerPanel() {
             }}
           >
             {paidToWorker
-              ? `$${Number(payment.amount || 0).toLocaleString()}`
+              ? formatCurrency(payment.amount || 0, "en")
               : order.assignmentPrice != null
-                ? `$${Number(order.assignmentPrice).toLocaleString()}`
+                ? formatCurrency(order.assignmentPrice, "en")
                 : "-"}
           </span>
           {!paidToWorker && order.assignmentPrice != null && (
@@ -1370,7 +1371,7 @@ export default function WorkerPanel() {
           </div>
           <div style={{ fontSize: 12, color: "var(--text2)" }}>
             {t("workerPanel.orderType", "Order Type")}:{" "}
-            {getOrderTypeLabel(order.type, language)}
+            {getOrderDisplayName(order, language)}
           </div>
           {(order?.rakhtBrandName || order?.rakhtColor) && (
             <div className="order-mobile-rakht">
@@ -1708,7 +1709,7 @@ export default function WorkerPanel() {
                         {order.customer?.billNumber || "-"}
                       </div>
                       <div style={{ fontSize: 12, color: "var(--text3)" }}>
-                        {getOrderTypeLabel(order.type, language)}
+                        {getOrderDisplayName(order, language)}
                       </div>
                       {order.assignmentPrice != null && (
                         <div
@@ -1719,7 +1720,7 @@ export default function WorkerPanel() {
                             marginTop: 2,
                           }}
                         >
-                          ${Number(order.assignmentPrice).toLocaleString()}
+                          {formatCurrency(order.assignmentPrice, "en")}
                         </div>
                       )}
                     </div>

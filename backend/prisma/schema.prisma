@@ -101,27 +101,31 @@ model Customer {
 }
 
 model Order {
-  id                  String    @id @default(uuid())
-  customerId          String
-  orderName           String?
-  type                OrderType
-  rakhtId             String?
-  rakhtTonId          String?
-  rakhtCompanyName    String?
-  rakhtBrandName      String?
-  rakhtColor          String?
-  rakhtColorHex       String?
-  rakhtRequiredMeters Float?
-  rakhtPiecePrice     Float?
-  totalPrice          Float
-  discount            Float     @default(0)
-  paidAmount          Float
-  remaining           Float
-  quantity            Int       @default(1)
-  isEmergency         Boolean   @default(false)
-  emergencyExpiry     DateTime?
-  isCompleted         Boolean   @default(false)
-  inProgress          Boolean   @default(false)
+  id                         String    @id @default(uuid())
+  customerId                 String
+  orderName                  String?
+  type                       OrderType
+  rakhtId                    String?
+  rakhtTonId                 String?
+  rakhtCompanyName           String?
+  rakhtBrandName             String?
+  rakhtColor                 String?
+  rakhtColorHex              String?
+  rakhtRequiredMeters        Float?
+  rakhtPiecePrice            Float?
+  rakhtCustomerPricePerMeter Float?
+  rakhtTotalCustomerPrice    Float?
+  totalPrice                 Float
+  totalBenefit               Float     @default(0)
+  discount                   Float     @default(0)
+  paidAmount                 Float
+  remaining                  Float
+  quantity                   Int       @default(1)
+  isEmergency                Boolean   @default(false)
+  emergencyExpiry            DateTime?
+  isForeignOrder             Boolean   @default(false)
+  isCompleted                Boolean   @default(false)
+  inProgress                 Boolean   @default(false)
 
   // Entry month/year — set by admin at order creation time
   entryMonth Int?
@@ -194,13 +198,16 @@ model Order {
   rakht         Rakht?         @relation(fields: [rakhtId], references: [id], onDelete: SetNull)
   rakhtTon      RakhtTon?      @relation(fields: [rakhtTonId], references: [id], onDelete: SetNull)
   boxId         Int?
-  box           Box?           @relation(fields: [boxId], references: [id])
+  box           Box?           @relation("OrderToBox", fields: [boxId], references: [id])
+  foreignBoxId  Int?
+  foreignBox    Box?           @relation("ForeignOrderToBox", fields: [foreignBoxId], references: [id])
   outfit        Outfit?
   waskat        Waskat?
   korty         Korty?
   yakhanQaq     YakhanQaq?
   notifications Notification[]
   transactions  Transaction[]
+  dailyTasks    DailyTask[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
@@ -210,6 +217,7 @@ model Order {
   @@index([rakhtTonId])
   @@index([isCompleted])
   @@index([isEmergency])
+  @@index([isForeignOrder])
   @@index([assignedToId])
   @@index([receivedById])
   @@index([qichikarAssignedToId])
@@ -305,6 +313,14 @@ enum OrderType {
   WASKAT
   KORTY
   YAKHANQAQ
+}
+
+enum BoxType {
+  OUTFIT
+  WASKAT
+  KORTY
+  YAKHANQAQ
+  FOREIGN_COUNTRY
 }
 
 model Outfit {
@@ -417,13 +433,14 @@ model Notification {
 }
 
 model Box {
-  id        Int       @id @default(autoincrement())
-  boxName   String
-  boxType   OrderType
-  capacity  Int
-  orders    Order[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id            Int      @id @default(autoincrement())
+  boxName       String
+  boxType       BoxType
+  capacity      Int
+  orders        Order[]  @relation("OrderToBox")
+  foreignOrders Order[]  @relation("ForeignOrderToBox")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model Yakhan {
@@ -518,6 +535,8 @@ model DailyTask {
   recipientName String
   amount        Float
   taskDate      DateTime
+  orderId       String?
+  order         Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
   note          String?
   createdById   String
   createdBy     User     @relation("CreatedDailyTasks", fields: [createdById], references: [id])
@@ -526,26 +545,27 @@ model DailyTask {
 
   @@index([createdById])
   @@index([taskDate])
+  @@index([orderId])
 }
 
 // ─── Transactions ─────────────────────────────────────────────────────────────
 
 model Transaction {
-  id              String          @id @default(uuid())
+  id              String            @id @default(uuid())
   accountType     AccountType
   userId          String
-  user            User            @relation("UserTransactions", fields: [userId], references: [id])
+  user            User              @relation("UserTransactions", fields: [userId], references: [id])
   orderId         String?
-  order           Order?          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  kind            TransactionKind @default(LOAN)
+  order           Order?            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  kind            TransactionKind   @default(LOAN)
   source          TransactionSource @default(MANUAL)
   amount          Float
   transactionDate DateTime
   note            String?
   createdById     String
-  createdBy       User            @relation("CreatedTransactions", fields: [createdById], references: [id])
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  createdBy       User              @relation("CreatedTransactions", fields: [createdById], references: [id])
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   @@index([userId])
   @@index([orderId])

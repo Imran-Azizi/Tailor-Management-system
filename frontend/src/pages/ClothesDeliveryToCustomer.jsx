@@ -6,7 +6,7 @@ import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { parseNumberLocale } from "../lib/normalize.js";
 import { formatCurrency } from "../lib/currency.js";
-import { getOrderTypeLabel } from "../lib/orderType.js";
+import { getOrderDisplayName } from "../lib/orderType.js";
 import {
   Card,
   EmptyState,
@@ -415,7 +415,7 @@ export default function ClothesDeliveryToCustomer() {
                               isRtl ? "text-right" : "text-left"
                             }`}
                           >
-                            {getOrderTypeLabel(o.type, language)}
+                            {getOrderDisplayName(o, language)}
                           </td>
                           <td className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-900 [direction:ltr] [unicode-bidi:embed]">
                             {formatMoney(o.totalPrice, language)}

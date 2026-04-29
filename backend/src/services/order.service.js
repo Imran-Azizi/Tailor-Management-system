@@ -5,6 +5,11 @@ import {
   normalizePhone,
 } from "../lib/normalize.js";
 import { createCustomerWithSequentialBill } from "../lib/billNumber.js";
+import {
+  getMonthPolicy,
+  assertMonthWritable,
+  isMonthSelectable,
+} from "../lib/monthPolicy.js";
 
 const NUMERIC_MEASUREMENT_FIELDS = new Set([
   "height",
@@ -124,6 +129,148 @@ export const enrichOrderAssignment = (order) => {
   };
 };
 
+const ORDER_TYPE_LABELS_EN = {
+  OUTFIT: "Outfit",
+  WASKAT: "Waskat",
+  KORTY: "Korty",
+  YAKHANQAQ: "YakhanQaq",
+};
+
+const getOrderTypeLabelEn = (type) => ORDER_TYPE_LABELS_EN[type] || type || "-";
+
+const normalizeNameForCompare = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+
+const escapeRegex = (value) =>
+  String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const stripRepeatedBasePrefix = (customName, baseLabel) => {
+  const escapedBase = escapeRegex(baseLabel);
+  const matcher = new RegExp(`^${escapedBase}(?:\\s*[-:|]\\s*|\\s+)(.+)$`, "i");
+  const match = String(customName || "").match(matcher);
+  return match?.[1]?.trim() || "";
+};
+
+const buildOrderDisplayName = ({
+  type,
+  orderName,
+  sequence = 1,
+  total = 1,
+}) => {
+  const normalizedSequence =
+    Number.isFinite(Number(sequence)) && Number(sequence) > 0
+      ? Number(sequence)
+      : 1;
+  const normalizedTotal =
+    Number.isFinite(Number(total)) && Number(total) > 0 ? Number(total) : 1;
+
+  const typeLabel = getOrderTypeLabelEn(type);
+  const baseLabel =
+    normalizedTotal > 1 ? `${typeLabel} ${normalizedSequence}` : typeLabel;
+  const customName =
+    typeof orderName === "string" ? normalizeText(orderName) || "" : "";
+
+  if (!customName) return baseLabel;
+
+  const normalizedBase = normalizeNameForCompare(baseLabel);
+  const normalizedCustom = normalizeNameForCompare(customName);
+  if (!normalizedCustom || normalizedCustom === normalizedBase) {
+    return baseLabel;
+  }
+
+  const strippedCustom = stripRepeatedBasePrefix(customName, baseLabel);
+  if (strippedCustom) {
+    const normalizedStripped = normalizeNameForCompare(strippedCustom);
+    if (normalizedStripped && normalizedStripped !== normalizedBase) {
+      return `${baseLabel} - ${strippedCustom}`;
+    }
+    return baseLabel;
+  }
+
+  if (normalizedCustom === normalizeNameForCompare(typeLabel)) {
+    return baseLabel;
+  }
+
+  return `${baseLabel} - ${customName}`;
+};
+
+const withOrderDisplayMeta = (order, { sequence = 1, total = 1 } = {}) => {
+  if (!order || typeof order !== "object") return order;
+  return {
+    ...order,
+    orderTypeSequence: sequence,
+    orderTypeTotal: total,
+    orderDisplayName: buildOrderDisplayName({
+      type: order.type,
+      orderName: order.orderName,
+      sequence,
+      total,
+    }),
+  };
+};
+
+const enrichOrdersWithDisplayMeta = async (orders = [], tx = prisma) => {
+  if (!Array.isArray(orders) || !orders.length) return orders;
+
+  const customerIds = Array.from(
+    new Set(
+      orders
+        .map((order) => order?.customerId)
+        .filter((customerId) => typeof customerId === "string" && customerId),
+    ),
+  );
+
+  if (!customerIds.length) {
+    return orders.map((order) => withOrderDisplayMeta(order));
+  }
+
+  const siblingOrders = await tx.order.findMany({
+    where: { customerId: { in: customerIds } },
+    select: {
+      id: true,
+      customerId: true,
+      type: true,
+    },
+    orderBy: [
+      { customerId: "asc" },
+      { type: "asc" },
+      { createdAt: "asc" },
+      { id: "asc" },
+    ],
+  });
+
+  const totalsByKey = new Map();
+  for (const sibling of siblingOrders) {
+    const key = `${sibling.customerId}:${sibling.type}`;
+    totalsByKey.set(key, (totalsByKey.get(key) || 0) + 1);
+  }
+
+  const sequenceByKey = new Map();
+  const metaByOrderId = new Map();
+  for (const sibling of siblingOrders) {
+    const key = `${sibling.customerId}:${sibling.type}`;
+    const nextSequence = (sequenceByKey.get(key) || 0) + 1;
+    sequenceByKey.set(key, nextSequence);
+    metaByOrderId.set(sibling.id, {
+      sequence: nextSequence,
+      total: totalsByKey.get(key) || 1,
+    });
+  }
+
+  return orders.map((order) =>
+    withOrderDisplayMeta(order, metaByOrderId.get(order?.id) || {}),
+  );
+};
+
+const enrichOrderWithDisplayMeta = async (order, tx = prisma) => {
+  if (!order) return order;
+  const [enriched] = await enrichOrdersWithDisplayMeta([order], tx);
+  return enriched;
+};
+
 const enrichOrderListAssignment = (orders = []) =>
   orders.map((order) => enrichOrderAssignment(order));
 
@@ -225,6 +372,7 @@ const findExistingCustomerByPhone = async (tx, phoneNumber) => {
 const ORDER_LIST_INCLUDE_BASE = {
   customer: true,
   box: true,
+  foreignBox: true,
   outfit: true,
   waskat: true,
   korty: true,
@@ -242,6 +390,7 @@ const ORDER_LIST_INCLUDE_BASE = {
 const ORDER_DETAIL_INCLUDE_BASE = {
   customer: true,
   box: true,
+  foreignBox: true,
   outfit: true,
   waskat: true,
   korty: true,
@@ -254,6 +403,210 @@ const ORDER_DETAIL_INCLUDE_BASE = {
   workerPaidBy: { select: { id: true, name: true } },
   qichikarPaidBy: { select: { id: true, name: true } },
   dokhtPaidBy: { select: { id: true, name: true } },
+};
+
+const ORDER_BENEFIT_INCLUDE_BASE = {
+  assignedTo: { select: { id: true, name: true, accountType: true } },
+  qichikarAssignedTo: { select: { id: true, name: true, accountType: true } },
+  dokhtAssignedTo: { select: { id: true, name: true, accountType: true } },
+};
+
+const toMoney = (value) => {
+  const amount = Number(value || 0);
+  if (!Number.isFinite(amount)) return 0;
+  return Math.round(amount * 100) / 100;
+};
+
+const toPositiveMoney = (value) => {
+  const amount = toMoney(value);
+  return amount > 0 ? amount : 0;
+};
+
+const EMERGENCY_ALERT_INTERVAL_MS = 12 * 60 * 60 * 1000;
+
+const buildEmergencyAlertMessage = ({
+  orderType,
+  customerName,
+  customerPhone,
+  billNumber,
+  createdAt,
+  statusLabel = "EMERGENCY",
+  intro = "Emergency order created. Please prioritize and complete this order first.",
+}) =>
+  [
+    "🚨 Emergency Alert",
+    intro,
+    `Bill #: ${billNumber || "-"}`,
+    `Customer: ${customerName || "-"}`,
+    `Phone: ${customerPhone || "-"}`,
+    `Order Type: ${orderType || "-"}`,
+    `Status: ${statusLabel}`,
+    `Created: ${new Date(createdAt || Date.now()).toISOString()}`,
+  ].join("\n");
+
+const buildExpenseRow = ({
+  key,
+  label,
+  amount,
+  userId = null,
+  userName = "-",
+  userRole = "-",
+  orderType = null,
+  source = "Order",
+  paidAt = null,
+}) => ({
+  key,
+  label,
+  amount: toPositiveMoney(amount),
+  userId,
+  userName,
+  userRole,
+  orderType,
+  source,
+  paidAt,
+});
+
+const buildOrderBenefitDetails = ({ order, linkedDailyExpenses = [] }) => {
+  const rows = [];
+
+  const purchaseTotal = toMoney(
+    Number(order?.rakhtPiecePrice || 0) *
+      Number(order?.rakhtRequiredMeters || 0),
+  );
+  const qichikarAmount = toPositiveMoney(order?.qichikarPaymentAmount);
+  const dokhtAmount = toPositiveMoney(order?.dokhtPaymentAmount);
+  const workerAmount = toPositiveMoney(order?.workerPaymentAmount);
+
+  if (purchaseTotal > 0) {
+    rows.push(
+      buildExpenseRow({
+        key: "purchase-total",
+        label: "Total Price (Purchase)",
+        amount: purchaseTotal,
+        userName: order?.rakhtBrandName || order?.rakhtCompanyName || "Rakht",
+        userRole: "RAKHT",
+        orderType: order?.type || null,
+        source: "Order",
+      }),
+    );
+  }
+
+  if (qichikarAmount > 0) {
+    rows.push(
+      buildExpenseRow({
+        key: "qichikar",
+        label: "Rakht users payment",
+        amount: qichikarAmount,
+        userId: order?.qichikarAssignedTo?.id || null,
+        userName: order?.qichikarAssignedTo?.name || "-",
+        userRole: "QICHIKAR",
+        orderType: order?.type || null,
+        source: "Order",
+        paidAt: order?.qichikarPaidAt || order?.qichikarAssignedAt || null,
+      }),
+    );
+  }
+
+  if (dokhtAmount > 0) {
+    rows.push(
+      buildExpenseRow({
+        key: "dokht",
+        label: "Dokht users payment",
+        amount: dokhtAmount,
+        userId: order?.dokhtAssignedTo?.id || null,
+        userName: order?.dokhtAssignedTo?.name || "-",
+        userRole: "DOKHT",
+        orderType: order?.type || null,
+        source: "Order",
+        paidAt: order?.dokhtPaidAt || order?.dokhtAssignedAt || null,
+      }),
+    );
+  }
+
+  // Legacy fallback for orders that only have workerPaymentAmount populated.
+  if (qichikarAmount <= 0 && dokhtAmount <= 0 && workerAmount > 0) {
+    rows.push(
+      buildExpenseRow({
+        key: "worker",
+        label: "Worker payment",
+        amount: workerAmount,
+        userId: order?.assignedTo?.id || null,
+        userName: order?.assignedTo?.name || "-",
+        userRole: order?.assignedTo?.accountType || "WORKER",
+        orderType: order?.type || null,
+        source: "Order",
+        paidAt: order?.workerPaidAt || null,
+      }),
+    );
+  }
+
+  for (const expense of linkedDailyExpenses) {
+    const amount = toPositiveMoney(expense?.amount);
+    if (amount <= 0) {
+      continue;
+    }
+    rows.push(
+      buildExpenseRow({
+        key: `daily-expense:${expense.id}`,
+        label: "Daily Expense (For Rakht)",
+        amount,
+        userName: expense?.recipientName || "-",
+        userRole: expense?.createdBy?.accountType || "DAILY_EXPENSE",
+        orderType: order?.type || null,
+        source: "DailyTask",
+        paidAt: expense?.taskDate || null,
+      }),
+    );
+  }
+
+  const totalExpenses = toMoney(
+    rows.reduce((sum, entry) => sum + toPositiveMoney(entry.amount), 0),
+  );
+  const totalOrderPrice = toMoney(order?.totalPrice || 0);
+  const totalBenefit = toMoney(totalOrderPrice - totalExpenses);
+
+  return {
+    orderId: order?.id,
+    totalOrderPrice,
+    totalExpenses,
+    totalBenefit,
+    expenses: rows,
+  };
+};
+
+export const getOrderBenefitDetails = async (orderId, tx = prisma) => {
+  const order = await tx.order.findUnique({
+    where: { id: orderId },
+    include: ORDER_BENEFIT_INCLUDE_BASE,
+  });
+  if (!order) return null;
+
+  const linkedDailyExpenses = await tx.dailyTask.findMany({
+    where: { orderId },
+    orderBy: [{ taskDate: "desc" }, { createdAt: "desc" }],
+    include: {
+      createdBy: { select: { id: true, name: true } },
+    },
+  });
+
+  const details = buildOrderBenefitDetails({ order, linkedDailyExpenses });
+
+  return {
+    ...details,
+    dailyExpenses: linkedDailyExpenses,
+  };
+};
+
+export const recalculateOrderBenefit = async (orderId, tx = prisma) => {
+  const details = await getOrderBenefitDetails(orderId, tx);
+  if (!details) return null;
+
+  await tx.order.update({
+    where: { id: orderId },
+    data: { totalBenefit: details.totalBenefit },
+  });
+
+  return details;
 };
 
 const getRolePaymentSnapshot = (order, role) => {
@@ -567,8 +920,12 @@ export const getAllOrders = async ({
     prisma.order.count({ where }),
   ]);
 
+  const enrichedData = await enrichOrdersWithDisplayMeta(
+    enrichOrderListAssignment(data),
+  );
+
   return {
-    data: enrichOrderListAssignment(data),
+    data: enrichedData,
     total,
     page: Number(page),
     limit: Number(limit),
@@ -600,7 +957,7 @@ export const getMonthlyReportOrders = async ({ month, year }) => {
     orderBy: [{ customer: { billNumber: "asc" } }, { createdAt: "asc" }],
   });
 
-  return orders;
+  return enrichOrdersWithDisplayMeta(orders);
 };
 
 export const lookupOrdersByBillOrPhone = async ({
@@ -676,7 +1033,12 @@ export const lookupOrdersByBillOrPhone = async ({
 
   if (!orders.length) return null;
 
-  return { customer, orders: enrichOrderListAssignment(orders) };
+  return {
+    customer,
+    orders: await enrichOrdersWithDisplayMeta(
+      enrichOrderListAssignment(orders),
+    ),
+  };
 };
 
 export const getOrderById = async (id) => {
@@ -684,7 +1046,7 @@ export const getOrderById = async (id) => {
     where: { id },
     includeBase: ORDER_DETAIL_INCLUDE_BASE,
   });
-  return enrichOrderAssignment(order);
+  return enrichOrderWithDisplayMeta(enrichOrderAssignment(order));
 };
 
 export const getCompletedOrdersFromWorkers = async ({
@@ -778,7 +1140,9 @@ export const getCompletedOrdersFromWorkers = async ({
     ORDER_LIST_INCLUDE_BASE,
   );
 
-  const normalizedData = enrichOrderListAssignment(data)
+  const normalizedData = (
+    await enrichOrdersWithDisplayMeta(enrichOrderListAssignment(data))
+  )
     .flatMap((order) => buildCompletedWorkerPaymentRows(order))
     .filter((row) => {
       if (
@@ -883,7 +1247,12 @@ export const getOrderBillByOrderId = async (id) => {
     ORDER_DETAIL_INCLUDE_BASE,
   );
 
-  return { customer, orders: enrichOrderListAssignment(orders) };
+  return {
+    customer,
+    orders: await enrichOrdersWithDisplayMeta(
+      enrichOrderListAssignment(orders),
+    ),
+  };
 };
 
 const buildOrderUpdateData = (existingOrder, body) => {
@@ -1040,6 +1409,7 @@ const notifyAdminsToCreateBox = async (
 const reserveRakhtStock = async (tx, selection) => {
   const requiredMeters = Number(selection?.requiredMeters || 0);
   const piecePrice = Number(selection?.piecePrice || 0);
+  const priceForCustomer = Number(selection?.priceForCustomer || 0);
 
   if (!selection?.rakhtId) {
     throw Object.assign(new Error("Rakht selection is required"), {
@@ -1066,6 +1436,13 @@ const reserveRakhtStock = async (tx, selection) => {
     throw Object.assign(new Error("Piece price must be a positive number"), {
       status: 400,
     });
+  }
+
+  if (!Number.isFinite(priceForCustomer) || priceForCustomer <= 0) {
+    throw Object.assign(
+      new Error("Price for customer must be a positive number"),
+      { status: 400 },
+    );
   }
 
   const rakht = await tx.rakht.findUnique({ where: { id: selection.rakhtId } });
@@ -1123,6 +1500,8 @@ const reserveRakhtStock = async (tx, selection) => {
     rakhtColorHex: ton.colorHex,
     rakhtRequiredMeters: requiredMeters,
     rakhtPiecePrice: piecePrice,
+    rakhtCustomerPricePerMeter: priceForCustomer,
+    rakhtTotalCustomerPrice: Math.round(priceForCustomer * requiredMeters),
   };
 };
 
@@ -1135,6 +1514,36 @@ export const createOrder = async ({
   createdByFinanceId,
 }) => {
   return prisma.$transaction(async (tx) => {
+    const monthPolicy = await getMonthPolicy({ tx });
+
+    const resolvedEntryMonth = Number(monthPolicy.currentMonth);
+    const resolvedEntryYear = Number(monthPolicy.currentYear);
+
+    const requestedEntryMonth =
+      entryMonth != null && Number.isFinite(Number(entryMonth))
+        ? Number(entryMonth)
+        : resolvedEntryMonth;
+    const requestedEntryYear =
+      entryYear != null && Number.isFinite(Number(entryYear))
+        ? Number(entryYear)
+        : resolvedEntryYear;
+
+    if (
+      requestedEntryMonth !== resolvedEntryMonth ||
+      requestedEntryYear !== resolvedEntryYear
+    ) {
+      throw Object.assign(
+        new Error("New entries are allowed only in the current month."),
+        { status: 403, code: "MONTH_ENTRY_MUST_BE_CURRENT" },
+      );
+    }
+
+    assertMonthWritable({
+      month: resolvedEntryMonth,
+      year: resolvedEntryYear,
+      policy: monthPolicy,
+    });
+
     let customer;
 
     if (customerInfo.customerId) {
@@ -1207,6 +1616,7 @@ export const createOrder = async ({
         paidAmount,
         isEmergency = false,
         emergencyExpiry,
+        isForeignOrder = false,
         quantity = 1,
         measurements,
       } = item;
@@ -1237,8 +1647,41 @@ export const createOrder = async ({
         );
       }
 
+      // Assign exactly one box destination: either regular type box or foreign box.
+      let boxId = null;
+      let foreignBoxId = null;
+      let autoBox = null;
+      if (isForeignOrder) {
+        const foreignBox = await tx.box.findFirst({
+          where: { boxType: "FOREIGN_COUNTRY" },
+          include: { _count: { select: { foreignOrders: true } } },
+          orderBy: { createdAt: "asc" },
+        });
+        if (!foreignBox) {
+          throw Object.assign(
+            new Error(
+              "No Foreign Country box exists. Please create one before assigning foreign orders.",
+            ),
+            { status: 400 },
+          );
+        }
+
+        if ((foreignBox._count?.foreignOrders || 0) >= foreignBox.capacity) {
+          throw Object.assign(
+            new Error(
+              "Foreign Country box is full. Please create a new one or increase capacity.",
+            ),
+            { status: 400, code: "BOX_CAPACITY_FULL", boxId: foreignBox.id },
+          );
+        }
+
+        foreignBoxId = foreignBox.id;
+      } else {
+        autoBox = await resolveAutoBoxForNewOrder(tx, type);
+        boxId = autoBox.boxId;
+      }
+
       const remaining = totalPrice - discount - paidAmount;
-      const autoBox = await resolveAutoBoxForNewOrder(tx, type);
 
       const order = await tx.order.create({
         data: {
@@ -1252,18 +1695,18 @@ export const createOrder = async ({
           remaining,
           isEmergency,
           emergencyExpiry: emergencyExpiry ? new Date(emergencyExpiry) : null,
+          isForeignOrder,
           quantity,
-          boxId: autoBox.boxId,
-          // Auto-fill entryMonth/entryYear from current date if not explicitly provided
-          // This ensures all orders are visible when filtering by month
-          entryMonth: entryMonth
-            ? Number(entryMonth)
-            : new Date().getMonth() + 1,
-          entryYear: entryYear ? Number(entryYear) : new Date().getFullYear(),
+          boxId,
+          foreignBoxId,
+          entryMonth: resolvedEntryMonth,
+          entryYear: resolvedEntryYear,
           createdByFinanceId: createdByFinanceId || null,
         },
-        include: { box: true },
+        include: { box: true, foreignBox: true },
       });
+
+      await recalculateOrderBenefit(order.id, tx);
 
       if (type === "OUTFIT") {
         await tx.outfit.create({
@@ -1288,14 +1731,32 @@ export const createOrder = async ({
         await tx.notification.create({
           data: {
             orderId: order.id,
-            message: `🚨 Emergency ${type} order for ${customer.firstName} (Bill #${customer.billNumber})`,
-            nextAlert: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            message: buildEmergencyAlertMessage({
+              orderType: type,
+              customerName: customer.firstName,
+              customerPhone: customer.phoneNumber,
+              billNumber: customer.billNumber,
+              createdAt: order.createdAt,
+            }),
+            nextAlert: new Date(Date.now() + EMERGENCY_ALERT_INTERVAL_MS),
             expiresAt: emergencyExpiry ? new Date(emergencyExpiry) : null,
           },
         });
       }
 
-      if (autoBox.alertReason && !alertedTypes.has(type)) {
+      // Foreign order notification
+      if (isForeignOrder && !isEmergency) {
+        await tx.notification.create({
+          data: {
+            orderId: order.id,
+            message: `🌍 Foreign Country order for ${customer.firstName} (Bill #${customer.billNumber}) has been assigned to Foreign Country box`,
+            nextAlert: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            expiresAt: null,
+          },
+        });
+      }
+
+      if (autoBox?.alertReason && !alertedTypes.has(type)) {
         await notifyAdminsToCreateBox(tx, {
           orderId: order.id,
           orderType: type,
@@ -1310,7 +1771,10 @@ export const createOrder = async ({
       createdOrders.push(order);
     }
 
-    return { customer, orders: createdOrders };
+    return {
+      customer,
+      orders: await enrichOrdersWithDisplayMeta(createdOrders, tx),
+    };
   });
 };
 
@@ -1370,6 +1834,50 @@ export const updateOrder = async (id, body) => {
   if (!existingOrder)
     throw Object.assign(new Error("Order not found"), { status: 404 });
 
+  const monthPolicy = await getMonthPolicy({ tx: prisma });
+  const existingMonth = Number(existingOrder.entryMonth);
+  const existingYear = Number(existingOrder.entryYear);
+  const currentMonth = Number(monthPolicy.currentMonth);
+  const currentYear = Number(monthPolicy.currentYear);
+
+  // Check if order is in the current month
+  if (
+    Number.isFinite(existingMonth) &&
+    Number.isFinite(existingYear) &&
+    Number.isFinite(currentMonth) &&
+    Number.isFinite(currentYear)
+  ) {
+    // If month/year don't match current, reject edit
+    if (existingMonth !== currentMonth || existingYear !== currentYear) {
+      throw Object.assign(
+        new Error(
+          "Past and future months are read-only. Edits only allowed for the current month.",
+        ),
+        { status: 403, code: "MONTH_READONLY" },
+      );
+    }
+  }
+
+  if (
+    Number.isFinite(existingMonth) &&
+    Number.isFinite(existingYear) &&
+    !isMonthSelectable({
+      month: existingMonth,
+      year: existingYear,
+      allowedUntil: {
+        month: monthPolicy.allowedUntilMonth,
+        year: monthPolicy.allowedUntilYear,
+      },
+    })
+  ) {
+    throw Object.assign(
+      new Error(
+        "This order belongs to a locked month. Future months cannot be modified.",
+      ),
+      { status: 403, code: "MONTH_LOCKED" },
+    );
+  }
+
   const data = buildOrderUpdateData(existingOrder, body);
   const shouldSyncBillEmergency =
     body.isEmergency !== undefined || body.emergencyExpiry !== undefined;
@@ -1403,11 +1911,13 @@ export const updateOrder = async (id, body) => {
       });
     }
 
+    await recalculateOrderBenefit(id, tx);
+
     const updated = await findUniqueOrderSafe({
       where: { id },
       includeBase: ORDER_DETAIL_INCLUDE_BASE,
     });
-    return enrichOrderAssignment(updated);
+    return enrichOrderWithDisplayMeta(enrichOrderAssignment(updated), tx);
   });
 };
 
@@ -1455,6 +1965,50 @@ export const updateOrderBill = async (
   });
   if (!seed) throw Object.assign(new Error("Order not found"), { status: 404 });
 
+  const monthPolicy = await getMonthPolicy({ tx: prisma });
+  const seedMonth = Number(seed.entryMonth);
+  const seedYear = Number(seed.entryYear);
+  const currentMonth = Number(monthPolicy.currentMonth);
+  const currentYear = Number(monthPolicy.currentYear);
+
+  // Check if order is in the current month
+  if (
+    Number.isFinite(seedMonth) &&
+    Number.isFinite(seedYear) &&
+    Number.isFinite(currentMonth) &&
+    Number.isFinite(currentYear)
+  ) {
+    // If month/year don't match current, reject edit
+    if (seedMonth !== currentMonth || seedYear !== currentYear) {
+      throw Object.assign(
+        new Error(
+          "Past and future months are read-only. Edits only allowed for the current month.",
+        ),
+        { status: 403, code: "MONTH_READONLY" },
+      );
+    }
+  }
+
+  if (
+    Number.isFinite(seedMonth) &&
+    Number.isFinite(seedYear) &&
+    !isMonthSelectable({
+      month: seedMonth,
+      year: seedYear,
+      allowedUntil: {
+        month: monthPolicy.allowedUntilMonth,
+        year: monthPolicy.allowedUntilYear,
+      },
+    })
+  ) {
+    throw Object.assign(
+      new Error(
+        "This order belongs to a locked month. Future months cannot be modified.",
+      ),
+      { status: 403, code: "MONTH_LOCKED" },
+    );
+  }
+
   return prisma.$transaction(async (tx) => {
     // Update customer info (same bill/customer)
     const nextFirstName =
@@ -1495,6 +2049,7 @@ export const updateOrderBill = async (
     const resolveRakhtSnapshot = async (selection) => {
       const requiredMeters = Number(selection?.requiredMeters || 0);
       const piecePrice = Number(selection?.piecePrice || 0);
+      const priceForCustomer = Number(selection?.priceForCustomer || 0);
 
       if (!selection?.rakhtId) {
         throw Object.assign(new Error("Rakht selection is required"), {
@@ -1550,6 +2105,12 @@ export const updateOrderBill = async (
         rakhtColorHex: ton.colorHex,
         rakhtRequiredMeters: requiredMeters,
         rakhtPiecePrice: piecePrice,
+        rakhtCustomerPricePerMeter:
+          priceForCustomer > 0 ? priceForCustomer : null,
+        rakhtTotalCustomerPrice:
+          priceForCustomer > 0
+            ? Math.round(priceForCustomer * requiredMeters)
+            : null,
       };
     };
 
@@ -1668,6 +2229,8 @@ export const updateOrderBill = async (
           },
         });
 
+        await recalculateOrderBenefit(id, tx);
+
         await upsertMeasurementsForType(tx, type, id, measurements);
         updatedOrCreatedIds.push(id);
         continue;
@@ -1700,6 +2263,14 @@ export const updateOrderBill = async (
             null,
           rakhtPiecePrice:
             rakhtSnapshot?.rakhtPiecePrice ?? seed.rakhtPiecePrice ?? null,
+          rakhtCustomerPricePerMeter:
+            rakhtSnapshot?.rakhtCustomerPricePerMeter ??
+            seed.rakhtCustomerPricePerMeter ??
+            null,
+          rakhtTotalCustomerPrice:
+            rakhtSnapshot?.rakhtTotalCustomerPrice ??
+            seed.rakhtTotalCustomerPrice ??
+            null,
           totalPrice,
           discount,
           paidAmount,
@@ -1710,6 +2281,8 @@ export const updateOrderBill = async (
           boxId: autoBox.boxId,
         },
       });
+
+      await recalculateOrderBenefit(created.id, tx);
 
       await upsertMeasurementsForType(tx, type, created.id, measurements);
       updatedOrCreatedIds.push(created.id);
@@ -1729,7 +2302,13 @@ export const updateOrderBill = async (
       ORDER_DETAIL_INCLUDE_BASE,
     );
 
-    return { customer, orders: enrichOrderListAssignment(freshOrders) };
+    return {
+      customer,
+      orders: await enrichOrdersWithDisplayMeta(
+        enrichOrderListAssignment(freshOrders),
+        tx,
+      ),
+    };
   });
 };
 
@@ -1813,14 +2392,27 @@ export const markComplete = async (id) => {
       where: { id },
       data: {
         isCompleted: true,
+        isEmergency: false,
+        emergencyExpiry: null,
         inProgress: false,
         boxId: null,
+        foreignBoxId: null,
       },
       include: {
         customer: true,
         box: true,
       },
     });
+
+    await tx.notification.updateMany({
+      where: { orderId: id },
+      data: {
+        isRead: true,
+        expiresAt: new Date(),
+      },
+    });
+
+    await recalculateOrderBenefit(id, tx);
 
     if (order.boxId) {
       const boxRecord = await tx.box.findUnique({ where: { id: order.boxId } });
@@ -1847,7 +2439,7 @@ export const markComplete = async (id) => {
       }
     }
 
-    return enrichOrderAssignment(updated);
+    return enrichOrderWithDisplayMeta(enrichOrderAssignment(updated), tx);
   });
 };
 
@@ -1859,6 +2451,13 @@ export const deleteOrder = async (id) =>
         id: true,
         type: true,
         customerId: true,
+        rakhtId: true,
+        rakhtTonId: true,
+        rakhtRequiredMeters: true,
+        rakhtCompanyName: true,
+        rakhtBrandName: true,
+        entryMonth: true,
+        entryYear: true,
         customer: { select: { billNumber: true } },
       },
     });
@@ -1866,6 +2465,29 @@ export const deleteOrder = async (id) =>
     if (!existing) {
       throw Object.assign(new Error("Order not found"), { status: 404 });
     }
+
+    const monthPolicy = await getMonthPolicy({ tx });
+    const existingMonth = Number(existing.entryMonth);
+    const existingYear = Number(existing.entryYear);
+    const currentMonth = Number(monthPolicy.currentMonth);
+    const currentYear = Number(monthPolicy.currentYear);
+
+    if (
+      Number.isFinite(existingMonth) &&
+      Number.isFinite(existingYear) &&
+      Number.isFinite(currentMonth) &&
+      Number.isFinite(currentYear) &&
+      (existingMonth !== currentMonth || existingYear !== currentYear)
+    ) {
+      throw Object.assign(
+        new Error(
+          "Past and future months are read-only. Deletions only allowed for the current month.",
+        ),
+        { status: 403, code: "MONTH_READONLY" },
+      );
+    }
+
+    await rollbackRakhtInventoryForDeletedOrder(tx, existing);
 
     // Remove linked transactions explicitly (and also handled by FK cascade).
     await tx.transaction.deleteMany({ where: { orderId: id } });
@@ -1895,3 +2517,101 @@ export const deleteOrder = async (id) =>
       await tx.customer.deleteMany({ where: { id: existing.customerId } });
     }
   });
+
+export const rollbackRakhtInventoryForDeletedOrder = async (tx, order) => {
+  const requiredMeters = Number(order?.rakhtRequiredMeters || 0);
+  const rakhtTonId = order?.rakhtTonId || null;
+
+  if (!rakhtTonId || !Number.isFinite(requiredMeters) || requiredMeters <= 0) {
+    return {
+      restored: false,
+      reason: "NO_RAKHT_SELECTION",
+    };
+  }
+
+  const ton = await tx.rakhtTon.findUnique({
+    where: { id: rakhtTonId },
+    select: {
+      id: true,
+      rakhtId: true,
+      totalMeters: true,
+      usedMeters: true,
+      name: true,
+    },
+  });
+
+  if (!ton) {
+    throw Object.assign(
+      new Error("Linked Rakht ton not found. Cannot rollback order deletion."),
+      { status: 409 },
+    );
+  }
+
+  if (order?.rakhtId && ton.rakhtId !== order.rakhtId) {
+    throw Object.assign(
+      new Error(
+        "Rakht company/ton mismatch detected. Deletion rollback cancelled.",
+      ),
+      { status: 409 },
+    );
+  }
+
+  const safeUsed = Number(ton.usedMeters || 0);
+  if (safeUsed < requiredMeters) {
+    throw Object.assign(
+      new Error(
+        "Invalid Rakht consumed meters state. Deletion rollback cancelled.",
+      ),
+      { status: 409 },
+    );
+  }
+
+  const rollbackResult = await tx.rakhtTon.updateMany({
+    where: {
+      id: rakhtTonId,
+      usedMeters: { gte: requiredMeters },
+    },
+    data: {
+      usedMeters: { decrement: requiredMeters },
+    },
+  });
+
+  if (rollbackResult.count !== 1) {
+    throw Object.assign(
+      new Error("Rakht inventory changed. Please retry deletion."),
+      { status: 409 },
+    );
+  }
+
+  const tonAfterRollback = await tx.rakhtTon.findUnique({
+    where: { id: rakhtTonId },
+    select: {
+      id: true,
+      totalMeters: true,
+      usedMeters: true,
+    },
+  });
+
+  const usedAfter = Number(tonAfterRollback?.usedMeters || 0);
+  const totalAfter = Number(tonAfterRollback?.totalMeters || 0);
+
+  if (usedAfter < 0 || usedAfter > totalAfter) {
+    throw Object.assign(
+      new Error(
+        "Rakht totals became invalid after rollback. Deletion cancelled.",
+      ),
+      { status: 409 },
+    );
+  }
+
+  return {
+    restored: true,
+    rakhtId: ton.rakhtId,
+    rakhtTonId,
+    companyName: order?.rakhtCompanyName || null,
+    brandName: order?.rakhtBrandName || null,
+    restoredMeters: requiredMeters,
+    consumedMetersAfter: usedAfter,
+    remainingMetersAfter: Math.max(0, totalAfter - usedAfter),
+  };
+};

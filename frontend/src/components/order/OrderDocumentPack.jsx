@@ -14,7 +14,10 @@ import { SHOP_CONFIG } from "../../config/shopConfig.js";
 import { toAsciiDigits } from "../../lib/normalize.js";
 import { formatCurrency } from "../../lib/currency.js";
 import { resolveRakhtColorHex } from "../../lib/rakhtColors.js";
-import { getOrderTypeLabel as getLocalizedOrderTypeLabel } from "../../lib/orderType.js";
+import {
+  getOrderDisplayName as getLocalizedOrderDisplayName,
+  getOrderTypeLabel as getLocalizedOrderTypeLabel,
+} from "../../lib/orderType.js";
 
 const NUMERIC_FIELDS = new Set([
   "height",
@@ -206,6 +209,10 @@ export function getOrderTypeLabel(type, language) {
   return getLocalizedOrderTypeLabel(type, language);
 }
 
+export function getOrderDisplayName(order, language, options) {
+  return getLocalizedOrderDisplayName(order, language, options);
+}
+
 function formatMoney(amount, language) {
   return formatCurrency(amount, language, {
     minimumFractionDigits: 0,
@@ -383,7 +390,7 @@ export function CustomerBill({ customer, order }) {
   const paid = order?.paidAmount || 0;
   const remaining = Math.max(0, order?.remaining ?? total - discount - paid);
   const qty = order?.quantity || 1;
-  const orderTypeLabel = getOrderTypeLabel(order?.type, settings.langCode);
+  const orderTypeLabel = getOrderDisplayName(order, settings.langCode);
   const { date, time } = getPrintDateTime(
     settings,
     order?.createdAt || Date.now(),
@@ -521,7 +528,9 @@ export function CustomerBill({ customer, order }) {
           <div>
             <p className={`${tableHeadClass}`}>{extraTxt.box}</p>
             <p className="mt-0.5 font-semibold text-slate-800">
-              {order?.box?.boxName || extraTxt.notAssigned}
+              {order?.box?.boxName ||
+                order?.foreignBox?.boxName ||
+                extraTxt.notAssigned}
             </p>
           </div>
         </div>
@@ -572,11 +581,10 @@ export function CustomerCombinedBill({ customer, orders = [] }) {
   const rowItems = safeOrders.map((order, index) => {
     const typeKey = order?.type || "ITEM";
     typeIndex[typeKey] = (typeIndex[typeKey] || 0) + 1;
-    const typeLabel = getOrderTypeLabel(typeKey, settings.langCode);
-    const itemLabel =
-      (typeCountTotals[typeKey] || 0) > 1
-        ? `${typeLabel} ${typeIndex[typeKey]}`
-        : typeLabel;
+    const itemLabel = getOrderDisplayName(order, settings.langCode, {
+      totalByType: typeCountTotals[typeKey],
+      sequenceByType: typeIndex[typeKey],
+    });
     const totalPrice = Number(order?.totalPrice || 0);
     return {
       order,
@@ -585,7 +593,10 @@ export function CustomerCombinedBill({ customer, orders = [] }) {
       itemLabel,
       qty: Number(order?.quantity || 1),
       amount: totalPrice,
-      boxName: order?.box?.boxName || extraTxt.notAssigned,
+      boxName:
+        order?.box?.boxName ||
+        order?.foreignBox?.boxName ||
+        extraTxt.notAssigned,
       rakhtColor: order?.rakhtColor || "-",
       rakhtColorHex: order?.rakhtColorHex || null,
       rakhtBrandName: order?.rakhtBrandName || "-",
@@ -872,8 +883,7 @@ function getOrderedMeasurementRows(entries, t) {
 
 function getOrderItemLabel(order, itemLabel, settings) {
   if (itemLabel?.trim()) return itemLabel.trim();
-  if (order?.orderName?.trim()) return order.orderName.trim();
-  return getOrderTypeLabel(order?.type, settings.langCode);
+  return getOrderDisplayName(order, settings.langCode);
 }
 
 function renderRakhtColorValue(colorName, colorHex) {
@@ -907,6 +917,18 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
   const dateValue = order?.createdAt || Date.now();
   const { date, time } = getPrintDateTime(settings, dateValue);
   const billLabel = getOrderItemLabel(order, itemLabel, settings);
+  const normalizedBillLabel = String(billLabel || "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+  const orderNameText =
+    typeof order?.orderName === "string" ? order.orderName.trim() : "";
+  const normalizedOrderName = String(orderNameText || "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+  const shouldRenderOrderNameNote =
+    Boolean(orderNameText) && normalizedOrderName !== normalizedBillLabel;
   const customerBarcode = customer?.billNumber || "-";
   const orderBarcode =
     order?.id || `${customer?.billNumber || "0"}-${order?.type || "item"}`;
@@ -1129,7 +1151,7 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
       </div>
 
       {/* Order notes (optional) */}
-      {order?.orderName?.trim() && (
+      {shouldRenderOrderNameNote && (
         <div
           className={`border-b border-slate-800 bg-amber-50 px-2 py-1.5 text-[10px] ${alignClass}`}
         >
@@ -1137,7 +1159,7 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
             {t("createOrder.additionalStyleInfo", { defaultValue: "Notes" })}
             :{" "}
           </span>
-          <span className="text-slate-800">{order.orderName.trim()}</span>
+          <span className="text-slate-800">{orderNameText}</span>
         </div>
       )}
 
@@ -1309,7 +1331,7 @@ export function OrderDocumentPack({ customer, order, previewId }) {
   const measurements = getMeasurementsFromOrder(order);
   const customerId = `${previewId}-customer`;
   const tailorId = `${previewId}-tailor`;
-  const orderTypeLabel = getOrderTypeLabel(order?.type, settings.langCode);
+  const orderTypeLabel = getOrderDisplayName(order, settings.langCode);
   const txt = settings.text;
 
   return (

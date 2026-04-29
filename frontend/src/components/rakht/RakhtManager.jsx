@@ -14,11 +14,17 @@ import {
   LuFilter,
   LuBuilding2,
   LuHistory,
+  LuEye,
 } from "react-icons/lu";
 import Select from "react-select";
 import toast from "react-hot-toast";
 import api from "../../lib/api.js";
 import { getApiErrorMessage } from "../../lib/feedback.js";
+import {
+  formatNumberLocale,
+  formatSystemDate,
+  formatSystemDateTime,
+} from "../../lib/locale.js";
 import { Modal, ConfirmDeleteModal, StatCard } from "../ui/index.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import {
@@ -30,7 +36,8 @@ import {
 } from "./rakhtFormConfig.js";
 
 export default function RakhtManager() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language || "en";
   const { isAdmin } = useAuth();
   const qc = useQueryClient();
   const [modal, setModal] = useState(false);
@@ -39,6 +46,7 @@ export default function RakhtManager() {
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [paymentCompany, setPaymentCompany] = useState(null);
   const [payAmount, setPayAmount] = useState("");
+  const [viewItemId, setViewItemId] = useState(null);
   const [filterCompany, setFilterCompany] = useState(null);
   const [filterBrand, setFilterBrand] = useState(null);
   const [filterStatus, setFilterStatus] = useState({
@@ -51,6 +59,15 @@ export default function RakhtManager() {
     queryKey: ["rakht-list"],
     queryFn: () => api.get("/rakhts").then((res) => res.data),
   });
+
+  const { data: viewDetails, isLoading: isViewLoading } = useQuery({
+    queryKey: ["rakht-detail", viewItemId],
+    queryFn: () => api.get(`/rakhts/${viewItemId}`).then((res) => res.data),
+    enabled: Boolean(viewItemId),
+  });
+
+  const formatAmount = (value) =>
+    formatNumberLocale(Math.round(Number(value || 0)), language);
 
   const saveMut = useMutation({
     mutationFn: (payload) => api.put(`/rakhts/${editing.id}`, payload),
@@ -163,7 +180,14 @@ export default function RakhtManager() {
     return Math.max(0, total - given);
   }, [form.totalPrice, form.givenMoney]);
 
-  const todayDisplay = new Date().toLocaleDateString();
+  const pricePerTon = useMemo(() => {
+    const total = Number(form.totalPrice || 0);
+    const qty = Number(form.tonQuantity || 0);
+    if (!Number.isFinite(total) || !Number.isFinite(qty) || qty <= 0) return 0;
+    return total / qty;
+  }, [form.totalPrice, form.tonQuantity]);
+
+  const todayDisplay = formatSystemDate(new Date(), language);
 
   const companyOptions = useMemo(() => {
     const unique = [
@@ -277,7 +301,7 @@ export default function RakhtManager() {
   );
 
   const payNowLabel = useMemo(
-    () => new Date().toLocaleString(),
+    () => formatSystemDateTime(new Date(), language),
     [paymentModalOpen],
   );
 
@@ -534,10 +558,17 @@ export default function RakhtManager() {
                     ).toLocaleString()}
                   </td>
                   <td>
-                    {item.date ? new Date(item.date).toLocaleDateString() : "-"}
+                    {item.date ? formatSystemDate(item.date, language) : "-"}
                   </td>
                   <td>
                     <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        className="btn btn-outline btn-sm"
+                        onClick={() => setViewItemId(item.id)}
+                        title={t("common.view", { defaultValue: "View" })}
+                      >
+                        <LuEye size={12} />
+                      </button>
                       <button
                         className="btn btn-outline btn-sm"
                         onClick={() => openEdit(item)}
@@ -559,6 +590,335 @@ export default function RakhtManager() {
           </table>
         </div>
       )}
+
+      <Modal
+        open={!!viewItemId}
+        onClose={() => setViewItemId(null)}
+        title={t("rakht.viewDetails", { defaultValue: "Rakht Details" })}
+        maxW={1100}
+      >
+        {isViewLoading || !viewDetails ? (
+          <p style={{ fontSize: 13, color: "var(--text3)" }}>
+            {t("common.loading")}
+          </p>
+        ) : (
+          <div style={{ display: "grid", gap: 16 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: 10,
+              }}
+            >
+              <div
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 10,
+                  padding: 12,
+                  background: "var(--surface2)",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: "var(--text3)",
+                    marginBottom: 4,
+                  }}
+                >
+                  {t("rakht.companyName", { defaultValue: "Company Name" })}
+                </p>
+                <p style={{ fontSize: 14, fontWeight: 700 }}>
+                  {viewDetails.companyName || "-"}
+                </p>
+              </div>
+              <div
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 10,
+                  padding: 12,
+                  background: "var(--surface2)",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: "var(--text3)",
+                    marginBottom: 4,
+                  }}
+                >
+                  {t("rakht.brandName", { defaultValue: "Brand Name" })}
+                </p>
+                <p style={{ fontSize: 14, fontWeight: 700 }}>
+                  {viewDetails.brandName || "-"}
+                </p>
+              </div>
+              <div
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 10,
+                  padding: 12,
+                  background: "var(--surface2)",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: "var(--text3)",
+                    marginBottom: 4,
+                  }}
+                >
+                  {t("rakht.tonQuantity", {
+                    defaultValue: "Total Ton Quantity",
+                  })}
+                </p>
+                <p style={{ fontSize: 14, fontWeight: 700 }}>
+                  {formatNumberLocale(
+                    Number(viewDetails.tonQuantity || 0),
+                    language,
+                  )}
+                </p>
+              </div>
+              <div
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 10,
+                  padding: 12,
+                  background: "var(--surface2)",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: "var(--text3)",
+                    marginBottom: 4,
+                  }}
+                >
+                  {t("rakht.totalPrice", { defaultValue: "Total Price" })}
+                </p>
+                <p style={{ fontSize: 14, fontWeight: 700 }}>
+                  {formatAmount(viewDetails.totalPrice)}
+                </p>
+              </div>
+              <div
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 10,
+                  padding: 12,
+                  background: "var(--surface2)",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: "var(--text3)",
+                    marginBottom: 4,
+                  }}
+                >
+                  {t("rakht.givenMoney", { defaultValue: "Given Money" })}
+                </p>
+                <p style={{ fontSize: 14, fontWeight: 700 }}>
+                  {formatAmount(viewDetails.givenMoney)}
+                </p>
+              </div>
+              <div
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 10,
+                  padding: 12,
+                  background: "var(--surface2)",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: "var(--text3)",
+                    marginBottom: 4,
+                  }}
+                >
+                  {t("rakht.remainingMoney", {
+                    defaultValue: "Remaining Money",
+                  })}
+                </p>
+                <p style={{ fontSize: 14, fontWeight: 700 }}>
+                  {formatAmount(viewDetails.remainingMoney)}
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <p
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  marginBottom: 8,
+                  color: "var(--text2)",
+                }}
+              >
+                {t("rakht.tonDetails", { defaultValue: "Ton Details" })}
+              </p>
+              <div className="tbl-wrap" style={{ overflowX: "auto" }}>
+                <table className="tbl">
+                  <thead>
+                    <tr>
+                      <th>{t("rakht.ton", { defaultValue: "Ton" })}</th>
+                      <th>
+                        {t("rakht.tonName", { defaultValue: "Ton Name" })}
+                      </th>
+                      <th>
+                        {t("rakht.tonTotalMeters", {
+                          defaultValue: "Total Meters",
+                        })}
+                      </th>
+                      <th>
+                        {t("rakht.tonTotalPrice", {
+                          defaultValue: "Ton Price",
+                        })}
+                      </th>
+                      <th>
+                        {t("rakht.pricePerMeter", {
+                          defaultValue: "Price / Meter",
+                        })}
+                      </th>
+                      <th>
+                        {t("rakht.consumedMeters", {
+                          defaultValue: "Consumed Meters",
+                        })}
+                      </th>
+                      <th>
+                        {t("rakht.remainingMeters", {
+                          defaultValue: "Remaining Meters",
+                        })}
+                      </th>
+                      <th>
+                        {t("rakht.totalProfit", {
+                          defaultValue: "Profit Per Ton",
+                        })}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(viewDetails.tons || []).map((ton) => (
+                      <tr key={ton.id}>
+                        <td>{ton.tonIdentifier}</td>
+                        <td>
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 6,
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: 10,
+                                height: 10,
+                                borderRadius: "50%",
+                                background: ton.colorHex || "#94A3B8",
+                                border: "1px solid rgba(0,0,0,.12)",
+                              }}
+                            />
+                            {ton.name || "-"}
+                          </span>
+                        </td>
+                        <td>{formatAmount(ton.totalMeters)}</td>
+                        <td>{formatAmount(ton.tonPrice)}</td>
+                        <td>{formatAmount(ton.pricePerMeter)}</td>
+                        <td>{formatAmount(ton.consumedMeters)}</td>
+                        <td>{formatAmount(ton.remainingMeters)}</td>
+                        <td>{formatAmount(ton.profitGenerated)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: 10,
+              }}
+            >
+              <div
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 10,
+                  padding: 12,
+                  background: "var(--surface2)",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: "var(--text3)",
+                    marginBottom: 4,
+                  }}
+                >
+                  {t("rakht.totalConsumedMeters", {
+                    defaultValue: "Total Consumed Meters",
+                  })}
+                </p>
+                <p style={{ fontSize: 15, fontWeight: 700 }}>
+                  {formatAmount(viewDetails.summary?.totalConsumedMeters)}
+                </p>
+              </div>
+              <div
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 10,
+                  padding: 12,
+                  background: "var(--surface2)",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: "var(--text3)",
+                    marginBottom: 4,
+                  }}
+                >
+                  {t("rakht.totalRemainingMeters", {
+                    defaultValue: "Total Remaining Meters",
+                  })}
+                </p>
+                <p style={{ fontSize: 15, fontWeight: 700 }}>
+                  {formatAmount(viewDetails.summary?.totalRemainingMeters)}
+                </p>
+              </div>
+              <div
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 10,
+                  padding: 12,
+                  background: "var(--surface2)",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: "var(--text3)",
+                    marginBottom: 4,
+                  }}
+                >
+                  {t("rakht.totalProfitGenerated", {
+                    defaultValue: "Total Company Profit",
+                  })}
+                </p>
+                <p
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 700,
+                    color: "var(--success, #15803D)",
+                  }}
+                >
+                  {formatAmount(viewDetails.summary?.totalProfitGenerated)}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <Modal
         open={paymentModalOpen}
@@ -848,6 +1208,77 @@ export default function RakhtManager() {
                       </div>
                     </div>
                   </div>
+
+                  {pricePerTon > 0 && (
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: 10,
+                        padding: "10px 8px",
+                        background: "rgba(37,99,235,.05)",
+                        borderRadius: 8,
+                      }}
+                    >
+                      <div>
+                        <p
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: "var(--text3)",
+                            marginBottom: 4,
+                          }}
+                        >
+                          {t("rakht.pricePerMeter", {
+                            defaultValue: "Price per Meter",
+                          })}
+                        </p>
+                        <p
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 700,
+                            color: "var(--primary)",
+                          }}
+                        >
+                          {(parseInt(ton.totalMeters, 10) || 0) > 0
+                            ? (
+                                pricePerTon /
+                                (parseInt(ton.totalMeters, 10) || 1)
+                              ).toLocaleString(undefined, {
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 2,
+                              })
+                            : "-"}
+                        </p>
+                      </div>
+                      <div>
+                        <p
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: "var(--text3)",
+                            marginBottom: 4,
+                          }}
+                        >
+                          {t("rakht.tonTotalPrice", {
+                            defaultValue: "Ton Total Price",
+                          })}
+                        </p>
+                        <p
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 700,
+                            color: "var(--success, #15803D)",
+                          }}
+                        >
+                          {pricePerTon.toLocaleString(undefined, {
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 2,
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -936,7 +1367,7 @@ export default function RakhtManager() {
                 readOnly
                 value={
                   editing?.date
-                    ? new Date(editing.date).toLocaleDateString()
+                    ? formatSystemDate(editing.date, language)
                     : todayDisplay
                 }
                 style={{ cursor: "default" }}

@@ -1,11 +1,33 @@
-import cron from 'node-cron';
-import { prisma } from '../lib/prisma.js';
+import cron from "node-cron";
+import { prisma } from "../lib/prisma.js";
+
+const EMERGENCY_ALERT_INTERVAL_MS = 12 * 60 * 60 * 1000;
+
+const buildEmergencyAlertMessage = ({
+  orderType,
+  customerName,
+  customerPhone,
+  billNumber,
+  createdAt,
+  statusLabel = "EMERGENCY - PENDING",
+  intro = "Emergency order reminder. Please prioritize and complete this order first.",
+}) =>
+  [
+    "🚨 Emergency Alert",
+    intro,
+    `Bill #: ${billNumber || "-"}`,
+    `Customer: ${customerName || "-"}`,
+    `Phone: ${customerPhone || "-"}`,
+    `Order Type: ${orderType || "-"}`,
+    `Status: ${statusLabel}`,
+    `Created: ${new Date(createdAt || Date.now()).toISOString()}`,
+  ].join("\n");
 
 export const startCronJobs = () => {
-  // Run every hour
-  cron.schedule('0 * * * *', async () => {
+  // Run every 15 minutes to catch due alerts reliably.
+  cron.schedule("*/15 * * * *", async () => {
     const now = new Date();
-    console.log('[Cron] Running notification check at', now.toISOString());
+    console.log("[Cron] Running notification check at", now.toISOString());
 
     // 1. Delete expired notifications
     const deleted = await prisma.notification.deleteMany({
@@ -15,11 +37,15 @@ export const startCronJobs = () => {
       console.log(`[Cron] Deleted ${deleted.count} expired notification(s)`);
     }
 
-    // 2. Re-trigger notifications that are due for next alert
+    // 2. Re-trigger emergency notifications every 12 hours while unresolved.
     const due = await prisma.notification.findMany({
       where: {
         nextAlert: { lte: now },
         OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+        order: {
+          isEmergency: true,
+          isCompleted: false,
+        },
       },
       include: { order: { include: { customer: true } } },
     });
@@ -29,16 +55,24 @@ export const startCronJobs = () => {
         where: { id: n.id },
         data: {
           isRead: false,
-          message: `🚨 URGENT: ${n.order.type} for ${n.order.customer.firstName} (Bill #${n.order.customer.billNumber}) is still pending`,
-          nextAlert: new Date(now.getTime() + 24 * 60 * 60 * 1000),
+          message: buildEmergencyAlertMessage({
+            orderType: n.order.type,
+            customerName: n.order.customer.firstName,
+            customerPhone: n.order.customer.phoneNumber,
+            billNumber: n.order.customer.billNumber,
+            createdAt: n.order.createdAt,
+          }),
+          nextAlert: new Date(now.getTime() + EMERGENCY_ALERT_INTERVAL_MS),
         },
       });
     }
 
     if (due.length > 0) {
-      console.log(`[Cron] Re-triggered ${due.length} emergency notification(s)`);
+      console.log(
+        `[Cron] Re-triggered ${due.length} emergency notification(s)`,
+      );
     }
   });
 
-  console.log('[Cron] Notification scheduler started');
+  console.log("[Cron] Notification scheduler started");
 };

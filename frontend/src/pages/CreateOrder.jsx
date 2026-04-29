@@ -16,6 +16,7 @@ import {
 } from "../lib/orderDraftApi.js";
 import { getMonthLabel } from "../lib/months.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useMonth } from "../context/MonthContext.jsx";
 import Step1CustomerInfo from "../components/order/Step1CustomerInfo.jsx";
 import Step2RakhtSelection from "../components/order/Step2RakhtSelection.jsx";
 import Step2OrderTypes from "../components/order/Step2OrderTypes.jsx";
@@ -117,6 +118,16 @@ export default function CreateOrder() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { isAdmin } = useAuth();
+  const {
+    viewMonth,
+    viewYear,
+    setViewMonth,
+    setViewYear,
+    monthPolicy,
+    isSelectableMonth,
+    currentGregorianMonth,
+    currentGregorianYear,
+  } = useMonth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({});
@@ -170,7 +181,7 @@ export default function CreateOrder() {
           draft.clientKey ||
             `order_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
         );
-        setDraftSaveLabel(t("orders.draftLoaded", "Draft restored"));
+        setDraftSaveLabel(i18n.t("orders.draftLoaded", "Draft restored"));
       } catch {
         if (!cancelled) {
           setForm({});
@@ -178,7 +189,7 @@ export default function CreateOrder() {
           setDraftId("");
           setDraftSaveLabel("");
           setSearchParams({}, { replace: true });
-          toast.error(t("orders.draftNotFound", "Draft not found"));
+          toast.error(i18n.t("orders.draftNotFound", "Draft not found"));
         }
       } finally {
         if (!cancelled) {
@@ -191,7 +202,7 @@ export default function CreateOrder() {
     return () => {
       cancelled = true;
     };
-  }, [draftParam, setSearchParams, t]);
+  }, [draftParam, setSearchParams]);
 
   const saveDraft = async () => {
     const hasCustomer =
@@ -259,7 +270,14 @@ export default function CreateOrder() {
   };
 
   const checkBoxAvailability = async (orderTypes) => {
-    for (const type of orderTypes) {
+    const entries = Array.isArray(orderTypes) ? orderTypes : [];
+
+    for (const entry of entries) {
+      const type = entry?.type;
+      if (!type || entry?.isForeignOrder) {
+        continue;
+      }
+
       try {
         const { data: boxes } = await api.get("/boxes", {
           params: { type },
@@ -293,12 +311,87 @@ export default function CreateOrder() {
         };
       }
     }
+
+    const hasForeignOrder = entries.some((entry) => entry?.isForeignOrder);
+    if (hasForeignOrder) {
+      try {
+        const { data: foreignBoxes } = await api.get("/boxes", {
+          params: { type: "FOREIGN_COUNTRY" },
+        });
+
+        if (!foreignBoxes?.length) {
+          return {
+            available: false,
+            error: t(
+              "createOrder.foreignBoxMissing",
+              "No Foreign Country box exists. Please create one first.",
+            ),
+            redirectToBox: true,
+          };
+        }
+
+        const availableForeign = foreignBoxes.find(
+          (box) => (box._count?.orders || 0) < Number(box.capacity || 0),
+        );
+
+        if (!availableForeign) {
+          return {
+            available: false,
+            error: t(
+              "createOrder.foreignBoxFull",
+              "Foreign Country box is full. Please increase capacity or create another one.",
+            ),
+            redirectToBox: true,
+          };
+        }
+      } catch {
+        return {
+          available: false,
+          error: t(
+            "createOrder.foreignBoxCheckFailed",
+            "Failed to validate Foreign Country box availability.",
+          ),
+          redirectToBox: false,
+        };
+      }
+    }
+
     return { available: true };
   };
 
   const submit = async (mergedInput = form) => {
     const merged = mergedInput;
     setError("");
+
+    const currentEntryMonth = currentGregorianMonth;
+    const currentEntryYear = currentGregorianYear;
+
+    const isCurrentMonthSelected =
+      Number(viewMonth) === currentEntryMonth &&
+      Number(viewYear) === currentEntryYear;
+
+    if (!isCurrentMonthSelected) {
+      setViewYear(currentEntryYear);
+      setViewMonth(currentEntryMonth);
+      const currentMonthOnlyMessage = t(
+        "createOrder.currentMonthOnly",
+        "New entries are allowed only in the current month.",
+      );
+      setError(currentMonthOnlyMessage);
+      toast.error(currentMonthOnlyMessage);
+      return;
+    }
+
+    if (!isSelectableMonth(currentEntryMonth, currentEntryYear)) {
+      const monthLockedMessage = t(
+        "navbar.futureMonthDisabled",
+        "Future months are locked until the current month is fully completed.",
+      );
+      setError(monthLockedMessage);
+      toast.error(monthLockedMessage);
+      return;
+    }
+
     const measurementError = validateMeasurementsBeforeSubmit(
       merged.orderTypes || [],
       merged.measurements || {},
@@ -314,9 +407,7 @@ export default function CreateOrder() {
     if (!boxCheck.available) {
       toast.error(boxCheck.error);
       setError(boxCheck.error);
-      if (boxCheck.redirectToBox) {
-        navigate("/boxes");
-      }
+      navigate("/boxes");
       return;
     }
 
@@ -332,6 +423,8 @@ export default function CreateOrder() {
         firstName: merged.firstName,
         phoneNumber: merged.phoneNumber,
       },
+      entryMonth: Number(viewMonth),
+      entryYear: Number(viewYear),
       rakhtSelections: (merged?.rakhtSelections || []).map((selection) => ({
         type: selection.type,
         orderItemKey: selection.orderItemKey,
@@ -339,6 +432,10 @@ export default function CreateOrder() {
         rakhtTonId: selection.rakhtTonId,
         requiredMeters: parseNumberLocale(selection.requiredMeters || 0),
         piecePrice: parseNumberLocale(selection.piecePrice || 0),
+        priceForCustomer: parseNumberLocale(selection.priceForCustomer || 0),
+        totalPriceForCustomer: parseNumberLocale(
+          selection.totalPriceForCustomer || 0,
+        ),
       })),
       orders: orderItems.map((item) => {
         const b = merged.billing?.[item.billingKey] || {};
@@ -350,6 +447,7 @@ export default function CreateOrder() {
           orderName: resolveOrderName(item.measurements),
           isEmergency: billEmergency.isEmergency,
           emergencyExpiry: billEmergency.emergencyExpiry,
+          isForeignOrder: !!item.isForeignOrder,
           measurements: meas,
           totalPrice: toWholeAmount(pricePerItem),
           discount: toWholeAmount(parseNumberLocale(b.discount) || 0),
@@ -665,7 +763,8 @@ function buildOrderItems(orderTypes, measurements) {
     sets.forEach((setValue, setIndex) => {
       typeCounter[entry.type] = (typeCounter[entry.type] || 0) + 1;
       const sequence = typeCounter[entry.type];
-      const displayName = buildDefaultItemName(entry.type, sequence);
+      const displayName =
+        setValue?.__name?.trim() || buildDefaultItemName(entry.type, sequence);
       items.push({
         billingKey: `${typeIndex}-${setIndex}`,
         typeIndex,
@@ -673,6 +772,7 @@ function buildOrderItems(orderTypes, measurements) {
         sequence,
         type: entry.type,
         displayName,
+        isForeignOrder: !!entry?.isForeignOrder,
         measurements: {
           ...setValue,
           __name: displayName,

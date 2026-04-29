@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,24 +18,35 @@ import {
 import api from "../lib/api.js";
 import { buildSelectStyles } from "../lib/dailyTasks.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
+import { getOrderDisplayName } from "../lib/orderType.js";
 import { Field, PageHeader } from "../components/ui/index.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 
 // ─── Zod schema ───────────────────────────────────────────────────────────────
-const schema = z.object({
-  fromName: z
-    .object({ value: z.string(), label: z.string() })
-    .nullable()
-    .refine((value) => value !== null, { message: "Sender is required" }),
-  recipientName: z.string().min(1, "Recipient name is required"),
-  amount: z
-    .string()
-    .min(1, "Amount is required")
-    .refine((v) => !isNaN(Number(v)) && Number(v) > 0, {
-      message: "Amount must be a positive number",
-    }),
-  taskDate: z.string().min(1, "Date & time is required"),
-  note: z.string().optional(),
-});
+const schema = z
+  .object({
+    fromName: z
+      .object({ value: z.string(), label: z.string() })
+      .nullable()
+      .refine((value) => value !== null, { message: "Sender is required" }),
+    recipientName: z.string().min(1, "Recipient name is required"),
+    amount: z.string().optional(),
+    taskDate: z.string().min(1, "Date & time is required"),
+    forRakht: z.enum(["NO", "YES"]).default("NO"),
+    note: z.string().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.forRakht === "NO") {
+      const amount = Number(value.amount);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["amount"],
+          message: "Amount must be a positive number",
+        });
+      }
+    }
+  });
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function nowLocalInput() {
@@ -79,29 +91,61 @@ function SectionHeader({ icon: Icon, label, accent = "var(--primary)" }) {
 
 // ─── Task creation form ───────────────────────────────────────────────────────
 function DailyTaskForm({ onSuccess }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { user, isAdmin } = useAuth();
   const qc = useQueryClient();
+  const language = i18n.resolvedLanguage || i18n.language || "en";
 
   const {
     control,
     register,
     handleSubmit,
+    setValue,
+    watch,
     reset,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(schema),
-    defaultValues: { taskDate: nowLocalInput() },
+    defaultValues: { taskDate: nowLocalInput(), forRakht: "NO" },
   });
+
+  const [orderBillSearch, setOrderBillSearch] = useState("");
+  const [orderSearchError, setOrderSearchError] = useState("");
+  const [lookupCustomer, setLookupCustomer] = useState(null);
+  const [foundOrders, setFoundOrders] = useState([]);
+  const [selectedOrderIds, setSelectedOrderIds] = useState([]);
+  const [orderTypeAmounts, setOrderTypeAmounts] = useState({});
+  const [allocationError, setAllocationError] = useState("");
+  const [searchingOrder, setSearchingOrder] = useState(false);
+  const forRakhtValue = watch("forRakht") || "NO";
 
   const { data: dokanUsers = [], isLoading: loadingDokanUsers } = useQuery({
     queryKey: ["daily-task-senders"],
-    queryFn: () => api.get("/users/dokan").then((r) => r.data),
+    queryFn: () =>
+      api
+        .get("/users/dokan", { params: { includeAdmins: true } })
+        .then((r) => r.data),
   });
 
   const senderOptions = dokanUsers.map((user) => ({
     value: user.name,
     label: user.name,
   }));
+
+  const defaultSender =
+    isAdmin && user?.name
+      ? senderOptions.find((option) => option.value === user.name) || null
+      : null;
+
+  const fromNameValue = watch("fromName");
+
+  useEffect(() => {
+    if (!defaultSender || fromNameValue) return;
+    setValue("fromName", defaultSender, {
+      shouldValidate: true,
+      shouldDirty: false,
+    });
+  }, [defaultSender, fromNameValue, setValue]);
 
   const mutation = useMutation({
     mutationFn: (payload) =>
@@ -114,22 +158,147 @@ function DailyTaskForm({ onSuccess }) {
         recipientName: "",
         amount: "",
         taskDate: nowLocalInput(),
+        forRakht: "NO",
         note: "",
       });
+      setOrderBillSearch("");
+      setOrderSearchError("");
+      setLookupCustomer(null);
+      setFoundOrders([]);
+      setSelectedOrderIds([]);
+      setOrderTypeAmounts({});
+      setAllocationError("");
       onSuccess?.();
     },
     onError: (err) =>
       toast.error(getApiErrorMessage(err, t("dailyTasks.createFailed"))),
   });
 
-  const onSubmit = (data) =>
+  const searchOrderByBill = async () => {
+    const raw = String(orderBillSearch || "").trim();
+    if (!raw) {
+      setOrderSearchError(
+        t("dailyTasks.billSearchRequired", "Please enter a bill number."),
+      );
+      setLookupCustomer(null);
+      setFoundOrders([]);
+      setSelectedOrderIds([]);
+      setOrderTypeAmounts({});
+      setAllocationError("");
+      return;
+    }
+
+    setSearchingOrder(true);
+    setOrderSearchError("");
+    setAllocationError("");
+    setLookupCustomer(null);
+    setFoundOrders([]);
+    setSelectedOrderIds([]);
+    setOrderTypeAmounts({});
+    try {
+      const { data: lookup } = await api.get("/orders/lookup", {
+        params: { billNumber: raw },
+      });
+
+      const orders = Array.isArray(lookup?.orders) ? lookup.orders : [];
+
+      if (!orders.length) {
+        setOrderSearchError("Order not found with this billNumber");
+        return;
+      }
+
+      setLookupCustomer({
+        billNumber: lookup?.customer?.billNumber,
+        customerName: lookup?.customer?.firstName || "-",
+      });
+      setFoundOrders(orders);
+    } catch {
+      setOrderSearchError("Order not found with this billNumber");
+    } finally {
+      setSearchingOrder(false);
+    }
+  };
+
+  const toggleOrderSelection = (orderId, checked) => {
+    setAllocationError("");
+    setSelectedOrderIds((prev) => {
+      if (checked) {
+        if (prev.includes(orderId)) return prev;
+        return [...prev, orderId];
+      }
+      return prev.filter((id) => id !== orderId);
+    });
+
+    if (!checked) {
+      setOrderTypeAmounts((prev) => {
+        const next = { ...prev };
+        delete next[orderId];
+        return next;
+      });
+    }
+  };
+
+  const onSubmit = (data) => {
+    if (data.forRakht === "YES") {
+      if (!foundOrders.length) {
+        setOrderSearchError("Order not found with this billNumber");
+        toast.error(
+          t(
+            "dailyTasks.selectOrderForRakht",
+            "Please select an order for Rakht expense.",
+          ),
+        );
+        return;
+      }
+
+      if (!selectedOrderIds.length) {
+        const message = t(
+          "dailyTasks.selectAtLeastOneOrderType",
+          "Please select at least one order type.",
+        );
+        setAllocationError(message);
+        toast.error(message);
+        return;
+      }
+
+      const invalid = selectedOrderIds.some((orderId) => {
+        const amount = Number(orderTypeAmounts[orderId]);
+        return !Number.isFinite(amount) || amount <= 0;
+      });
+
+      if (invalid) {
+        const message = t(
+          "dailyTasks.invalidOrderTypeAmount",
+          "Enter a valid amount for each selected order type.",
+        );
+        setAllocationError(message);
+        toast.error(message);
+        return;
+      }
+
+      const allocations = selectedOrderIds.map((orderId) => ({
+        orderId,
+        amount: Number(orderTypeAmounts[orderId]),
+      }));
+
+      mutation.mutate({
+        fromName: data.fromName.value,
+        recipientName: data.recipientName.trim(),
+        taskDate: new Date(data.taskDate).toISOString(),
+        allocations,
+        note: data.note?.trim() || undefined,
+      });
+      return;
+    }
+
     mutation.mutate({
       fromName: data.fromName.value,
       recipientName: data.recipientName.trim(),
-      amount: Number(data.amount),
+      amount: Number(data.amount || 0),
       taskDate: new Date(data.taskDate).toISOString(),
       note: data.note?.trim() || undefined,
     });
+  };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate>
@@ -181,6 +350,201 @@ function DailyTaskForm({ onSuccess }) {
         </Field>
       </div>
 
+      <div style={{ marginBottom: 20 }}>
+        <Field
+          label={t("dailyTasks.forRakht", "For Rakht")}
+          error={errors.forRakht?.message}
+          required
+        >
+          <Controller
+            name="forRakht"
+            control={control}
+            render={({ field }) => (
+              <Select
+                classNamePrefix="rs"
+                isSearchable={false}
+                options={[
+                  { value: "NO", label: t("common.no", "No") },
+                  { value: "YES", label: t("common.yes", "Yes") },
+                ]}
+                value={
+                  [
+                    { value: "NO", label: t("common.no", "No") },
+                    { value: "YES", label: t("common.yes", "Yes") },
+                  ].find((option) => option.value === field.value) || null
+                }
+                onChange={(option) => {
+                  const next = option?.value || "NO";
+                  field.onChange(next);
+                  setValue("forRakht", next, { shouldValidate: true });
+                  if (next !== "YES") {
+                    setOrderBillSearch("");
+                    setOrderSearchError("");
+                    setLookupCustomer(null);
+                    setFoundOrders([]);
+                    setSelectedOrderIds([]);
+                    setOrderTypeAmounts({});
+                    setAllocationError("");
+                  }
+                }}
+              />
+            )}
+          />
+        </Field>
+
+        {forRakhtValue === "YES" && (
+          <div style={{ marginTop: 10 }}>
+            <Field
+              label={t("dailyTasks.searchByBillNumber", "Search by billNumber")}
+              error={orderSearchError || undefined}
+            >
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  className="inp"
+                  placeholder={t(
+                    "dailyTasks.billNumberPlaceholder",
+                    "Enter bill number",
+                  )}
+                  value={orderBillSearch}
+                  onChange={(event) => {
+                    setOrderBillSearch(event.target.value);
+                    setOrderSearchError("");
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      searchOrderByBill();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={searchOrderByBill}
+                  disabled={searchingOrder}
+                >
+                  {searchingOrder
+                    ? t("common.loading", "Loading...")
+                    : t("common.search", "Search")}
+                </button>
+              </div>
+            </Field>
+
+            {lookupCustomer && foundOrders.length > 0 && (
+              <div
+                style={{
+                  marginTop: 10,
+                  border: "1px solid var(--border)",
+                  borderRadius: 10,
+                  padding: 10,
+                  background: "var(--surface2)",
+                }}
+              >
+                <p style={{ margin: 0, fontSize: 12, color: "var(--text3)" }}>
+                  {t("dailyTasks.billNumber", "Bill")}: #
+                  {lookupCustomer.billNumber} |{" "}
+                  {t("common.customer", "Customer")}:{" "}
+                  {lookupCustomer.customerName}
+                </p>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                    gap: 10,
+                    marginTop: 10,
+                  }}
+                >
+                  {foundOrders.map((order) => {
+                    const isSelected = selectedOrderIds.includes(order.id);
+                    const typeLabel = getOrderDisplayName(order, language);
+                    return (
+                      <label
+                        key={order.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          padding: "8px 10px",
+                          border: "1px solid var(--border)",
+                          borderRadius: 8,
+                          background: isSelected
+                            ? "var(--primary-soft, rgba(37,99,235,.08))"
+                            : "var(--surface)",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(event) =>
+                            toggleOrderSelection(order.id, event.target.checked)
+                          }
+                        />
+                        <span style={{ fontSize: 13, fontWeight: 600 }}>
+                          {typeLabel}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                {selectedOrderIds.length > 0 && (
+                  <div style={{ marginTop: 12 }}>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                          "repeat(auto-fit, minmax(220px, 1fr))",
+                        gap: 10,
+                      }}
+                    >
+                      {selectedOrderIds.map((orderId) => {
+                        const order = foundOrders.find(
+                          (item) => item.id === orderId,
+                        );
+                        const typeLabel = order
+                          ? getOrderDisplayName(order, language)
+                          : t("common.type", "Type");
+                        return (
+                          <Field
+                            key={orderId}
+                            label={`${typeLabel} - ${t("dailyTasks.amount", "Amount")}`}
+                            required
+                          >
+                            <input
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              className="inp"
+                              placeholder="0.00"
+                              value={orderTypeAmounts[orderId] || ""}
+                              onChange={(event) => {
+                                setAllocationError("");
+                                setOrderTypeAmounts((prev) => ({
+                                  ...prev,
+                                  [orderId]: event.target.value,
+                                }));
+                              }}
+                            />
+                          </Field>
+                        );
+                      })}
+                    </div>
+                    {allocationError ? (
+                      <p
+                        style={{ color: "#DC2626", marginTop: 8, fontSize: 12 }}
+                      >
+                        {allocationError}
+                      </p>
+                    ) : null}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       <div
         style={{
           display: "grid",
@@ -189,20 +553,22 @@ function DailyTaskForm({ onSuccess }) {
           marginBottom: 20,
         }}
       >
-        <Field
-          label={t("dailyTasks.amount")}
-          error={errors.amount?.message}
-          required
-        >
-          <input
-            type="number"
-            min="0.01"
-            step="0.01"
-            className={`inp${errors.amount ? " inp-err" : ""}`}
-            placeholder="0.00"
-            {...register("amount")}
-          />
-        </Field>
+        {forRakhtValue !== "YES" ? (
+          <Field
+            label={t("dailyTasks.amount")}
+            error={errors.amount?.message}
+            required
+          >
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              className={`inp${errors.amount ? " inp-err" : ""}`}
+              placeholder="0.00"
+              {...register("amount")}
+            />
+          </Field>
+        ) : null}
         <Field
           label={t("dailyTasks.taskDate")}
           error={errors.taskDate?.message}

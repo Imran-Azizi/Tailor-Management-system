@@ -6,12 +6,9 @@ import toast from "react-hot-toast";
 import {
   LuArrowUpDown,
   LuBadgeDollarSign,
-  LuBuilding2,
   LuCalendarCheck,
   LuCalendarDays,
-  LuChartColumn,
   LuDownload,
-  LuEye,
   LuFilter,
   LuHistory,
   LuRefreshCcw,
@@ -21,28 +18,31 @@ import {
 } from "react-icons/lu";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
+import { formatCurrency } from "../lib/currency.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
-import { getMonthLabel } from "../lib/months.js";
+import { formatMonthYearLabel } from "../lib/months.js";
+import { formatSystemDateTime } from "../lib/locale.js";
 import {
   Badge,
   Card,
   EmptyState,
-  Modal,
   PageHeader,
   Spinner,
-  StatCard,
 } from "../components/ui/index.jsx";
 
 const PAGE_SIZE = 20;
 
 function formatMoney(value) {
-  return Math.round(Number(value || 0)).toLocaleString();
+  return formatCurrency(value, "en", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
 }
 
-function formatDateTime(value) {
+function formatDateTime(value, language) {
   if (!value) return "-";
-  return new Date(value).toLocaleString();
+  return formatSystemDateTime(value, language);
 }
 
 function formatDateValue(value) {
@@ -110,7 +110,6 @@ export default function PaymentHistory() {
     setPage(1);
   }, [viewMonth, viewYear]);
   const [sortOrder, setSortOrder] = useState("desc");
-  const [detailCompany, setDetailCompany] = useState(null);
   const [exporting, setExporting] = useState("");
   const deferredSearch = useDeferredValue(search.trim());
 
@@ -171,24 +170,6 @@ export default function PaymentHistory() {
     queryFn: () => api.get("/rakhts").then((res) => res.data),
   });
 
-  const { data: companyDetailData, isLoading: isCompanyDetailLoading } =
-    useQuery({
-      queryKey: ["rakht-payment-history-company-detail", detailCompany],
-      enabled: Boolean(detailCompany),
-      queryFn: () =>
-        api
-          .get("/rakhts/payment-history", {
-            params: {
-              companyName: detailCompany,
-              page: 1,
-              limit: 50,
-              sortBy: "paidAt",
-              sortOrder: "desc",
-            },
-          })
-          .then((res) => res.data),
-    });
-
   const companyOptions = useMemo(() => {
     const uniqueCompanies = [
       ...new Set(rakhtRows.map((row) => row.companyName).filter(Boolean)),
@@ -202,14 +183,6 @@ export default function PaymentHistory() {
   const total = Number(data?.total || 0);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const summary = data?.summary || { totalPaid: 0, totalRemaining: 0 };
-  const detailRows = Array.isArray(companyDetailData?.data)
-    ? companyDetailData.data
-    : [];
-  const detailSummary = companyDetailData?.summary || {
-    totalPaid: 0,
-    totalRemaining: 0,
-  };
-
   const activeFilterCount = [
     Boolean(deferredSearch),
     Boolean(companyFilter?.value),
@@ -274,7 +247,7 @@ export default function PaymentHistory() {
             formatMoney(row.totalPriceAfter),
             formatMoney(row.paidAmount),
             formatMoney(row.remainingAfter),
-            formatDateTime(row.paidAt),
+            formatDateTime(row.paidAt, language),
             status,
             row.paidBy?.name || "-",
           ]
@@ -352,7 +325,7 @@ export default function PaymentHistory() {
           `${t("rakht.totalPrice", { defaultValue: "Total Price" })}: ${formatMoney(row.totalPriceAfter)} | ${t("rakht.paidAmount", { defaultValue: "Paid Amount" })}: ${formatMoney(row.paidAmount)} | ${t("rakht.remainingMoney", { defaultValue: "Remaining" })}: ${formatMoney(row.remainingAfter)}`,
         );
         writeLine(
-          `${t("common.status", { defaultValue: "Status" })}: ${status} | ${t("rakht.dateTime", { defaultValue: "Date & Time" })}: ${formatDateTime(row.paidAt)} | ${t("common.user", { defaultValue: "User" })}: ${row.paidBy?.name || "-"}`,
+          `${t("common.status", { defaultValue: "Status" })}: ${status} | ${t("rakht.dateTime", { defaultValue: "Date & Time" })}: ${formatDateTime(row.paidAt, language)} | ${t("common.user", { defaultValue: "User" })}: ${row.paidBy?.name || "-"}`,
           { lineHeight: 18 },
         );
       });
@@ -442,7 +415,7 @@ export default function PaymentHistory() {
           <span>
             {t("common.viewingMonth", "Viewing data for")}:{" "}
             <strong style={{ fontWeight: 700 }}>
-              {getMonthLabel(viewMonth, language)} {viewYear}
+              {formatMonthYearLabel(viewMonth, viewYear, language)}
             </strong>
           </span>
           {data?.total === 0 && !isLoading && (
@@ -632,50 +605,32 @@ export default function PaymentHistory() {
         </div>
       </Card>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
-          gap: 12,
-        }}
-      >
-        <StatCard
-          label={t("rakht.totalRecords", { defaultValue: "Total Records" })}
-          value={total}
-          sub={t("rakht.filteredResults", { defaultValue: "Filtered results" })}
-          Icon={LuHistory}
-          accent="#2563EB"
-        />
-        <StatCard
-          label={t("rakht.totalPaidMoney", {
-            defaultValue: "Total Paid Money",
-          })}
-          value={formatMoney(summary.totalPaid)}
-          sub={t("rakht.filteredSummary", {
-            defaultValue: "Across the current filter set",
-          })}
-          Icon={LuWallet}
-          accent="#15803D"
-        />
-        <StatCard
-          label={t("rakht.remainingMoney", {
-            defaultValue: "Remaining Amount",
-          })}
-          value={formatMoney(summary.totalRemaining)}
-          sub={t("rakht.filteredSummary", {
-            defaultValue: "Across the current filter set",
-          })}
-          Icon={LuBadgeDollarSign}
-          accent="#B45309"
-        />
-        <StatCard
-          label={t("rakht.currentPage", { defaultValue: "Current Page" })}
-          value={rows.length}
-          sub={`${t("common.page", { defaultValue: "Page" })} ${page} / ${totalPages}`}
-          Icon={LuChartColumn}
-          accent="#7C3AED"
-        />
-      </div>
+      <Card>
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
+          <span className="badge bg-gray">
+            {t("rakht.totalRecords", { defaultValue: "Total Records" })}:{" "}
+            {total}
+          </span>
+          <span className="badge bg-green">
+            {t("rakht.totalPaidMoney", { defaultValue: "Total Paid Money" })}:{" "}
+            {formatMoney(summary.totalPaid)}
+          </span>
+          <span className="badge bg-gold">
+            {t("rakht.remainingMoney", { defaultValue: "Remaining Amount" })}:{" "}
+            {formatMoney(summary.totalRemaining)}
+          </span>
+          <span className="badge bg-gray">
+            {t("common.page", { defaultValue: "Page" })}: {page} / {totalPages}
+          </span>
+        </div>
+      </Card>
 
       <Card
         title={t("rakht.paymentHistory", { defaultValue: "Payment History" })}
@@ -762,7 +717,6 @@ export default function PaymentHistory() {
                     </button>
                   </th>
                   <th>{t("common.user", { defaultValue: "User" })}</th>
-                  <th>{t("common.actions", { defaultValue: "Actions" })}</th>
                 </tr>
               </thead>
               <tbody>
@@ -770,21 +724,8 @@ export default function PaymentHistory() {
                   const status = getPaymentStatus(row, t);
                   return (
                     <tr key={row.id}>
-                      <td>
-                        <button
-                          type="button"
-                          onClick={() => setDetailCompany(row.companyName)}
-                          style={{
-                            background: "none",
-                            border: 0,
-                            padding: 0,
-                            cursor: "pointer",
-                            color: "var(--primary)",
-                            fontWeight: 700,
-                          }}
-                        >
-                          {row.companyName || "-"}
-                        </button>
+                      <td style={{ fontWeight: 700 }}>
+                        {row.companyName || "-"}
                       </td>
                       <td>{formatMoney(row.totalPriceAfter)}</td>
                       <td>{formatMoney(row.paidAmount)}</td>
@@ -792,18 +733,8 @@ export default function PaymentHistory() {
                       <td>
                         <Badge v={status.variant}>{status.label}</Badge>
                       </td>
-                      <td>{formatDateTime(row.paidAt)}</td>
+                      <td>{formatDateTime(row.paidAt, language)}</td>
                       <td>{row.paidBy?.name || "-"}</td>
-                      <td>
-                        <button
-                          type="button"
-                          className="btn btn-outline btn-sm"
-                          onClick={() => setDetailCompany(row.companyName)}
-                        >
-                          <LuEye size={13} />
-                          {t("common.view", { defaultValue: "View" })}
-                        </button>
-                      </td>
                     </tr>
                   );
                 })}
@@ -850,135 +781,6 @@ export default function PaymentHistory() {
           </div>
         </div>
       </Card>
-
-      <Modal
-        open={Boolean(detailCompany)}
-        onClose={() => setDetailCompany(null)}
-        title={t("rakht.companyHistoryTitle", {
-          defaultValue: `${detailCompany || ""} Payment History`,
-        })}
-        maxW={860}
-      >
-        <div style={{ display: "grid", gap: 14 }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: 10,
-            }}
-          >
-            <div className="stat-card">
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 10,
-                    background: "#2563EB18",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <LuBuilding2 size={18} style={{ color: "#2563EB" }} />
-                </div>
-                <div>
-                  <p
-                    style={{
-                      fontSize: 12,
-                      color: "var(--text3)",
-                      fontWeight: 700,
-                    }}
-                  >
-                    {t("rakht.companyName", { defaultValue: "Company Name" })}
-                  </p>
-                  <p style={{ fontSize: 15, fontWeight: 700 }}>
-                    {detailCompany || "-"}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="stat-card">
-              <p
-                style={{ fontSize: 12, color: "var(--text3)", fontWeight: 700 }}
-              >
-                {t("rakht.totalPaidMoney", {
-                  defaultValue: "Total Paid Money",
-                })}
-              </p>
-              <p style={{ fontSize: 22, fontWeight: 700, color: "#15803D" }}>
-                {formatMoney(detailSummary.totalPaid)}
-              </p>
-            </div>
-            <div className="stat-card">
-              <p
-                style={{ fontSize: 12, color: "var(--text3)", fontWeight: 700 }}
-              >
-                {t("rakht.remainingMoney", {
-                  defaultValue: "Remaining Amount",
-                })}
-              </p>
-              <p style={{ fontSize: 22, fontWeight: 700, color: "#B45309" }}>
-                {formatMoney(detailSummary.totalRemaining)}
-              </p>
-            </div>
-          </div>
-
-          {isCompanyDetailLoading ? (
-            <Spinner />
-          ) : detailRows.length === 0 ? (
-            <EmptyState
-              message={t("rakht.noPaymentHistory", {
-                defaultValue: "No payment history found.",
-              })}
-            />
-          ) : (
-            <div className="tbl-wrap" style={{ overflowX: "auto" }}>
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th>
-                      {t("rakht.paidAmount", { defaultValue: "Paid Amount" })}
-                    </th>
-                    <th>
-                      {t("rakht.remainingBefore", {
-                        defaultValue: "Remaining Before",
-                      })}
-                    </th>
-                    <th>
-                      {t("rakht.remainingAfter", {
-                        defaultValue: "Remaining After",
-                      })}
-                    </th>
-                    <th>{t("common.status", { defaultValue: "Status" })}</th>
-                    <th>
-                      {t("rakht.dateTime", { defaultValue: "Date & Time" })}
-                    </th>
-                    <th>{t("common.user", { defaultValue: "User" })}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {detailRows.map((row) => {
-                    const status = getPaymentStatus(row, t);
-                    return (
-                      <tr key={row.id}>
-                        <td>{formatMoney(row.paidAmount)}</td>
-                        <td>{formatMoney(row.remainingBefore)}</td>
-                        <td>{formatMoney(row.remainingAfter)}</td>
-                        <td>
-                          <Badge v={status.variant}>{status.label}</Badge>
-                        </td>
-                        <td>{formatDateTime(row.paidAt)}</td>
-                        <td>{row.paidBy?.name || "-"}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </Modal>
     </div>
   );
 }

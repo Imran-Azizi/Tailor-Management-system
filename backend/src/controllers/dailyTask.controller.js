@@ -1,9 +1,11 @@
 import {
   createDailyTaskSchema,
+  createDailyTaskBatchSchema,
   updateDailyTaskSchema,
 } from "../validators/dailyTask.validator.js";
 import * as service from "../services/dailyTask.service.js";
 import { buildDailyTaskReportPdf } from "../lib/dailyTaskReportPdf.js";
+import { normalizeReportLanguage } from "../lib/reportLocale.js";
 
 const DAILY_TASK_EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
@@ -57,13 +59,14 @@ export const dailyTaskReport = async (req, res, next) => {
 export const dailyTaskReportPdf = async (req, res, next) => {
   try {
     const { reportType = "daily", date, from, to } = req.query;
+    const language = normalizeReportLanguage(req.query.lang || "en");
     const report = await service.getDailyTaskReport({
       reportType,
       date,
       from,
       to,
     });
-    const pdfBuffer = await buildDailyTaskReportPdf(report);
+    const pdfBuffer = await buildDailyTaskReportPdf(report, language);
 
     const safeType = String(report.filters.reportType || "daily").toLowerCase();
     const filename = `daily-task-${safeType}-report.pdf`;
@@ -91,8 +94,26 @@ export const getDailyTask = async (req, res, next) => {
 /** POST /api/daily-tasks */
 export const createDailyTask = async (req, res, next) => {
   try {
+    if (
+      Array.isArray(req.body.allocations) &&
+      req.body.allocations.length > 0
+    ) {
+      const body = createDailyTaskBatchSchema.parse({
+        ...req.body,
+        allocations: req.body.allocations.map((item) => ({
+          ...item,
+          orderId: item?.orderId,
+          amount: Number(item?.amount),
+        })),
+      });
+
+      const tasks = await service.createDailyTaskBatch(body, req.user.id);
+      return res.status(201).json({ data: tasks, count: tasks.length });
+    }
+
     const body = createDailyTaskSchema.parse({
       ...req.body,
+      orderId: req.body.orderId,
       amount: Number(req.body.amount),
     });
     const task = await service.createDailyTask(body, req.user.id);
@@ -113,6 +134,7 @@ export const updateDailyTask = async (req, res, next) => {
 
     const body = updateDailyTaskSchema.parse({
       ...req.body,
+      orderId: req.body.orderId,
       amount: Number(req.body.amount),
     });
 

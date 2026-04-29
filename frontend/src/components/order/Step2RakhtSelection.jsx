@@ -14,6 +14,23 @@ const emptySelection = {
   rakhtTonId: "",
   requiredMeters: "",
   piecePrice: "",
+  priceForCustomer: "",
+};
+
+const getTonRemainingMeters = (ton) => {
+  const totalMeters = Number(ton?.totalMeters || 0);
+  const usedMeters = Number(ton?.usedMeters || 0);
+  if (!Number.isFinite(totalMeters) || totalMeters <= 0) return 0;
+  if (!Number.isFinite(usedMeters) || usedMeters <= 0) {
+    return Math.round(Math.max(0, totalMeters));
+  }
+  return Math.round(Math.max(0, totalMeters - usedMeters));
+};
+
+const round2 = (value) => {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.round((numeric + Number.EPSILON) * 100) / 100;
 };
 
 export default function Step2RakhtSelection({
@@ -75,6 +92,10 @@ export default function Step2RakhtSelection({
             existing?.piecePrice !== undefined
               ? String(existing.piecePrice)
               : fallback.piecePrice || "",
+          priceForCustomer:
+            existing?.priceForCustomer !== undefined
+              ? String(existing.priceForCustomer)
+              : fallback.priceForCustomer || "",
         };
       });
       return next;
@@ -120,8 +141,9 @@ export default function Step2RakhtSelection({
       const companyName = current.companyName || "";
       const brandName = current.brandName || "";
       const rakhtTonId = current.rakhtTonId || "";
-      const requiredMeters = Math.round(Number(current.requiredMeters || 0));
+      const requiredMeters = Number(current.requiredMeters || 0);
       const piecePrice = Number(current.piecePrice || 0);
+      const priceForCustomer = Number(current.priceForCustomer || 0);
 
       const orderTypeLabel =
         item.label || getOrderTypeLabel(item.type, language);
@@ -138,6 +160,16 @@ export default function Step2RakhtSelection({
           t("createOrder.completeRakhtSelectionForItem", {
             type: orderTypeLabel,
             defaultValue: `Please complete Rakht selection for ${orderTypeLabel}.`,
+          }),
+        );
+        return;
+      }
+
+      if (!Number.isFinite(priceForCustomer) || priceForCustomer <= 0) {
+        toast.error(
+          t("createOrder.priceForCustomerRequired", {
+            type: orderTypeLabel,
+            defaultValue: `Please enter Price for Customer for ${orderTypeLabel}.`,
           }),
         );
         return;
@@ -169,9 +201,7 @@ export default function Step2RakhtSelection({
         return;
       }
 
-      const tonAvailable = Math.round(
-        Number(ton.availableMeters ?? ton.totalMeters ?? 0),
-      );
+      const tonAvailable = getTonRemainingMeters(ton);
 
       if (requiredMeters > tonAvailable) {
         toast.error(
@@ -194,6 +224,8 @@ export default function Step2RakhtSelection({
         rakhtColorHex: ton.colorHex,
         requiredMeters,
         piecePrice,
+        priceForCustomer,
+        totalPriceForCustomer: round2(priceForCustomer * requiredMeters),
       });
     }
 
@@ -233,6 +265,7 @@ export default function Step2RakhtSelection({
             const rakhtTonId = current.rakhtTonId || "";
             const requiredMeters = Number(current.requiredMeters || 0);
             const piecePrice = Number(current.piecePrice || 0);
+            const priceForCustomer = Number(current.priceForCustomer || 0);
 
             const filteredByCompany = (rakhtRows || []).filter(
               (item) => item.companyName === companyName,
@@ -269,23 +302,23 @@ export default function Step2RakhtSelection({
             );
 
             const availableMeters = selectedTon
-              ? Math.round(
-                  Number(
-                    selectedTon.availableMeters ?? selectedTon.totalMeters ?? 0,
-                  ),
-                )
+              ? getTonRemainingMeters(selectedTon)
               : 0;
 
             const remainingAfter = Math.round(
               Math.max(0, availableMeters - requiredMeters),
             );
-            const purchasePricePerMeter = Number(
-              selectedTon?.purchasePricePerMeter || 0,
-            );
             const computedTotalPrice =
               Number.isFinite(piecePrice) && Number.isFinite(requiredMeters)
-                ? piecePrice * Math.max(0, requiredMeters)
+                ? round2(piecePrice * Math.max(0, requiredMeters))
                 : 0;
+            const computedTotalPriceForCustomer =
+              Number.isFinite(priceForCustomer) &&
+              Number.isFinite(requiredMeters)
+                ? round2(priceForCustomer * Math.max(0, requiredMeters))
+                : 0;
+            const rakhtBenefit =
+              computedTotalPriceForCustomer - computedTotalPrice;
 
             const typeLabel = item.label;
 
@@ -435,14 +468,10 @@ export default function Step2RakhtSelection({
                               style={{ fontSize: 11, color: "var(--text3)" }}
                             >
                               &nbsp;-&nbsp;
-                              {Math.round(
-                                Number(
-                                  opt.ton.availableMeters ??
-                                    opt.ton.totalMeters ??
-                                    0,
-                                ),
-                              )}
-                              m
+                              {getTonRemainingMeters(opt.ton)}m{" "}
+                              {t("rakht.remaining", {
+                                defaultValue: "remaining",
+                              })}
                             </span>
                           )}
                         </span>
@@ -472,8 +501,8 @@ export default function Step2RakhtSelection({
                       <LuRuler size={14} className="ico" />
                       <input
                         type="number"
-                        min="1"
-                        step="1"
+                        min="0.01"
+                        step="0.01"
                         className="inp"
                         value={current.requiredMeters || ""}
                         onChange={(event) =>
@@ -485,28 +514,121 @@ export default function Step2RakhtSelection({
                     </div>
                   </Field>
 
-                  <Field
-                    label={t("rakht.sellingPricePerMeter", {
-                      defaultValue: "Selling Price per Meter",
-                    })}
-                    required
+                  {/* Selling Price per Meter (read-only) + Total Price (auto-calc) */}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: 12,
+                    }}
                   >
-                    <div className="iw">
-                      <LuRuler size={14} className="ico" />
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        className="inp"
-                        value={current.piecePrice || ""}
-                        onChange={(event) =>
-                          updateSelection(item.key, {
-                            piecePrice: event.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                  </Field>
+                    <Field
+                      label={t("rakht.sellingPricePerMeter", {
+                        defaultValue: "Selling Price / m (Purchase)",
+                      })}
+                    >
+                      <div className="iw">
+                        <LuRuler size={14} className="ico" />
+                        <input
+                          type="number"
+                          className="inp"
+                          value={current.piecePrice || ""}
+                          readOnly
+                          disabled
+                          style={{
+                            background: "var(--surface2)",
+                            cursor: "not-allowed",
+                          }}
+                        />
+                      </div>
+                    </Field>
+
+                    <Field
+                      label={t("rakht.totalPurchasePrice", {
+                        defaultValue: "Total Price (Purchase)",
+                      })}
+                    >
+                      <div className="iw">
+                        <LuRuler size={14} className="ico" />
+                        <input
+                          type="text"
+                          className="inp"
+                          value={
+                            computedTotalPrice > 0
+                              ? computedTotalPrice.toLocaleString("en-US")
+                              : "0"
+                          }
+                          readOnly
+                          disabled
+                          style={{
+                            background: "var(--surface2)",
+                            cursor: "not-allowed",
+                          }}
+                        />
+                      </div>
+                    </Field>
+                  </div>
+
+                  {/* Price for Customer (editable) + Total Price for Customer (auto-calc) */}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: 12,
+                    }}
+                  >
+                    <Field
+                      label={t("rakht.priceForCustomer", {
+                        defaultValue: "Price for Customer / m",
+                      })}
+                      required
+                    >
+                      <div className="iw">
+                        <LuRuler size={14} className="ico" />
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          className="inp"
+                          value={current.priceForCustomer || ""}
+                          onChange={(event) =>
+                            updateSelection(item.key, {
+                              priceForCustomer: event.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                    </Field>
+
+                    <Field
+                      label={t("rakht.totalPriceForCustomer", {
+                        defaultValue: "Total Price for Customer",
+                      })}
+                    >
+                      <div className="iw">
+                        <LuRuler size={14} className="ico" />
+                        <input
+                          type="text"
+                          className="inp"
+                          value={
+                            computedTotalPriceForCustomer > 0
+                              ? computedTotalPriceForCustomer.toLocaleString(
+                                  "en-US",
+                                )
+                              : "0"
+                          }
+                          readOnly
+                          disabled
+                          style={{
+                            background: "var(--surface2)",
+                            cursor: "not-allowed",
+                            fontWeight: 700,
+                            color: "var(--primary)",
+                          }}
+                        />
+                      </div>
+                    </Field>
+                  </div>
 
                   {selectedTon ? (
                     <>
@@ -529,37 +651,10 @@ export default function Step2RakhtSelection({
                             : {availableMeters}
                           </span>
                           <span>
-                            {t("rakht.purchasePricePerMeter", {
-                              defaultValue: "Price per meter",
-                            })}
-                            :{" "}
-                            {purchasePricePerMeter > 0
-                              ? purchasePricePerMeter.toLocaleString(
-                                  undefined,
-                                  {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  },
-                                )
-                              : "-"}
-                          </span>
-                          <span>
                             {t("rakht.remainingAfterSelection", {
                               defaultValue: "Remaining after selection",
                             })}
                             : {remainingAfter}
-                          </span>
-                          <span>
-                            {t("rakht.selectionTotalPrice", {
-                              defaultValue: "Total price",
-                            })}
-                            :{" "}
-                            {computedTotalPrice > 0
-                              ? computedTotalPrice.toLocaleString(undefined, {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })
-                              : "0.00"}
                           </span>
                           <span>
                             {t("rakht.companyName", {
@@ -585,6 +680,36 @@ export default function Step2RakhtSelection({
                             />
                             {t("rakht.tonName", { defaultValue: "Name" })}:{" "}
                             {selectedTon.name}
+                          </span>
+                          {computedTotalPriceForCustomer > 0 && (
+                            <span
+                              style={{
+                                fontWeight: 700,
+                                color: "var(--primary)",
+                              }}
+                            >
+                              {t("rakht.totalPriceForCustomer", {
+                                defaultValue: "Total for Customer",
+                              })}
+                              :{" "}
+                              {computedTotalPriceForCustomer.toLocaleString(
+                                "en-US",
+                              )}
+                            </span>
+                          )}
+                          <span
+                            style={{
+                              fontWeight: 700,
+                              color:
+                                rakhtBenefit >= 0
+                                  ? "var(--success, #16a34a)"
+                                  : "var(--danger, #ef4444)",
+                            }}
+                          >
+                            {t("rakht.benefit", {
+                              defaultValue: "Rakht Benefit",
+                            })}
+                            : {rakhtBenefit.toLocaleString("en-US")}
                           </span>
                         </div>
                       </div>

@@ -1,6 +1,13 @@
 import PDFDocument from "pdfkit";
 import fs from "fs";
 import { createRequire } from "module";
+import {
+  formatReportDateTime,
+  formatReportNumber,
+  getReportLocaleTag,
+  normalizeReportLanguage,
+  resolveReportText,
+} from "./reportLocale.js";
 
 const require = createRequire(import.meta.url);
 const reshaper = require("arabic-persian-reshaper");
@@ -42,8 +49,8 @@ function toPdf(value, arabicFontName) {
   }
 }
 
-function fmt(value) {
-  return Number(value || 0).toLocaleString("en-US", {
+function fmt(value, language) {
+  return formatReportNumber(value, language, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -64,18 +71,42 @@ const MONTH_NAMES = [
   "December",
 ];
 
-function monthName(n) {
-  return MONTH_NAMES[(Number(n) - 1) % 12] || String(n);
+function monthName(n, language = "en") {
+  const locale = getReportLocaleTag(language);
+  const month = Number(n);
+  if (!Number.isFinite(month) || month < 1 || month > 12) return String(n);
+  try {
+    return new Intl.DateTimeFormat(locale, { month: "long" }).format(
+      new Date(2026, month - 1, 1),
+    );
+  } catch {
+    return MONTH_NAMES[(month - 1) % 12] || String(n);
+  }
 }
 
-function orderTypeLabel(type) {
+function orderTypeLabel(type, language = "en") {
+  const normalized = normalizeReportLanguage(language);
   const map = {
-    OUTFIT: "Outfit",
-    WASKAT: "Waskat",
-    KORTY: "Korty",
-    YAKHANQAQ: "YakhanQaq",
+    en: {
+      OUTFIT: "Outfit",
+      WASKAT: "Waskat",
+      KORTY: "Korty",
+      YAKHANQAQ: "YakhanQaq",
+    },
+    dari: {
+      OUTFIT: "لباس",
+      WASKAT: "واسکت",
+      KORTY: "کرتی",
+      YAKHANQAQ: "یخن قاق",
+    },
+    pashto: {
+      OUTFIT: "لباس",
+      WASKAT: "واسکټ",
+      KORTY: "کورټی",
+      YAKHANQAQ: "یخن قاق",
+    },
   };
-  return map[type] || type;
+  return map[normalized]?.[type] || map.en[type] || type;
 }
 
 // ─── Column layout ────────────────────────────────────────────────────────────
@@ -96,7 +127,7 @@ const COL = {
 const ROW_H = 20;
 const FOOTER_THRESHOLD_MARGIN = 56;
 
-function drawTableHeader(doc, y) {
+function drawTableHeader(doc, y, labels) {
   doc.save();
   doc.roundedRect(40, y, 555, ROW_H, 3).fill("#1E293B");
   doc.restore();
@@ -104,16 +135,16 @@ function drawTableHeader(doc, y) {
   doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(7.5);
 
   Object.entries({
-    num: "#",
-    bill: "Bill#",
-    customer: "Customer",
-    type: "Type",
-    qty: "Qty",
-    total: "Total",
-    discount: "Discount",
-    paid: "Paid",
-    remaining: "Remaining",
-    status: "Status",
+    num: labels.columns.num,
+    bill: labels.columns.bill,
+    customer: labels.columns.customer,
+    type: labels.columns.type,
+    qty: labels.columns.qty,
+    total: labels.columns.total,
+    discount: labels.columns.discount,
+    paid: labels.columns.paid,
+    remaining: labels.columns.remaining,
+    status: labels.columns.status,
   }).forEach(([key, label]) => {
     const c = COL[key];
     doc.text(label, c.x, y + 6, { width: c.w, align: c.align || "left" });
@@ -122,7 +153,7 @@ function drawTableHeader(doc, y) {
   return y + ROW_H;
 }
 
-function drawRow(doc, y, index, order, arabicFontName) {
+function drawRow(doc, y, index, order, arabicFontName, language, labels) {
   if (index % 2 === 0) {
     doc.save();
     doc.rect(40, y, 555, ROW_H).fill("#F8FAFC");
@@ -146,30 +177,39 @@ function drawRow(doc, y, index, order, arabicFontName) {
     align: rtl ? "right" : "left",
   });
   doc.font("Helvetica");
-  doc.text(orderTypeLabel(order.type), c.type.x, y + 6, { width: c.type.w });
+  doc.text(
+    order.orderDisplayName || orderTypeLabel(order.type, language),
+    c.type.x,
+    y + 6,
+    {
+      width: c.type.w,
+    },
+  );
   doc.text(String(order.quantity ?? 1), c.qty.x, y + 6, { width: c.qty.w });
-  doc.text(fmt(order.totalPrice), c.total.x, y + 6, {
+  doc.text(fmt(order.totalPrice, language), c.total.x, y + 6, {
     width: c.total.w,
     align: "right",
   });
-  doc.text(fmt(order.discount), c.discount.x, y + 6, {
+  doc.text(fmt(order.discount, language), c.discount.x, y + 6, {
     width: c.discount.w,
     align: "right",
   });
-  doc.text(fmt(order.paidAmount), c.paid.x, y + 6, {
+  doc.text(fmt(order.paidAmount, language), c.paid.x, y + 6, {
     width: c.paid.w,
     align: "right",
   });
 
   const rem = Number(order.remaining ?? 0);
   doc.fillColor(rem > 0 ? "#DC2626" : "#16A34A");
-  doc.text(fmt(rem), c.remaining.x, y + 6, {
+  doc.text(fmt(rem, language), c.remaining.x, y + 6, {
     width: c.remaining.w,
     align: "right",
   });
   doc.fillColor("#0F172A");
 
-  const statusLabel = order.isCompleted ? "Done" : "Pending";
+  const statusLabel = order.isCompleted
+    ? labels.statusDone
+    : labels.statusPending;
   const statusColor = order.isCompleted ? "#16A34A" : "#D97706";
   doc.fillColor(statusColor).font("Helvetica-Bold").fontSize(7.5);
   doc.text(statusLabel, c.status.x, y + 7, { width: c.status.w });
@@ -193,14 +233,21 @@ function summaryRow(doc, label, value, y, valueColor = "#0F172A") {
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
-export function buildMonthlyReportPdf({ month, year, orders }) {
+export function buildMonthlyReportPdf({
+  month,
+  year,
+  orders,
+  language = "en",
+}) {
+  const labels = resolveReportText(language).monthly;
+
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
       size: "A4",
       layout: "landscape",
       margin: 40,
       info: {
-        Title: `Monthly Report - ${monthName(month)} ${year}`,
+        Title: `${labels.title} - ${monthName(month, language)} ${year}`,
         Author: "Tailor System",
       },
     });
@@ -245,14 +292,14 @@ export function buildMonthlyReportPdf({ month, year, orders }) {
       .font("Helvetica-Bold")
       .fontSize(20)
       .fillColor("#FFFFFF")
-      .text(`Monthly Report — ${monthName(month)} ${year}`, 40, 18);
+      .text(`${labels.title} — ${monthName(month, language)} ${year}`, 40, 18);
 
     doc
       .font("Helvetica")
       .fontSize(9)
       .fillColor("#94A3B8")
       .text(
-        `Generated: ${new Date().toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}   |   Total Orders: ${safeOrders.length}`,
+        `${labels.generatedAt}: ${formatReportDateTime(new Date(), language)}   |   ${labels.totalOrders}: ${formatReportNumber(safeOrders.length, language)}`,
         40,
         42,
       );
@@ -264,23 +311,44 @@ export function buildMonthlyReportPdf({ month, year, orders }) {
       .font("Helvetica-Bold")
       .fontSize(10)
       .fillColor("#0F172A")
-      .text("Summary", 40, y);
+      .text(labels.summary, 40, y);
 
     y += 14;
-    y = summaryRow(doc, "Total Orders", String(safeOrders.length), y);
     y = summaryRow(
       doc,
-      "Completed / Pending",
-      `${completedCount} / ${pendingCount}`,
+      labels.totalOrders,
+      formatReportNumber(safeOrders.length, language),
       y,
     );
-    y = summaryRow(doc, "Gross Revenue", `${fmt(totalRevenue)} AFN`, y);
-    y = summaryRow(doc, "Total Discounts", `${fmt(totalDiscount)} AFN`, y);
-    y = summaryRow(doc, "Total Paid", `${fmt(totalPaid)} AFN`, y, "#16A34A");
     y = summaryRow(
       doc,
-      "Total Remaining (Outstanding)",
-      `${fmt(totalRemaining)} AFN`,
+      labels.completedPending,
+      `${formatReportNumber(completedCount, language)} / ${formatReportNumber(pendingCount, language)}`,
+      y,
+    );
+    y = summaryRow(
+      doc,
+      labels.grossRevenue,
+      `${fmt(totalRevenue, language)} AF`,
+      y,
+    );
+    y = summaryRow(
+      doc,
+      labels.totalDiscounts,
+      `${fmt(totalDiscount, language)} AF`,
+      y,
+    );
+    y = summaryRow(
+      doc,
+      labels.totalPaid,
+      `${fmt(totalPaid, language)} AF`,
+      y,
+      "#16A34A",
+    );
+    y = summaryRow(
+      doc,
+      labels.totalRemaining,
+      `${fmt(totalRemaining, language)} AF`,
       y,
       totalRemaining > 0 ? "#DC2626" : "#16A34A",
     );
@@ -299,7 +367,7 @@ export function buildMonthlyReportPdf({ month, year, orders }) {
       .font("Helvetica-Bold")
       .fontSize(11)
       .fillColor("#0F172A")
-      .text("Order Records", 40, y);
+      .text(labels.orderRecords, 40, y);
 
     y += 14;
 
@@ -309,9 +377,9 @@ export function buildMonthlyReportPdf({ month, year, orders }) {
         .font("Helvetica")
         .fontSize(11)
         .fillColor("#64748B")
-        .text("No orders found for this month.", 40, y + 8);
+        .text(labels.noOrders, 40, y + 8);
     } else {
-      y = drawTableHeader(doc, y);
+      y = drawTableHeader(doc, y, labels);
 
       const footerThreshold = doc.page.height - FOOTER_THRESHOLD_MARGIN;
 
@@ -324,14 +392,14 @@ export function buildMonthlyReportPdf({ month, year, orders }) {
             .fontSize(10)
             .fillColor("#0F172A")
             .text(
-              `Monthly Report — ${monthName(month)} ${year} (continued)`,
+              `${labels.title} — ${monthName(month, language)} ${year} (${labels.continued})`,
               40,
               y,
             );
           y += 18;
-          y = drawTableHeader(doc, y);
+          y = drawTableHeader(doc, y, labels);
         }
-        y = drawRow(doc, y, index, order, arabicFontName);
+        y = drawRow(doc, y, index, order, arabicFontName, language, labels);
       });
 
       // ── Totals row ──────────────────────────────────────────────────────────
@@ -341,20 +409,20 @@ export function buildMonthlyReportPdf({ month, year, orders }) {
       doc.restore();
 
       doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(8);
-      doc.text("TOTALS", COL.customer.x, y + 7, { width: 100 });
-      doc.text(fmt(totalRevenue), COL.total.x, y + 7, {
+      doc.text(labels.totals, COL.customer.x, y + 7, { width: 100 });
+      doc.text(fmt(totalRevenue, language), COL.total.x, y + 7, {
         width: COL.total.w,
         align: "right",
       });
-      doc.text(fmt(totalDiscount), COL.discount.x, y + 7, {
+      doc.text(fmt(totalDiscount, language), COL.discount.x, y + 7, {
         width: COL.discount.w,
         align: "right",
       });
-      doc.text(fmt(totalPaid), COL.paid.x, y + 7, {
+      doc.text(fmt(totalPaid, language), COL.paid.x, y + 7, {
         width: COL.paid.w,
         align: "right",
       });
-      doc.text(fmt(totalRemaining), COL.remaining.x, y + 7, {
+      doc.text(fmt(totalRemaining, language), COL.remaining.x, y + 7, {
         width: COL.remaining.w,
         align: "right",
       });
@@ -366,7 +434,7 @@ export function buildMonthlyReportPdf({ month, year, orders }) {
       .fontSize(8)
       .fillColor("#94A3B8")
       .text(
-        `Khan Rahimi Tailor System — Monthly Report ${monthName(month)} ${year}`,
+        `${labels.footerPrefix} — ${labels.title} ${monthName(month, language)} ${year}`,
         40,
         doc.page.height - 26,
         { width: pageW - 80, align: "center" },

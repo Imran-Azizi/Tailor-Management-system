@@ -54,9 +54,14 @@ export function buildSelectStyles(hasError = false) {
   };
 }
 
-export async function downloadDailyTaskReportPdf({ reportType, date }) {
+export async function downloadDailyTaskReportPdf({
+  reportType,
+  date,
+  language,
+}) {
   const params = { reportType };
   if (date) params.date = date;
+  if (language) params.lang = language;
 
   const response = await api.get("/daily-tasks/report/pdf", {
     params,

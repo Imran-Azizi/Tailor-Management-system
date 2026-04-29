@@ -6,6 +6,7 @@ export const createTransactionSchema = z.object({
     invalid_type_error: "Invalid account type",
   }),
   userId: z.string().min(1, "User is required"),
+  orderId: z.string().optional(),
   amount: z
     .number({
       required_error: "Amount is required",

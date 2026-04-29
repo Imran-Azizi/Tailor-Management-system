@@ -27,6 +27,7 @@ const schema = z.object({
       message: "Amount must be a positive number",
     }),
   transactionDate: z.string().min(1, "Transaction date is required"),
+  orderId: z.string().optional(),
   note: z.string().optional(),
 });
 
@@ -94,6 +95,7 @@ export default function MakeTransaction() {
       user: null,
       amount: "",
       transactionDate: today(),
+      orderId: "",
       note: "",
     },
   });
@@ -142,6 +144,7 @@ export default function MakeTransaction() {
         amount: "",
         transactionDate: today(),
         note: "",
+        orderId: "",
       });
       setSelectedAccountType(null);
     },
@@ -155,6 +158,7 @@ export default function MakeTransaction() {
       userId: values.user.value,
       amount: Number(values.amount),
       transactionDate: values.transactionDate,
+      orderId: values.orderId?.trim() || undefined,
       note: values.note || undefined,
     });
   };
@@ -290,6 +294,21 @@ export default function MakeTransaction() {
                 />
               </Field>
             </div>
+
+            <Field
+              label={`${t("transaction.orderId", "Order ID")} (${t("common.optional")})`}
+              error={errors.orderId?.message}
+            >
+              <input
+                type="text"
+                className="inp"
+                placeholder={t(
+                  "transaction.orderIdPlaceholder",
+                  "Link this payment to a specific order (optional)",
+                )}
+                {...register("orderId")}
+              />
+            </Field>
 
             <Field
               label={`${t("transaction.note")} (${t("common.optional")})`}

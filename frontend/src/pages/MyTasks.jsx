@@ -1,3 +1,4 @@
+import { formatCurrency } from "../lib/currency.js";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -21,9 +22,10 @@ import {
 
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
-import { getOrderTypeLabel } from "../lib/orderType.js";
+import { getOrderDisplayName } from "../lib/orderType.js";
 import { formatUserNotificationMessage } from "../lib/notifications.js";
 import { formatDateTimeLocale } from "../lib/locale.js";
+import { formatSystemDate } from "../lib/locale.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import {
   Badge,
@@ -103,15 +105,14 @@ function statusColor(s) {
 }
 
 function fmt$(v) {
-  return `$${Number(v || 0).toLocaleString()}`;
-}
-function fmtDate(d) {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
+  return formatCurrency(v, "en", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   });
+}
+function fmtDate(d, language) {
+  if (!d) return "—";
+  return formatSystemDate(d, language);
 }
 
 // ── Measurements grid ──────────────────────────────────────────────────────────
@@ -288,7 +289,7 @@ function OrderDetailModal({
             </h2>
             <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
               <Badge v={TYPE_V[order.type] || "gold"}>
-                {getOrderTypeLabel(order.type, language)}
+                {getOrderDisplayName(order, language)}
               </Badge>
               {order.isEmergency && <Badge v="red">⚡ Emergency</Badge>}
               {order.orderName && (
@@ -546,7 +547,7 @@ function OrderDetailModal({
                     style={{ color: "var(--text3)" }}
                   />
                   <span style={{ color: "var(--text2)" }}>
-                    {fmtDate(order.assignedAt)}
+                    {fmtDate(order.assignedAt, language)}
                   </span>
                 </div>
               </div>
@@ -777,7 +778,7 @@ function OrderCard({
               #{order.customer?.billNumber}
             </span>
             <Badge v={TYPE_V[order.type] || "gold"}>
-              {getOrderTypeLabel(order.type, language)}
+              {getOrderDisplayName(order, language)}
             </Badge>
             {order.isEmergency && <Badge v="red">⚡ Emergency</Badge>}
             <span
@@ -811,7 +812,7 @@ function OrderCard({
             {order.assignedAt && (
               <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <LuCalendarClock size={11} />
-                {fmtDate(order.assignedAt)}
+                {fmtDate(order.assignedAt, language)}
               </span>
             )}
             {order.assignedBy && (
@@ -955,7 +956,7 @@ function OrderCard({
             }}
           >
             <LuSquareCheck size={13} />
-            {t("orders.done")} · {fmtDate(order.updatedAt)}
+            {t("orders.done")} · {fmtDate(order.updatedAt, language)}
           </span>
         )}
       </div>

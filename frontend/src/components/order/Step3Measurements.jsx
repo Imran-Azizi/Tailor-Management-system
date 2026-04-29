@@ -170,8 +170,11 @@ function MeasureBlock({
   entry,
   value,
   onChange,
+  onNameChange,
   onRemove,
   canRemove,
+  showNameInput = false,
+  defaultName = "",
   errors = {},
   setFieldError,
 }) {
@@ -265,6 +268,22 @@ function MeasureBlock({
 
       {open && (
         <div className="measure-block-body">
+          {showNameInput && (
+            <div style={{ marginBottom: 14 }}>
+              <label className="lbl" style={{ fontSize: 11 }}>
+                {t("createOrder.nameNewSet")}
+              </label>
+              <input
+                type="text"
+                className="inp"
+                style={{ height: 38, fontSize: 13 }}
+                value={value?.__name || ""}
+                onChange={(e) => onNameChange?.(e.target.value)}
+                placeholder={defaultName}
+              />
+            </div>
+          )}
+
           <div className="measure-section-head">
             <span
               style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
@@ -450,6 +469,19 @@ export default function Step3Measurements({
     });
   };
 
+  const setCustomName = (typeIdx, setIdx, customName) => {
+    setError("");
+    setData((prev) => {
+      const nextSets = [...(prev[typeIdx] || [{}])];
+      const current = nextSets[setIdx] || {};
+      nextSets[setIdx] = {
+        ...current,
+        __name: customName,
+      };
+      return { ...prev, [typeIdx]: nextSets };
+    });
+  };
+
   const clearFieldError = (typeIdx, setIdx, field) => {
     setFieldErrors((prev) => ({
       ...prev,
@@ -471,16 +503,9 @@ export default function Step3Measurements({
     setError("");
     setData((prev) => {
       const currentSets = prev[typeIdx] || [];
-      const sequence = currentSets.length + 1;
-      const fallbackType = orderTypes[typeIdx]?.type;
       return {
         ...prev,
-        [typeIdx]: [
-          ...currentSets,
-          {
-            __name: buildDefaultItemName(fallbackType, sequence, language),
-          },
-        ],
+        [typeIdx]: [...currentSets, { __name: "" }],
       };
     });
   };
@@ -622,11 +647,20 @@ export default function Step3Measurements({
                     }}
                     value={setValue}
                     errors={blockErrors}
+                    onNameChange={(customName) =>
+                      setCustomName(typeIdx, setIdx, customName)
+                    }
                     onChange={(nextValue) =>
                       setMeasure(typeIdx, setIdx, nextValue)
                     }
                     onRemove={() => removeSet(typeIdx, setIdx)}
                     canRemove={(data[typeIdx] || []).length > 1}
+                    showNameInput={setIdx > 0}
+                    defaultName={buildDefaultItemName(
+                      entry.type,
+                      setIdx + 1,
+                      language,
+                    )}
                     setFieldError={(field) =>
                       clearFieldError(typeIdx, setIdx, field)
                     }
@@ -647,7 +681,7 @@ export default function Step3Measurements({
                 className="btn btn-outline btn-sm"
                 onClick={() => addSet(typeIdx)}
               >
-                Add another
+                {t("createOrder.addAnotherSet")}
               </button>
             </div>
           </section>

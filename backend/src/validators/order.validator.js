@@ -19,6 +19,7 @@ const orderItemSchema = z.object({
   quantity: z.number().int().min(1).default(1),
   isEmergency: z.boolean().default(false),
   emergencyExpiry: z.string().optional().nullable(),
+  isForeignOrder: z.boolean().default(false),
   boxId: z.number().int().optional().nullable(),
   measurements: z.record(z.any()).optional(),
 });
@@ -34,6 +35,8 @@ const rakhtSelectionSchema = z.object({
   rakhtTonId: z.string().min(1, "Rakht ton is required"),
   requiredMeters: z.number().positive("Required meters must be positive"),
   piecePrice: z.number().positive("Piece price must be positive"),
+  priceForCustomer: z.number().positive("Price for customer must be positive"),
+  totalPriceForCustomer: z.number().min(0).optional(),
 });
 
 export const createOrderSchema = z.object({
@@ -43,7 +46,7 @@ export const createOrderSchema = z.object({
     phoneNumber: optionalText,
   }),
   entryMonth: z.number().int().min(1).max(12).optional().nullable(),
-  entryYear: z.number().int().min(2000).max(2100).optional().nullable(),
+  entryYear: z.number().int().min(1300).max(2200).optional().nullable(),
   rakhtSelections: z
     .array(rakhtSelectionSchema)
     .min(1, "At least one Rakht selection is required"),
@@ -58,7 +61,9 @@ export const updateOrderSchema = z.object({
   isCompleted: z.boolean().optional(),
   isEmergency: z.boolean().optional(),
   emergencyExpiry: z.string().optional().nullable(),
+  isForeignOrder: z.boolean().optional(),
   boxId: z.number().int().optional().nullable(),
+  foreignBoxId: z.number().int().optional().nullable(),
 });
 
 export const updateOrderBillSchema = z.object({

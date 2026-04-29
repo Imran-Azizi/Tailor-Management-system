@@ -65,6 +65,7 @@ export const createTransaction = async (req, res, next) => {
   try {
     const body = createTransactionSchema.parse({
       ...req.body,
+      orderId: req.body.orderId,
       amount: Number(req.body.amount),
     });
     const transaction = await service.createTransaction(body, req.user.id);

@@ -25,6 +25,7 @@ import {
   LuTrash2,
   LuCalendarCheck,
   LuDownload,
+  LuLock,
 } from "react-icons/lu";
 import { useTheme } from "../context/ThemeContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -35,9 +36,21 @@ import {
   formatSystemNotificationMessage,
   formatUserNotificationMessage,
 } from "../lib/notifications.js";
-import { formatDateTimeLocale } from "../lib/locale.js";
+import { formatDateTimeLocale, formatSystemDateTime } from "../lib/locale.js";
+import {
+  EMERGENCY_SOUND_MUTED_KEY,
+  EMERGENCY_SOUND_LAST_SEEN_KEY,
+  playEmergencyAlertSound,
+  shouldPlayEmergencyAlertCycle,
+} from "../lib/emergencyAlert.js";
 import { deleteOrderDraft, listOrderDrafts } from "../lib/orderDraftApi.js";
-import { getMonthLabel, MONTHS } from "../lib/months.js";
+import {
+  getMonthLabel,
+  getDisplayYearForLanguage,
+  getDisplayMonthLabelForLanguage,
+  formatMonthYearLabel,
+  MONTHS,
+} from "../lib/months.js";
 import { EmptyState, Modal, NotificationText, Spinner } from "./ui/index.jsx";
 
 function useOutside(ref, fn) {
@@ -58,7 +71,11 @@ const ROLE_COLORS = {
 };
 
 // Emergency + worker-status notifications (for Admin)
-function SystemNotifPanel({ onClose }) {
+function SystemNotifPanel({
+  onClose,
+  emergencyAlarmMuted,
+  onToggleEmergencyAlarmMuted,
+}) {
   const { t, i18n } = useTranslation();
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -112,6 +129,7 @@ function SystemNotifPanel({ onClose }) {
         ),
       ),
   });
+
   const readAllWorkerMut = useMutation({
     mutationFn: () => api.patch("/users/me/notifications/read-all"),
     onSuccess: () => {
@@ -147,6 +165,19 @@ function SystemNotifPanel({ onClose }) {
               {t("navbar.viewAll")}
             </button>
           )}
+          <button
+            onClick={onToggleEmergencyAlarmMuted}
+            className="notif-panel-link-btn"
+            title={
+              emergencyAlarmMuted
+                ? t("navbar.unmuteEmergencyAlarm", "Unmute emergency alarm")
+                : t("navbar.muteEmergencyAlarm", "Mute emergency alarm")
+            }
+          >
+            {emergencyAlarmMuted
+              ? t("navbar.unmute", "Unmute")
+              : t("navbar.mute", "Mute")}
+          </button>
           <button
             onClick={onClose}
             className="notif-panel-close-btn"
@@ -297,7 +328,12 @@ function SystemNotifPanel({ onClose }) {
                 <div
                   key={n.id}
                   className="notif-panel-item"
-                  style={{ cursor: "default" }}
+                  onClick={() => {
+                    readEmergencyMut.mutate(n.id);
+                    navigate(`/orders/${n.orderId}/edit`);
+                    onClose();
+                  }}
+                  style={{ cursor: "pointer" }}
                 >
                   <LuTriangleAlert
                     size={14}
@@ -329,7 +365,10 @@ function SystemNotifPanel({ onClose }) {
                     </p>
                   </div>
                   <button
-                    onClick={() => readEmergencyMut.mutate(n.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      readEmergencyMut.mutate(n.id);
+                    }}
                     title={t("navbar.markAsRead")}
                     className="notif-panel-close-btn"
                     style={{ width: 26, height: 26, borderRadius: 6 }}
@@ -562,7 +601,13 @@ function UserNotifPanel({ onClose }) {
   );
 }
 
-function NotificationSidebar({ open, onClose, isWorker }) {
+function NotificationSidebar({
+  open,
+  onClose,
+  isWorker,
+  emergencyAlarmMuted,
+  onToggleEmergencyAlarmMuted,
+}) {
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -600,7 +645,11 @@ function NotificationSidebar({ open, onClose, isWorker }) {
         {isWorker ? (
           <UserNotifPanel onClose={onClose} />
         ) : (
-          <SystemNotifPanel onClose={onClose} />
+          <SystemNotifPanel
+            onClose={onClose}
+            emergencyAlarmMuted={emergencyAlarmMuted}
+            onToggleEmergencyAlarmMuted={onToggleEmergencyAlarmMuted}
+          />
         )}
       </aside>
     </div>
@@ -612,7 +661,18 @@ function NotificationSidebar({ open, onClose, isWorker }) {
 function MonthDropdown({ onClose }) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language || "en";
-  const { viewMonth, viewYear, setViewMonth, setViewYear } = useMonth();
+  const {
+    viewMonth,
+    viewYear,
+    setViewMonth,
+    setViewYear,
+    monthPolicy,
+    isSelectableMonth,
+    getMonthDisabledReason,
+    getMonthAccessMode,
+    currentGregorianMonth,
+    currentGregorianYear,
+  } = useMonth();
   const { isAdmin } = useAuth();
 
   const [reportLoading, setReportLoading] = useState(false);
@@ -621,34 +681,31 @@ function MonthDropdown({ onClose }) {
   const activeYear = viewYear;
   const setMonth = setViewMonth;
   const setYear = setViewYear;
+  const futureMonthDisabledText = t(
+    "navbar.futureMonthDisabled",
+    "Future months are locked until the current month is fully completed.",
+  );
+  const pastMonthReadOnlyText = t(
+    "navbar.pastMonthReadOnly",
+    "Past months are read-only. No editing allowed.",
+  );
+  const currentMonthText = t("navbar.currentMonth", "Current month");
 
-  const currentYear = new Date().getFullYear();
-  const years = [currentYear - 1, currentYear, currentYear + 1];
+  const baseYear = Number(
+    monthPolicy.currentYear || viewYear || new Date().getFullYear(),
+  );
+  const years = [baseYear - 1, baseYear, baseYear + 1];
 
   const handleGenerateReport = async () => {
     if (reportLoading) return;
     setReportLoading(true);
     try {
       const response = await api.get("/orders/report/monthly", {
-        params: { month: viewMonth, year: viewYear },
+        params: { month: viewMonth, year: viewYear, lang: language },
         responseType: "blob",
       });
-      const MONTH_NAMES = [
-        "January",
-        "February",
-        "March",
-        "April",
-        "May",
-        "June",
-        "July",
-        "August",
-        "September",
-        "October",
-        "November",
-        "December",
-      ];
-      const monthLabel = MONTH_NAMES[(viewMonth - 1) % 12] || String(viewMonth);
-      const filename = `Monthly_Report_${monthLabel}_${viewYear}.pdf`;
+      const monthLabel = formatMonthYearLabel(viewMonth, viewYear, language);
+      const filename = `Monthly_Report_${monthLabel}.pdf`;
       const url = URL.createObjectURL(
         new Blob([response.data], { type: "application/pdf" }),
       );
@@ -667,50 +724,106 @@ function MonthDropdown({ onClose }) {
     }
   };
 
+  const selectedAccessMode = getMonthAccessMode(activeMonth, activeYear);
+  const modeConfig = {
+    editable: {
+      Icon: LuPencil,
+      label: currentMonthText,
+      cls: "month-mode-badge month-mode-badge--editable",
+    },
+    readonly: {
+      Icon: LuEye,
+      label: pastMonthReadOnlyText,
+      cls: "month-mode-badge month-mode-badge--readonly",
+    },
+    disabled: {
+      Icon: LuLock,
+      label: futureMonthDisabledText,
+      cls: "month-mode-badge month-mode-badge--locked",
+    },
+  };
+  const mode = modeConfig[selectedAccessMode] || modeConfig.disabled;
+
   return (
     <div
       className="dd-menu month-dd"
-      style={{ minWidth: 230, insetInlineStart: 0, insetInlineEnd: "auto" }}
+      style={{ minWidth: 270, insetInlineStart: 0, insetInlineEnd: "auto" }}
     >
-      <div
-        className="dd-hd"
-        style={{ display: "flex", alignItems: "center", gap: 6 }}
-      >
-        <LuCalendarCheck size={12} />
-        {t("navbar.viewDataByMonth", "View Data by Month")}
+      <div className="month-dd-header">
+        <LuCalendarCheck size={13} />
+        <span>{t("navbar.viewDataByMonth", "View Data by Month")}</span>
+      </div>
+
+      <div className={mode.cls}>
+        <mode.Icon size={11} />
+        <span>{mode.label}</span>
       </div>
 
       <div className="month-year-row">
-        {years.map((y) => (
-          <button
-            key={y}
-            type="button"
-            className={`month-year-btn${activeYear === y ? " on" : ""}`}
-            onClick={() => setYear(y)}
-          >
-            {y}
-          </button>
-        ))}
+        {years.map((y) => {
+          const yearEnabled = MONTHS.some((m) => isSelectableMonth(m.value, y));
+          const isCurrentYear = y === currentGregorianYear;
+          return (
+            <button
+              key={y}
+              type="button"
+              className={`month-year-btn${activeYear === y ? " on" : ""}${isCurrentYear ? " current-year" : ""}`}
+              disabled={!yearEnabled}
+              title={
+                yearEnabled
+                  ? isCurrentYear
+                    ? currentMonthText
+                    : ""
+                  : futureMonthDisabledText
+              }
+              onClick={() => setYear(y)}
+            >
+              {getDisplayYearForLanguage(y, activeMonth, language)}
+            </button>
+          );
+        })}
       </div>
 
       <div className="month-grid">
-        {MONTHS.map((m) => (
-          <button
-            key={m.value}
-            type="button"
-            className={`month-cell${activeMonth === m.value ? " on" : ""}`}
-            onClick={() => {
-              setMonth(m.value);
-              onClose();
-            }}
-          >
-            {getMonthLabel(m.value, language)}
-          </button>
-        ))}
+        {MONTHS.map((m) => {
+          const disabled = !isSelectableMonth(m.value, activeYear);
+          const reason = getMonthDisabledReason(m.value, activeYear);
+          const accessMode = getMonthAccessMode(m.value, activeYear);
+          const isCurrentMonth =
+            m.value === currentGregorianMonth &&
+            activeYear === currentGregorianYear;
+
+          let tooltip = "";
+          if (isCurrentMonth) {
+            tooltip = currentMonthText;
+          } else if (reason === "past_month_readonly") {
+            tooltip = pastMonthReadOnlyText;
+          } else if (reason === "future_month_locked") {
+            tooltip = futureMonthDisabledText;
+          }
+
+          return (
+            <button
+              key={m.value}
+              type="button"
+              className={`month-cell${activeMonth === m.value ? " on" : ""}${isCurrentMonth ? " current" : ""}${accessMode === "readonly" ? " readonly" : ""}`}
+              disabled={disabled}
+              title={tooltip}
+              aria-label={tooltip}
+              onClick={() => {
+                if (disabled) return;
+                setMonth(m.value);
+                onClose();
+              }}
+            >
+              {getDisplayMonthLabelForLanguage(m.value, activeYear, language)}
+            </button>
+          );
+        })}
       </div>
 
-      <div style={{ padding: "8px 10px 4px" }}>
-        {isAdmin && (
+      {isAdmin && (
+        <div className="month-dd-footer">
           <button
             type="button"
             className="month-report-btn"
@@ -722,8 +835,8 @@ function MonthDropdown({ onClose }) {
               ? t("report.generating", "Generating...")
               : t("report.generate", "Generate Report")}
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -738,7 +851,7 @@ function MonthSelector() {
 
   useOutside(viewRef, () => setViewOpen(false));
 
-  const viewLabel = `${getMonthLabel(viewMonth, language)} ${viewYear}`;
+  const viewLabel = formatMonthYearLabel(viewMonth, viewYear, language);
 
   return (
     <div className="month-selector-wrap">
@@ -876,6 +989,13 @@ export default function Navbar({ onHamburger, pageTitle }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
+  const [emergencyAlarmMuted, setEmergencyAlarmMuted] = useState(() => {
+    try {
+      return localStorage.getItem(EMERGENCY_SOUND_MUTED_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
   const langRef = useRef();
   const userRef = useRef();
   useOutside(langRef, () => setLangOpen(false));
@@ -943,6 +1063,27 @@ export default function Navbar({ onHamburger, pageTitle }) {
     : canViewAdminNotifications
       ? unreadSystem.length + (isAdmin ? unreadAdminWorker.length : 0)
       : 0;
+
+  useEffect(() => {
+    if (!canViewAdminNotifications || emergencyAlarmMuted) return;
+    if (!Array.isArray(unreadSystem) || unreadSystem.length === 0) return;
+
+    if (shouldPlayEmergencyAlertCycle(unreadSystem)) {
+      playEmergencyAlertSound();
+    }
+  }, [canViewAdminNotifications, emergencyAlarmMuted, unreadSystem]);
+
+  const toggleEmergencyAlarmMuted = () => {
+    setEmergencyAlarmMuted((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(EMERGENCY_SOUND_MUTED_KEY, next ? "1" : "0");
+      } catch {
+        // ignore storage write failures
+      }
+      return next;
+    });
+  };
 
   const onSearch = (e) => {
     if (e.key === "Enter" && search.trim()) {
@@ -1113,6 +1254,8 @@ export default function Navbar({ onHamburger, pageTitle }) {
           open={notifOpen}
           onClose={() => setNotifOpen(false)}
           isWorker={isWorker}
+          emergencyAlarmMuted={emergencyAlarmMuted}
+          onToggleEmergencyAlarmMuted={toggleEmergencyAlarmMuted}
         />
       )}
 
@@ -1145,7 +1288,7 @@ export default function Navbar({ onHamburger, pageTitle }) {
                         t("orders.unknownCustomer", "Unnamed")}
                     </td>
                     <td>{(draft.orderTypes || []).join(", ") || "-"}</td>
-                    <td>{new Date(draft.updatedAt).toLocaleString()}</td>
+                    <td>{formatSystemDateTime(draft.updatedAt, language)}</td>
                     <td>
                       <div
                         style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
@@ -1215,7 +1358,7 @@ export default function Navbar({ onHamburger, pageTitle }) {
             </div>
             <div style={{ fontSize: 13, color: "var(--text2)" }}>
               <b>{t("orders.lastUpdated", "Last Updated")}:</b>{" "}
-              {new Date(selectedDraft.updatedAt).toLocaleString()}
+              {formatSystemDateTime(selectedDraft.updatedAt, language)}
             </div>
             <div
               style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}

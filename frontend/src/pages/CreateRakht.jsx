@@ -7,6 +7,7 @@ import Select from "react-select";
 import toast from "react-hot-toast";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
+import { formatSystemDate } from "../lib/locale.js";
 import { PageHeader } from "../components/ui/index.jsx";
 import {
   TON_QTY_OPTIONS,
@@ -17,7 +18,8 @@ import {
 } from "../components/rakht/rakhtFormConfig.js";
 
 export default function CreateRakht() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language || "en";
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [form, setForm] = useState(emptyForm());
@@ -403,7 +405,7 @@ export default function CreateRakht() {
                 <input
                   className="inp"
                   readOnly
-                  value={new Date().toLocaleDateString()}
+                  value={formatSystemDate(new Date(), language)}
                   style={{ cursor: "default" }}
                 />
               </div>

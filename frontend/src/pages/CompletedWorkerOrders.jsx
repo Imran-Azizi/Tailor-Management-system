@@ -15,11 +15,12 @@ import {
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { parseNumberLocale } from "../lib/normalize.js";
-import { getOrderTypeLabel } from "../lib/orderType.js";
+import { getOrderDisplayName } from "../lib/orderType.js";
 import { formatDateLocale } from "../lib/locale.js";
+import { formatCurrency } from "../lib/currency.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
-import { getMonthLabel } from "../lib/months.js";
+import { formatMonthYearLabel } from "../lib/months.js";
 import {
   Badge,
   Card,
@@ -285,7 +286,7 @@ export default function CompletedWorkerOrders() {
           <span>
             {t("common.viewingMonth", "Viewing data for")}:{" "}
             <strong style={{ fontWeight: 700 }}>
-              {getMonthLabel(viewMonth, language)} {viewYear}
+              {formatMonthYearLabel(viewMonth, viewYear, language)}
             </strong>
           </span>
           {data?.total === 0 && !isLoading && (
@@ -365,7 +366,10 @@ export default function CompletedWorkerOrders() {
         />
         <StatCard
           label={t("completedWorkerOrders.totalPaid", "Total Paid")}
-          value={`$${Number(stats.totalPaidAmount || 0).toLocaleString()}`}
+          value={formatCurrency(stats.totalPaidAmount || 0, "en", {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+          })}
           Icon={LuCircleDollarSign}
           accent="#7C3AED"
         />
@@ -626,7 +630,7 @@ export default function CompletedWorkerOrders() {
                           </span>
                         </div>
                       </td>
-                      <td>{getOrderTypeLabel(order.type, language)}</td>
+                      <td>{getOrderDisplayName(order, language)}</td>
                       <td>
                         {formatDateLocale(
                           order.completedAt || order.updatedAt,
@@ -742,13 +746,13 @@ export default function CompletedWorkerOrders() {
               </div>
               <div>
                 <b>{t("workerPanel.orderType", "Order Type")}:</b>{" "}
-                {getOrderTypeLabel(confirmPayment.order.type, language)}
+                {getOrderDisplayName(confirmPayment.order, language)}
               </div>
               <div>
                 <b>
                   {t("completedWorkerOrders.paymentAmount", "Payment Amount")}:
                 </b>{" "}
-                ${Number(confirmPayment.amount || 0).toLocaleString()}
+                {formatCurrency(confirmPayment.amount || 0, "en")}
               </div>
             </div>
 

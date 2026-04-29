@@ -11,7 +11,9 @@ import {
   LuClock,
 } from "react-icons/lu";
 import api from "../lib/api.js";
-import { getOrderTypeLabel } from "../lib/orderType.js";
+import { getOrderDisplayName } from "../lib/orderType.js";
+import { formatSystemDate } from "../lib/locale.js";
+import { formatCurrency } from "../lib/currency.js";
 import {
   Spinner,
   EmptyState,
@@ -20,7 +22,10 @@ import {
 } from "../components/ui/index.jsx";
 
 function formatMoney(v) {
-  return `$${Number(v || 0).toLocaleString()}`;
+  return formatCurrency(v, "en", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
 }
 
 function CustomerRow({ customer, expanded, onToggle }) {
@@ -204,7 +209,7 @@ function CustomerRow({ customer, expanded, onToggle }) {
                           }[o.type] || "gold"
                         }
                       >
-                        {getOrderTypeLabel(o.type, language)}
+                        {getOrderDisplayName(o, language)}
                       </Badge>
                     </td>
                     <td style={{ padding: "8px 10px", fontWeight: 600 }}>
@@ -231,7 +236,7 @@ function CustomerRow({ customer, expanded, onToggle }) {
                       </Badge>
                     </td>
                     <td style={{ padding: "8px 10px", color: "var(--text3)" }}>
-                      {new Date(o.createdAt).toLocaleDateString()}
+                      {formatSystemDate(o.createdAt, language)}
                     </td>
                   </tr>
                 ))}

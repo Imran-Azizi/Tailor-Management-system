@@ -151,7 +151,7 @@
     },
     notificationMessages: {
       assignment:
-        "New order assigned by {{assignedBy}}: {{customer}} - Bill #{{billNumber}} ({{orderType}}) - Price: ${{price}}{{notePart}}",
+        "New order assigned by {{assignedBy}}: {{customer}} - Bill #{{billNumber}} ({{orderType}}) - Price: {{price}} AF{{notePart}}",
       notePart: ". Note: {{note}}",
       workStarted:
         "{{user}} started working on order for {{customer}} - Bill #{{billNumber}} ({{orderType}}).",
@@ -169,7 +169,7 @@
         "Capacity of this box is full for {{orderType}} - {{customer}} - Bill #{{billNumber}}.",
       boxNotFound:
         "No box found for {{orderType}} orders - {{customer}} - Bill #{{billNumber}}.",
-      adminPayment: "Admin has given you ${{amount}} on {{date}}.",
+      adminPayment: "Admin has given you {{amount}} AF on {{date}}.",
     },
     delivery: {
       orderHeader: "Order",
@@ -576,7 +576,7 @@
     },
     notificationMessages: {
       assignment:
-        "سفارش جدید توسط {{assignedBy}} واگذار شد: {{customer}} - بل #{{billNumber}} ({{orderType}}) - قیمت: ${{price}}{{notePart}}",
+        "سفارش جدید توسط {{assignedBy}} واگذار شد: {{customer}} - بل #{{billNumber}} ({{orderType}}) - قیمت: {{price}} AF{{notePart}}",
       notePart: ". یادداشت: {{note}}",
       workStarted:
         "{{user}} کار روی سفارش {{customer}} را آغاز کرد - بل #{{billNumber}} ({{orderType}}).",
@@ -1078,7 +1078,7 @@
     },
     notificationMessages: {
       assignment:
-        "نوی فرمایش د {{assignedBy}} لخوا وسپارل شو: {{customer}} - بل #{{billNumber}} ({{orderType}}) - بیه: ${{price}}{{notePart}}",
+        "نوی فرمایش د {{assignedBy}} لخوا وسپارل شو: {{customer}} - بل #{{billNumber}} ({{orderType}}) - بیه: {{price}} AF{{notePart}}",
       notePart: ". یادښت: {{note}}",
       workStarted:
         "{{user}} د {{customer}} پر فرمایش کار پیل کړ - بل #{{billNumber}} ({{orderType}}).",

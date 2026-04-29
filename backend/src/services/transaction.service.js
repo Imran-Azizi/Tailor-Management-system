@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma.js";
+import { recalculateOrderBenefit } from "./order.service.js";
 
 const USER_SELECT = {
   id: true,
@@ -18,6 +19,7 @@ export const createTransaction = async (data, createdById) => {
     data: {
       accountType: data.accountType,
       userId: data.userId,
+      orderId: data.orderId || null,
       kind: "LOAN",
       source: "MANUAL",
       amount: data.amount,
@@ -51,6 +53,10 @@ export const createTransaction = async (data, createdById) => {
         type: "ADMIN_PAYMENT",
       },
     });
+  }
+
+  if (transaction.orderId) {
+    await recalculateOrderBenefit(transaction.orderId);
   }
 
   return transaction;
@@ -100,7 +106,9 @@ export const getTransactionSummaryForUser = async (userId, accountType) => {
 
   return {
     loanTotal: Number(loanAggregate._sum.amount || 0),
-    totalCompletedPayments: Number(completedPayments._sum?.[paymentSumField] || 0),
+    totalCompletedPayments: Number(
+      completedPayments._sum?.[paymentSumField] || 0,
+    ),
   };
 };
 

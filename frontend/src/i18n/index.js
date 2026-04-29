@@ -78,6 +78,10 @@ const resources = {
         allCaughtUp: "All caught up!",
         markAllRead: "Mark all read",
         viewDataByMonth: "View Data by Month",
+        futureMonthDisabled:
+          "Future months are locked until the current month is fully completed.",
+        pastMonthReadOnly: "Past months are read-only. No editing allowed.",
+        currentMonth: "Current month",
       },
       auth: {
         signIn: "Sign In",
@@ -340,6 +344,7 @@ const resources = {
         reviewOrder: "Review Order",
         reviewCopy: "Review all information carefully before submitting.",
         confirmSubmit: "Confirm & Submit Order",
+        currentMonthOnly: "New entries are allowed only in the current month.",
         createFailed: "Failed to create order. Please check your inputs.",
       },
       transaction: {
@@ -542,6 +547,11 @@ const resources = {
         allCaughtUp: "همه اعلان‌ها بررسی شده‌اند!",
         markAllRead: "همه را خوانده علامت بزن",
         viewDataByMonth: "مشاهده داده‌ها بر اساس ماه",
+        futureMonthDisabled:
+          "ماه‌های آینده تا تکمیل کامل ماه جاری قابل انتخاب نیستند.",
+        pastMonthReadOnly:
+          "ماه‌های گذشته فقط برای مشاهده هستند. ویرایش مجاز نیست.",
+        currentMonth: "ماه جاری",
       },
       auth: {
         signIn: "ورود",
@@ -799,6 +809,7 @@ const resources = {
         reviewOrder: "بازبینی سفارش",
         reviewCopy: "قبل از ارسال تمام اطلاعات را بازبینی کنید.",
         confirmSubmit: "تایید و ارسال سفارش",
+        currentMonthOnly: "ثبت سفارش جدید فقط در ماه جاری مجاز است.",
         createFailed: "ایجاد سفارش انجام نشد. ورودی‌ها را بررسی کنید.",
       },
       transaction: {
@@ -989,6 +1000,11 @@ const resources = {
         allCaughtUp: "ټولې خبرتیاوې کتل شوې دي!",
         markAllRead: "ټولې لوستل شوې",
         viewDataByMonth: "د میاشتې پہ میاشت ډیړا لیدل",
+        futureMonthDisabled:
+          "راتلونکې میاشتې تر هغه پورې نه شي ټاکل کېدای چې روانه میاشت بشپړه نه وي.",
+        pastMonthReadOnly:
+          "تېرې شوې میاشتې یوازې د لیدلو لپاره دي. تبدیل کول اجازت نه دی.",
+        currentMonth: "روانه میاشت",
       },
       auth: {
         signIn: "ننوتل",
@@ -1226,6 +1242,7 @@ const resources = {
         reviewOrder: "د فرمایش بیاکتنه",
         reviewCopy: "معلومات په دقت سره وګورئ مخکې له سپارلو.",
         confirmSubmit: "تایید او فرمایش وسپارئ",
+        currentMonthOnly: "نوې داخلې یوازې په روانه میاشت کې اجازه لري.",
         createFailed: "فرمایش جوړ نه شو. مهرباني وکړئ معلومات وګورئ.",
       },
       dadAndStud: {

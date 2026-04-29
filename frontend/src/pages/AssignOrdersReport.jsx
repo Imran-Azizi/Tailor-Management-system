@@ -5,7 +5,7 @@ import { LuReceipt, LuSearch } from "react-icons/lu";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { parseNumberLocale } from "../lib/normalize.js";
-import { getOrderTypeLabel } from "../lib/orderType.js";
+import { getOrderDisplayName } from "../lib/orderType.js";
 import {
   Card,
   EmptyState,
@@ -177,10 +177,22 @@ export default function AssignOrdersReport() {
 
           <button
             type="button"
-            className="btn btn-primary"
+            className="btn"
             onClick={searchByBill}
             disabled={loading}
-            style={{ minWidth: 120, justifyContent: "center" }}
+            style={{
+              minWidth: 132,
+              justifyContent: "center",
+              height: 42,
+              border: "1px solid transparent",
+              borderRadius: 10,
+              background:
+                "linear-gradient(135deg, #1D4ED8 0%, #2563EB 55%, #0EA5E9 100%)",
+              color: "#fff",
+              fontWeight: 700,
+              boxShadow: "0 8px 22px rgba(37,99,235,.28)",
+              opacity: loading ? 0.72 : 1,
+            }}
           >
             <LuSearch size={14} />
             {t("common.search", "Search")}
@@ -236,7 +248,7 @@ export default function AssignOrdersReport() {
                             color: "var(--text1)",
                           }}
                         >
-                          {getOrderTypeLabel(order.type, language)}
+                          {getOrderDisplayName(order, language)}
                         </span>
                         <span className="badge bg-gray">
                           #{order?.customer?.billNumber ?? "-"}

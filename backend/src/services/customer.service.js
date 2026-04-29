@@ -1,6 +1,146 @@
 import { prisma } from "../lib/prisma.js";
 import { normalizeText, normalizePhone } from "../lib/normalize.js";
 import { createCustomerWithSequentialBill } from "../lib/billNumber.js";
+import { rollbackRakhtInventoryForDeletedOrder } from "./order.service.js";
+
+const ORDER_TYPE_LABELS_EN = {
+  OUTFIT: "Outfit",
+  WASKAT: "Waskat",
+  KORTY: "Korty",
+  YAKHANQAQ: "YakhanQaq",
+};
+
+const getOrderTypeLabelEn = (type) => ORDER_TYPE_LABELS_EN[type] || type || "-";
+
+const normalizeNameForCompare = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+
+const escapeRegex = (value) =>
+  String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const stripRepeatedBasePrefix = (customName, baseLabel) => {
+  const escapedBase = escapeRegex(baseLabel);
+  const matcher = new RegExp(`^${escapedBase}(?:\\s*[-:|]\\s*|\\s+)(.+)$`, "i");
+  const match = String(customName || "").match(matcher);
+  return match?.[1]?.trim() || "";
+};
+
+const buildOrderDisplayName = ({
+  type,
+  orderName,
+  sequence = 1,
+  total = 1,
+}) => {
+  const typeLabel = getOrderTypeLabelEn(type);
+  const normalizedTotal =
+    Number.isFinite(Number(total)) && Number(total) > 0 ? Number(total) : 1;
+  const normalizedSequence =
+    Number.isFinite(Number(sequence)) && Number(sequence) > 0
+      ? Number(sequence)
+      : 1;
+  const baseLabel =
+    normalizedTotal > 1 ? `${typeLabel} ${normalizedSequence}` : typeLabel;
+  const customName =
+    typeof orderName === "string" ? normalizeText(orderName) || "" : "";
+
+  if (!customName) return baseLabel;
+
+  const normalizedBase = normalizeNameForCompare(baseLabel);
+  const normalizedCustom = normalizeNameForCompare(customName);
+  if (!normalizedCustom || normalizedCustom === normalizedBase) {
+    return baseLabel;
+  }
+
+  const strippedCustom = stripRepeatedBasePrefix(customName, baseLabel);
+  if (strippedCustom) {
+    const normalizedStripped = normalizeNameForCompare(strippedCustom);
+    if (normalizedStripped && normalizedStripped !== normalizedBase) {
+      return `${baseLabel} - ${strippedCustom}`;
+    }
+    return baseLabel;
+  }
+
+  if (normalizedCustom === normalizeNameForCompare(typeLabel)) {
+    return baseLabel;
+  }
+
+  return `${baseLabel} - ${customName}`;
+};
+
+const enrichOrdersWithDisplayMeta = async (orders = [], tx = prisma) => {
+  if (!Array.isArray(orders) || !orders.length) return orders;
+
+  const customerIds = Array.from(
+    new Set(
+      orders
+        .map((order) => order?.customerId)
+        .filter((customerId) => typeof customerId === "string" && customerId),
+    ),
+  );
+
+  if (!customerIds.length) {
+    return orders.map((order) => ({
+      ...order,
+      orderTypeSequence: 1,
+      orderTypeTotal: 1,
+      orderDisplayName: buildOrderDisplayName({
+        type: order?.type,
+        orderName: order?.orderName,
+      }),
+    }));
+  }
+
+  const siblingOrders = await tx.order.findMany({
+    where: { customerId: { in: customerIds } },
+    select: {
+      id: true,
+      customerId: true,
+      type: true,
+    },
+    orderBy: [
+      { customerId: "asc" },
+      { type: "asc" },
+      { createdAt: "asc" },
+      { id: "asc" },
+    ],
+  });
+
+  const totalsByKey = new Map();
+  for (const sibling of siblingOrders) {
+    const key = `${sibling.customerId}:${sibling.type}`;
+    totalsByKey.set(key, (totalsByKey.get(key) || 0) + 1);
+  }
+
+  const sequenceByKey = new Map();
+  const metaByOrderId = new Map();
+  for (const sibling of siblingOrders) {
+    const key = `${sibling.customerId}:${sibling.type}`;
+    const nextSequence = (sequenceByKey.get(key) || 0) + 1;
+    sequenceByKey.set(key, nextSequence);
+    metaByOrderId.set(sibling.id, {
+      sequence: nextSequence,
+      total: totalsByKey.get(key) || 1,
+    });
+  }
+
+  return orders.map((order) => {
+    const meta = metaByOrderId.get(order?.id) || { sequence: 1, total: 1 };
+    return {
+      ...order,
+      orderTypeSequence: meta.sequence,
+      orderTypeTotal: meta.total,
+      orderDisplayName: buildOrderDisplayName({
+        type: order?.type,
+        orderName: order?.orderName,
+        sequence: meta.sequence,
+        total: meta.total,
+      }),
+    };
+  });
+};
 
 const toPhoneDigits = (value) =>
   (normalizePhone(value || "") || "").replace(/[^0-9]/g, "");
@@ -132,8 +272,8 @@ export const getAllCustomers = async ({
   return { data, total, page: Number(page), limit: Number(limit) };
 };
 
-export const getCustomerById = (id) =>
-  prisma.customer.findUnique({
+export const getCustomerById = async (id) => {
+  const customer = await prisma.customer.findUnique({
     where: { id },
     include: {
       orders: {
@@ -143,11 +283,20 @@ export const getCustomerById = (id) =>
           korty: true,
           yakhanQaq: true,
           box: true,
+          foreignBox: true,
         },
         orderBy: { createdAt: "desc" },
       },
     },
   });
+
+  if (!customer) return null;
+
+  return {
+    ...customer,
+    orders: await enrichOrdersWithDisplayMeta(customer.orders || []),
+  };
+};
 
 export const createCustomer = async (body) => {
   const normalized = {
@@ -187,11 +336,23 @@ export const deleteCustomer = async (id) =>
 
     const customerOrders = await tx.order.findMany({
       where: { customerId: id },
-      select: { id: true },
+      select: {
+        id: true,
+        rakhtId: true,
+        rakhtTonId: true,
+        rakhtRequiredMeters: true,
+        rakhtCompanyName: true,
+        rakhtBrandName: true,
+      },
     });
     const orderIds = customerOrders.map((order) => order.id);
 
     if (orderIds.length) {
+      for (const order of customerOrders) {
+        await rollbackRakhtInventoryForDeletedOrder(tx, order);
+      }
+
+      await tx.transaction.deleteMany({ where: { orderId: { in: orderIds } } });
       await tx.userNotification.deleteMany({
         where: { orderId: { in: orderIds } },
       });

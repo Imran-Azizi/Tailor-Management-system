@@ -13,9 +13,62 @@ export const getAll = async (req, res, next) => {
   }
 };
 
+export const getOne = async (req, res, next) => {
+  try {
+    res.json(await service.getRakhtDetailById(req.params.id));
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getRevenueSummary = async (req, res, next) => {
   try {
-    res.json(await service.getRakhtRevenueSummary());
+    const search = typeof req.query.search === "string" ? req.query.search : "";
+    const companyName =
+      typeof req.query.companyName === "string"
+        ? req.query.companyName
+        : undefined;
+    const brandName =
+      typeof req.query.brandName === "string" ? req.query.brandName : undefined;
+    const tonName =
+      typeof req.query.tonName === "string" ? req.query.tonName : undefined;
+    const orderType =
+      typeof req.query.orderType === "string" ? req.query.orderType : undefined;
+    const fromDate =
+      typeof req.query.fromDate === "string" ? req.query.fromDate : undefined;
+    const toDate =
+      typeof req.query.toDate === "string" ? req.query.toDate : undefined;
+    const minMeters =
+      typeof req.query.minMeters === "string"
+        ? Number(req.query.minMeters)
+        : undefined;
+    const maxMeters =
+      typeof req.query.maxMeters === "string"
+        ? Number(req.query.maxMeters)
+        : undefined;
+    const page =
+      typeof req.query.page === "string" ? Number(req.query.page) : undefined;
+    const limit =
+      typeof req.query.limit === "string" ? Number(req.query.limit) : undefined;
+
+    const isFinance = req.user?.accountType === "FINANCE";
+
+    res.json(
+      await service.getRakhtRevenueSummary({
+        financeUserId: isFinance ? req.user.id : null,
+        search,
+        companyName,
+        brandName,
+        tonName,
+        orderType,
+        fromDate,
+        toDate,
+        minMeters,
+        maxMeters,
+        page,
+        limit,
+      }),
+    );
   } catch (error) {
     next(error);
   }

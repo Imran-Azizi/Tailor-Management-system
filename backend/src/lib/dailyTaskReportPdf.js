@@ -1,6 +1,11 @@
 import PDFDocument from "pdfkit";
 import fs from "fs";
 import { createRequire } from "module";
+import {
+  formatReportDateTime,
+  formatReportNumber,
+  resolveReportText,
+} from "./reportLocale.js";
 
 const require = createRequire(import.meta.url);
 const reshaper = require("arabic-persian-reshaper");
@@ -42,26 +47,16 @@ function toPdfArabicText(value) {
   }
 }
 
-function formatReportType(type) {
+function formatReportType(type, labels) {
   const value = String(type || "daily");
-  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+  return labels.reportTypes[value] || labels.reportTypes.custom;
 }
 
-function formatDate(value) {
-  return new Date(value).toLocaleString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatMoney(value) {
-  return `$${Number(value || 0).toLocaleString("en-US", {
+function formatMoney(value, language) {
+  return `${formatReportNumber(value, language, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  })}`;
+  })} AF`;
 }
 
 function truncate(value, maxLength = 24) {
@@ -84,30 +79,32 @@ function drawSummaryRow(doc, label, value, y) {
     .text(String(value), 230, y, { width: 320 });
 }
 
-function drawTableHeader(doc, y) {
+function drawTableHeader(doc, y, labels) {
   const rowHeight = 22;
   doc.save();
   doc.roundedRect(40, y, 515, rowHeight, 4).fill("#E2E8F0");
   doc.restore();
 
   doc.fillColor("#0F172A").font("Helvetica-Bold").fontSize(9);
-  doc.text("#", 48, y + 7, { width: 20 });
-  doc.text("Date", 72, y + 7, { width: 104 });
-  doc.text("From", 182, y + 7, { width: 110 });
-  doc.text("Recipient", 298, y + 7, { width: 110 });
-  doc.text("Amount", 414, y + 7, { width: 70, align: "right" });
-  doc.text("Note", 492, y + 7, { width: 56 });
+  doc.text(labels.columns.num, 48, y + 7, { width: 20 });
+  doc.text(labels.columns.date, 72, y + 7, { width: 104 });
+  doc.text(labels.columns.from, 182, y + 7, { width: 110 });
+  doc.text(labels.columns.recipient, 298, y + 7, { width: 110 });
+  doc.text(labels.columns.amount, 414, y + 7, { width: 70, align: "right" });
+  doc.text(labels.columns.note, 492, y + 7, { width: 56 });
 
   return y + rowHeight;
 }
 
-export function buildDailyTaskReportPdf(report) {
+export function buildDailyTaskReportPdf(report, language = "en") {
+  const text = resolveReportText(language).daily;
+
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
       size: "A4",
       margin: 40,
       info: {
-        Title: "Daily Tasks Report",
+        Title: text.title,
         Author: "Tailor System",
       },
     });
@@ -137,13 +134,17 @@ export function buildDailyTaskReportPdf(report) {
       .font("Helvetica-Bold")
       .fontSize(19)
       .fillColor("#0F172A")
-      .text("Daily Tasks Report", 40, 36);
+      .text(text.title, 40, 36);
 
     doc
       .font("Helvetica")
       .fontSize(10)
       .fillColor("#475569")
-      .text(`Generated at: ${formatDate(new Date().toISOString())}`, 40, 62);
+      .text(
+        `${text.generatedAt}: ${formatReportDateTime(new Date(), language)}`,
+        40,
+        62,
+      );
 
     doc
       .moveTo(40, 78)
@@ -152,30 +153,35 @@ export function buildDailyTaskReportPdf(report) {
       .strokeColor("#CBD5E1")
       .stroke();
 
-    drawSummaryRow(doc, "Report type", formatReportType(type), 92);
+    drawSummaryRow(doc, text.reportType, formatReportType(type, text), 92);
     drawSummaryRow(
       doc,
-      "Date range",
-      `${formatDate(from)} - ${formatDate(to)}`,
+      text.dateRange,
+      `${formatReportDateTime(from, language)} - ${formatReportDateTime(to, language)}`,
       108,
     );
-    drawSummaryRow(doc, "Total tasks", summary.totalTasks || 0, 124);
     drawSummaryRow(
       doc,
-      "Total amount / expenses",
-      formatMoney(summary.totalAmount),
+      text.totalTasks,
+      formatReportNumber(summary.totalTasks || 0, language),
+      124,
+    );
+    drawSummaryRow(
+      doc,
+      text.totalAmount,
+      formatMoney(summary.totalAmount, language),
       140,
     );
     drawSummaryRow(
       doc,
-      "Highest expense",
-      formatMoney(summary.highestExpense),
+      text.highestExpense,
+      formatMoney(summary.highestExpense, language),
       156,
     );
     drawSummaryRow(
       doc,
-      "Average expense",
-      formatMoney(summary.averageAmount),
+      text.averageExpense,
+      formatMoney(summary.averageAmount, language),
       172,
     );
 
@@ -184,10 +190,10 @@ export function buildDailyTaskReportPdf(report) {
       .font("Helvetica-Bold")
       .fontSize(11)
       .fillColor("#0F172A")
-      .text("Daily Task Records", 40, y);
+      .text(text.records, 40, y);
 
     y += 10;
-    y = drawTableHeader(doc, y + 6);
+    y = drawTableHeader(doc, y + 6, text);
 
     const baseRowHeight = 20;
     const noteColumnWidth = 56;
@@ -199,11 +205,7 @@ export function buildDailyTaskReportPdf(report) {
         .font("Helvetica")
         .fontSize(10)
         .fillColor("#64748B")
-        .text(
-          "No daily task records found for the selected period.",
-          44,
-          y + 10,
-        );
+        .text(text.noRecords, 44, y + 10);
     } else {
       tasks.forEach((task, index) => {
         const noteText = String(task.note || "-");
@@ -230,8 +232,8 @@ export function buildDailyTaskReportPdf(report) {
             .font("Helvetica-Bold")
             .fontSize(11)
             .fillColor("#0F172A")
-            .text("Daily Task Records (continued)", 40, y);
-          y = drawTableHeader(doc, y + 16);
+            .text(`${text.records} (${text.continued})`, 40, y);
+          y = drawTableHeader(doc, y + 16, text);
         }
 
         if (index % 2 === 0) {
@@ -242,10 +244,12 @@ export function buildDailyTaskReportPdf(report) {
 
         doc.fillColor("#0F172A").font("Helvetica").fontSize(9);
         doc.text(String(index + 1), 48, y + 6, { width: 20 });
-        doc.text(formatDate(task.taskDate), 72, y + 6, { width: 104 });
+        doc.text(formatReportDateTime(task.taskDate, language), 72, y + 6, {
+          width: 104,
+        });
         doc.text(truncate(task.fromName, 18), 182, y + 6, { width: 110 });
         doc.text(truncate(task.recipientName, 18), 298, y + 6, { width: 110 });
-        doc.text(formatMoney(task.amount), 414, y + 6, {
+        doc.text(formatMoney(task.amount, language), 414, y + 6, {
           width: 70,
           align: "right",
         });
@@ -264,7 +268,7 @@ export function buildDailyTaskReportPdf(report) {
       .font("Helvetica")
       .fontSize(8)
       .fillColor("#94A3B8")
-      .text("Tailor System - Daily Tasks Report", 40, doc.page.height - 26, {
+      .text(text.footer, 40, doc.page.height - 26, {
         width: 515,
         align: "center",
       });

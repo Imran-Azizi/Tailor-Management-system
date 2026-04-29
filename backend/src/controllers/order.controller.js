@@ -8,6 +8,10 @@ import { prisma } from "../lib/prisma.js";
 import { parseNumberLocale } from "../lib/normalize.js";
 import { sendCustomerCompletionSMS } from "../services/sms.service.js";
 import { buildMonthlyReportPdf } from "../lib/monthlyReportPdf.js";
+import {
+  getReportLocaleTag,
+  normalizeReportLanguage,
+} from "../lib/reportLocale.js";
 
 const WORKER_ACCOUNT_TYPES = ["QICHIKAR", "DOKHT"];
 const SAME_ROLE_CLAIM_CONFLICT_MESSAGE =
@@ -155,7 +159,11 @@ export const getOne = async (req, res, next) => {
           .json({ error: "You do not have permission to access this order." });
       }
     }
-    res.json(data);
+    const benefitDetails = await service.getOrderBenefitDetails(req.params.id);
+    res.json({
+      ...data,
+      benefitDetails,
+    });
   } catch (error) {
     next(error);
   }
@@ -386,6 +394,8 @@ export const markComplete = async (req, res, next) => {
           },
         });
 
+        await service.recalculateOrderBenefit(req.params.id);
+
         const msg = `Qichikar Name: ${user.name} | Bill Number: ${order.customer.billNumber} | Order Type: ${order.type} | Customer Name: ${order.customer.firstName} | Cutting completed successfully and ready for Dokht.`;
         await Promise.all(
           admins.map((admin) =>
@@ -442,6 +452,8 @@ export const markComplete = async (req, res, next) => {
           receivedBy: { select: { id: true, name: true, accountType: true } },
         },
       });
+
+      await service.recalculateOrderBenefit(req.params.id);
 
       const msg = `Dokht Name: ${user.name} | Bill Number: ${order.customer.billNumber} | Order Type: ${order.type} | Customer Name: ${order.customer.firstName} | Stitching completed successfully and waiting for full payment / admin completion.`;
       await Promise.all(
@@ -917,8 +929,10 @@ export const payWorkerForCompletedOrder = async (req, res, next) => {
       },
     });
 
+    await service.recalculateOrderBenefit(orderId);
+
     const roleLabel = paymentRole === "DOKHT" ? "Dokht" : "Qichikar";
-    const payoutMsg = `Admin paid your completed ${roleLabel} order - Bill #${order.customer.billNumber} (${order.customer.firstName}) - Amount: $${Number(paymentAmount).toLocaleString()}.`;
+    const payoutMsg = `Admin paid your completed ${roleLabel} order - Bill #${order.customer.billNumber} (${order.customer.firstName}) - Amount: ${Number(paymentAmount).toLocaleString()} AF.`;
 
     await prisma.userNotification.create({
       data: {
@@ -949,6 +963,7 @@ export const getMonthlyReport = async (req, res, next) => {
   try {
     const month = Number(req.query.month);
     const year = Number(req.query.year);
+    const language = normalizeReportLanguage(req.query.lang || "en");
 
     if (!month || !year || month < 1 || month > 12) {
       return res
@@ -957,27 +972,26 @@ export const getMonthlyReport = async (req, res, next) => {
     }
 
     const orders = await service.getMonthlyReportOrders({ month, year });
-    const pdfBuffer = await buildMonthlyReportPdf({ month, year, orders });
+    const pdfBuffer = await buildMonthlyReportPdf({
+      month,
+      year,
+      orders,
+      language,
+    });
 
-    const MONTH_NAMES = [
-      "January",
-      "February",
-      "March",
-      "April",
-      "May",
-      "June",
-      "July",
-      "August",
-      "September",
-      "October",
-      "November",
-      "December",
-    ];
-    const monthLabel = MONTH_NAMES[(month - 1) % 12] || String(month);
-    const filename = `Monthly_Report_${monthLabel}_${year}.pdf`;
+    const monthLabel = new Intl.DateTimeFormat(getReportLocaleTag(language), {
+      month: "long",
+    }).format(new Date(year, month - 1, 1));
+    const asciiFallback = `Monthly_Report_${month}_${year}.pdf`;
+    const encodedFilename = encodeURIComponent(
+      `Monthly_Report_${monthLabel}_${year}.pdf`,
+    );
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodedFilename}`,
+    );
     res.send(pdfBuffer);
   } catch (error) {
     next(error);
@@ -1174,12 +1188,14 @@ export const assign = async (req, res, next) => {
         },
       });
 
+      await service.recalculateOrderBenefit(orderId, tx);
+
       return updated;
     });
     const normalizedOrder = service.enrichOrderAssignment(order);
 
     if (assignedToId) {
-      const msg = `New order assigned by ${req.user.name}: ${order.customer.firstName} - Bill #${order.customer.billNumber} (${order.type}) - Price: $${Number(normalizedAssignmentPrice || 0).toLocaleString()}${normalizedOrder.assignmentNote ? `. Note: ${normalizedOrder.assignmentNote}` : ""}`;
+      const msg = `New order assigned by ${req.user.name}: ${order.customer.firstName} - Bill #${order.customer.billNumber} (${order.type}) - Price: ${Number(normalizedAssignmentPrice || 0).toLocaleString()} AF${normalizedOrder.assignmentNote ? `. Note: ${normalizedOrder.assignmentNote}` : ""}`;
       await prisma.userNotification.create({
         data: {
           userId: assignedToId,

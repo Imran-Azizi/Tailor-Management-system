@@ -7,7 +7,11 @@ import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { parseNumberLocale } from "../lib/normalize.js";
 import { formatCurrency } from "../lib/currency.js";
-import { getOrderTypeLabel, getOrderTypeOptions } from "../lib/orderType.js";
+import {
+  getOrderDisplayName,
+  getOrderTypeLabel,
+  getOrderTypeOptions,
+} from "../lib/orderType.js";
 import {
   Card,
   EmptyState,
@@ -569,7 +573,7 @@ export default function AssignOrders() {
                                   number: idx + 1,
                                 },
                               )}{" "}
-                              - {getOrderTypeLabel(order.type, language)}
+                              - {getOrderDisplayName(order, language)}
                             </p>
                             <p
                               style={{
