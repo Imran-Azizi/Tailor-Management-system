@@ -5,7 +5,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "vite preview --host 0.0.0.0 --port ${PORT:-4173}"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -25,7 +29,6 @@
     "react-router-dom": "^6.24.0",
     "react-select": "^5.8.0",
     "recharts": "^2.12.7",
-    "tailor-system": "file:..",
     "zod": "^3.23.8"
   },
   "devDependencies": {
