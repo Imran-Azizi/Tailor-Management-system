@@ -163,29 +163,35 @@ export function MonthProvider({ children }) {
     ],
   );
 
-  const getMonthDisabledReason = useCallback((month, year) => {
-    const status = getMonthStatus(
-      month,
-      year,
-      monthPolicy.currentMonth,
-      monthPolicy.currentYear,
-    );
-    if (status === "future") return "future_month_locked";
-    if (status === "past") return "past_month_readonly";
-    return "";
-  }, [monthPolicy.currentMonth, monthPolicy.currentYear]);
+  const getMonthDisabledReason = useCallback(
+    (month, year) => {
+      const status = getMonthStatus(
+        month,
+        year,
+        monthPolicy.currentMonth,
+        monthPolicy.currentYear,
+      );
+      if (status === "future") return "future_month_locked";
+      if (status === "past") return "past_month_readonly";
+      return "";
+    },
+    [monthPolicy.currentMonth, monthPolicy.currentYear],
+  );
 
-  const getMonthAccessMode = useCallback((month, year) => {
-    const status = getMonthStatus(
-      month,
-      year,
-      monthPolicy.currentMonth,
-      monthPolicy.currentYear,
-    );
-    if (status === "current") return "editable";
-    if (status === "past") return "readonly";
-    return "disabled";
-  }, [monthPolicy.currentMonth, monthPolicy.currentYear]);
+  const getMonthAccessMode = useCallback(
+    (month, year) => {
+      const status = getMonthStatus(
+        month,
+        year,
+        monthPolicy.currentMonth,
+        monthPolicy.currentYear,
+      );
+      if (status === "current") return "editable";
+      if (status === "past") return "readonly";
+      return "disabled";
+    },
+    [monthPolicy.currentMonth, monthPolicy.currentYear],
+  );
 
   return (
     <MonthContext.Provider

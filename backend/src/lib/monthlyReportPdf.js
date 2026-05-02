@@ -426,7 +426,8 @@ function drawDashboardStatsCards(
   isRtl,
 ) {
   const statLabels = labels.stats || {};
-  const netBenefit = Number(stats.totalRakhtRevenue || 0) + Number(stats.totalOrderBenefit || 0);
+  const netBenefit =
+    Number(stats.totalRakhtRevenue || 0) + Number(stats.totalOrderBenefit || 0);
 
   // Highlighted full-width net benefit card for quick executive visibility.
   const netCardHeight = 54;
