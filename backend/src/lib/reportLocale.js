@@ -10,7 +10,7 @@ const AFGHANISTAN_TIMEZONE = "Asia/Kabul";
 const WEEKDAY_MAP_DARI = {
   Sun: "یکشنبه",
   Mon: "دوشنبه",
-  Tue: "سه‌شنبه",
+  Tue: "سه شنبه",
   Wed: "چهارشنبه",
   Thu: "پنجشنبه",
   Fri: "جمعه",
@@ -27,7 +27,7 @@ const WEEKDAY_MAP_PASHTO = {
   Sat: "شنبه",
 };
 
-const JALALI_MONTHS_DARI = [
+const AFGHAN_MONTHS_DARI = [
   "حمل",
   "ثور",
   "جوزا",
@@ -42,7 +42,7 @@ const JALALI_MONTHS_DARI = [
   "حوت",
 ];
 
-const JALALI_MONTHS_PASHTO = [
+const AFGHAN_MONTHS_PASHTO = [
   "وری",
   "غویی",
   "غبرګولی",
@@ -139,9 +139,8 @@ export function formatMonthlyReportHeaderDateTime(value, language = "en") {
     const monthIndex = Math.max(1, Math.min(12, Number(monthRaw || 1))) - 1;
     const monthName =
       normalized === "pashto"
-        ? JALALI_MONTHS_PASHTO[monthIndex]
-        : JALALI_MONTHS_DARI[monthIndex];
-
+        ? AFGHAN_MONTHS_PASHTO[monthIndex]
+        : AFGHAN_MONTHS_DARI[monthIndex];
     const weekdayName =
       normalized === "pashto"
         ? WEEKDAY_MAP_PASHTO[weekdayShort] || weekdayShort
@@ -158,8 +157,7 @@ export function formatMonthlyReportHeaderDateTime(value, language = "en") {
       return formatReportDateTime(date, language);
     }
 
-    const datePart = `${weekdayName}، ${day} ${monthName} ${year}`;
-    return `${datePart} — ${timePart}`;
+    return `${weekdayName}، ${day} ${monthName} ${year} — ${timePart}`;
   } catch {
     return formatReportDateTime(date, language);
   }
@@ -204,6 +202,7 @@ export const REPORT_TEXT = {
       },
       statusDone: "Done",
       statusPending: "Pending",
+      statusEmergency: "Emergency",
       dashboardStatsTitle: "Dashboard Snapshot",
       statGroups: {
         revenue: "Revenue & Profit",
@@ -214,6 +213,7 @@ export const REPORT_TEXT = {
       stats: {
         totalRakhtRevenue: "Total Rakht Revenue",
         totalOrderBenefit: "Total Order Benefit",
+        netBenefit: "Net Benefit",
         totalOrders: "Total Orders",
         totalAmount: "Total Amount",
         collected: "Collected",
@@ -287,6 +287,7 @@ export const REPORT_TEXT = {
       },
       statusDone: "تکمیل",
       statusPending: "در انتظار",
+      statusEmergency: "عاجل",
       dashboardStatsTitle: "نمای کلی داشبورد",
       statGroups: {
         revenue: "عواید و فایده",
@@ -297,6 +298,7 @@ export const REPORT_TEXT = {
       stats: {
         totalRakhtRevenue: "مجموع عاید رخت",
         totalOrderBenefit: "مجموع فایده سفارش‌ها",
+        netBenefit: "درآمد خالص",
         totalOrders: "مجموع سفارش‌ها",
         totalAmount: "مجموع مبلغ",
         collected: "مجموع پرداخت شده",
@@ -370,6 +372,7 @@ export const REPORT_TEXT = {
       },
       statusDone: "بشپړ",
       statusPending: "په تمه",
+      statusEmergency: "بیړنی",
       dashboardStatsTitle: "د ډشبورډ لنډه کتنه",
       statGroups: {
         revenue: "عاید او ګټه",
@@ -380,6 +383,7 @@ export const REPORT_TEXT = {
       stats: {
         totalRakhtRevenue: "د رخت ټول عاید",
         totalOrderBenefit: "د فرمایشونو ټول ګټه",
+        netBenefit: "خالص عاید",
         totalOrders: "ټول فرمایشونه",
         totalAmount: "ټول مقدار",
         collected: "ټول ترلاسه شوي",

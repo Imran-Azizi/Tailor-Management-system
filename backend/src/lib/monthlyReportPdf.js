@@ -5,7 +5,6 @@ import { fileURLToPath } from "url";
 import {
   formatMonthlyReportHeaderDateTime,
   formatReportNumber,
-  getReportLocaleTag,
   normalizeReportLanguage,
   isRtlReportLanguage,
   resolveReportText,
@@ -103,32 +102,57 @@ function fmt(value, language) {
   });
 }
 
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
+const MONTH_NAMES = {
+  en: [
+    "Hamal",
+    "Sawr",
+    "Jawza",
+    "Saratan",
+    "Asad",
+    "Sunbula",
+    "Mizan",
+    "Aqrab",
+    "Qaws",
+    "Jadi",
+    "Dalwa",
+    "Hut",
+  ],
+  dari: [
+    "حمل",
+    "ثور",
+    "جوزا",
+    "سرطان",
+    "اسد",
+    "سنبله",
+    "میزان",
+    "عقرب",
+    "قوس",
+    "جدی",
+    "دلو",
+    "حوت",
+  ],
+  pashto: [
+    "وری",
+    "غویی",
+    "غبرګولی",
+    "چنګاښ",
+    "زمری",
+    "وږی",
+    "تله",
+    "لړم",
+    "لیندۍ",
+    "مرغومی",
+    "سلواغه",
+    "کب",
+  ],
+};
 
 function monthName(n, language = "en") {
-  const locale = getReportLocaleTag(language);
+  const normalized = normalizeReportLanguage(language);
   const month = Number(n);
   if (!Number.isFinite(month) || month < 1 || month > 12) return String(n);
-  try {
-    return new Intl.DateTimeFormat(locale, { month: "long" }).format(
-      new Date(2026, month - 1, 1),
-    );
-  } catch {
-    return MONTH_NAMES[(month - 1) % 12] || String(n);
-  }
+  const names = MONTH_NAMES[normalized] || MONTH_NAMES.en;
+  return names[(month - 1) % 12] || String(n);
 }
 
 function orderTypeLabel(type, language = "en") {
@@ -359,10 +383,17 @@ function drawRow(
     10,
   );
 
-  const statusLabel = order.isCompleted
-    ? labels.statusDone
-    : labels.statusPending;
-  const statusColor = order.isCompleted ? "#16A34A" : "#D97706";
+  const isEmergency = Boolean(order.isEmergency) && !order.isCompleted;
+  const statusLabel = isEmergency
+    ? labels.statusEmergency || "Emergency"
+    : order.isCompleted
+      ? labels.statusDone
+      : labels.statusPending;
+  const statusColor = isEmergency
+    ? "#DC2626"
+    : order.isCompleted
+      ? "#16A34A"
+      : "#D97706";
   wt(
     doc,
     statusLabel,
@@ -395,6 +426,40 @@ function drawDashboardStatsCards(
   isRtl,
 ) {
   const statLabels = labels.stats || {};
+  const netBenefit = Number(stats.totalRakhtRevenue || 0) + Number(stats.totalOrderBenefit || 0);
+
+  // Highlighted full-width net benefit card for quick executive visibility.
+  const netCardHeight = 54;
+  doc.save();
+  doc.roundedRect(TABLE_X, y, TABLE_W, netCardHeight, 6).fill("#EEF2FF");
+  doc
+    .roundedRect(TABLE_X, y, TABLE_W, netCardHeight, 6)
+    .lineWidth(0.8)
+    .stroke("#C7D2FE");
+  const netAccentX = isRtl ? TABLE_X + TABLE_W - 4 : TABLE_X;
+  doc.rect(netAccentX, y, 4, netCardHeight).fill("#4F46E5");
+  doc.restore();
+
+  wt(
+    doc,
+    statLabels.netBenefit || "Net Benefit",
+    TABLE_X + 12,
+    y + 10,
+    { width: TABLE_W - 24, align: rtlAwareAlign(isRtl, "left") },
+    fkFont,
+    "#3730A3",
+    true,
+    10.2,
+  );
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(13)
+    .fillColor("#1E1B4B")
+    .text(`${fmt(netBenefit, language)} AF`, TABLE_X + 12, y + 27, {
+      width: TABLE_W - 24,
+      align: rtlAwareAlign(isRtl, "left"),
+    });
+
   const groups = [
     {
       title: labels?.statGroups?.revenue || "Revenue & Profit",
@@ -483,7 +548,7 @@ function drawDashboardStatsCards(
   const groupGap = 10;
   const cardHeight = 46;
   const cardWidth = (TABLE_W - gap * (cardsPerRow - 1)) / cardsPerRow;
-  let cursorY = y;
+  let cursorY = y + netCardHeight + 10;
 
   groups.forEach((group) => {
     wt(

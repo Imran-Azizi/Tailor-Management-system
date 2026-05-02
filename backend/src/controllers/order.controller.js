@@ -13,6 +13,7 @@ import {
   getReportLocaleTag,
   normalizeReportLanguage,
 } from "../lib/reportLocale.js";
+import { assertNotFutureAfghanMonth } from "../lib/afghanistanDate.js";
 
 const WORKER_ACCOUNT_TYPES = ["QICHIKAR", "DOKHT"];
 const SAME_ROLE_CLAIM_CONFLICT_MESSAGE =
@@ -983,13 +984,15 @@ export const getMonthlyReport = async (req, res, next) => {
   try {
     const month = Number(req.query.month);
     const year = Number(req.query.year);
-    const language = normalizeReportLanguage(req.query.lang || "en");
+    const language = normalizeReportLanguage(req.query.lang || "dari");
 
     if (!month || !year || month < 1 || month > 12) {
       return res
         .status(400)
         .json({ error: "Valid month (1-12) and year are required" });
     }
+
+    assertNotFutureAfghanMonth({ month, year });
 
     const [orders, dashboardStats] = await Promise.all([
       service.getMonthlyReportOrders({ month, year }),
