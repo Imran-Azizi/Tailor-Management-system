@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import {
-  formatReportDateTime,
+  formatMonthlyReportHeaderDateTime,
   formatReportNumber,
   getReportLocaleTag,
   normalizeReportLanguage,
@@ -372,55 +372,6 @@ function drawRow(
   return y + ROW_H;
 }
 
-function summaryRow(
-  doc,
-  label,
-  value,
-  y,
-  fkFont,
-  isRtl,
-  valueColor = "#0F172A",
-) {
-  if (isRtl) {
-    // RTL: value (numbers, always LTR) on LEFT, label (Arabic text) on RIGHT
-    doc
-      .font("Helvetica-Bold")
-      .fontSize(11.5)
-      .fillColor(valueColor)
-      .text(value, 40, y, { width: 200, align: "left" });
-    wt(
-      doc,
-      label,
-      240,
-      y,
-      { width: 560, align: "right" },
-      fkFont,
-      "#475569",
-      false,
-      11.5,
-    );
-  } else {
-    wt(
-      doc,
-      label,
-      40,
-      y,
-      { width: 220, align: "left" },
-      fkFont,
-      "#475569",
-      false,
-      11.5,
-    );
-    // Value is always numbers/ASCII — no shaping needed
-    doc
-      .font("Helvetica-Bold")
-      .fontSize(11.5)
-      .fillColor(valueColor)
-      .text(value, 260, y, { width: 335, align: "left" });
-  }
-  return y + 16;
-}
-
 function ensurePageSpace(doc, y, requiredHeight) {
   const maxY = doc.page.height - FOOTER_THRESHOLD_MARGIN;
   if (y + requiredHeight <= maxY) return y;
@@ -649,9 +600,6 @@ export async function buildMonthlyReportPdf({
       (s, o) => s + (o.remaining || 0),
       0,
     );
-    const completedCount = safeOrders.filter((o) => o.isCompleted).length;
-    const pendingCount = safeOrders.length - completedCount;
-
     // ── Header ───────────────────────────────────────────────────────────────
     const pageW = doc.page.width;
 
@@ -671,7 +619,7 @@ export async function buildMonthlyReportPdf({
 
     wt(
       doc,
-      `${labels.generatedAt}: ${formatReportDateTime(new Date(), language)}`,
+      `${labels.generatedAt}: ${formatMonthlyReportHeaderDateTime(new Date(), language)}`,
       40,
       40,
       { width: pageW - 80, align: rtlAwareAlign(isRtl, "left") },
@@ -692,80 +640,8 @@ export async function buildMonthlyReportPdf({
       9,
     );
 
-    // ── Summary ───────────────────────────────────────────────────────────────
+    // ── Dashboard Snapshot ────────────────────────────────────────────────────
     let y = 80;
-
-    // Light background panel with top accent stripe for the summary section
-    doc.save();
-    doc.roundedRect(TABLE_X, y - 4, TABLE_W, 128, 5).fill("#F8FAFC");
-    doc.rect(TABLE_X, y - 4, TABLE_W, 3).fill("#3B82F6");
-    doc.restore();
-
-    wt(
-      doc,
-      labels.summary,
-      40,
-      y,
-      { width: TABLE_W, align: rtlAwareAlign(isRtl, "left") },
-      fkFont,
-      "#0F172A",
-      true,
-      12,
-    );
-
-    y += 14;
-    y = summaryRow(
-      doc,
-      labels.totalOrders,
-      formatReportNumber(safeOrders.length, language),
-      y,
-      fkFont,
-      isRtl,
-    );
-    y = summaryRow(
-      doc,
-      labels.completedPending,
-      `${formatReportNumber(completedCount, language)} / ${formatReportNumber(pendingCount, language)}`,
-      y,
-      fkFont,
-      isRtl,
-    );
-    y = summaryRow(
-      doc,
-      labels.grossRevenue,
-      `${fmt(totalRevenue, language)} AF`,
-      y,
-      fkFont,
-      isRtl,
-    );
-    y = summaryRow(
-      doc,
-      labels.totalDiscounts,
-      `${fmt(totalDiscount, language)} AF`,
-      y,
-      fkFont,
-      isRtl,
-    );
-    y = summaryRow(
-      doc,
-      labels.totalPaid,
-      `${fmt(totalPaid, language)} AF`,
-      y,
-      fkFont,
-      isRtl,
-      "#16A34A",
-    );
-    y = summaryRow(
-      doc,
-      labels.totalRemaining,
-      `${fmt(totalRemaining, language)} AF`,
-      y,
-      fkFont,
-      isRtl,
-      totalRemaining > 0 ? "#DC2626" : "#16A34A",
-    );
-
-    y += 8;
     wt(
       doc,
       labels.dashboardStatsTitle || "Dashboard Snapshot",

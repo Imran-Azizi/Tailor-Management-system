@@ -4,7 +4,6 @@
   "private": true,
   "description": "Full-stack Tailor Management System — Express + Prisma backend, React + Vite frontend",
   "scripts": {
-  "postinstall": "npm install --prefix frontend --include=dev && npm install --prefix backend --include=dev",
   "build": "npm --prefix frontend run build",
   "start": "npm --prefix backend run start"
 },

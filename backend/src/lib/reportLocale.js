@@ -59,6 +59,34 @@ export function formatReportDateTime(value, language = "en", options = {}) {
   }).format(date);
 }
 
+export function formatMonthlyReportHeaderDateTime(value, language = "en") {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+
+  const normalized = normalizeReportLanguage(language);
+  if (normalized === "en") {
+    return formatReportDateTime(date, language);
+  }
+
+  const locale = getReportLocaleTag(language);
+  const datePart = new Intl.DateTimeFormat(locale, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: AFGHANISTAN_TIMEZONE,
+  }).format(date);
+
+  const timePart = new Intl.DateTimeFormat(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: AFGHANISTAN_TIMEZONE,
+  }).format(date);
+
+  return `${datePart} — ${timePart}`;
+}
+
 export function formatReportNumber(value, language = "en", options = {}) {
   const num = Number(value || 0);
   const safeNum = Number.isFinite(num) ? num : 0;
@@ -155,14 +183,14 @@ export const REPORT_TEXT = {
     monthly: {
       title: "گزارش ماهانه",
       generatedAt: "زمان تولید",
-      totalOrders: "مجموع سفارش ها",
+      totalOrders: "مجموع سفارش‌ها",
       summary: "خلاصه",
       completedPending: "تکمیل شده / در انتظار",
       grossRevenue: "درآمد ناخالص",
-      totalDiscounts: "مجموع تخفیف ها",
+      totalDiscounts: "مجموع تخفیف‌ها",
       totalPaid: "مجموع پرداخت شده",
       totalRemaining: "مجموع باقی مانده",
-      orderRecords: "فهرست سفارش ها",
+      orderRecords: "فهرست سفارش‌ها",
       noOrders: "برای این ماه سفارشی ثبت نشده است.",
       continued: "ادامه",
       footerPrefix: "سیستم خیاطی هوشمند صافی",
@@ -190,18 +218,18 @@ export const REPORT_TEXT = {
       },
       stats: {
         totalRakhtRevenue: "مجموع عاید رخت",
-        totalOrderBenefit: "مجموع فایده سفارش ها",
-        totalOrders: "مجموع سفارش ها",
+        totalOrderBenefit: "مجموع فایده سفارش‌ها",
+        totalOrders: "مجموع سفارش‌ها",
         totalAmount: "مجموع مبلغ",
         collected: "مجموع پرداخت شده",
         outstanding: "مجموع باقی مانده",
         totalDailyExpenses: "مجموع مصارف روزانه",
         totalRakhtPrice: "مجموع قیمت رخت ها",
         totalLoan: "مجموع قرض",
-        totalQichikarUsersMoney: "مجموع پول قیچی کاران",
-        totalDokhtUsersMoney: "مجموع پول دخت کاران",
-        emergency: "سفارش های عاجل",
-        thisYear: "سفارش های امسال",
+        totalQichikarUsersMoney: "مجموع پول قیچی‌کاران",
+        totalDokhtUsersMoney: "مجموع پول دوخت‌کاران",
+        emergency: "سفارش‌های عاجل",
+        thisYear: "سفارش‌های امسال",
       },
     },
     daily: {
@@ -236,7 +264,7 @@ export const REPORT_TEXT = {
   },
   pashto: {
     monthly: {
-      title: "مياشتنی راپور",
+      title: "میاشتنی راپور",
       generatedAt: "د جوړېدو وخت",
       totalOrders: "ټول فرمایشونه",
       summary: "لنډیز",
@@ -253,7 +281,7 @@ export const REPORT_TEXT = {
       columns: {
         num: "#",
         bill: "بل#",
-        customer: "مشتری",
+        customer: "پېرودونکی",
         type: "ډول",
         qty: "شمېر",
         total: "ټول",
@@ -276,13 +304,13 @@ export const REPORT_TEXT = {
         totalOrderBenefit: "د فرمایشونو ټول ګټه",
         totalOrders: "ټول فرمایشونه",
         totalAmount: "ټول مقدار",
-        collected: "ټول راټول شوي",
+        collected: "ټول ترلاسه شوي",
         outstanding: "ټول پاتې",
         totalDailyExpenses: "د ورځنیو مصارفو ټول مقدار",
         totalRakhtPrice: "د ټولو رختونو ټول قیمت",
         totalLoan: "ټول قرض",
         totalQichikarUsersMoney: "د قیچي کارانو ټولې پیسې",
-        totalDokhtUsersMoney: "د دخت کارانو ټولې پیسې",
+        totalDokhtUsersMoney: "د دوخت‌کارانو ټولې پیسې",
         emergency: "بیړني فرمایشونه",
         thisYear: "د دې کال فرمایشونه",
       },
