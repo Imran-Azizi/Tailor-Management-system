@@ -69,7 +69,10 @@ function escapeRegex(value) {
 
 function stripRepeatedBasePrefix(customName, baseLabel) {
   const escapedBase = escapeRegex(baseLabel);
-  const matcher = new RegExp(`^${escapedBase}(?:\\s*[-:|]\\s*|\\s+)(.+)$`, "i");
+  const matcher = new RegExp(
+    `^${escapedBase}(?:\\s*(?:-|:|\\|)\\s*|\\s+)(.+)$`,
+    "i",
+  );
   const match = String(customName || "").match(matcher);
   return match?.[1]?.trim() || "";
 }

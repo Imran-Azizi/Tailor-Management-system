@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
@@ -8,38 +9,45 @@ import {
   RoleRoute,
   WorkerProtectedRoute,
 } from "./components/ProtectedRoute.jsx";
-import Layout from "./components/Layout.jsx";
-import WorkerLayout from "./components/WorkerLayout.jsx";
-import WorkerPanel from "./pages/WorkerPanel.jsx";
-import Login from "./pages/Login.jsx";
-import Dashboard from "./pages/Dashboard.jsx";
-import CreateOrder from "./pages/CreateOrder.jsx";
-import AllOrders from "./pages/AllOrders.jsx";
-import EditOrder from "./pages/EditOrder.jsx";
-import Customers from "./pages/Customers.jsx";
-import Boxes from "./pages/Boxes.jsx";
-import Designs from "./pages/Designs.jsx";
-import Notifications from "./pages/Notifications.jsx";
-import PrintBills from "./pages/PrintBills.jsx";
-import UserManagement from "./pages/UserManagement.jsx";
-import MyTasks from "./pages/MyTasks.jsx";
-import CustomerTransactions from "./pages/CustomerTransactions.jsx";
-import CustomerReport from "./pages/CustomerReport.jsx";
-import MakeTransaction from "./pages/MakeTransaction.jsx";
-import AllTransactions from "./pages/AllTransactions.jsx";
 import ScrollToTop from "./components/ScrollToTop.jsx";
-import ClothesDeliveryToCustomer from "./pages/ClothesDeliveryToCustomer.jsx";
-import AssignOrders from "./pages/AssignOrders.jsx";
-import AssignOrdersReport from "./pages/AssignOrdersReport.jsx";
-import CompletedWorkerOrders from "./pages/CompletedWorkerOrders.jsx";
-import DailyTasks from "./pages/DailyTasks.jsx";
-import AllDailyTasks from "./pages/AllDailyTasks.jsx";
-import DailyTaskDetails from "./pages/DailyTaskDetails.jsx";
-import CreateRakht from "./pages/CreateRakht.jsx";
-import AllRakhts from "./pages/AllRakhts.jsx";
-import PaymentHistory from "./pages/PaymentHistory.jsx";
-import RakhtRevenue from "./pages/RakhtRevenue.jsx";
-import BackupManagement from "./pages/BackupManagement.jsx";
+
+const Layout = lazy(() => import("./components/Layout.jsx"));
+const WorkerLayout = lazy(() => import("./components/WorkerLayout.jsx"));
+const WorkerPanel = lazy(() => import("./pages/WorkerPanel.jsx"));
+const Login = lazy(() => import("./pages/Login.jsx"));
+const Dashboard = lazy(() => import("./pages/Dashboard.jsx"));
+const CreateOrder = lazy(() => import("./pages/CreateOrder.jsx"));
+const AllOrders = lazy(() => import("./pages/AllOrders.jsx"));
+const EditOrder = lazy(() => import("./pages/EditOrder.jsx"));
+const Customers = lazy(() => import("./pages/Customers.jsx"));
+const Boxes = lazy(() => import("./pages/Boxes.jsx"));
+const Designs = lazy(() => import("./pages/Designs.jsx"));
+const Notifications = lazy(() => import("./pages/Notifications.jsx"));
+const PrintBills = lazy(() => import("./pages/PrintBills.jsx"));
+const UserManagement = lazy(() => import("./pages/UserManagement.jsx"));
+const MyTasks = lazy(() => import("./pages/MyTasks.jsx"));
+const CustomerTransactions = lazy(
+  () => import("./pages/CustomerTransactions.jsx"),
+);
+const CustomerReport = lazy(() => import("./pages/CustomerReport.jsx"));
+const MakeTransaction = lazy(() => import("./pages/MakeTransaction.jsx"));
+const AllTransactions = lazy(() => import("./pages/AllTransactions.jsx"));
+const ClothesDeliveryToCustomer = lazy(
+  () => import("./pages/ClothesDeliveryToCustomer.jsx"),
+);
+const AssignOrders = lazy(() => import("./pages/AssignOrders.jsx"));
+const AssignOrdersReport = lazy(() => import("./pages/AssignOrdersReport.jsx"));
+const CompletedWorkerOrders = lazy(
+  () => import("./pages/CompletedWorkerOrders.jsx"),
+);
+const DailyTasks = lazy(() => import("./pages/DailyTasks.jsx"));
+const AllDailyTasks = lazy(() => import("./pages/AllDailyTasks.jsx"));
+const DailyTaskDetails = lazy(() => import("./pages/DailyTaskDetails.jsx"));
+const CreateRakht = lazy(() => import("./pages/CreateRakht.jsx"));
+const AllRakhts = lazy(() => import("./pages/AllRakhts.jsx"));
+const PaymentHistory = lazy(() => import("./pages/PaymentHistory.jsx"));
+const RakhtRevenue = lazy(() => import("./pages/RakhtRevenue.jsx"));
+const BackupManagement = lazy(() => import("./pages/BackupManagement.jsx"));
 
 function RoleBasedRedirect() {
   const { user } = useAuth();
@@ -60,7 +68,8 @@ export default function App() {
             }}
           >
             <ScrollToTop />
-            <Routes>
+            <Suspense fallback={null}>
+              <Routes>
               {/* Public */}
               <Route path="/login" element={<Login />} />
 
@@ -318,7 +327,8 @@ export default function App() {
 
               {/* Fallback */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
+              </Routes>
+            </Suspense>
           </BrowserRouter>
         </MonthProvider>
       </AuthProvider>
