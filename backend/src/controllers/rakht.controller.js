@@ -1,4 +1,6 @@
 import * as service from "../services/rakht.service.js";
+import { normalizeReportLanguage } from "../lib/reportLocale.js";
+import { buildPaymentHistoryReportPdf } from "../lib/paymentHistoryReportPdf.js";
 import {
   createRakhtSchema,
   payRemainingMoneySchema,
@@ -118,6 +120,103 @@ export const getPaymentHistory = async (req, res, next) => {
         limit,
       }),
     );
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getPaymentHistoryPdf = async (req, res, next) => {
+  try {
+    const companyName =
+      typeof req.query.companyName === "string"
+        ? req.query.companyName
+        : undefined;
+    const search = typeof req.query.search === "string" ? req.query.search : "";
+    const status = typeof req.query.status === "string" ? req.query.status : "";
+    const fromDate =
+      typeof req.query.fromDate === "string" ? req.query.fromDate : undefined;
+    const toDate =
+      typeof req.query.toDate === "string" ? req.query.toDate : undefined;
+    const month = req.query.month != null ? Number(req.query.month) : null;
+    const year = req.query.year != null ? Number(req.query.year) : null;
+    const sortBy =
+      typeof req.query.sortBy === "string" ? req.query.sortBy : undefined;
+    const sortOrder =
+      typeof req.query.sortOrder === "string" ? req.query.sortOrder : undefined;
+    const page =
+      typeof req.query.page === "string" ? Number(req.query.page) : 1;
+    const limit =
+      typeof req.query.limit === "string" ? Number(req.query.limit) : 20;
+    const language = normalizeReportLanguage(req.query.lang || "en");
+
+    const currentPage = await service.getRakhtPaymentHistory({
+      companyName,
+      search,
+      status,
+      fromDate,
+      toDate,
+      month,
+      year,
+      sortBy,
+      sortOrder,
+      page,
+      limit,
+    });
+
+    const safeLimit = Math.max(1, Number(limit) || 20);
+    const exportLimit = Math.min(
+      Math.max(Number(currentPage?.total || safeLimit), safeLimit),
+      5000,
+    );
+    const exportRows = await service.getRakhtPaymentHistory({
+      companyName,
+      search,
+      status,
+      fromDate,
+      toDate,
+      month,
+      year,
+      sortBy,
+      sortOrder,
+      page: 1,
+      limit: exportLimit,
+    });
+
+    const activeFilterCount = [
+      Boolean(String(search || "").trim()),
+      Boolean(String(companyName || "").trim()),
+      Boolean(String(status || "").trim()),
+      Boolean(fromDate),
+      Boolean(toDate),
+    ].filter(Boolean).length;
+
+    const pdfBuffer = await buildPaymentHistoryReportPdf({
+      rows: exportRows?.data || [],
+      summary: exportRows?.summary || { totalPaid: 0, totalRemaining: 0 },
+      filters: {
+        search,
+        companyName,
+        status,
+        fromDate,
+        toDate,
+        activeFilterCount,
+      },
+      language,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Cache-Control",
+      "no-store, no-cache, must-revalidate, proxy-revalidate",
+    );
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="payment-history-report.pdf"',
+    );
+    res.setHeader("Content-Length", pdfBuffer.length);
+    res.send(pdfBuffer);
   } catch (error) {
     next(error);
   }

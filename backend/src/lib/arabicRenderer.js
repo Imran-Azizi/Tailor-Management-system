@@ -2,8 +2,8 @@
  * arabicRenderer.js — Professional Arabic/Dari/Pashto text rendering for PDFKit
  *
  * Strategy: Use fontkit to shape Arabic text (correct contextual glyph forms
- * via OpenType GSUB features), then render glyphs as vector paths in reversed
- * order so PDFKit's LTR engine produces correct RTL visual output.
+ * via OpenType GSUB features), then render glyphs as vector paths with the
+ * glyph order returned by the shaper.
  *
  * This works for ALL Arabic-script characters including Pashto-specific
  * characters (ټ ډ ړ ږ ګ ۍ ې) that have no Unicode Presentation Form code points
@@ -55,15 +55,8 @@ export async function drawArabicText(
   const scale = fontSize / fkFont.unitsPerEm;
 
   // Shape the text explicitly as Arabic RTL script for stable Dari/Pashto joining.
-  const run = fkFont.layout(
-    text,
-    [],
-    RTL_SCRIPT,
-    RTL_LANGUAGE,
-    RTL_DIRECTION,
-  );
-  const glyphs = run.glyphs;
-  const positions = run.positions;
+  const run = fkFont.layout(text, [], RTL_SCRIPT, RTL_LANGUAGE, RTL_DIRECTION);
+  const { glyphs, positions } = run;
 
   if (!glyphs.length) return;
 
@@ -90,23 +83,18 @@ export async function drawArabicText(
   doc.save();
   doc.fillColor(fillColor);
 
-  // Render glyphs in reverse order so the visual output remains right-to-left.
-  // Some fontkit RTL runs provide glyphs in visual order; iterating backward
-  // prevents mirrored words in generated PDFs.
-  let curX = blockLeft + totalWidthPts; // start from the right edge
+  // Keep shaper-provided glyph order; reversing here flips mixed RTL/number text.
+  let curX = blockLeft;
 
-  for (let i = glyphs.length - 1; i >= 0; i--) {
+  for (let i = 0; i < glyphs.length; i += 1) {
     const glyph = glyphs[i];
     const pos = positions[i];
-    const glyphWidthPts = pos.xAdvance * scale;
-
-    curX -= glyphWidthPts; // advance leftward
 
     const glyphX = curX + pos.xOffset * scale;
     const glyphY = baselineY - pos.yOffset * scale;
 
     // Get the glyph's SVG outline path
-    const path = glyph.path;
+    const { path } = glyph;
     if (!path) continue;
     const svgPath = path.toSVG();
     if (!svgPath || svgPath.trim() === "M0 0" || svgPath.length < 5) continue;
@@ -119,6 +107,8 @@ export async function drawArabicText(
     doc.transform(scale, 0, 0, -scale, glyphX, glyphY);
     doc.path(svgPath).fill();
     doc.restore();
+
+    curX += pos.xAdvance * scale;
   }
 
   doc.restore();
@@ -144,15 +134,8 @@ export function drawArabicTextSync(
   const { width, align = "left", fontSize = doc._fontSize || 12 } = opts;
 
   const scale = fontSize / fkFont.unitsPerEm;
-  const run = fkFont.layout(
-    text,
-    [],
-    RTL_SCRIPT,
-    RTL_LANGUAGE,
-    RTL_DIRECTION,
-  );
-  const glyphs = run.glyphs;
-  const positions = run.positions;
+  const run = fkFont.layout(text, [], RTL_SCRIPT, RTL_LANGUAGE, RTL_DIRECTION);
+  const { glyphs, positions } = run;
 
   if (!glyphs.length) return 0;
 
@@ -175,19 +158,16 @@ export function drawArabicTextSync(
   doc.save();
   doc.fillColor(fillColor);
 
-  let curX = blockLeft + totalWidthPts;
+  let curX = blockLeft;
 
-  for (let i = glyphs.length - 1; i >= 0; i--) {
+  for (let i = 0; i < glyphs.length; i += 1) {
     const glyph = glyphs[i];
     const pos = positions[i];
-    const glyphWidthPts = pos.xAdvance * scale;
-
-    curX -= glyphWidthPts;
 
     const glyphX = curX + pos.xOffset * scale;
     const glyphY = baselineY - pos.yOffset * scale;
 
-    const path = glyph.path;
+    const { path } = glyph;
     if (!path) continue;
     const svgPath = path.toSVG();
     if (!svgPath || svgPath.length < 5) continue;
@@ -196,6 +176,8 @@ export function drawArabicTextSync(
     doc.transform(scale, 0, 0, -scale, glyphX, glyphY);
     doc.path(svgPath).fill();
     doc.restore();
+
+    curX += pos.xAdvance * scale;
   }
 
   doc.restore();

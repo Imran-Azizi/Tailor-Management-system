@@ -26,17 +26,19 @@ function resolveArabicFontPath() {
     process.env.PDF_BAHIJ_FONT_PATH,
     process.env.PDF_VAZIRMATN_FONT_PATH,
     process.env.PDF_ARABIC_FONT_PATH,
+    // Preferred bundled fonts first for predictable production output
+    path.join(__dirname, "../fonts/Vazirmatn-Regular.ttf"),
+    path.join(__dirname, "../fonts/NotoNaskhArabic-Regular.ttf"),
+    path.join(__dirname, "../fonts/NotoSansArabic-Regular.ttf"),
+    path.join(__dirname, "../fonts/NotoNastaliqUrdu-Regular.ttf"),
     "C:/Windows/Fonts/bahij.ttf",
     "C:/Windows/Fonts/bahij-zar.ttf",
     "C:/Windows/Fonts/Bahij_Zar.ttf",
     "C:/Windows/Fonts/Bahij Zar.ttf",
+    // Additional bundled compatibility names
     path.join(__dirname, "../fonts/Bahij_Zar.ttf"),
     path.join(__dirname, "../fonts/Bahij-Zar.ttf"),
     path.join(__dirname, "../fonts/BahijZar.ttf"),
-    path.join(__dirname, "../fonts/Vazirmatn-Regular.ttf"),
-    path.join(__dirname, "../fonts/NotoSansArabic-Regular.ttf"),
-    path.join(__dirname, "../fonts/NotoNastaliqUrdu-Regular.ttf"),
-    path.join(__dirname, "../fonts/NotoNaskhArabic-Regular.ttf"),
     "C:/Windows/Fonts/segoeui.ttf",
     "C:/Windows/Fonts/tahoma.ttf",
     "C:/Windows/Fonts/arial.ttf",
@@ -76,6 +78,129 @@ function wt(
   }
 }
 
+// --- Stat Card Grid for Dashboard Section (like monthly report) ---
+function drawDashboardStatsCards(
+  doc,
+  y,
+  labels,
+  stats,
+  language,
+  fkFont,
+  isRtl,
+) {
+  const statLabels = labels.stats || {};
+  const groups = [
+    {
+      title: labels?.statGroups?.revenue || "Revenue & Profit",
+      cards: [
+        {
+          label: statLabels.totalAmount,
+          value: `${formatReportNumber(stats.totalRevenue || 0, language)} AF`,
+          accent: "#16A34A",
+        },
+        {
+          label: statLabels.collected,
+          value: `${formatReportNumber(stats.totalPaid || 0, language)} AF`,
+          accent: "#0891B2",
+        },
+        {
+          label: statLabels.outstanding,
+          value: `${formatReportNumber(stats.totalRemaining || 0, language)} AF`,
+          accent: "#DC2626",
+        },
+      ],
+    },
+    {
+      title: labels?.statGroups?.expenses || "Expenses",
+      cards: [
+        {
+          label: statLabels.totalDailyExpenses,
+          value: `${formatReportNumber(stats.totalDailyExpenses || 0, language)} AF`,
+          accent: "#16A34A",
+        },
+      ],
+    },
+    {
+      title: labels?.statGroups?.orders || "Orders",
+      cards: [
+        {
+          label: statLabels.totalTasks,
+          value: formatReportNumber(stats.totalTasks || 0, language),
+          accent: "#2563EB",
+        },
+      ],
+    },
+  ];
+
+  const cardsPerRow = 3;
+  const gap = 8;
+  const groupGap = 10;
+  const cardHeight = 46;
+  const cardWidth = (TABLE_W - gap * (cardsPerRow - 1)) / cardsPerRow;
+  let cursorY = y;
+
+  groups.forEach((group) => {
+    wt(
+      doc,
+      group.title,
+      TABLE_X,
+      cursorY,
+      { width: TABLE_W, align: rtlAwareAlign(isRtl, "left") },
+      fkFont,
+      "#334155",
+      true,
+      10.5,
+    );
+    cursorY += 14;
+
+    group.cards.forEach((card, index) => {
+      const row = Math.floor(index / cardsPerRow);
+      const col = index % cardsPerRow;
+      const visualCol = isRtl ? cardsPerRow - 1 - col : col;
+      const x = TABLE_X + visualCol * (cardWidth + gap);
+      const cardY = cursorY + row * (cardHeight + gap);
+
+      doc.save();
+      doc.roundedRect(x, cardY, cardWidth, cardHeight, 5).fill("#F8FAFC");
+      doc
+        .roundedRect(x, cardY, cardWidth, cardHeight, 5)
+        .lineWidth(0.6)
+        .stroke("#E2E8F0");
+      doc.rect(x, cardY, 3, cardHeight).fill(card.accent || "#1D4ED8");
+      doc.restore();
+
+      wt(
+        doc,
+        card.label || "-",
+        x + 8,
+        cardY + 7,
+        {
+          width: cardWidth - 16,
+          align: rtlAwareAlign(isRtl, "left"),
+        },
+        fkFont,
+        "#475569",
+        false,
+        8.6,
+      );
+
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(10.6)
+        .fillColor("#0F172A")
+        .text(card.value, x + 8, cardY + 23, {
+          width: cardWidth - 16,
+          align: rtlAwareAlign(isRtl, "left"),
+        });
+    });
+
+    const rows = Math.ceil(group.cards.length / cardsPerRow);
+    cursorY += rows * (cardHeight + gap) - gap + groupGap;
+  });
+
+  return cursorY - groupGap;
+}
+
 function formatReportType(type, labels) {
   const value = String(type || "daily");
   return labels.reportTypes[value] || labels.reportTypes.custom;
@@ -102,12 +227,12 @@ const TABLE_X = 40;
 const TABLE_W = 515;
 const TABLE_ROW_H = 24;
 const DAILY_COL = {
-  num: { x: 48, w: 20 },
-  date: { x: 72, w: 104 },
-  from: { x: 182, w: 110 },
-  recipient: { x: 298, w: 110 },
-  amount: { x: 414, w: 70, align: "right" },
-  note: { x: 492, w: 56 },
+  num: { x: 48, w: 24 },
+  date: { x: 76, w: 94 },
+  from: { x: 174, w: 90 },
+  recipient: { x: 268, w: 90 },
+  amount: { x: 362, w: 86, align: "right" },
+  note: { x: 452, w: 98 },
 };
 
 function mirrorColumns(columns, tableX, tableWidth) {
@@ -137,14 +262,17 @@ function drawSummaryRow(doc, label, value, y, fkFont, isRtl) {
     11.5,
   );
   // value is always formatted numbers/dates — no shaping needed
-  doc
-    .font("Helvetica-Bold")
-    .fontSize(11.5)
-    .fillColor("#0F172A")
-    .text(String(value), 230, y, {
-      width: 320,
-      align: rtlAwareAlign(isRtl, "left"),
-    });
+  wt(
+    doc,
+    String(value),
+    230,
+    y,
+    { width: 320, align: rtlAwareAlign(isRtl, "left") },
+    fkFont,
+    "#0F172A",
+    true,
+    11.5,
+  );
 }
 
 function drawTableHeader(doc, y, labels, fkFont, isRtl, colMap) {
@@ -422,7 +550,8 @@ export async function buildDailyTaskReportPdf(report, language = "en") {
           width: colMap.num.w,
           align: rtlAwareAlign(isRtl, "left"),
         });
-        doc.text(
+        wt(
+          doc,
           formatReportDateTime(task.taskDate, language),
           colMap.date.x,
           y + 6,
@@ -430,15 +559,39 @@ export async function buildDailyTaskReportPdf(report, language = "en") {
             width: colMap.date.w,
             align: rtlAwareAlign(isRtl, "left"),
           },
+          fkFont,
+          "#0F172A",
+          false,
+          10,
         );
-        doc.text(truncate(task.fromName, 18), colMap.from.x, y + 6, {
-          width: colMap.from.w,
-          align: rtlAwareAlign(isRtl, "left"),
-        });
-        doc.text(truncate(task.recipientName, 18), colMap.recipient.x, y + 6, {
-          width: colMap.recipient.w,
-          align: rtlAwareAlign(isRtl, "left"),
-        });
+        wt(
+          doc,
+          truncate(task.fromName, 22),
+          colMap.from.x,
+          y + 6,
+          {
+            width: colMap.from.w,
+            align: rtlAwareAlign(isRtl, "left"),
+          },
+          fkFont,
+          "#0F172A",
+          false,
+          10,
+        );
+        wt(
+          doc,
+          truncate(task.recipientName, 22),
+          colMap.recipient.x,
+          y + 6,
+          {
+            width: colMap.recipient.w,
+            align: rtlAwareAlign(isRtl, "left"),
+          },
+          fkFont,
+          "#0F172A",
+          false,
+          10,
+        );
         doc.text(formatMoney(task.amount, language), colMap.amount.x, y + 6, {
           width: colMap.amount.w,
           align: "right",

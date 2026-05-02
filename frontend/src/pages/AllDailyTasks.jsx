@@ -49,8 +49,8 @@ import {
   Spinner,
 } from "../components/ui/index.jsx";
 
-function formatMoney(v) {
-  return formatCurrency(v, "en", {
+function formatMoney(v, language = "en") {
+  return formatCurrency(v, language, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   });
@@ -492,7 +492,7 @@ function TaskRow({
           }}
         >
           <LuBadgeCheck size={12} />
-          {formatMoney(task.amount)}
+          {formatMoney(task.amount, language)}
         </span>
       </td>
       <td style={{ textAlign: "center" }}>
@@ -549,7 +549,8 @@ function TaskCard({
   isMonthEditable = true,
   disabledReason,
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language;
   const isEditable = isMonthEditable && isDailyTaskEditable(task);
 
   return (
@@ -624,7 +625,7 @@ function TaskCard({
           }}
         >
           <LuBadgeCheck size={12} style={{ marginInlineEnd: 4 }} />
-          {formatMoney(task.amount)}
+          {formatMoney(task.amount, language)}
         </span>
       </div>
 
@@ -1100,7 +1101,7 @@ export default function AllDailyTasks() {
         />
         <StatBanner
           label={t("dailyTasks.totalAmount")}
-          value={formatMoney(summaryTotalAmount)}
+          value={formatMoney(summaryTotalAmount, language)}
           Icon={LuBadgeDollarSign}
           accent="#16A34A"
           sub={`${tasks.length} ${t("dailyTasks.taskCount", "tasks on page")}`}

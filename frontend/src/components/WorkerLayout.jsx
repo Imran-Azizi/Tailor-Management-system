@@ -11,15 +11,22 @@ import {
   LuSun,
   LuMoon,
   LuLanguages,
+  LuCalendarCheck,
   LuChevronDown,
   LuX,
   LuCircleDollarSign,
 } from "react-icons/lu";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTheme } from "../context/ThemeContext.jsx";
+import { useMonth } from "../context/MonthContext.jsx";
 import api from "../lib/api.js";
 import { formatUserNotificationMessage } from "../lib/notifications.js";
 import { formatDateTimeLocale } from "../lib/locale.js";
+import {
+  MONTHS,
+  getDisplayMonthLabelForLanguage,
+  getDisplayYearForLanguage,
+} from "../lib/months.js";
 import { NotificationText } from "./ui/index.jsx";
 
 const ROLE_CONFIG = {
@@ -417,6 +424,7 @@ export default function WorkerLayout() {
   const { user } = useAuth();
   const { dark, toggle } = useTheme();
   const { i18n, t } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language || "en";
   const workerScope = [user?.id, user?.accountType];
 
   const [notifOpen, setNotifOpen] = useState(false);
@@ -432,6 +440,20 @@ export default function WorkerLayout() {
   const cfg = ROLE_CONFIG[user?.accountType] || ROLE_CONFIG.QICHIKAR;
   const { color: roleColor, labelKey } = cfg;
   const roleLabel = t(labelKey);
+  const {
+    viewMonth,
+    viewYear,
+    setViewMonth,
+    setViewYear,
+    monthPolicy,
+    isSelectableMonth,
+  } = useMonth();
+  const baseYear = Number(
+    monthPolicy.currentYear || viewYear || new Date().getFullYear(),
+  );
+  const selectableYears = [baseYear - 1, baseYear, baseYear + 1].filter((y) =>
+    MONTHS.some((m) => isSelectableMonth(m.value, y)),
+  );
 
   const { data: unreadNotifsRaw = [] } = useQuery({
     queryKey: ["worker-notifs-count", ...workerScope],
@@ -507,6 +529,51 @@ export default function WorkerLayout() {
               {roleLabel}
             </p>
           </div>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "6px 8px",
+            borderRadius: 10,
+            border: "1px solid var(--border)",
+            background: "var(--surface2)",
+          }}
+          title={t("navbar.viewDataByMonth", "View Data by Month")}
+        >
+          <LuCalendarCheck size={14} style={{ color: "var(--text2)" }} />
+          <select
+            value={viewMonth}
+            onChange={(e) => setViewMonth(Number(e.target.value))}
+            style={workerMonthSelectStyle}
+          >
+            {MONTHS.map((month) => (
+              <option
+                key={month.value}
+                value={month.value}
+                disabled={!isSelectableMonth(month.value, viewYear)}
+              >
+                {getDisplayMonthLabelForLanguage(
+                  month.value,
+                  viewYear,
+                  language,
+                )}
+              </option>
+            ))}
+          </select>
+          <select
+            value={viewYear}
+            onChange={(e) => setViewYear(Number(e.target.value))}
+            style={workerMonthSelectStyle}
+          >
+            {selectableYears.map((year) => (
+              <option key={year} value={year}>
+                {getDisplayYearForLanguage(year, viewMonth, language)}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div
@@ -646,4 +713,15 @@ const btnStyle = {
   display: "flex",
   alignItems: "center",
   gap: 5,
+};
+
+const workerMonthSelectStyle = {
+  border: "1px solid var(--border)",
+  borderRadius: 8,
+  background: "var(--surface)",
+  color: "var(--text1)",
+  fontSize: 12,
+  fontWeight: 600,
+  padding: "5px 8px",
+  outline: "none",
 };

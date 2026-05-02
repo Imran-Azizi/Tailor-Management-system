@@ -58,9 +58,10 @@
     "createNewAccount": "Create New Account",
     "dadAndStud": "Dad & Stud",
     "report": "Report",
-    "transactions": "Transactions",
-    "makeTransaction": "Make Transaction",
-    "allTransactions": "All Transactions",
+    "clothesStatus": "Clothes Status",
+    "transactions": "Loan",
+    "makeTransaction": "Make Loan",
+    "allTransactions": "All Loans",
     "completedFromWorkers": "Completed From Workers",
     "dailyTasks": "Daily Expenses"
   },
@@ -116,6 +117,7 @@
     "totalOutstanding": "Total Outstanding"
   },
   "report": {
+    "title": "Report",
     "subtitle": "Business overview and customer analytics",
     "totalCustomers": "Total Customers",
     "totalOrders": "Total Orders",
@@ -129,6 +131,10 @@
     "generating": "Generating...",
     "generateFailed": "Failed to generate report",
     "noData": "No data available for this month"
+  },
+  "dashboardPage": {
+    "netBenefit": "Net Benefit",
+    "netBenefitSub": "Total Rakht Revenue + Total Order Benefit"
   },
   "assignment": {
     "assignOrder": "Assign Order",
@@ -320,24 +326,24 @@
     "createFailed": "Failed to create order. Please check your inputs."
   },
   "transaction": {
-    "title": "Make Transaction",
-    "subtitle": "Record a financial transaction for a user",
-    "allTitle": "All Transactions",
-    "allSubtitle": "View and search all recorded transactions",
+    "title": "Make Loan",
+    "subtitle": "Record a loan entry for a user",
+    "allTitle": "All Loans",
+    "allSubtitle": "View and search all recorded loan entries",
     "accountType": "Account Type",
     "userName": "User Name",
     "amount": "Amount",
     "transactionDate": "Transaction Date",
     "note": "Note",
-    "notePlaceholder": "Optional note about this transaction...",
-    "submit": "Submit Transaction",
+    "notePlaceholder": "Optional note about this loan entry...",
+    "submit": "Submit Loan",
     "submitting": "Submitting...",
-    "success": "Transaction recorded successfully.",
-    "failed": "Failed to record transaction.",
+    "success": "Loan recorded successfully.",
+    "failed": "Failed to record loan.",
     "selectAccountType": "Select account type...",
     "selectUser": "Select user...",
     "selectAccountTypeFirst": "Select account type first",
-    "totalTransactions": "Total Transactions",
+    "totalTransactions": "Total Loans",
     "totalAmount": "Total Amount",
     "allTypes": "All Types",
     "searchPlaceholder": "Search by user name...",

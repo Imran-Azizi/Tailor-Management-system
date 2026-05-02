@@ -37,7 +37,7 @@ function hasTimeParts(options = {}) {
 
 function withDateLocaleDefaults(language = "en", options = {}) {
   const next = { ...options };
-  if (usesAfghanLocalFormat(language) && !next.timeZone) {
+  if (!next.timeZone) {
     next.timeZone = AFGHANISTAN_TIMEZONE;
   }
   if (

@@ -27,6 +27,8 @@ import { formatUserNotificationMessage } from "../lib/notifications.js";
 import { formatDateTimeLocale, formatSystemDate } from "../lib/locale.js";
 import { formatCurrency } from "../lib/currency.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useMonth } from "../context/MonthContext.jsx";
+import { formatMonthYearLabel } from "../lib/months.js";
 import { NotificationText } from "../components/ui/index.jsx";
 
 const ROLE_CONFIG = {
@@ -632,6 +634,7 @@ function OrderDetailsModal({ order, language, t, onClose }) {
 export default function WorkerPanel() {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
+  const { viewMonth, viewYear, setViewMonth, setViewYear } = useMonth();
   const qc = useQueryClient();
   const language = i18n.resolvedLanguage || i18n.language || "en";
   const cfg = ROLE_CONFIG[user?.accountType] || ROLE_CONFIG.QICHIKAR;
@@ -648,9 +651,17 @@ export default function WorkerPanel() {
   const [optimisticCompletedIds, setOptimisticCompletedIds] = useState([]);
 
   const { data: orderPayload, isLoading } = useQuery({
-    queryKey: ["worker-panel-orders", ...workerScope],
+    queryKey: ["worker-panel-orders", ...workerScope, viewMonth, viewYear],
     queryFn: () =>
-      api.get("/orders", { params: { limit: 200 } }).then((r) => r.data),
+      api
+        .get("/orders", {
+          params: {
+            limit: 200,
+            month: viewMonth,
+            year: viewYear,
+          },
+        })
+        .then((r) => r.data),
     enabled: Boolean(user?.id && user?.accountType),
     refetchInterval: 30000,
   });
@@ -667,8 +678,21 @@ export default function WorkerPanel() {
   });
 
   const { data: workerMoneySummary } = useQuery({
-    queryKey: ["worker-panel-transaction-summary", ...workerScope],
-    queryFn: () => api.get("/transactions/me/summary").then((r) => r.data),
+    queryKey: [
+      "worker-panel-transaction-summary",
+      ...workerScope,
+      viewMonth,
+      viewYear,
+    ],
+    queryFn: () =>
+      api
+        .get("/transactions/me/summary", {
+          params: {
+            month: viewMonth,
+            year: viewYear,
+          },
+        })
+        .then((r) => r.data),
     enabled: Boolean(user?.id && user?.accountType),
     refetchInterval: 15000,
     refetchOnWindowFocus: true,
@@ -697,8 +721,26 @@ export default function WorkerPanel() {
   const receiveMut = useMutation({
     mutationFn: (id) => api.patch(`/orders/${id}/receive`).then((r) => r.data),
     onSuccess: (updatedOrder) => {
-      qc.setQueryData(["worker-panel-orders", ...workerScope], (prev) =>
-        upsertOrderInWorkerPayload(prev, updatedOrder),
+      const receivedOrderMonth = Number(updatedOrder?.entryMonth);
+      const receivedOrderYear = Number(updatedOrder?.entryYear);
+      const hasOrderMonthContext =
+        Number.isFinite(receivedOrderMonth) &&
+        Number.isFinite(receivedOrderYear) &&
+        receivedOrderMonth >= 1 &&
+        receivedOrderMonth <= 12;
+
+      if (
+        hasOrderMonthContext &&
+        (receivedOrderMonth !== Number(viewMonth) ||
+          receivedOrderYear !== Number(viewYear))
+      ) {
+        setViewMonth(receivedOrderMonth);
+        setViewYear(receivedOrderYear);
+      }
+
+      qc.setQueryData(
+        ["worker-panel-orders", ...workerScope, viewMonth, viewYear],
+        (prev) => upsertOrderInWorkerPayload(prev, updatedOrder),
       );
       qc.setQueryData(["worker-panel-notifs", ...workerScope], (prev = []) =>
         Array.isArray(prev)
@@ -1483,6 +1525,12 @@ export default function WorkerPanel() {
             >
               {cfg.label} - {t("workerPanel.allOrders", "All Orders")}:{" "}
               {stats.all}
+            </p>
+            <p
+              style={{ margin: "6px 0 0", color: "var(--text3)", fontSize: 12 }}
+            >
+              {t("common.viewingMonth", "Viewing data for")}:{" "}
+              <b>{formatMonthYearLabel(viewMonth, viewYear, language)}</b>
             </p>
           </div>
           <span

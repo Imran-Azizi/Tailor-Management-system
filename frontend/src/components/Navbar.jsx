@@ -1156,7 +1156,7 @@ export default function Navbar({ onHamburger, pageTitle }) {
         <span className="nav-title">{pageTitle}</span>
         <div className="nav-spacer" />
 
-        {(isAdmin || isFinance) && <MonthSelector />}
+        {(isAdmin || isFinance || isWorker) && <MonthSelector />}
 
         <div className="nav-search">
           <LuSearch size={14} className="ns-ico" />

@@ -3,6 +3,7 @@ import {
   listAccountTypes,
   listUsersByType,
   listTransactions,
+  listTransactionsPdf,
   getMyTransactionSummary,
   createTransaction,
 } from '../controllers/transaction.controller.js';
@@ -18,6 +19,7 @@ router.get('/users/:accountType', listUsersByType);
 router.get('/me/summary',         getMyTransactionSummary);
 
 // CRUD — ADMIN and DOKAN only
+router.get('/report/pdf', authorize('ADMIN', 'DOKAN'), listTransactionsPdf);
 router.get('/',  authorize('ADMIN', 'DOKAN'), listTransactions);
 router.post('/', authorize('ADMIN', 'DOKAN'), createTransaction);
 

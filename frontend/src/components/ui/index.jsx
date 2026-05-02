@@ -178,12 +178,16 @@ export const Badge = ({ children, v = "gold" }) => (
 
 export const Modal = ({ open, onClose, title, children, maxW = 480 }) => {
   if (!open) return null;
+  const docDir =
+    typeof document !== "undefined"
+      ? document.documentElement.getAttribute("dir") || "ltr"
+      : "ltr";
   return (
     <div
       className="modal-bg"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="modal-box" style={{ maxWidth: maxW }}>
+      <div className="modal-box" dir={docDir} style={{ maxWidth: maxW }}>
         <div className="modal-hd">
           <h2>{title}</h2>
           <button

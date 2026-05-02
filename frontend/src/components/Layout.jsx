@@ -22,7 +22,7 @@ const TITLES = {
   "/orders/completed": "common.completedOrders",
   "/orders/assignments": "assignment.assignOrder",
   "/orders/assignments/clothes": "assignment.assignOrder",
-  "/orders/assignments/report": "sidebar.report",
+  "/orders/assignments/report": "sidebar.clothesStatus",
   "/delivery": "sidebar.clothesDelivery",
   "/customers": "common.customers",
   "/boxes": "common.boxManagement",
@@ -34,7 +34,9 @@ const TITLES = {
   "/my-tasks": "myTasks.title",
   "/customers/create": "sidebar.createNewAccount",
   "/customers/transactions": "sidebar.dadAndStud",
-  "/customers/report": "sidebar.report",
+  "/customers/report": "report.title",
+  "/transactions/create": "transaction.title",
+  "/transactions": "transaction.allTitle",
 };
 
 export default function Layout() {

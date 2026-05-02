@@ -21,6 +21,10 @@ function hasArabicScript(value) {
   return ARABIC_SCRIPT_REGEX.test(String(value || ""));
 }
 
+function hasLatinScript(value) {
+  return /[A-Za-z]/.test(String(value || ""));
+}
+
 // ─── Font resolution ─────────────────────────────────────────────────────────
 // Returns the best available font path for Arabic/Dari/Pashto
 // Priority: bundled NotoNaskhArabic / Segoe UI / Tahoma → Linux paths → Aldhabi fallback
@@ -31,20 +35,20 @@ function resolveArabicFontPath() {
     process.env.PDF_BAHIJ_FONT_PATH,
     process.env.PDF_VAZIRMATN_FONT_PATH,
     process.env.PDF_ARABIC_FONT_PATH,
+    // Preferred bundled fonts first for predictable production output
+    path.join(__dirname, "../fonts/Vazirmatn-Regular.ttf"),
+    path.join(__dirname, "../fonts/NotoNaskhArabic-Regular.ttf"),
+    path.join(__dirname, "../fonts/NotoSansArabic-Regular.ttf"),
+    path.join(__dirname, "../fonts/NotoNastaliqUrdu-Regular.ttf"),
     // Bahij family (if installed locally)
     "C:/Windows/Fonts/bahij.ttf",
     "C:/Windows/Fonts/bahij-zar.ttf",
     "C:/Windows/Fonts/Bahij_Zar.ttf",
     "C:/Windows/Fonts/Bahij Zar.ttf",
-    // Preferred bundled fonts (drop TTF files into backend/src/fonts/)
+    // Additional bundled compatibility names
     path.join(__dirname, "../fonts/Bahij_Zar.ttf"),
     path.join(__dirname, "../fonts/Bahij-Zar.ttf"),
     path.join(__dirname, "../fonts/BahijZar.ttf"),
-    path.join(__dirname, "../fonts/Vazirmatn-Regular.ttf"),
-    path.join(__dirname, "../fonts/NotoSansArabic-Regular.ttf"),
-    path.join(__dirname, "../fonts/NotoNastaliqUrdu-Regular.ttf"),
-    // Bundled fallback (works on any OS including Railway)
-    path.join(__dirname, "../fonts/NotoNaskhArabic-Regular.ttf"),
     // Windows clean UI-first fallbacks
     "C:/Windows/Fonts/segoeui.ttf",
     "C:/Windows/Fonts/tahoma.ttf",
@@ -152,23 +156,43 @@ function orderTypeLabel(type, language = "en") {
   return map[normalized]?.[type] || map.en[type] || type;
 }
 
+function getLocalizedTypeDisplay(order, language, isRtl) {
+  const safeOrder = order || {};
+  const seq = Math.max(1, Number(safeOrder.orderTypeSequence || 1));
+  const localizedBase = `${formatReportNumber(seq, language)} ${orderTypeLabel(safeOrder.type, language)}`;
+
+  if (!isRtl) {
+    return safeOrder.orderDisplayName || localizedBase;
+  }
+
+  const customName = String(safeOrder.orderName || "").trim();
+  const hasPureArabicCustom =
+    customName && hasArabicScript(customName) && !hasLatinScript(customName);
+
+  if (hasPureArabicCustom) {
+    return `${localizedBase} - ${customName}`;
+  }
+
+  return localizedBase;
+}
+
 // ─── Column layout ────────────────────────────────────────────────────────────
 // #   Bill   Customer   Type   Qty   Total     Discount  Paid      Remaining  Status
 const COL = {
-  num: { x: 40, w: 22 },
-  bill: { x: 62, w: 36 },
-  customer: { x: 98, w: 100 },
-  type: { x: 198, w: 64 },
-  qty: { x: 262, w: 26 },
-  total: { x: 288, w: 64, align: "right" },
-  discount: { x: 352, w: 56, align: "right" },
-  paid: { x: 408, w: 62, align: "right" },
-  remaining: { x: 470, w: 62, align: "right" },
-  status: { x: 532, w: 43 },
+  num: { x: 40, w: 24 },
+  bill: { x: 64, w: 36 },
+  customer: { x: 100, w: 118 },
+  type: { x: 218, w: 190 },
+  qty: { x: 408, w: 32 },
+  total: { x: 440, w: 78, align: "right" },
+  discount: { x: 518, w: 70, align: "right" },
+  paid: { x: 588, w: 76, align: "right" },
+  remaining: { x: 664, w: 80, align: "right" },
+  status: { x: 744, w: 56 },
 };
 
 const TABLE_X = 40;
-const TABLE_W = 555;
+const TABLE_W = 760;
 const ROW_H = 26;
 const FOOTER_THRESHOLD_MARGIN = 56;
 
@@ -193,6 +217,26 @@ const COL_RTL = mirrorColumns(COL, TABLE_X, TABLE_W);
 function drawTableHeader(doc, y, labels, fkFont, isRtl, colMap) {
   doc.save();
   doc.roundedRect(TABLE_X, y, TABLE_W, ROW_H, 3).fill("#1E293B");
+
+  // Subtle separators improve scanability in dense RTL/LTR tables.
+  const boundaryXs = Array.from(
+    new Set(
+      Object.values(colMap)
+        .map((col) => Number(col.x))
+        .filter(Boolean),
+    ),
+  )
+    .sort((a, b) => a - b)
+    .filter((x) => x > TABLE_X && x < TABLE_X + TABLE_W);
+
+  boundaryXs.forEach((x) => {
+    doc
+      .moveTo(x, y + 3)
+      .lineTo(x, y + ROW_H - 3)
+      .lineWidth(0.4)
+      .strokeColor("rgba(255,255,255,0.18)")
+      .stroke();
+  });
   doc.restore();
 
   Object.entries({
@@ -212,19 +256,29 @@ function drawTableHeader(doc, y, labels, fkFont, isRtl, colMap) {
       doc,
       label,
       c.x,
-      y + 6,
+      y + (isRtl ? 7 : 6),
       { width: c.w, align: rtlAwareAlign(isRtl, c.align || "left") },
       fkFont,
       "#FFFFFF",
       true,
-      10,
+      isRtl ? 9.6 : 10,
     );
   });
 
   return y + ROW_H;
 }
 
-function drawRow(doc, y, index, order, fkFont, language, labels, isRtl, colMap) {
+function drawRow(
+  doc,
+  y,
+  index,
+  order,
+  fkFont,
+  language,
+  labels,
+  isRtl,
+  colMap,
+) {
   if (index % 2 === 0) {
     doc.save();
     doc.rect(TABLE_X, y, TABLE_W, ROW_H).fill("#F8FAFC");
@@ -279,12 +333,20 @@ function drawRow(doc, y, index, order, fkFont, language, labels, isRtl, colMap) 
     false,
     10,
   );
+  const typeText = getLocalizedTypeDisplay(order, language, isRtl);
+
+  // Truncate long type text with ellipsis for RTL
+  let displayTypeText = typeText;
+  const maxTypeLen = isRtl ? 32 : 40;
+  if (displayTypeText.length > maxTypeLen) {
+    displayTypeText = displayTypeText.slice(0, maxTypeLen - 1) + "…";
+  }
   wt(
     doc,
-    order.orderDisplayName || orderTypeLabel(order.type, language),
+    displayTypeText,
     c.type.x,
     y + 6,
-    { width: c.type.w, align: rtlAwareAlign(isRtl, "left") },
+    { width: c.type.w, align: rtlAwareAlign(isRtl, "left"), ellipsis: true },
     fkFont,
     "#0F172A",
     false,
@@ -339,11 +401,181 @@ function summaryRow(
   return y + 16;
 }
 
+function ensurePageSpace(doc, y, requiredHeight) {
+  const maxY = doc.page.height - FOOTER_THRESHOLD_MARGIN;
+  if (y + requiredHeight <= maxY) return y;
+  doc.addPage();
+  return 40;
+}
+
+function drawDashboardStatsCards(
+  doc,
+  y,
+  labels,
+  stats,
+  language,
+  fkFont,
+  isRtl,
+) {
+  const statLabels = labels.stats || {};
+  const groups = [
+    {
+      title: labels?.statGroups?.revenue || "Revenue & Profit",
+      cards: [
+        {
+          label: statLabels.totalAmount,
+          value: `${fmt(stats.totalRevenue || 0, language)} AF`,
+          accent: "#16A34A",
+        },
+        {
+          label: statLabels.collected,
+          value: `${fmt(stats.totalPaid || 0, language)} AF`,
+          accent: "#0891B2",
+        },
+        {
+          label: statLabels.outstanding,
+          value: `${fmt(stats.totalRemaining || 0, language)} AF`,
+          accent: "#DC2626",
+        },
+        {
+          label: statLabels.totalOrderBenefit,
+          value: `${fmt(stats.totalOrderBenefit || 0, language)} AF`,
+          accent: "#1D4ED8",
+        },
+        {
+          label: statLabels.totalRakhtRevenue,
+          value: `${fmt(stats.totalRakhtRevenue || 0, language)} AF`,
+          accent: "#0F766E",
+        },
+      ],
+    },
+    {
+      title: labels?.statGroups?.expenses || "Expenses",
+      cards: [
+        {
+          label: statLabels.totalDailyExpenses,
+          value: `${fmt(stats.totalDailyExpenses || 0, language)} AF`,
+          accent: "#16A34A",
+        },
+        {
+          label: statLabels.totalRakhtPrice,
+          value: `${fmt(stats.totalRakhtPrice || 0, language)} AF`,
+          accent: "#2563EB",
+        },
+        {
+          label: statLabels.totalLoan,
+          value: `${fmt(stats.totalLoan || 0, language)} AF`,
+          accent: "#D97706",
+        },
+      ],
+    },
+    {
+      title: labels?.statGroups?.workers || "Worker Earnings",
+      cards: [
+        {
+          label: statLabels.totalQichikarUsersMoney,
+          value: `${fmt(stats.totalQichikarUsersMoney || 0, language)} AF`,
+          accent: "#D97706",
+        },
+        {
+          label: statLabels.totalDokhtUsersMoney,
+          value: `${fmt(stats.totalDokhtUsersMoney || 0, language)} AF`,
+          accent: "#DB2777",
+        },
+      ],
+    },
+    {
+      title: labels?.statGroups?.orders || "Orders",
+      cards: [
+        {
+          label: statLabels.totalOrders,
+          value: formatReportNumber(stats.totalOrders || 0, language),
+          accent: "#2563EB",
+        },
+        {
+          label: statLabels.emergency,
+          value: formatReportNumber(stats.emergencyOrders || 0, language),
+          accent: "#DC2626",
+        },
+      ],
+    },
+  ];
+
+  const cardsPerRow = 3;
+  const gap = 8;
+  const groupGap = 10;
+  const cardHeight = 46;
+  const cardWidth = (TABLE_W - gap * (cardsPerRow - 1)) / cardsPerRow;
+  let cursorY = y;
+
+  groups.forEach((group) => {
+    wt(
+      doc,
+      group.title,
+      TABLE_X,
+      cursorY,
+      { width: TABLE_W, align: rtlAwareAlign(isRtl, "left") },
+      fkFont,
+      "#334155",
+      true,
+      10.5,
+    );
+    cursorY += 14;
+
+    group.cards.forEach((card, index) => {
+      const row = Math.floor(index / cardsPerRow);
+      const col = index % cardsPerRow;
+      const visualCol = isRtl ? cardsPerRow - 1 - col : col;
+      const x = TABLE_X + visualCol * (cardWidth + gap);
+      const cardY = cursorY + row * (cardHeight + gap);
+
+      doc.save();
+      doc.roundedRect(x, cardY, cardWidth, cardHeight, 5).fill("#F8FAFC");
+      doc
+        .roundedRect(x, cardY, cardWidth, cardHeight, 5)
+        .lineWidth(0.6)
+        .stroke("#E2E8F0");
+      doc.rect(x, cardY, 3, cardHeight).fill(card.accent || "#1D4ED8");
+      doc.restore();
+
+      wt(
+        doc,
+        card.label || "-",
+        x + 8,
+        cardY + 7,
+        {
+          width: cardWidth - 16,
+          align: rtlAwareAlign(isRtl, "left"),
+        },
+        fkFont,
+        "#475569",
+        false,
+        8.6,
+      );
+
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(10.6)
+        .fillColor("#0F172A")
+        .text(card.value, x + 8, cardY + 23, {
+          width: cardWidth - 16,
+          align: rtlAwareAlign(isRtl, "left"),
+        });
+    });
+
+    const rows = Math.ceil(group.cards.length / cardsPerRow);
+    cursorY += rows * (cardHeight + gap) - gap + groupGap;
+  });
+
+  return cursorY - groupGap;
+}
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 export async function buildMonthlyReportPdf({
   month,
   year,
   orders,
+  dashboardStats = null,
   language = "en",
 }) {
   const labels = resolveReportText(language).monthly;
@@ -414,9 +646,20 @@ export async function buildMonthlyReportPdf({
 
     wt(
       doc,
-      `${labels.generatedAt}: ${formatReportDateTime(new Date(), language)}   |   ${labels.totalOrders}: ${formatReportNumber(safeOrders.length, language)}`,
+      `${labels.generatedAt}: ${formatReportDateTime(new Date(), language)}`,
       40,
-      42,
+      40,
+      { width: pageW - 80, align: rtlAwareAlign(isRtl, "left") },
+      fkFont,
+      "#94A3B8",
+      false,
+      9,
+    );
+    wt(
+      doc,
+      `${labels.totalOrders}: ${formatReportNumber(safeOrders.length, language)}`,
+      40,
+      52,
       { width: pageW - 80, align: rtlAwareAlign(isRtl, "left") },
       fkFont,
       "#94A3B8",
@@ -432,7 +675,7 @@ export async function buildMonthlyReportPdf({
       labels.summary,
       40,
       y,
-      { width: 555, align: rtlAwareAlign(isRtl, "left") },
+      { width: TABLE_W, align: rtlAwareAlign(isRtl, "left") },
       fkFont,
       "#0F172A",
       true,
@@ -491,8 +734,47 @@ export async function buildMonthlyReportPdf({
       totalRemaining > 0 ? "#DC2626" : "#16A34A",
     );
 
+    y += 8;
+    wt(
+      doc,
+      labels.dashboardStatsTitle || "Dashboard Snapshot",
+      40,
+      y,
+      { width: TABLE_W, align: rtlAwareAlign(isRtl, "left") },
+      fkFont,
+      "#0F172A",
+      true,
+      12,
+    );
+    y += 16;
+    y = ensurePageSpace(doc, y, 320);
+    y = drawDashboardStatsCards(
+      doc,
+      y,
+      labels,
+      dashboardStats || {
+        totalRakhtRevenue: 0,
+        totalOrderBenefit: 0,
+        totalOrders: safeOrders.length,
+        totalRevenue,
+        totalPaid,
+        totalRemaining,
+        totalDailyExpenses: 0,
+        totalRakhtPrice: 0,
+        totalLoan: 0,
+        totalQichikarUsersMoney: 0,
+        totalDokhtUsersMoney: 0,
+        emergencyOrders: 0,
+        yearOrders: safeOrders.length,
+      },
+      language,
+      fkFont,
+      isRtl,
+    );
+
     // ── Divider ───────────────────────────────────────────────────────────────
     y += 10;
+    y = ensurePageSpace(doc, y, 70);
     doc
       .moveTo(40, y)
       .lineTo(pageW - TABLE_X, y)
@@ -506,7 +788,7 @@ export async function buildMonthlyReportPdf({
       labels.orderRecords,
       40,
       y,
-      { width: 555, align: rtlAwareAlign(isRtl, "left") },
+      { width: TABLE_W, align: rtlAwareAlign(isRtl, "left") },
       fkFont,
       "#0F172A",
       true,
@@ -521,7 +803,7 @@ export async function buildMonthlyReportPdf({
         labels.noOrders,
         40,
         y + 8,
-        { width: 555, align: rtlAwareAlign(isRtl, "left") },
+        { width: TABLE_W, align: rtlAwareAlign(isRtl, "left") },
         fkFont,
         "#64748B",
         false,
@@ -567,35 +849,58 @@ export async function buildMonthlyReportPdf({
       // ── Totals row ──────────────────────────────────────────────────────────
       y += 4;
       doc.save();
-      doc.roundedRect(TABLE_X, y, TABLE_W, ROW_H + 2, 3).fill("#1E293B");
+      doc.roundedRect(TABLE_X, y, TABLE_W, ROW_H, 3).fill("#1E293B");
+
+      const totalsBoundaryXs = Array.from(
+        new Set(
+          Object.values(colMap)
+            .map((col) => Number(col.x))
+            .filter(Boolean),
+        ),
+      )
+        .sort((a, b) => a - b)
+        .filter((x) => x > TABLE_X && x < TABLE_X + TABLE_W);
+
+      totalsBoundaryXs.forEach((x) => {
+        doc
+          .moveTo(x, y + 3)
+          .lineTo(x, y + ROW_H - 3)
+          .lineWidth(0.35)
+          .strokeColor("rgba(255,255,255,0.14)")
+          .stroke();
+      });
       doc.restore();
 
+      // Right-align totals label for RTL
       wt(
         doc,
         labels.totals,
         colMap.customer.x,
-        y + 7,
-        { width: 100, align: rtlAwareAlign(isRtl, "left") },
+        y + (isRtl ? 7 : 6),
+        {
+          width: colMap.customer.w,
+          align: isRtl ? "right" : rtlAwareAlign(isRtl, "left"),
+        },
         fkFont,
         "#FFFFFF",
         true,
-        9.5,
+        isRtl ? 9.3 : 9.5,
       );
       // Totals values are numbers — always Helvetica
       doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#FFFFFF");
-      doc.text(fmt(totalRevenue, language), colMap.total.x, y + 7, {
+      doc.text(fmt(totalRevenue, language), colMap.total.x, y + 6, {
         width: colMap.total.w,
         align: "right",
       });
-      doc.text(fmt(totalDiscount, language), colMap.discount.x, y + 7, {
+      doc.text(fmt(totalDiscount, language), colMap.discount.x, y + 6, {
         width: colMap.discount.w,
         align: "right",
       });
-      doc.text(fmt(totalPaid, language), colMap.paid.x, y + 7, {
+      doc.text(fmt(totalPaid, language), colMap.paid.x, y + 6, {
         width: colMap.paid.w,
         align: "right",
       });
-      doc.text(fmt(totalRemaining, language), colMap.remaining.x, y + 7, {
+      doc.text(fmt(totalRemaining, language), colMap.remaining.x, y + 6, {
         width: colMap.remaining.w,
         align: "right",
       });

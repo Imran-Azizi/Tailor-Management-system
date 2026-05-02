@@ -31,8 +31,8 @@ import { formatSystemDate } from "../lib/locale.js";
 import { formatCurrency } from "../lib/currency.js";
 import { Spinner, Badge } from "../components/ui/index.jsx";
 
-function formatMoney(v) {
-  return formatCurrency(v, "en", {
+function formatMoney(v, language = "en") {
+  return formatCurrency(v, language, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   });
@@ -131,7 +131,7 @@ export default function CustomerReport() {
           </div>
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700 }}>
-              {t("sidebar.report")}
+              {t("report.title", "Report")}
             </h1>
             <p style={{ fontSize: 13, color: "var(--text3)" }}>
               {t("report.subtitle")}
@@ -187,7 +187,7 @@ export default function CustomerReport() {
               },
               {
                 label: t("report.totalRevenue"),
-                value: formatMoney(analytics?.totalRevenue),
+                value: formatMoney(analytics?.totalRevenue, language),
                 Icon: LuTrendingUp,
                 color: "#16a34a",
                 isText: true,
@@ -196,6 +196,7 @@ export default function CustomerReport() {
                 label: t("report.totalPending"),
                 value: formatMoney(
                   analytics?.totalRemaining ?? analytics?.totalPending,
+                  language,
                 ),
                 Icon: LuTrendingDown,
                 color: "#DC2626",
@@ -281,7 +282,7 @@ export default function CustomerReport() {
                     />
                     <YAxis tick={{ fontSize: 11, fill: "var(--text3)" }} />
                     <Tooltip
-                      formatter={(v) => formatMoney(v)}
+                      formatter={(v) => formatMoney(v, language)}
                       contentStyle={{
                         background: "var(--surface)",
                         border: "1px solid var(--border)",

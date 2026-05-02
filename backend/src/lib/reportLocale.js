@@ -29,13 +29,9 @@ function hasTimeParts(options = {}) {
 }
 
 function withReportDateDefaults(language = "en", options = {}) {
-  const normalized = normalizeReportLanguage(language);
   const next = { ...options };
 
-  if (
-    (normalized === "dari" || normalized === "pashto") &&
-    !next.timeZone
-  ) {
+  if (!next.timeZone) {
     next.timeZone = AFGHANISTAN_TIMEZONE;
   }
 
@@ -102,6 +98,28 @@ export const REPORT_TEXT = {
       },
       statusDone: "Done",
       statusPending: "Pending",
+      dashboardStatsTitle: "Dashboard Snapshot",
+      statGroups: {
+        revenue: "Revenue & Profit",
+        expenses: "Expenses",
+        workers: "Worker Earnings",
+        orders: "Orders",
+      },
+      stats: {
+        totalRakhtRevenue: "Total Rakht Revenue",
+        totalOrderBenefit: "Total Order Benefit",
+        totalOrders: "Total Orders",
+        totalAmount: "Total Amount",
+        collected: "Collected",
+        outstanding: "Outstanding",
+        totalDailyExpenses: "Total Daily Expenses",
+        totalRakhtPrice: "Total Rakht Price",
+        totalLoan: "Total Loan",
+        totalQichikarUsersMoney: "Total Qichikar Users Money",
+        totalDokhtUsersMoney: "Total Dokht Users Money",
+        emergency: "Emergency Orders",
+        thisYear: "This Year Orders",
+      },
     },
     daily: {
       title: "Daily Tasks Report",
@@ -163,6 +181,28 @@ export const REPORT_TEXT = {
       },
       statusDone: "تکمیل",
       statusPending: "در انتظار",
+      dashboardStatsTitle: "نمای کلی داشبورد",
+      statGroups: {
+        revenue: "عواید و فایده",
+        expenses: "مصارف",
+        workers: "درآمد کارگران",
+        orders: "سفارش ها",
+      },
+      stats: {
+        totalRakhtRevenue: "مجموع عاید رخت",
+        totalOrderBenefit: "مجموع فایده سفارش ها",
+        totalOrders: "مجموع سفارش ها",
+        totalAmount: "مجموع مبلغ",
+        collected: "مجموع پرداخت شده",
+        outstanding: "مجموع باقی مانده",
+        totalDailyExpenses: "مجموع مصارف روزانه",
+        totalRakhtPrice: "مجموع قیمت رخت ها",
+        totalLoan: "مجموع قرض",
+        totalQichikarUsersMoney: "مجموع پول قیچی کاران",
+        totalDokhtUsersMoney: "مجموع پول دخت کاران",
+        emergency: "سفارش های عاجل",
+        thisYear: "سفارش های امسال",
+      },
     },
     daily: {
       title: "گزارش مصارف روزانه",
@@ -224,6 +264,28 @@ export const REPORT_TEXT = {
       },
       statusDone: "بشپړ",
       statusPending: "په تمه",
+      dashboardStatsTitle: "د ډشبورډ لنډه کتنه",
+      statGroups: {
+        revenue: "عاید او ګټه",
+        expenses: "مصارف",
+        workers: "د کارګرانو عاید",
+        orders: "فرمایشونه",
+      },
+      stats: {
+        totalRakhtRevenue: "د رخت ټول عاید",
+        totalOrderBenefit: "د فرمایشونو ټول ګټه",
+        totalOrders: "ټول فرمایشونه",
+        totalAmount: "ټول مقدار",
+        collected: "ټول راټول شوي",
+        outstanding: "ټول پاتې",
+        totalDailyExpenses: "د ورځنیو مصارفو ټول مقدار",
+        totalRakhtPrice: "د ټولو رختونو ټول قیمت",
+        totalLoan: "ټول قرض",
+        totalQichikarUsersMoney: "د قیچي کارانو ټولې پیسې",
+        totalDokhtUsersMoney: "د دخت کارانو ټولې پیسې",
+        emergency: "بیړني فرمایشونه",
+        thisYear: "د دې کال فرمایشونه",
+      },
     },
     daily: {
       title: "د ورځنيو مصارفو راپور",

@@ -71,6 +71,8 @@
     },
     dashboardPage: {
       title: "Dashboard",
+      netBenefit: "Net Benefit",
+      netBenefitSub: "Total Rakht Revenue + Total Order Benefit",
       totalOrders: "Total Orders",
       totalAmount: "Total Amount",
       totalDailyExpenses: "Total Amount of All Daily Expenses",
@@ -107,11 +109,19 @@
         day: "numeric",
       },
     },
+    report: {
+      title: "Report",
+    },
     transaction: {
+      title: "Make Loan",
+      subtitle: "Record a loan entry for a user",
+      allTitle: "All Loans",
+      allSubtitle: "View and search all recorded loan entries",
+      totalTransactions: "Total Loans",
       value: "Value",
       type: "Type",
       selectType: "Select type...",
-      loanOption: "Is Loan",
+      loanOption: "Loan",
     },
     notificationsPage: {
       title: "Notifications",
@@ -198,15 +208,69 @@
       tabs: {
         outfit: "Outfit",
         waskat: "Waskat",
+        contributor: "Contributor",
         partug: "Partug",
         perhan: "Perhan",
         jacket: "Jacket",
         yakhanaqq: "YakhanQaq",
       },
+      contributor: {
+        title: "Contributor",
+        subtitle: "Manage contributor shares from net benefit",
+        create: "Create Contributor",
+        edit: "Edit Contributor",
+        created: "Contributor created successfully.",
+        updated: "Contributor updated successfully.",
+        deleted: "Contributor deleted successfully.",
+        createFailed: "Unable to create contributor.",
+        updateFailed: "Unable to update contributor.",
+        deleteFailed: "Unable to delete contributor.",
+        deleteTitle: "Delete Contributor",
+        deleteConfirm:
+          'Delete contributor "{{name}}" permanently? This action cannot be undone.',
+        empty: "No contributors created yet.",
+        totalPercentage: "Total Contributor Percentage",
+        totalPercentageHint:
+          "Total can reach exactly 100% but cannot exceed it.",
+        fields: {
+          name: "Contributor Name",
+          fatherName: "Father Name",
+          phoneNumber: "Phone Number",
+          percentage: "Percentage",
+          password: "Password",
+          money: "Contributor Money",
+        },
+        placeholders: {
+          name: "Enter contributor name",
+          fatherName: "Enter contributor father name",
+          phoneNumber: "Enter phone number",
+          percentage: "Enter percentage",
+          password: "Enter password",
+        },
+        password: {
+          invalid: "Contributor password is incorrect.",
+          confirmUpdateTitle: "Confirm Update with Password",
+          confirmDeleteTitle: "Confirm Delete with Password",
+          confirmUpdateMessage:
+            'Enter password for contributor "{{name}}" to apply updates.',
+          confirmDeleteMessage:
+            'Enter password for contributor "{{name}}" to delete this record.',
+        },
+        validation: {
+          required: "Please complete all required fields.",
+          passwordRequired: "Password is required.",
+          passwordMin: "Password must be at least 6 characters.",
+          verifyBeforeEdit: "Please verify password before updating.",
+          percentageNumber: "Percentage must be a valid number.",
+          percentageRange: "Percentage must be between 0 and 100.",
+          totalLimit:
+            "Total contributor percentage cannot be greater than 100%.",
+        },
+      },
     },
     assignment: {
       clothesToWorkers: "Clothes to Dokht and Qichikar",
-      reportTitle: "Order Tracking",
+      reportTitle: "Clothes Status",
       assignPageSubtitle:
         "Assign pending orders to Dokht or Qichikar with a focused, fast workflow.",
       assignmentSetup: "Assignment Setup",
@@ -255,6 +319,12 @@
       readyToAssign: "Ready to assign",
       dokhtLabel: "Dokht",
       qichikarLabel: "Qichikar",
+    },
+    sidebar: {
+      clothesStatus: "Clothes Status",
+      transactions: "Loan",
+      makeTransaction: "Make Loan",
+      allTransactions: "All Loans",
     },
     myTasks: {
       totalShort: "Total",
@@ -454,14 +524,15 @@
     },
     sidebar: {
       clothesDelivery: "تحویل لباس به مشتری",
-      transactions: "حسابات",
-      makeTransaction: "داد و ستد",
+      clothesStatus: "وضعیت لباس",
+      transactions: "قرض",
+      makeTransaction: "ثبت قرض",
       mute: "بی‌صدا",
       unmute: "فعال‌سازی صدا",
       muteEmergencyAlarm: "بی‌صدا کردن هشدار عاجل",
       unmuteEmergencyAlarm: "فعال‌سازی دوباره هشدار عاجل",
       viewOrder: "مشاهده و پرداخت",
-      allTransactions: "همه داد و ستد ها",
+      allTransactions: "همه قرض‌ها",
     },
     ui: {
       pageSummary: "صفحه {{page}} از {{pages}} · {{total}} مجموع",
@@ -560,6 +631,8 @@
     },
     dashboardPage: {
       title: "داشبورد",
+      netBenefit: "درآمد خالص",
+      netBenefitSub: "مجموع عاید رخت + مجموع فایده سفارش‌ها",
       totalOrders: "مجموع سفارشات",
       totalAmount: "مقدار کل",
       totalDailyExpenses: "مجموع مقدار تمام مصارف روزانه",
@@ -596,13 +669,19 @@
         day: "numeric",
       },
     },
+    report: {
+      title: "گزارش",
+    },
     transaction: {
-      title: "داد و ستد",
-      allTitle: "همه داد و ستد ها",
+      title: "ثبت قرض",
+      subtitle: "ثبت یک قرض برای کاربر",
+      allTitle: "همه قرض‌ها",
+      allSubtitle: "مشاهده و جستجوی تمام قرض‌های ثبت‌شده",
+      totalTransactions: "مجموع قرض‌ها",
       value: "مقدار",
       type: "نوع",
       selectType: "نوع را انتخاب کنید...",
-      loanOption: "قرضه",
+      loanOption: "قرض",
     },
     notificationsPage: {
       title: "اعلان‌ها",
@@ -689,13 +768,67 @@
       tabs: {
         outfit: "لباس",
         waskat: "واسکت",
+        contributor: "همکار",
         yakhanaqq: "یخن‌قاق",
+      },
+      contributor: {
+        title: "مدیریت همکار",
+        subtitle: "سهم همکاران را از درآمد خالص مدیریت کنید",
+        create: "ایجاد همکار",
+        edit: "ویرایش همکار",
+        created: "همکار با موفقیت ایجاد شد.",
+        updated: "همکار با موفقیت به‌روزرسانی شد.",
+        deleted: "همکار با موفقیت حذف شد.",
+        createFailed: "ایجاد همکار ممکن نشد.",
+        updateFailed: "به‌روزرسانی همکار ممکن نشد.",
+        deleteFailed: "حذف همکار ممکن نشد.",
+        deleteTitle: "حذف همکار",
+        deleteConfirm:
+          "همکار «{{name}}» به‌صورت دائمی حذف شود؟ این عمل برگشت‌پذیر نیست.",
+        empty: "هنوز هیچ همکاری ایجاد نشده است.",
+        totalPercentage: "مجموع فیصدی همکاران",
+        totalPercentageHint:
+          "مجموع می‌تواند دقیقاً ۱۰۰٪ باشد اما نباید بیشتر شود.",
+        fields: {
+          name: "نام همکار",
+          fatherName: "نام پدر",
+          phoneNumber: "شماره تماس",
+          percentage: "فیصدی",
+          password: "رمز عبور",
+          money: "پول همکار",
+        },
+        placeholders: {
+          name: "نام همکار را وارد کنید",
+          fatherName: "نام پدر همکار را وارد کنید",
+          phoneNumber: "شماره تماس را وارد کنید",
+          percentage: "فیصدی را وارد کنید",
+          password: "رمز عبور را وارد کنید",
+        },
+        password: {
+          invalid: "رمز عبور همکار نادرست است.",
+          confirmUpdateTitle: "تأیید ویرایش با رمز عبور",
+          confirmDeleteTitle: "تأیید حذف با رمز عبور",
+          confirmUpdateMessage:
+            "برای اعمال ویرایش همکار «{{name}}»، رمز عبور را وارد کنید.",
+          confirmDeleteMessage:
+            "برای حذف همکار «{{name}}»، رمز عبور را وارد کنید.",
+        },
+        validation: {
+          required: "لطفاً تمام فیلدهای ضروری را تکمیل کنید.",
+          passwordRequired: "رمز عبور ضروری است.",
+          passwordMin: "رمز عبور باید حداقل ۶ کاراکتر باشد.",
+          verifyBeforeEdit: "لطفاً قبل از ویرایش، رمز عبور را تأیید کنید.",
+          percentageNumber: "فیصدی باید عدد معتبر باشد.",
+          percentageRange: "فیصدی باید بین ۰ تا ۱۰۰ باشد.",
+          totalLimit:
+            "Total contributor percentage cannot be greater than 100%.",
+        },
       },
     },
     assignment: {
       assignOrder: "لباس به دوخت و قیچی",
       clothesToWorkers: "لباس به دخت و قیچی‌کار",
-      reportTitle: "رهگیری سفارش",
+      reportTitle: "وضعیت لباس",
       assignPageSubtitle:
         "سفارش‌های در انتظار را با روند سریع و دقیق به دخت یا قیچی‌کار واگذار کنید.",
       reportSubtitle:
@@ -1004,10 +1137,11 @@
     },
     sidebar: {
       clothesDelivery: "جامې مشتری ته سپارل",
+      clothesStatus: "د کالو وضعیت",
       overview: "لنډه کتنه",
-      transactions: "حسابات",
-      makeTransaction: "لیږد ثبت کړئ",
-      allTransactions: "ټول لیږدونه",
+      transactions: "پور",
+      makeTransaction: "پور ثبت کړئ",
+      allTransactions: "ټول پورونه",
     },
     ui: {
       pageSummary: "پاڼه {{page}} له {{pages}} څخه · ټول {{total}}",
@@ -1111,6 +1245,8 @@
     },
     dashboardPage: {
       title: "ډشبورډ",
+      netBenefit: "خالص ګټه",
+      netBenefitSub: "د رخت ټول عاید + د فرمایشونو ټول ګټه",
       totalOrders: "ټول فرمایشونه",
       totalAmount: "ټول مقدار",
       totalDailyExpenses: "د ټولو ورځنیو لګښتونو ټول مقدار",
@@ -1147,9 +1283,15 @@
         day: "numeric",
       },
     },
+    report: {
+      title: "راپور",
+    },
     transaction: {
-      title: "داد و ستد",
-      allTitle: "همه داد و ستد ها",
+      title: "پور ثبت کړئ",
+      subtitle: "د یو کارونکي لپاره پور ثبت کړئ",
+      allTitle: "ټول پورونه",
+      allSubtitle: "ټول ثبت شوي پورونه وګورئ او پلټنه وکړئ",
+      totalTransactions: "ټول پورونه",
       value: "ارزښت",
       type: "ډول",
       selectType: "ډول وټاکئ...",
@@ -1238,13 +1380,67 @@
       tabs: {
         outfit: "کالي",
         waskat: "واسکت",
+        contributor: "مرستندوی",
         yakhanaqq: "یخن‌قاق",
+      },
+      contributor: {
+        title: "د مرستندوي مدیریت",
+        subtitle: "د خالصې ګټې له مخې د مرستندویانو ونډه اداره کړئ",
+        create: "مرستندوی جوړ کړئ",
+        edit: "مرستندوی سم کړئ",
+        created: "مرستندوی په بریالیتوب جوړ شو.",
+        updated: "مرستندوی په بریالیتوب تازه شو.",
+        deleted: "مرستندوی په بریالیتوب حذف شو.",
+        createFailed: "مرستندوی جوړ نه شو.",
+        updateFailed: "مرستندوی تازه نه شو.",
+        deleteFailed: "مرستندوی حذف نه شو.",
+        deleteTitle: "د مرستندوی حذف",
+        deleteConfirm:
+          'مرستندوی "{{name}}" دایمي حذف شي؟ دا عمل بېرته نه راګرځي.',
+        empty: "لا هم هېڅ مرستندوی نشته.",
+        totalPercentage: "د مرستندویانو ټول سلنه",
+        totalPercentageHint:
+          "ټولیزه سلنه دقیق 100٪ ته رسېدلی شي خو زیاتېدلای نه شي.",
+        fields: {
+          name: "د مرستندوی نوم",
+          fatherName: "د پلار نوم",
+          phoneNumber: "د تماس شمېره",
+          percentage: "سلنه",
+          password: "پټنوم",
+          money: "د مرستندوی پیسې",
+        },
+        placeholders: {
+          name: "د مرستندوی نوم ولیکئ",
+          fatherName: "د پلار نوم ولیکئ",
+          phoneNumber: "د تماس شمېره ولیکئ",
+          percentage: "سلنه ولیکئ",
+          password: "پټنوم ولیکئ",
+        },
+        password: {
+          invalid: "د مرستندوی پټنوم ناسم دی.",
+          confirmUpdateTitle: "تازه کول د پټنوم په تایید",
+          confirmDeleteTitle: "حذف د پټنوم په تایید",
+          confirmUpdateMessage:
+            'د "{{name}}" مرستندوی د تازه کولو لپاره پټنوم ولیکئ.',
+          confirmDeleteMessage:
+            'د "{{name}}" مرستندوی د حذف لپاره پټنوم ولیکئ.',
+        },
+        validation: {
+          required: "مهرباني وکړئ ټول ضروري فیلډونه ډک کړئ.",
+          passwordRequired: "پټنوم اړین دی.",
+          passwordMin: "پټنوم باید لږ تر لږه ۶ توري وي.",
+          verifyBeforeEdit: "مهرباني وکړئ د سمون مخکې پټنوم تایید کړئ.",
+          percentageNumber: "سلنه باید معتبره شمېره وي.",
+          percentageRange: "سلنه باید له 0 تر 100 پورې وي.",
+          totalLimit:
+            "Total contributor percentage cannot be greater than 100%.",
+        },
       },
     },
     assignment: {
       assignOrder: "کالې دخت او قیچي‌کار ته",
       clothesToWorkers: "لباس د دخت او قیچي‌کار لپاره",
-      reportTitle: "د فرمایش تعقیب",
+      reportTitle: "د کالو وضعیت",
       assignPageSubtitle:
         "پاتې فرمایشونه د چټک او منظم بهیر له لارې دخت یا قیچي‌کار ته وسپارئ.",
       reportSubtitle:

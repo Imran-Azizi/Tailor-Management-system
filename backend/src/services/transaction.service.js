@@ -63,24 +63,49 @@ export const createTransaction = async (data, createdById) => {
   return transaction;
 };
 
-export const getTransactionSummaryForUser = async (userId, accountType) => {
+export const getTransactionSummaryForUser = async (
+  userId,
+  accountType,
+  { month = null, year = null } = {},
+) => {
+  const parsedMonth = month != null ? Number(month) : null;
+  const parsedYear = year != null ? Number(year) : null;
+  const hasMonthFilter =
+    parsedMonth &&
+    parsedYear &&
+    Number.isFinite(parsedMonth) &&
+    Number.isFinite(parsedYear);
+
+  const monthRange = hasMonthFilter
+    ? getAfghanMonthDateRange({ month: parsedMonth, year: parsedYear })
+    : null;
+  const paidDateFilter = hasMonthFilter
+    ? {
+        gte: monthRange.start,
+        lte: monthRange.end,
+      }
+    : null;
+
   const completedPaymentWhere =
     accountType === "DOKHT"
       ? {
           dokhtAssignedToId: userId,
           dokhtCompletedAt: { not: null },
           dokhtPaymentStatus: "PAID_TO_WORKER",
+          ...(paidDateFilter ? { dokhtPaidAt: paidDateFilter } : {}),
         }
       : accountType === "QICHIKAR"
         ? {
             qichikarAssignedToId: userId,
             qichikarCompletedAt: { not: null },
             qichikarPaymentStatus: "PAID_TO_WORKER",
+            ...(paidDateFilter ? { qichikarPaidAt: paidDateFilter } : {}),
           }
         : {
             assignedToId: userId,
             isCompleted: true,
             workerPaymentStatus: "PAID_TO_WORKER",
+            ...(paidDateFilter ? { workerPaidAt: paidDateFilter } : {}),
           };
 
   const paymentSumField =
@@ -96,6 +121,11 @@ export const getTransactionSummaryForUser = async (userId, accountType) => {
         userId,
         kind: "LOAN",
         source: "MANUAL",
+        ...(paidDateFilter
+          ? {
+              transactionDate: paidDateFilter,
+            }
+          : {}),
       },
       _sum: { amount: true },
     }),

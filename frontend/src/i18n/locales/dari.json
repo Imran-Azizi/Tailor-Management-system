@@ -57,10 +57,11 @@
     "createNewAccount": "ایجاد حساب جدید",
     "dadAndStud": "داد و ستد",
     "report": "گزارش",
+    "clothesStatus": "وضعیت لباس",
     "finance": "مالی",
-    "transactions": "تراکنش‌ها",
-    "makeTransaction": "ثبت تراکنش",
-    "allTransactions": "همه تراکنش‌ها",
+    "transactions": "قرض",
+    "makeTransaction": "ثبت قرض",
+    "allTransactions": "همه قرض‌ها",
     "completedFromWorkers": "تکمیل‌شده‌ها از کارگرها",
     "dailyTasks": "مصارف روزانه"
   },
@@ -116,6 +117,7 @@
     "totalOutstanding": "مجموع باقی‌مانده"
   },
   "report": {
+    "title": "گزارش",
     "subtitle": "نمای کلی کسب‌وکار و تحلیل مشتریان",
     "totalCustomers": "مجموع مشتریان",
     "totalOrders": "مجموع سفارش‌ها",
@@ -129,6 +131,10 @@
     "generating": "در حال ساخت‌...",
     "generateFailed": "ساختن گزارش انجام نشد",
     "noData": "داده‌ای برای این ماه موجود نیست"
+  },
+  "dashboardPage": {
+    "netBenefit": "درآمد خالص",
+    "netBenefitSub": "مجموع عاید رخت + مجموع فایده سفارش‌ها"
   },
   "assignment": {
     "assignOrder": "واگذاری سفارش",
@@ -320,24 +326,24 @@
     "createFailed": "ایجاد سفارش انجام نشد. ورودی‌ها را بررسی کنید."
   },
   "transaction": {
-    "title": "ثبت تراکنش",
-    "subtitle": "ثبت یک تراکنش مالی برای کاربر",
-    "allTitle": "همه تراکنش‌ها",
-    "allSubtitle": "مشاهده و جستجوی تمام تراکنش‌های ثبت‌شده",
+    "title": "ثبت قرض",
+    "subtitle": "ثبت یک قرض برای کاربر",
+    "allTitle": "همه قرض‌ها",
+    "allSubtitle": "مشاهده و جستجوی تمام قرض‌های ثبت‌شده",
     "accountType": "نوع حساب",
     "userName": "نام کاربر",
     "amount": "مبلغ",
-    "transactionDate": "تاریخ تراکنش",
+    "transactionDate": "تاریخ قرض",
     "note": "یادداشت",
-    "notePlaceholder": "یادداشت اختیاری درباره این تراکنش...",
-    "submit": "ثبت تراکنش",
+    "notePlaceholder": "یادداشت اختیاری درباره این قرض...",
+    "submit": "ثبت قرض",
     "submitting": "در حال ثبت...",
-    "success": "تراکنش با موفقیت ثبت شد.",
-    "failed": "ثبت تراکنش انجام نشد.",
+    "success": "قرض با موفقیت ثبت شد.",
+    "failed": "ثبت قرض انجام نشد.",
     "selectAccountType": "نوع حساب را انتخاب کنید...",
     "selectUser": "کاربر را انتخاب کنید...",
     "selectAccountTypeFirst": "ابتدا نوع حساب را انتخاب کنید",
-    "totalTransactions": "مجموع تراکنش‌ها",
+    "totalTransactions": "مجموع قرض‌ها",
     "totalAmount": "مجموع مبلغ",
     "allTypes": "همه انواع",
     "searchPlaceholder": "جستجو بر اساس نام کاربر...",

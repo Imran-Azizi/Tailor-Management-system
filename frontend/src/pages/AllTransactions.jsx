@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import toast from "react-hot-toast";
 import {
   LuArrowRightLeft,
   LuBadgeDollarSign,
@@ -17,6 +18,7 @@ import {
   LuX,
 } from "react-icons/lu";
 import api from "../lib/api.js";
+import { getApiErrorMessage } from "../lib/feedback.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
 import { formatMonthYearLabel } from "../lib/months.js";
@@ -46,8 +48,8 @@ const BADGE_V = {
   QICHIKAR: "amber",
 };
 
-function formatMoney(v) {
-  return formatCurrency(v, "en", {
+function formatMoney(v, language = "en") {
+  return formatCurrency(v, language, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   });
@@ -158,7 +160,7 @@ export default function AllTransactions() {
           row.user?.name || "-",
           row.accountType || "-",
           formatTransactionKind(row.kind, t),
-          formatMoney(row.amount),
+          formatMoney(row.amount, language),
           formatDate(row.transactionDate, language),
           String(row.note || "-").replaceAll('"', '""'),
           row.createdBy?.name || "-",
@@ -185,63 +187,35 @@ export default function AllTransactions() {
   const handleExportPdf = async () => {
     try {
       setExporting("pdf");
-      const rows = await exportRows();
-      const { default: jsPDF } = await import("jspdf");
-      const doc = new jsPDF({ unit: "pt", format: "a4" });
-      const width = doc.internal.pageSize.getWidth();
-      let y = 40;
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(16);
-      doc.text("All Transactions Report", 40, y);
-      y += 22;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
-      doc.text(
-        `Filters: search=${search || "-"}, type=${typeFilter || "ALL"}`,
-        40,
-        y,
-        { maxWidth: width - 80 },
-      );
-      y += 18;
-      doc.text(
-        `Totals: ${formatMoney(totalAmount)} (current page), records=${data?.total || 0}`,
-        40,
-        y,
-        { maxWidth: width - 80 },
-      );
-      y += 20;
-
-      rows.forEach((row, index) => {
-        if (y > 760) {
-          doc.addPage();
-          y = 40;
-        }
-        doc.setFont("helvetica", "bold");
-        doc.text(
-          `${index + 1}. ${row.user?.name || "-"} (${row.accountType || "-"})`,
-          40,
-          y,
-          { maxWidth: width - 80 },
-        );
-        y += 14;
-        doc.setFont("helvetica", "normal");
-        doc.text(
-          `${formatTransactionKind(row.kind, t)} | ${formatMoney(row.amount)} | ${formatDate(row.transactionDate, language)}`,
-          40,
-          y,
-          { maxWidth: width - 80 },
-        );
-        y += 14;
-        doc.text(
-          `Note: ${row.note || "-"} | By: ${row.createdBy?.name || "-"} | Created: ${formatDate(row.createdAt, language)}`,
-          40,
-          y,
-          { maxWidth: width - 80 },
-        );
-        y += 16;
+      const response = await api.get("/transactions/report/pdf", {
+        params: {
+          page,
+          limit: 20,
+          search,
+          accountType: typeFilter,
+          month: isAdmin ? viewMonth : undefined,
+          year: isAdmin ? viewYear : undefined,
+          lang: language,
+          _ts: Date.now(),
+        },
+        responseType: "blob",
       });
-
-      doc.save("all-transactions-report.pdf");
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "all-transactions-report.pdf";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error(
+        getApiErrorMessage(
+          error,
+          t("common.exportPdfFailed", "Failed to export PDF"),
+        ),
+      );
     } finally {
       setExporting("");
     }
@@ -296,6 +270,7 @@ export default function AllTransactions() {
 
       {isAdmin && (
         <div
+          className="month-info-banner"
           style={{
             display: "flex",
             alignItems: "center",
@@ -319,6 +294,7 @@ export default function AllTransactions() {
           </span>
           {data?.total === 0 && !isLoading && (
             <span
+              className="month-info-empty"
               style={{ marginInlineStart: "auto", fontSize: 11, opacity: 0.75 }}
             >
               {t("common.noDataThisMonth", "No data found for this month")}
@@ -334,7 +310,7 @@ export default function AllTransactions() {
           </span>
           <span className="badge bg-gold" style={{ marginInlineStart: 8 }}>
             {t("transaction.totalAmount", "Total Amount")}:{" "}
-            {formatMoney(totalAmount)}
+            {formatMoney(totalAmount, language)}
           </span>
         </div>
         <div
@@ -463,7 +439,7 @@ export default function AllTransactions() {
         />
         <StatCard
           label={t("transaction.totalAmount", "Total Amount")}
-          value={formatMoney(totalAmount)}
+          value={formatMoney(totalAmount, language)}
           sub={t("transaction.currentPageTotal", "Current page total")}
           Icon={LuBadgeDollarSign}
           accent="#0F766E"
@@ -618,7 +594,7 @@ export default function AllTransactions() {
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {formatMoney(tx.amount)}
+                      {formatMoney(tx.amount, language)}
                     </td>
 
                     <td

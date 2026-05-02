@@ -33,8 +33,8 @@ import {
 
 const PAGE_SIZE = 20;
 
-function formatMoney(value) {
-  return formatCurrency(value, "en", {
+function formatMoney(value, language = "en") {
+  return formatCurrency(value, language, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   });
@@ -96,6 +96,7 @@ function toCsvValue(value) {
 export default function PaymentHistory() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
+  const isRtl = i18n.dir?.(language) === "rtl";
   const { isAdmin } = useAuth();
   const { viewMonth, viewYear } = useMonth();
   const [page, setPage] = useState(1);
@@ -244,9 +245,9 @@ export default function PaymentHistory() {
         csvLines.push(
           [
             row.companyName,
-            formatMoney(row.totalPriceAfter),
-            formatMoney(row.paidAmount),
-            formatMoney(row.remainingAfter),
+            formatMoney(row.totalPriceAfter, language),
+            formatMoney(row.paidAmount, language),
+            formatMoney(row.remainingAfter, language),
             formatDateTime(row.paidAt, language),
             status,
             row.paidBy?.name || "-",
@@ -275,64 +276,23 @@ export default function PaymentHistory() {
   const handleExportPdf = async () => {
     try {
       setExporting("pdf");
-      const allRows = await exportRows();
-      const { default: jsPDF } = await import("jspdf");
-      const doc = new jsPDF({ unit: "pt", format: "a4" });
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      let y = 48;
-
-      const writeLine = (text, options = {}) => {
-        const nextY = y + (options.gapBefore || 0);
-        if (nextY > pageHeight - 48) {
-          doc.addPage();
-          y = 48;
-        } else {
-          y = nextY;
-        }
-        doc.setFont("helvetica", options.bold ? "bold" : "normal");
-        doc.setFontSize(options.size || 10);
-        doc.text(String(text), options.x || 40, y, {
-          maxWidth: options.maxWidth || pageWidth - 80,
-        });
-        y += options.lineHeight || 16;
-      };
-
-      writeLine(
-        t("rakht.paymentHistory", { defaultValue: "Payment History" }),
-        {
-          bold: true,
-          size: 16,
-          lineHeight: 24,
+      const response = await api.get("/rakhts/payment-history/pdf", {
+        params: {
+          ...queryParams,
+          lang: language,
+          _ts: Date.now(),
         },
-      );
-      writeLine(
-        `${t("rakht.totalPaidMoney", { defaultValue: "Total Paid" })}: ${formatMoney(summary.totalPaid)} | ${t("rakht.remainingMoney", { defaultValue: "Remaining" })}: ${formatMoney(summary.totalRemaining)}`,
-        { size: 11, lineHeight: 20 },
-      );
-      writeLine(
-        `${t("common.filters", { defaultValue: "Filters" })}: ${activeFilterCount || 0}`,
-        { size: 10, lineHeight: 18 },
-      );
-
-      allRows.forEach((row, index) => {
-        const status = getPaymentStatus(row, t).label;
-        writeLine(`${index + 1}. ${row.companyName || "-"}`, {
-          bold: true,
-          gapBefore: 8,
-        });
-        writeLine(
-          `${t("rakht.totalPrice", { defaultValue: "Total Price" })}: ${formatMoney(row.totalPriceAfter)} | ${t("rakht.paidAmount", { defaultValue: "Paid Amount" })}: ${formatMoney(row.paidAmount)} | ${t("rakht.remainingMoney", { defaultValue: "Remaining" })}: ${formatMoney(row.remainingAfter)}`,
-        );
-        writeLine(
-          `${t("common.status", { defaultValue: "Status" })}: ${status} | ${t("rakht.dateTime", { defaultValue: "Date & Time" })}: ${formatDateTime(row.paidAt, language)} | ${t("common.user", { defaultValue: "User" })}: ${row.paidBy?.name || "-"}`,
-          { lineHeight: 18 },
-        );
+        responseType: "blob",
       });
-
-      doc.save(
-        `payment-history-${formatDateValue(new Date()) || "export"}.pdf`,
-      );
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `payment-history-${formatDateValue(new Date()) || "export"}.pdf`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
     } catch (error) {
       toast.error(
         getApiErrorMessage(
@@ -397,6 +357,7 @@ export default function PaymentHistory() {
 
       {isAdmin && (
         <div
+          className="month-info-banner"
           style={{
             display: "flex",
             alignItems: "center",
@@ -420,6 +381,7 @@ export default function PaymentHistory() {
           </span>
           {data?.total === 0 && !isLoading && (
             <span
+              className="month-info-empty"
               style={{ marginInlineStart: "auto", fontSize: 11, opacity: 0.75 }}
             >
               {t("common.noDataThisMonth", "No data found for this month")}
@@ -473,6 +435,8 @@ export default function PaymentHistory() {
             </label>
             <Select
               classNamePrefix="rs"
+              isRtl={isRtl}
+              menuPosition="fixed"
               value={companyFilter}
               onChange={(option) => {
                 setCompanyFilter(option);
@@ -490,6 +454,8 @@ export default function PaymentHistory() {
             </label>
             <Select
               classNamePrefix="rs"
+              isRtl={isRtl}
+              menuPosition="fixed"
               value={statusFilter}
               onChange={(option) => {
                 setStatusFilter(option);
@@ -620,11 +586,11 @@ export default function PaymentHistory() {
           </span>
           <span className="badge bg-green">
             {t("rakht.totalPaidMoney", { defaultValue: "Total Paid Money" })}:{" "}
-            {formatMoney(summary.totalPaid)}
+            {formatMoney(summary.totalPaid, language)}
           </span>
           <span className="badge bg-gold">
             {t("rakht.remainingMoney", { defaultValue: "Remaining Amount" })}:{" "}
-            {formatMoney(summary.totalRemaining)}
+            {formatMoney(summary.totalRemaining, language)}
           </span>
           <span className="badge bg-gray">
             {t("common.page", { defaultValue: "Page" })}: {page} / {totalPages}
@@ -727,9 +693,9 @@ export default function PaymentHistory() {
                       <td style={{ fontWeight: 700 }}>
                         {row.companyName || "-"}
                       </td>
-                      <td>{formatMoney(row.totalPriceAfter)}</td>
-                      <td>{formatMoney(row.paidAmount)}</td>
-                      <td>{formatMoney(row.remainingAfter)}</td>
+                      <td>{formatMoney(row.totalPriceAfter, language)}</td>
+                      <td>{formatMoney(row.paidAmount, language)}</td>
+                      <td>{formatMoney(row.remainingAfter, language)}</td>
                       <td>
                         <Badge v={status.variant}>{status.label}</Badge>
                       </td>

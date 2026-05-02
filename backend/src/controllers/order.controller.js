@@ -8,6 +8,7 @@ import { prisma } from "../lib/prisma.js";
 import { parseNumberLocale } from "../lib/normalize.js";
 import { sendCustomerCompletionSMS } from "../services/sms.service.js";
 import { buildMonthlyReportPdf } from "../lib/monthlyReportPdf.js";
+import { getDashboardStats } from "../services/analytics.service.js";
 import {
   getReportLocaleTag,
   normalizeReportLanguage,
@@ -913,7 +914,8 @@ export const payWorkerForCompletedOrder = async (req, res, next) => {
 
     if (isPaidAlready && !isEditWindowOpen) {
       return res.status(409).json({
-        error: "Payment edit window has expired. Payments can only be updated within 24 hours.",
+        error:
+          "Payment edit window has expired. Payments can only be updated within 24 hours.",
         code: "PAYMENT_EDIT_WINDOW_EXPIRED",
       });
     }
@@ -989,11 +991,15 @@ export const getMonthlyReport = async (req, res, next) => {
         .json({ error: "Valid month (1-12) and year are required" });
     }
 
-    const orders = await service.getMonthlyReportOrders({ month, year });
+    const [orders, dashboardStats] = await Promise.all([
+      service.getMonthlyReportOrders({ month, year }),
+      getDashboardStats({ month, year }),
+    ]);
     const pdfBuffer = await buildMonthlyReportPdf({
       month,
       year,
       orders,
+      dashboardStats,
       language,
     });
 
