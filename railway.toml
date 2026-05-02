@@ -1,0 +1,6 @@
+[build]
+builder = "RAILPACK"
+buildCommand = "npm install --prefix frontend --include=dev && npm install --prefix backend --include=dev && npm --prefix frontend run build"
+
+[deploy]
+startCommand = "npm --prefix backend run start"
