@@ -1,6 +1,17 @@
 import { prisma } from "../lib/prisma.js";
 import { getMonthPolicy as getMonthPolicyCore } from "../lib/monthPolicy.js";
-import { getCurrentAfghanMonthYear } from "../lib/monthPolicy.js";
+import {
+  getAfghanMonthDateRange,
+  getCurrentAfghanMonthYear,
+} from "../lib/afghanistanDate.js";
+import {
+  MONEY_SCALE,
+  METER_SCALE,
+  toNumberScaled,
+  mulScaled,
+  subScaled,
+  addScaled,
+} from "../lib/decimal.js";
 
 const AFGHAN_MONTH_LABELS_EN = [
   "January",
@@ -16,12 +27,6 @@ const AFGHAN_MONTH_LABELS_EN = [
   "November",
   "December",
 ];
-
-const round2 = (value) => {
-  const numeric = Number(value || 0);
-  if (!Number.isFinite(numeric)) return 0;
-  return Math.round(numeric * 100) / 100;
-};
 
 const computeRakhtBenefitRevenue = async (where) => {
   const rows = await prisma.order.findMany({
@@ -40,25 +45,33 @@ const computeRakhtBenefitRevenue = async (where) => {
 
   let total = 0;
   for (const row of rows) {
-    const meters = Number(row.rakhtRequiredMeters || 0);
-    const costPerMeter = Number(row.rakhtPiecePrice || 0);
-    const sellingPerMeter = Number(row.rakhtCustomerPricePerMeter || 0);
-    const sellingTotal = Number(row.rakhtTotalCustomerPrice || 0);
+    const meters = toNumberScaled(row.rakhtRequiredMeters || 0, METER_SCALE);
+    const costPerMeter = toNumberScaled(row.rakhtPiecePrice || 0, MONEY_SCALE);
+    const sellingPerMeter = toNumberScaled(
+      row.rakhtCustomerPricePerMeter || 0,
+      MONEY_SCALE,
+    );
+    const sellingTotal = toNumberScaled(
+      row.rakhtTotalCustomerPrice || 0,
+      MONEY_SCALE,
+    );
 
-    if (!Number.isFinite(meters) || !Number.isFinite(costPerMeter)) continue;
-
-    const totalCost = meters * costPerMeter;
+    const totalCost = mulScaled(meters, costPerMeter, MONEY_SCALE);
     const totalSelling =
       sellingTotal > 0
         ? sellingTotal
         : sellingPerMeter > 0
-          ? sellingPerMeter * meters
+          ? mulScaled(sellingPerMeter, meters, MONEY_SCALE)
           : totalCost;
 
-    total += totalSelling - totalCost;
+    total = addScaled(
+      total,
+      subScaled(totalSelling, totalCost, MONEY_SCALE),
+      MONEY_SCALE,
+    );
   }
 
-  return round2(total);
+  return toNumberScaled(total, MONEY_SCALE);
 };
 
 export const getMonthPolicy = async () => getMonthPolicyCore({ tx: prisma });
@@ -77,12 +90,11 @@ export const getDashboardStats = async ({
     Number.isFinite(parsedMonth) &&
     Number.isFinite(parsedYear);
 
-  const monthStart = hasMonthFilter
-    ? new Date(parsedYear, parsedMonth - 1, 1, 0, 0, 0, 0)
+  const monthRange = hasMonthFilter
+    ? getAfghanMonthDateRange({ month: parsedMonth, year: parsedYear })
     : null;
-  const monthEnd = hasMonthFilter
-    ? new Date(parsedYear, parsedMonth, 0, 23, 59, 59, 999)
-    : null;
+  const monthStart = monthRange?.start || null;
+  const monthEnd = monthRange?.end || null;
 
   // Finance user data isolation — scope all order queries to their created orders
   const financeWhere = financeUserId
@@ -255,14 +267,17 @@ export const getDashboardStats = async ({
     }),
     prisma.order.aggregate({
       where: {
-        ...financeWhere,
+        ...monthWhere,
       },
       _sum: { totalBenefit: true },
     }),
-    computeRakhtBenefitRevenue(financeWhere),
+    computeRakhtBenefitRevenue(monthWhere),
   ]);
 
-  const monthlyRevenue = await getMonthlyRevenue(financeUserId);
+  const monthlyRevenue = await getMonthlyRevenue(financeUserId, {
+    month: hasMonthFilter ? parsedMonth : null,
+    year: hasMonthFilter ? parsedYear : null,
+  });
 
   return {
     totalOrders,
@@ -304,10 +319,55 @@ export const getDashboardStats = async ({
   };
 };
 
-const getMonthlyRevenue = async (financeUserId) => {
+const getMonthlyRevenue = async (
+  financeUserId,
+  { month = null, year = null } = {},
+) => {
   const financeWhere = financeUserId
     ? { createdByFinanceId: String(financeUserId) }
     : {};
+
+  const parsedMonth = month != null ? Number(month) : null;
+  const parsedYear = year != null ? Number(year) : null;
+  const hasSelectedMonth =
+    parsedMonth &&
+    parsedYear &&
+    Number.isFinite(parsedMonth) &&
+    Number.isFinite(parsedYear);
+
+  if (hasSelectedMonth) {
+    const { start: monthStart, end: monthEnd } = getAfghanMonthDateRange({
+      month: parsedMonth,
+      year: parsedYear,
+    });
+
+    const result = await prisma.order.aggregate({
+      where: {
+        ...financeWhere,
+        OR: [
+          { entryMonth: parsedMonth, entryYear: parsedYear },
+          { entryMonth: null, createdAt: { gte: monthStart, lte: monthEnd } },
+        ],
+      },
+      _sum: { totalPrice: true, paidAmount: true },
+      _count: true,
+    });
+
+    const afghanLabel =
+      AFGHAN_MONTH_LABELS_EN[(parsedMonth || 1) - 1] || String(parsedMonth);
+
+    return [
+      {
+        month: `${afghanLabel} ${parsedYear}`,
+        monthNumber: parsedMonth,
+        monthYear: parsedYear,
+        revenue: result._sum.totalPrice || 0,
+        paid: result._sum.paidAmount || 0,
+        count: result._count,
+      },
+    ];
+  }
+
   const months = [];
   for (let i = 5; i >= 0; i--) {
     const d = new Date();

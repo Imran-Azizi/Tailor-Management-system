@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma.js";
+import { getAfghanMonthDateRange } from "../lib/afghanistanDate.js";
 import { recalculateOrderBenefit } from "./order.service.js";
 
 const USER_SELECT = {
@@ -136,8 +137,10 @@ export const getTransactions = async ({
     Number.isFinite(parsedMonth) &&
     Number.isFinite(parsedYear)
   ) {
-    const monthStart = new Date(parsedYear, parsedMonth - 1, 1, 0, 0, 0, 0);
-    const monthEnd = new Date(parsedYear, parsedMonth, 0, 23, 59, 59, 999);
+    const { start: monthStart, end: monthEnd } = getAfghanMonthDateRange({
+      month: parsedMonth,
+      year: parsedYear,
+    });
     where.transactionDate = { gte: monthStart, lte: monthEnd };
   }
 

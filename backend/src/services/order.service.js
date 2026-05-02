@@ -10,6 +10,17 @@ import {
   assertMonthWritable,
   isMonthSelectable,
 } from "../lib/monthPolicy.js";
+import { getAfghanMonthDateRange } from "../lib/afghanistanDate.js";
+import {
+  MONEY_SCALE,
+  METER_SCALE,
+  toNumberScaled,
+  mulScaled,
+  subScaled,
+  maxScaled,
+  decimalLt,
+  sumScaled,
+} from "../lib/decimal.js";
 
 const NUMERIC_MEASUREMENT_FIELDS = new Set([
   "height",
@@ -135,6 +146,7 @@ const ORDER_TYPE_LABELS_EN = {
   KORTY: "Korty",
   YAKHANQAQ: "YakhanQaq",
 };
+const SUPPORTED_ORDER_TYPES = new Set(Object.keys(ORDER_TYPE_LABELS_EN));
 
 const getOrderTypeLabelEn = (type) => ORDER_TYPE_LABELS_EN[type] || type || "-";
 
@@ -277,6 +289,14 @@ const enrichOrderListAssignment = (orders = []) =>
 const toPhoneDigits = (value) =>
   (normalizePhone(value || "") || "").replace(/[^0-9]/g, "");
 
+const generateFallbackPhoneNumber = () => {
+  const ts = Date.now();
+  const suffix = Math.floor(Math.random() * 1_000_000)
+    .toString()
+    .padStart(6, "0");
+  return `700${ts}${suffix}`;
+};
+
 const getPhoneLookupTokens = (digits) => {
   const tokens = new Set();
   if (!digits) return [];
@@ -412,14 +432,44 @@ const ORDER_BENEFIT_INCLUDE_BASE = {
 };
 
 const toMoney = (value) => {
-  const amount = Number(value || 0);
-  if (!Number.isFinite(amount)) return 0;
-  return Math.round(amount * 100) / 100;
+  return toNumberScaled(value, MONEY_SCALE);
 };
 
 const toPositiveMoney = (value) => {
-  const amount = toMoney(value);
-  return amount > 0 ? amount : 0;
+  return maxScaled(toMoney(value), 0, MONEY_SCALE);
+};
+
+const WORKER_PAYMENT_EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+const getWorkerPaymentEditMeta = (paymentStatus, paidAtValue) => {
+  if (paymentStatus !== "PAID_TO_WORKER" || !paidAtValue) {
+    return {
+      canEditWorkerPayment: false,
+      workerPaymentEditExpiresAt: null,
+      workerPaymentEditRemainingMs: 0,
+      workerPaymentEditWindowHours: 24,
+    };
+  }
+
+  const paidAtMs = new Date(paidAtValue).getTime();
+  if (!Number.isFinite(paidAtMs)) {
+    return {
+      canEditWorkerPayment: false,
+      workerPaymentEditExpiresAt: null,
+      workerPaymentEditRemainingMs: 0,
+      workerPaymentEditWindowHours: 24,
+    };
+  }
+
+  const expiresAtMs = paidAtMs + WORKER_PAYMENT_EDIT_WINDOW_MS;
+  const remainingMs = Math.max(0, expiresAtMs - Date.now());
+
+  return {
+    canEditWorkerPayment: remainingMs > 0,
+    workerPaymentEditExpiresAt: new Date(expiresAtMs).toISOString(),
+    workerPaymentEditRemainingMs: remainingMs,
+    workerPaymentEditWindowHours: 24,
+  };
 };
 
 const EMERGENCY_ALERT_INTERVAL_MS = 12 * 60 * 60 * 1000;
@@ -469,9 +519,10 @@ const buildExpenseRow = ({
 const buildOrderBenefitDetails = ({ order, linkedDailyExpenses = [] }) => {
   const rows = [];
 
-  const purchaseTotal = toMoney(
-    Number(order?.rakhtPiecePrice || 0) *
-      Number(order?.rakhtRequiredMeters || 0),
+  const purchaseTotal = mulScaled(
+    order?.rakhtPiecePrice || 0,
+    order?.rakhtRequiredMeters || 0,
+    MONEY_SCALE,
   );
   const qichikarAmount = toPositiveMoney(order?.qichikarPaymentAmount);
   const dokhtAmount = toPositiveMoney(order?.dokhtPaymentAmount);
@@ -559,11 +610,12 @@ const buildOrderBenefitDetails = ({ order, linkedDailyExpenses = [] }) => {
     );
   }
 
-  const totalExpenses = toMoney(
-    rows.reduce((sum, entry) => sum + toPositiveMoney(entry.amount), 0),
+  const totalExpenses = sumScaled(
+    rows.map((entry) => toPositiveMoney(entry.amount)),
+    MONEY_SCALE,
   );
   const totalOrderPrice = toMoney(order?.totalPrice || 0);
-  const totalBenefit = toMoney(totalOrderPrice - totalExpenses);
+  const totalBenefit = subScaled(totalOrderPrice, totalExpenses, MONEY_SCALE);
 
   return {
     orderId: order?.id,
@@ -639,6 +691,10 @@ const buildCompletedWorkerPaymentRows = (order) => {
 
   if (order?.qichikarCompletedAt && order?.qichikarAssignedTo) {
     const paymentSnapshot = getRolePaymentSnapshot(order, "QICHIKAR");
+    const editMeta = getWorkerPaymentEditMeta(
+      paymentSnapshot.status,
+      paymentSnapshot.paidAt,
+    );
     rows.push({
       ...order,
       rowId: `${order.id}:QICHIKAR`,
@@ -649,11 +705,16 @@ const buildCompletedWorkerPaymentRows = (order) => {
       workerPaymentAmount: paymentSnapshot.amount,
       workerPaidAt: paymentSnapshot.paidAt,
       workerPaidBy: paymentSnapshot.paidBy,
+      ...editMeta,
     });
   }
 
   if (order?.dokhtCompletedAt && order?.dokhtAssignedTo) {
     const paymentSnapshot = getRolePaymentSnapshot(order, "DOKHT");
+    const editMeta = getWorkerPaymentEditMeta(
+      paymentSnapshot.status,
+      paymentSnapshot.paidAt,
+    );
     rows.push({
       ...order,
       rowId: `${order.id}:DOKHT`,
@@ -664,6 +725,7 @@ const buildCompletedWorkerPaymentRows = (order) => {
       workerPaymentAmount: paymentSnapshot.amount,
       workerPaidAt: paymentSnapshot.paidAt,
       workerPaidBy: paymentSnapshot.paidBy,
+      ...editMeta,
     });
   }
 
@@ -671,6 +733,10 @@ const buildCompletedWorkerPaymentRows = (order) => {
     const paymentSnapshot = getRolePaymentSnapshot(
       order,
       order.assignedTo.accountType,
+    );
+    const editMeta = getWorkerPaymentEditMeta(
+      paymentSnapshot.status,
+      paymentSnapshot.paidAt,
     );
     rows.push({
       ...order,
@@ -682,6 +748,7 @@ const buildCompletedWorkerPaymentRows = (order) => {
       workerPaymentAmount: paymentSnapshot.amount,
       workerPaidAt: paymentSnapshot.paidAt,
       workerPaidBy: paymentSnapshot.paidBy,
+      ...editMeta,
     });
   }
 
@@ -745,6 +812,7 @@ const findUniqueOrderSafe = async ({
 export const getAllOrders = async ({
   status,
   type,
+  hasRemaining,
   page = 1,
   limit = 20,
   search,
@@ -771,6 +839,9 @@ export const getAllOrders = async ({
     where.isCompleted = false;
   }
   if (type) where.type = type;
+  if (String(hasRemaining).toLowerCase() === "true") {
+    where.remaining = { gt: 0 };
+  }
 
   // Month/year filter — filter by explicit entryMonth/entryYear stored on the order
   const parsedMonth =
@@ -782,8 +853,10 @@ export const getAllOrders = async ({
     Number.isFinite(parsedMonth) &&
     Number.isFinite(parsedYear)
   ) {
-    const monthStart = new Date(parsedYear, parsedMonth - 1, 1, 0, 0, 0, 0);
-    const monthEnd = new Date(parsedYear, parsedMonth, 0, 23, 59, 59, 999);
+    const { start: monthStart, end: monthEnd } = getAfghanMonthDateRange({
+      month: parsedMonth,
+      year: parsedYear,
+    });
     // Match orders with explicit entryMonth/Year OR (for legacy orders) by createdAt range
     where.OR = [
       ...(where.OR || []),
@@ -941,8 +1014,10 @@ export const getMonthlyReportOrders = async ({ month, year }) => {
     });
   }
 
-  const monthStart = new Date(y, m - 1, 1, 0, 0, 0, 0);
-  const monthEnd = new Date(y, m, 0, 23, 59, 59, 999);
+  const { start: monthStart, end: monthEnd } = getAfghanMonthDateRange({
+    month: m,
+    year: y,
+  });
 
   const orders = await prisma.order.findMany({
     where: {
@@ -1088,7 +1163,16 @@ export const getCompletedOrdersFromWorkers = async ({
     Number.isFinite(parsedMonth) &&
     Number.isFinite(parsedYear)
   ) {
-    where.AND.push({ entryMonth: parsedMonth, entryYear: parsedYear });
+    const { start: monthStart, end: monthEnd } = getAfghanMonthDateRange({
+      month: parsedMonth,
+      year: parsedYear,
+    });
+    where.AND.push({
+      OR: [
+        { entryMonth: parsedMonth, entryYear: parsedYear },
+        { entryMonth: null, createdAt: { gte: monthStart, lte: monthEnd } },
+      ],
+    });
   }
 
   if (search && String(search).trim()) {
@@ -1256,11 +1340,17 @@ export const getOrderBillByOrderId = async (id) => {
 };
 
 const buildOrderUpdateData = (existingOrder, body) => {
-  const totalPrice = body.totalPrice ?? existingOrder.totalPrice;
-  const discount = body.discount ?? existingOrder.discount;
-  const paidAmount = body.paidAmount ?? existingOrder.paidAmount;
+  const totalPrice = toMoney(body.totalPrice ?? existingOrder.totalPrice);
+  const discount = toMoney(body.discount ?? existingOrder.discount);
+  const paidAmount = toMoney(body.paidAmount ?? existingOrder.paidAmount);
   const quantity = body.quantity ?? existingOrder.quantity;
-  const remaining = totalPrice - discount - paidAmount;
+  const remaining = toMoney(
+    subScaled(
+      subScaled(totalPrice, discount, MONEY_SCALE),
+      paidAmount,
+      MONEY_SCALE,
+    ),
+  );
 
   if (
     body.isCompleted !== undefined &&
@@ -1407,9 +1497,12 @@ const notifyAdminsToCreateBox = async (
 };
 
 const reserveRakhtStock = async (tx, selection) => {
-  const requiredMeters = Number(selection?.requiredMeters || 0);
-  const piecePrice = Number(selection?.piecePrice || 0);
-  const priceForCustomer = Number(selection?.priceForCustomer || 0);
+  const requiredMeters = toNumberScaled(
+    selection?.requiredMeters || 0,
+    METER_SCALE,
+  );
+  const piecePrice = toMoney(selection?.piecePrice || 0);
+  const priceForCustomer = toMoney(selection?.priceForCustomer || 0);
 
   if (!selection?.rakhtId) {
     throw Object.assign(new Error("Rakht selection is required"), {
@@ -1432,15 +1525,15 @@ const reserveRakhtStock = async (tx, selection) => {
     );
   }
 
-  if (!Number.isFinite(piecePrice) || piecePrice <= 0) {
-    throw Object.assign(new Error("Piece price must be a positive number"), {
+  if (!Number.isFinite(piecePrice) || piecePrice < 0) {
+    throw Object.assign(new Error("Piece price must be a valid number"), {
       status: 400,
     });
   }
 
-  if (!Number.isFinite(priceForCustomer) || priceForCustomer <= 0) {
+  if (!Number.isFinite(priceForCustomer) || priceForCustomer < 0) {
     throw Object.assign(
-      new Error("Price for customer must be a positive number"),
+      new Error("Price for customer must be a valid number"),
       { status: 400 },
     );
   }
@@ -1461,11 +1554,12 @@ const reserveRakhtStock = async (tx, selection) => {
     });
   }
 
-  const safeAvailable = Math.max(
+  const safeAvailable = maxScaled(
+    subScaled(ton.totalMeters || 0, ton.usedMeters || 0, METER_SCALE),
     0,
-    Number(ton.totalMeters || 0) - Number(ton.usedMeters || 0),
+    METER_SCALE,
   );
-  if (safeAvailable < requiredMeters) {
+  if (decimalLt(safeAvailable, requiredMeters)) {
     throw Object.assign(
       new Error(`Insufficient Rakht stock. Available: ${safeAvailable}`),
       { status: 400 },
@@ -1476,7 +1570,7 @@ const reserveRakhtStock = async (tx, selection) => {
     where: {
       id: ton.id,
       usedMeters: {
-        lte: Number(ton.totalMeters || 0) - requiredMeters,
+        lte: subScaled(ton.totalMeters || 0, requiredMeters, METER_SCALE),
       },
     },
     data: {
@@ -1501,7 +1595,11 @@ const reserveRakhtStock = async (tx, selection) => {
     rakhtRequiredMeters: requiredMeters,
     rakhtPiecePrice: piecePrice,
     rakhtCustomerPricePerMeter: priceForCustomer,
-    rakhtTotalCustomerPrice: Math.round(priceForCustomer * requiredMeters),
+    rakhtTotalCustomerPrice: mulScaled(
+      priceForCustomer,
+      requiredMeters,
+      MONEY_SCALE,
+    ),
   };
 };
 
@@ -1544,38 +1642,64 @@ export const createOrder = async ({
       policy: monthPolicy,
     });
 
+    const safeCustomerInfo =
+      customerInfo && typeof customerInfo === "object" ? customerInfo : {};
+    const normalizedPhone = normalizePhone(safeCustomerInfo.phoneNumber || "");
+    const normalizedFirstName = safeCustomerInfo.firstName
+      ? normalizeText(safeCustomerInfo.firstName)
+      : "";
     let customer;
 
-    if (customerInfo.customerId) {
+    if (safeCustomerInfo.customerId) {
       customer = await tx.customer.findUnique({
-        where: { id: customerInfo.customerId },
+        where: { id: safeCustomerInfo.customerId },
       });
       if (!customer)
         throw Object.assign(new Error("Customer not found"), { status: 404 });
-    } else {
-      const normalizedPhone = normalizePhone(customerInfo.phoneNumber || "");
-      const normalizedFirstName = customerInfo.firstName
-        ? normalizeText(customerInfo.firstName)
-        : "";
 
-      if (!toPhoneDigits(normalizedPhone)) {
-        throw Object.assign(new Error("Phone number is required"), {
-          status: 400,
-        });
+      const customerPatch = {};
+      if (normalizedFirstName) {
+        customerPatch.firstName = normalizedFirstName;
+      }
+      if (toPhoneDigits(normalizedPhone)) {
+        customerPatch.phoneNumber = normalizedPhone;
       }
 
-      customer = await findExistingCustomerByPhone(tx, normalizedPhone);
-      if (!customer) {
-        if (!normalizedFirstName) {
-          throw Object.assign(
-            new Error("Customer name is required for new customers"),
-            { status: 400 },
-          );
+      if (Object.keys(customerPatch).length > 0) {
+        customer = await tx.customer.update({
+          where: { id: customer.id },
+          data: customerPatch,
+        });
+      }
+    } else {
+      customer = toPhoneDigits(normalizedPhone)
+        ? await findExistingCustomerByPhone(tx, normalizedPhone)
+        : null;
+
+      if (customer) {
+        const customerPatch = {};
+        if (normalizedFirstName) {
+          customerPatch.firstName = normalizedFirstName;
+        }
+        if (toPhoneDigits(normalizedPhone)) {
+          customerPatch.phoneNumber = normalizedPhone;
         }
 
+        if (Object.keys(customerPatch).length > 0) {
+          customer = await tx.customer.update({
+            where: { id: customer.id },
+            data: customerPatch,
+          });
+        }
+      }
+
+      if (!customer) {
+        const fallbackPhone = normalizedPhone || generateFallbackPhoneNumber();
+        const fallbackName = normalizedFirstName || "Walk-in Customer";
+
         customer = await createCustomerWithSequentialBill(tx, {
-          firstName: normalizedFirstName,
-          phoneNumber: normalizedPhone,
+          firstName: fallbackName,
+          phoneNumber: fallbackPhone,
         });
       }
     }
@@ -1587,6 +1711,18 @@ export const createOrder = async ({
 
     for (const selection of rakhtSelections || []) {
       if (!selection?.type) continue;
+      const requiredMeters = toNumberScaled(
+        selection?.requiredMeters || 0,
+        METER_SCALE,
+      );
+      if (
+        !selection?.rakhtId ||
+        !selection?.rakhtTonId ||
+        !Number.isFinite(requiredMeters) ||
+        requiredMeters <= 0
+      ) {
+        continue;
+      }
       const snapshot = await reserveRakhtStock(tx, selection);
 
       if (selection?.orderItemKey) {
@@ -1606,7 +1742,7 @@ export const createOrder = async ({
       rakhtSnapshotQueueByType.set(selection.type, queue);
     }
 
-    for (const item of orderItems) {
+    for (const item of orderItems || []) {
       const {
         orderItemKey,
         type,
@@ -1620,9 +1756,14 @@ export const createOrder = async ({
         quantity = 1,
         measurements,
       } = item;
+      if (!SUPPORTED_ORDER_TYPES.has(type)) {
+        continue;
+      }
       const normalizedMeasurements = sanitizeMeasurements(measurements, type);
-
-      validateMeasurements(type, normalizedMeasurements, orderName);
+      const persistedMeasurements = withRequiredMeasurementDefaults(
+        type,
+        normalizedMeasurements,
+      );
 
       const itemKey =
         orderItemKey !== undefined && orderItemKey !== null
@@ -1636,15 +1777,6 @@ export const createOrder = async ({
       const rakhtSnapshot = rakhtSnapshotFromItem || typeQueue.shift() || null;
       if (typeQueue.length >= 0) {
         rakhtSnapshotQueueByType.set(type, typeQueue);
-      }
-
-      if (!rakhtSnapshot) {
-        throw Object.assign(
-          new Error(
-            `Rakht selection is required for order ${itemKey || type}.`,
-          ),
-          { status: 400 },
-        );
       }
 
       // Assign exactly one box destination: either regular type box or foreign box.
@@ -1681,22 +1813,58 @@ export const createOrder = async ({
         boxId = autoBox.boxId;
       }
 
-      const remaining = totalPrice - discount - paidAmount;
+      const parsedTotalPrice = Number(totalPrice);
+      const parsedDiscount = Number(discount);
+      const parsedPaidAmount = Number(paidAmount);
+      const safeTotalPrice =
+        Number.isFinite(parsedTotalPrice) && parsedTotalPrice > 0
+          ? toMoney(parsedTotalPrice)
+          : 0;
+      const safeDiscount = Math.max(
+        0,
+        Math.min(
+          safeTotalPrice,
+          toMoney(Number.isFinite(parsedDiscount) ? parsedDiscount : 0),
+        ),
+      );
+      const safePaidAmount = Math.max(
+        0,
+        Math.min(
+          safeTotalPrice - safeDiscount,
+          toMoney(Number.isFinite(parsedPaidAmount) ? parsedPaidAmount : 0),
+        ),
+      );
+      const safeQuantity = Math.max(1, Math.trunc(Number(quantity || 1)));
+      const parsedEmergencyExpiry = emergencyExpiry
+        ? new Date(emergencyExpiry)
+        : null;
+      const safeEmergencyExpiry =
+        parsedEmergencyExpiry &&
+        Number.isFinite(parsedEmergencyExpiry.getTime())
+          ? parsedEmergencyExpiry
+          : null;
+      const remaining = toMoney(
+        subScaled(
+          subScaled(safeTotalPrice, safeDiscount, MONEY_SCALE),
+          safePaidAmount,
+          MONEY_SCALE,
+        ),
+      );
 
       const order = await tx.order.create({
         data: {
           customerId: customer.id,
           type,
           orderName: orderName || null,
-          ...rakhtSnapshot,
-          totalPrice,
-          discount,
-          paidAmount,
+          ...(rakhtSnapshot || {}),
+          totalPrice: safeTotalPrice,
+          discount: safeDiscount,
+          paidAmount: safePaidAmount,
           remaining,
           isEmergency,
-          emergencyExpiry: emergencyExpiry ? new Date(emergencyExpiry) : null,
+          emergencyExpiry: safeEmergencyExpiry,
           isForeignOrder,
-          quantity,
+          quantity: safeQuantity,
           boxId,
           foreignBoxId,
           entryMonth: resolvedEntryMonth,
@@ -1710,19 +1878,19 @@ export const createOrder = async ({
 
       if (type === "OUTFIT") {
         await tx.outfit.create({
-          data: { orderId: order.id, ...normalizedMeasurements },
+          data: { orderId: order.id, ...persistedMeasurements },
         });
       } else if (type === "WASKAT") {
         await tx.waskat.create({
-          data: { orderId: order.id, ...normalizedMeasurements },
+          data: { orderId: order.id, ...persistedMeasurements },
         });
       } else if (type === "KORTY") {
         await tx.korty.create({
-          data: { orderId: order.id, ...normalizedMeasurements },
+          data: { orderId: order.id, ...persistedMeasurements },
         });
       } else if (type === "YAKHANQAQ") {
         await tx.yakhanQaq.create({
-          data: { orderId: order.id, ...normalizedMeasurements },
+          data: { orderId: order.id, ...persistedMeasurements },
         });
       }
 
@@ -1739,7 +1907,7 @@ export const createOrder = async ({
               createdAt: order.createdAt,
             }),
             nextAlert: new Date(Date.now() + EMERGENCY_ALERT_INTERVAL_MS),
-            expiresAt: emergencyExpiry ? new Date(emergencyExpiry) : null,
+            expiresAt: safeEmergencyExpiry,
           },
         });
       }
@@ -1811,22 +1979,24 @@ const sanitizeMeasurements = (m, type) => {
   return result;
 };
 
-const validateMeasurements = (type, measurements, orderName) => {
+const withRequiredMeasurementDefaults = (type, measurements = {}) => {
+  const result = { ...(measurements || {}) };
   const requiredFields = REQUIRED_MEASUREMENT_FIELDS[type] || [];
-  const missingFields = requiredFields.filter((field) => {
-    const value = measurements[field];
-    return typeof value !== "number" || Number.isNaN(value);
-  });
 
-  if (!missingFields.length) return;
+  for (const field of requiredFields) {
+    const value = result[field];
+    if (typeof value !== "number" || Number.isNaN(value)) {
+      result[field] = 0;
+    }
+  }
 
-  const orderLabel = orderName?.trim() ? `${type} (${orderName.trim()})` : type;
-  throw Object.assign(
-    new Error(
-      `Missing required measurements for ${orderLabel}: ${missingFields.join(", ")}`,
-    ),
-    { status: 400 },
-  );
+  return result;
+};
+
+const validateMeasurements = (type, measurements, orderName) => {
+  void type;
+  void measurements;
+  void orderName;
 };
 
 export const updateOrder = async (id, body) => {
@@ -1926,31 +2096,31 @@ const computeRemaining = ({ totalPrice, discount, paidAmount }) =>
 
 const upsertMeasurementsForType = async (tx, type, orderId, measurements) => {
   const normalized = sanitizeMeasurements(measurements, type);
-  validateMeasurements(type, normalized);
+  const persistedForCreate = withRequiredMeasurementDefaults(type, normalized);
 
   if (type === "OUTFIT") {
     await tx.outfit.upsert({
       where: { orderId },
       update: normalized,
-      create: { orderId, ...normalized },
+      create: { orderId, ...persistedForCreate },
     });
   } else if (type === "WASKAT") {
     await tx.waskat.upsert({
       where: { orderId },
       update: normalized,
-      create: { orderId, ...normalized },
+      create: { orderId, ...persistedForCreate },
     });
   } else if (type === "KORTY") {
     await tx.korty.upsert({
       where: { orderId },
       update: normalized,
-      create: { orderId, ...normalized },
+      create: { orderId, ...persistedForCreate },
     });
   } else if (type === "YAKHANQAQ") {
     await tx.yakhanQaq.upsert({
       where: { orderId },
       update: normalized,
-      create: { orderId, ...normalized },
+      create: { orderId, ...persistedForCreate },
     });
   }
 };
@@ -2047,9 +2217,18 @@ export const updateOrderBill = async (
     const existingById = new Map(existingOrders.map((o) => [o.id, o]));
 
     const resolveRakhtSnapshot = async (selection) => {
-      const requiredMeters = Number(selection?.requiredMeters || 0);
-      const piecePrice = Number(selection?.piecePrice || 0);
-      const priceForCustomer = Number(selection?.priceForCustomer || 0);
+      const requiredMeters = toNumberScaled(
+        selection?.requiredMeters || 0,
+        METER_SCALE,
+      );
+      const piecePrice = toNumberScaled(
+        selection?.piecePrice || 0,
+        MONEY_SCALE,
+      );
+      const priceForCustomer = toNumberScaled(
+        selection?.priceForCustomer || 0,
+        MONEY_SCALE,
+      );
 
       if (!selection?.rakhtId) {
         throw Object.assign(new Error("Rakht selection is required"), {
@@ -2109,7 +2288,7 @@ export const updateOrderBill = async (
           priceForCustomer > 0 ? priceForCustomer : null,
         rakhtTotalCustomerPrice:
           priceForCustomer > 0
-            ? Math.round(priceForCustomer * requiredMeters)
+            ? mulScaled(priceForCustomer, requiredMeters, MONEY_SCALE)
             : null,
       };
     };
@@ -2195,12 +2374,6 @@ export const updateOrderBill = async (
           );
         }
 
-        validateMeasurements(
-          type,
-          sanitizeMeasurements(measurements, type),
-          orderName,
-        );
-
         const remaining = computeRemaining({
           totalPrice,
           discount,
@@ -2238,7 +2411,6 @@ export const updateOrderBill = async (
 
       // New item -> create new order under same customer
       const normalizedMeasurements = sanitizeMeasurements(measurements, type);
-      validateMeasurements(type, normalizedMeasurements, orderName);
 
       const remaining = totalPrice - discount - paidAmount;
       const autoBox = await resolveAutoBoxForNewOrder(tx, type);
@@ -2519,7 +2691,10 @@ export const deleteOrder = async (id) =>
   });
 
 export const rollbackRakhtInventoryForDeletedOrder = async (tx, order) => {
-  const requiredMeters = Number(order?.rakhtRequiredMeters || 0);
+  const requiredMeters = toNumberScaled(
+    order?.rakhtRequiredMeters || 0,
+    METER_SCALE,
+  );
   const rakhtTonId = order?.rakhtTonId || null;
 
   if (!rakhtTonId || !Number.isFinite(requiredMeters) || requiredMeters <= 0) {
@@ -2556,8 +2731,8 @@ export const rollbackRakhtInventoryForDeletedOrder = async (tx, order) => {
     );
   }
 
-  const safeUsed = Number(ton.usedMeters || 0);
-  if (safeUsed < requiredMeters) {
+  const safeUsed = toNumberScaled(ton.usedMeters || 0, METER_SCALE);
+  if (decimalLt(safeUsed, requiredMeters)) {
     throw Object.assign(
       new Error(
         "Invalid Rakht consumed meters state. Deletion rollback cancelled.",
@@ -2592,10 +2767,16 @@ export const rollbackRakhtInventoryForDeletedOrder = async (tx, order) => {
     },
   });
 
-  const usedAfter = Number(tonAfterRollback?.usedMeters || 0);
-  const totalAfter = Number(tonAfterRollback?.totalMeters || 0);
+  const usedAfter = toNumberScaled(
+    tonAfterRollback?.usedMeters || 0,
+    METER_SCALE,
+  );
+  const totalAfter = toNumberScaled(
+    tonAfterRollback?.totalMeters || 0,
+    METER_SCALE,
+  );
 
-  if (usedAfter < 0 || usedAfter > totalAfter) {
+  if (decimalLt(usedAfter, 0) || decimalLt(totalAfter, usedAfter)) {
     throw Object.assign(
       new Error(
         "Rakht totals became invalid after rollback. Deletion cancelled.",
@@ -2612,6 +2793,10 @@ export const rollbackRakhtInventoryForDeletedOrder = async (tx, order) => {
     brandName: order?.rakhtBrandName || null,
     restoredMeters: requiredMeters,
     consumedMetersAfter: usedAfter,
-    remainingMetersAfter: Math.max(0, totalAfter - usedAfter),
+    remainingMetersAfter: maxScaled(
+      subScaled(totalAfter, usedAfter, METER_SCALE),
+      0,
+      METER_SCALE,
+    ),
   };
 };

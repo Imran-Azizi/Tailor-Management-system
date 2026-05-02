@@ -22,7 +22,10 @@ import {
 
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
-import { getOrderDisplayName } from "../lib/orderType.js";
+import {
+  getOrderLabelParts,
+  getOrderPrimaryDisplayName,
+} from "../lib/orderType.js";
 import { formatUserNotificationMessage } from "../lib/notifications.js";
 import { formatDateTimeLocale } from "../lib/locale.js";
 import { formatSystemDate } from "../lib/locale.js";
@@ -233,6 +236,12 @@ function OrderDetailModal({
 }) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
+  const orderLabel = getOrderLabelParts(order, language);
+  const orderPrimaryName = getOrderPrimaryDisplayName(
+    order,
+    order.customer?.firstName,
+    language,
+  );
   const status = getStatus(order);
   const sc = statusColor(status);
 
@@ -275,13 +284,13 @@ function OrderDetailModal({
         >
           <div>
             <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>
-              {order.customer?.firstName}
+              {orderPrimaryName}
               <span
                 style={{
                   fontSize: 13,
                   fontWeight: 500,
                   color: "var(--text3)",
-                  marginLeft: 8,
+                  marginInlineStart: 8,
                 }}
               >
                 Bill #{order.customer?.billNumber}
@@ -289,20 +298,9 @@ function OrderDetailModal({
             </h2>
             <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
               <Badge v={TYPE_V[order.type] || "gold"}>
-                {getOrderDisplayName(order, language)}
+                {orderLabel.baseTypeLabel}
               </Badge>
               {order.isEmergency && <Badge v="red">⚡ Emergency</Badge>}
-              {order.orderName && (
-                <span
-                  style={{
-                    fontSize: 12,
-                    color: "var(--text3)",
-                    fontStyle: "italic",
-                  }}
-                >
-                  "{order.orderName}"
-                </span>
-              )}
               <span
                 style={{
                   fontSize: 11,
@@ -378,7 +376,7 @@ function OrderDetailModal({
                     style={{ color: "var(--text3)", flexShrink: 0 }}
                   />
                   <span style={{ fontSize: 13, fontWeight: 700 }}>
-                    {order.customer?.firstName}
+                    {orderPrimaryName}
                   </span>
                 </div>
                 {order.customer?.phoneNumber && (
@@ -677,7 +675,7 @@ function OrderDetailModal({
               padding: "14px 24px",
               borderTop: "1px solid var(--border)",
               display: "flex",
-              justifyContent: "flex-end",
+              justifyContent: "end",
             }}
           >
             <button
@@ -712,6 +710,12 @@ function OrderCard({
 }) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
+  const orderLabel = getOrderLabelParts(order, language);
+  const orderPrimaryName = getOrderPrimaryDisplayName(
+    order,
+    order.customer?.firstName,
+    language,
+  );
   const status = getStatus(order);
   const sc = statusColor(status);
 
@@ -720,7 +724,7 @@ function OrderCard({
       style={{
         background: "var(--surface)",
         border: "1px solid var(--border)",
-        borderLeft: `3px solid ${sc}`,
+        borderInlineStart: `3px solid ${sc}`,
         borderRadius: 12,
         padding: "16px 20px",
         display: "flex",
@@ -770,7 +774,7 @@ function OrderCard({
             <span
               style={{ fontSize: 15, fontWeight: 800, color: "var(--text1)" }}
             >
-              {order.customer?.firstName}
+              {orderPrimaryName}
             </span>
             <span
               style={{ fontSize: 12, color: "var(--text3)", fontWeight: 500 }}
@@ -778,7 +782,7 @@ function OrderCard({
               #{order.customer?.billNumber}
             </span>
             <Badge v={TYPE_V[order.type] || "gold"}>
-              {getOrderDisplayName(order, language)}
+              {orderLabel.baseTypeLabel}
             </Badge>
             {order.isEmergency && <Badge v="red">⚡ Emergency</Badge>}
             <span
@@ -821,9 +825,6 @@ function OrderCard({
                 {t("assignment.assignedBy")}: {order.assignedBy.name}
               </span>
             )}
-            {order.orderName && (
-              <span style={{ fontStyle: "italic" }}>"{order.orderName}"</span>
-            )}
           </div>
 
           {order.assignmentNote && (
@@ -841,7 +842,7 @@ function OrderCard({
         </div>
 
         {/* Price */}
-        <div style={{ textAlign: "right", flexShrink: 0 }}>
+        <div style={{ textAlign: "end", flexShrink: 0 }}>
           <p style={{ fontSize: 15, fontWeight: 800, color: "var(--text1)" }}>
             {fmt$(order.totalPrice)}
           </p>

@@ -42,12 +42,14 @@ export const listDailyTasks = async (req, res, next) => {
 /** GET /api/daily-tasks/report */
 export const dailyTaskReport = async (req, res, next) => {
   try {
-    const { reportType = "monthly", date, from, to } = req.query;
+    const { reportType = "monthly", date, from, to, month, year } = req.query;
     const result = await service.getDailyTaskReport({
       reportType,
       date,
       from,
       to,
+      month: month != null ? Number(month) : null,
+      year: year != null ? Number(year) : null,
     });
     res.json(result);
   } catch (err) {
@@ -58,13 +60,15 @@ export const dailyTaskReport = async (req, res, next) => {
 /** GET /api/daily-tasks/report/pdf */
 export const dailyTaskReportPdf = async (req, res, next) => {
   try {
-    const { reportType = "daily", date, from, to } = req.query;
+    const { reportType = "daily", date, from, to, month, year } = req.query;
     const language = normalizeReportLanguage(req.query.lang || "en");
     const report = await service.getDailyTaskReport({
       reportType,
       date,
       from,
       to,
+      month: month != null ? Number(month) : null,
+      year: year != null ? Number(year) : null,
     });
     const pdfBuffer = await buildDailyTaskReportPdf(report, language);
 
@@ -72,6 +76,12 @@ export const dailyTaskReportPdf = async (req, res, next) => {
     const filename = `daily-task-${safeType}-report.pdf`;
 
     res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Cache-Control",
+      "no-store, no-cache, must-revalidate, proxy-revalidate",
+    );
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.setHeader("Content-Length", pdfBuffer.length);
     res.send(pdfBuffer);

@@ -352,7 +352,7 @@ export default function AllTransactions() {
                 size={14}
                 style={{
                   position: "absolute",
-                  left: 10,
+                  insetInlineStart: 10,
                   top: "50%",
                   transform: "translateY(-50%)",
                   color: "var(--text3)",
@@ -360,7 +360,7 @@ export default function AllTransactions() {
               />
               <input
                 className="inp"
-                style={{ paddingLeft: 32 }}
+                style={{ paddingInlineStart: 32 }}
                 placeholder={t(
                   "transaction.searchPlaceholder",
                   "Search by user name",
@@ -383,7 +383,7 @@ export default function AllTransactions() {
                 size={14}
                 style={{
                   position: "absolute",
-                  left: 10,
+                  insetInlineStart: 10,
                   top: "50%",
                   transform: "translateY(-50%)",
                   color: "var(--text3)",
@@ -392,7 +392,7 @@ export default function AllTransactions() {
               />
               <select
                 className="inp"
-                style={{ paddingLeft: 32 }}
+                style={{ paddingInlineStart: 32 }}
                 value={typeFilter}
                 onChange={(e) => {
                   setTypeFilter(e.target.value);
@@ -436,7 +436,7 @@ export default function AllTransactions() {
           >
             <LuFilter
               size={12}
-              style={{ marginRight: 4, verticalAlign: "middle" }}
+              style={{ marginInlineEnd: 4, verticalAlign: "middle" }}
             />
             {t("common.filters", "Filters")}: {activeFilterCount}
           </span>
@@ -519,7 +519,7 @@ export default function AllTransactions() {
                         top: 0,
                         zIndex: 1,
                         padding: "12px 14px",
-                        textAlign: "left",
+                        textAlign: "start",
                         fontSize: 12,
                         fontWeight: 700,
                         color: "var(--text3)",

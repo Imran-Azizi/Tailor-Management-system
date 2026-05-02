@@ -673,7 +673,7 @@ export default function Step3Measurements({
               style={{
                 marginTop: 12,
                 display: "flex",
-                justifyContent: "flex-end",
+                justifyContent: "end",
               }}
             >
               <button

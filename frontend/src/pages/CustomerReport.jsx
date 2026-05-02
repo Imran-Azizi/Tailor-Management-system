@@ -47,9 +47,20 @@ const ORDER_COLORS = {
 
 const PIE_COLORS = ["#2563EB", "#0D9488", "#D97706", "#DC2626", "#7C3AED"];
 
+function isReportRtl(language = "en") {
+  const l = String(language || "en").toLowerCase();
+  return (
+    l.startsWith("dari") ||
+    l.startsWith("fa") ||
+    l.startsWith("pashto") ||
+    l.startsWith("ps")
+  );
+}
+
 export default function CustomerReport() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
+  const isRtl = isReportRtl(language);
 
   // Fetch analytics for chart data
   const { data: analytics, isLoading: analyticsLoading } = useQuery({
@@ -82,7 +93,17 @@ export default function CustomerReport() {
   const handlePrint = () => window.print();
 
   return (
-    <div style={{ padding: "0 0 40px" }} className="report-root">
+    <div
+      style={{
+        padding: "0 0 40px",
+        direction: isRtl ? "rtl" : "ltr",
+        textAlign: isRtl ? "right" : "left",
+        fontFamily: isRtl
+          ? "'Noto Naskh Arabic', 'Noto Sans Arabic', 'Inter', sans-serif"
+          : undefined,
+      }}
+      className="report-root"
+    >
       {/* Header */}
       <div
         style={{
@@ -379,7 +400,7 @@ export default function CustomerReport() {
                         key={h}
                         style={{
                           padding: "10px 16px",
-                          textAlign: "left",
+                          textAlign: isRtl ? "right" : "left",
                           fontSize: 12,
                           fontWeight: 600,
                           color: "var(--text3)",
@@ -413,6 +434,7 @@ export default function CustomerReport() {
                             display: "flex",
                             alignItems: "center",
                             gap: 9,
+                            flexDirection: isRtl ? "row-reverse" : "row",
                           }}
                         >
                           <div
@@ -460,6 +482,7 @@ export default function CustomerReport() {
                             display: "flex",
                             alignItems: "center",
                             gap: 4,
+                            flexDirection: isRtl ? "row-reverse" : "row",
                           }}
                         >
                           <LuPhone size={11} /> {c.phoneNumber}
@@ -491,6 +514,7 @@ export default function CustomerReport() {
                             display: "flex",
                             alignItems: "center",
                             gap: 4,
+                            flexDirection: isRtl ? "row-reverse" : "row",
                           }}
                         >
                           <LuCalendar size={11} />{" "}

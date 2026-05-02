@@ -6,10 +6,10 @@ import {
   useEffect,
 } from "react";
 import api from "../lib/api.js";
-import { getCurrentGregorianMonthYear, getMonthStatus } from "../lib/months.js";
+import { getCurrentAfghanMonthYear, getMonthStatus } from "../lib/months.js";
 
 const { month: CURRENT_MONTH, year: CURRENT_YEAR } =
-  getCurrentGregorianMonthYear();
+  getCurrentAfghanMonthYear();
 
 function load(key, fallback) {
   try {

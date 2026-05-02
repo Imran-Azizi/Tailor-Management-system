@@ -14,7 +14,8 @@ import toast from "react-hot-toast";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import {
-  getOrderDisplayName,
+  getOrderLabelParts,
+  getOrderPrimaryDisplayName,
   getOrderTypeLabel,
   ORDER_TYPE_VALUES,
 } from "../lib/orderType.js";
@@ -273,7 +274,7 @@ export default function Boxes() {
                       size={13}
                       style={{
                         position: "absolute",
-                        left: 11,
+                        insetInlineStart: 11,
                         top: "50%",
                         transform: "translateY(-50%)",
                         color: "var(--text3)",
@@ -281,7 +282,7 @@ export default function Boxes() {
                     />
                     <input
                       className="inp"
-                      style={{ height: 36, paddingLeft: 32 }}
+                      style={{ height: 36, paddingInlineStart: 32 }}
                       placeholder={t("boxesPage.searchInBox")}
                       value={query}
                       onChange={(e) => setBoxSearch(box.id, e.target.value)}
@@ -326,75 +327,77 @@ export default function Boxes() {
                         overflowY: "auto",
                       }}
                     >
-                      {filteredOrders.map((order) => (
-                        <div
-                          key={order.id}
-                          style={{
-                            padding: "8px 12px",
-                            background: "var(--surface2)",
-                            borderRadius: 8,
-                            border: "1px solid var(--border)",
-                          }}
-                        >
+                      {filteredOrders.map((order) => {
+                        const orderLabel = getOrderLabelParts(
+                          order,
+                          i18n.resolvedLanguage || i18n.language,
+                        );
+                        return (
                           <div
+                            key={order.id}
                             style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              gap: 8,
-                              marginBottom: 3,
+                              padding: "8px 12px",
+                              background: "var(--surface2)",
+                              borderRadius: 8,
+                              border: "1px solid var(--border)",
                             }}
                           >
-                            <div style={{ minWidth: 0 }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: 8,
+                                marginBottom: 3,
+                              }}
+                            >
+                              <div style={{ minWidth: 0 }}>
+                                <span
+                                  style={{
+                                    fontFamily: "monospace",
+                                    fontSize: 12,
+                                    fontWeight: 600,
+                                    color: "var(--primary)",
+                                    marginInlineEnd: 6,
+                                  }}
+                                >
+                                  #{order.customer?.billNumber}
+                                </span>
+                                <span style={{ fontSize: 13, fontWeight: 600 }}>
+                                  {getOrderPrimaryDisplayName(
+                                    order,
+                                    order.customer?.firstName,
+                                    i18n.resolvedLanguage || i18n.language,
+                                  )}
+                                </span>
+                              </div>
                               <span
-                                style={{
-                                  fontFamily: "monospace",
-                                  fontSize: 12,
-                                  fontWeight: 600,
-                                  color: "var(--primary)",
-                                  marginRight: 6,
-                                }}
+                                className={`badge bg-${TV[order.type] || "gold"}`}
+                                style={{ fontSize: 10 }}
                               >
-                                #{order.customer?.billNumber}
-                              </span>
-                              <span style={{ fontSize: 13, fontWeight: 600 }}>
-                                {order.customer?.firstName || "-"}
+                                {orderLabel.baseTypeLabel}
                               </span>
                             </div>
-                            <span
-                              className={`badge bg-${TV[order.type] || "gold"}`}
-                              style={{ fontSize: 10 }}
+                            <div
+                              style={{
+                                fontSize: 11,
+                                color: "var(--text3)",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                gap: 8,
+                              }}
                             >
-                              {getOrderDisplayName(
-                                order,
-                                i18n.resolvedLanguage || i18n.language,
-                              )}
-                            </span>
+                              <span>{orderLabel.baseTypeLabel}</span>
+                              <span>
+                                {formatDateLocale(
+                                  order.createdAt,
+                                  i18n.resolvedLanguage || i18n.language,
+                                )}
+                              </span>
+                            </div>
                           </div>
-                          <div
-                            style={{
-                              fontSize: 11,
-                              color: "var(--text3)",
-                              display: "flex",
-                              justifyContent: "space-between",
-                              gap: 8,
-                            }}
-                          >
-                            <span>
-                              {getOrderDisplayName(
-                                order,
-                                i18n.resolvedLanguage || i18n.language,
-                              )}
-                            </span>
-                            <span>
-                              {formatDateLocale(
-                                order.createdAt,
-                                i18n.resolvedLanguage || i18n.language,
-                              )}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
 

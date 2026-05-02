@@ -7,7 +7,9 @@ import {
 
 export const getAll = async (req, res, next) => {
   try {
-    res.json(await service.getAllRakht());
+    const month = req.query.month != null ? Number(req.query.month) : null;
+    const year = req.query.year != null ? Number(req.query.year) : null;
+    res.json(await service.getAllRakht({ month, year }));
   } catch (error) {
     next(error);
   }
@@ -38,6 +40,8 @@ export const getRevenueSummary = async (req, res, next) => {
       typeof req.query.fromDate === "string" ? req.query.fromDate : undefined;
     const toDate =
       typeof req.query.toDate === "string" ? req.query.toDate : undefined;
+    const month = req.query.month != null ? Number(req.query.month) : null;
+    const year = req.query.year != null ? Number(req.query.year) : null;
     const minMeters =
       typeof req.query.minMeters === "string"
         ? Number(req.query.minMeters)
@@ -63,6 +67,8 @@ export const getRevenueSummary = async (req, res, next) => {
         orderType,
         fromDate,
         toDate,
+        month,
+        year,
         minMeters,
         maxMeters,
         page,

@@ -11,7 +11,7 @@ import {
   LuClock,
 } from "react-icons/lu";
 import api from "../lib/api.js";
-import { getOrderDisplayName } from "../lib/orderType.js";
+import { getOrderLabelParts } from "../lib/orderType.js";
 import { formatSystemDate } from "../lib/locale.js";
 import { formatCurrency } from "../lib/currency.js";
 import {
@@ -178,7 +178,7 @@ function CustomerRow({ customer, expanded, onToggle }) {
                       key={h}
                       style={{
                         padding: "7px 10px",
-                        textAlign: "left",
+                        textAlign: "start",
                         color: "var(--text3)",
                         fontWeight: 600,
                         borderBottom: "1px solid var(--border)",
@@ -190,56 +190,72 @@ function CustomerRow({ customer, expanded, onToggle }) {
                 </tr>
               </thead>
               <tbody>
-                {orders.map((o, i) => (
-                  <tr
-                    key={o.id}
-                    style={{ borderBottom: "1px solid var(--border)" }}
-                  >
-                    <td style={{ padding: "8px 10px", color: "var(--text3)" }}>
-                      {i + 1}
-                    </td>
-                    <td style={{ padding: "8px 10px" }}>
-                      <Badge
-                        v={
-                          {
-                            OUTFIT: "gold",
-                            WASKAT: "teal",
-                            KORTY: "amber",
-                            YAKHANQAQ: "red",
-                          }[o.type] || "gold"
-                        }
-                      >
-                        {getOrderDisplayName(o, language)}
-                      </Badge>
-                    </td>
-                    <td style={{ padding: "8px 10px", fontWeight: 600 }}>
-                      {formatMoney(o.totalPrice)}
-                    </td>
-                    <td style={{ padding: "8px 10px", color: "#16a34a" }}>
-                      {formatMoney(o.paidAmount)}
-                    </td>
-                    <td style={{ padding: "8px 10px", color: "var(--text3)" }}>
-                      {formatMoney(o.discount)}
-                    </td>
-                    <td
-                      style={{
-                        padding: "8px 10px",
-                        color: o.remaining > 0 ? "#DC2626" : "#16a34a",
-                        fontWeight: o.remaining > 0 ? 700 : 400,
-                      }}
+                {orders.map((o, i) => {
+                  const orderLabel = getOrderLabelParts(o, language);
+                  return (
+                    <tr
+                      key={o.id}
+                      style={{ borderBottom: "1px solid var(--border)" }}
                     >
-                      {formatMoney(o.remaining)}
-                    </td>
-                    <td style={{ padding: "8px 10px" }}>
-                      <Badge v={o.isCompleted ? "green" : "amber"}>
-                        {o.isCompleted ? t("orders.done") : t("orders.pending")}
-                      </Badge>
-                    </td>
-                    <td style={{ padding: "8px 10px", color: "var(--text3)" }}>
-                      {formatSystemDate(o.createdAt, language)}
-                    </td>
-                  </tr>
-                ))}
+                      <td
+                        style={{ padding: "8px 10px", color: "var(--text3)" }}
+                      >
+                        {i + 1}
+                      </td>
+                      <td style={{ padding: "8px 10px" }}>
+                        <Badge
+                          v={
+                            {
+                              OUTFIT: "gold",
+                              WASKAT: "teal",
+                              KORTY: "amber",
+                              YAKHANQAQ: "red",
+                            }[o.type] || "gold"
+                          }
+                        >
+                          {orderLabel.baseTypeLabel}
+                        </Badge>
+                        {orderLabel.customName ? (
+                          <div style={{ marginTop: 4, fontSize: 11 }}>
+                            {orderLabel.customName}
+                          </div>
+                        ) : null}
+                      </td>
+                      <td style={{ padding: "8px 10px", fontWeight: 600 }}>
+                        {formatMoney(o.totalPrice)}
+                      </td>
+                      <td style={{ padding: "8px 10px", color: "#16a34a" }}>
+                        {formatMoney(o.paidAmount)}
+                      </td>
+                      <td
+                        style={{ padding: "8px 10px", color: "var(--text3)" }}
+                      >
+                        {formatMoney(o.discount)}
+                      </td>
+                      <td
+                        style={{
+                          padding: "8px 10px",
+                          color: o.remaining > 0 ? "#DC2626" : "#16a34a",
+                          fontWeight: o.remaining > 0 ? 700 : 400,
+                        }}
+                      >
+                        {formatMoney(o.remaining)}
+                      </td>
+                      <td style={{ padding: "8px 10px" }}>
+                        <Badge v={o.isCompleted ? "green" : "amber"}>
+                          {o.isCompleted
+                            ? t("orders.done")
+                            : t("orders.pending")}
+                        </Badge>
+                      </td>
+                      <td
+                        style={{ padding: "8px 10px", color: "var(--text3)" }}
+                      >
+                        {formatSystemDate(o.createdAt, language)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </td>
@@ -250,7 +266,7 @@ function CustomerRow({ customer, expanded, onToggle }) {
 }
 
 export default function CustomerTransactions() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState(null);
@@ -335,14 +351,14 @@ export default function CustomerTransactions() {
             size={13}
             style={{
               position: "absolute",
-              left: 10,
+              insetInlineStart: 10,
               color: "var(--text3)",
               pointerEvents: "none",
             }}
           />
           <input
             className="inp"
-            style={{ paddingLeft: 32, width: 200, height: 36 }}
+            style={{ paddingInlineStart: 32, width: 200, height: 36 }}
             placeholder={t("orders.searchCustomers")}
             value={search}
             onChange={(e) => {
@@ -454,7 +470,7 @@ export default function CustomerTransactions() {
                         key={i}
                         style={{
                           padding: "11px 16px",
-                          textAlign: "left",
+                          textAlign: "start",
                           fontSize: 12,
                           fontWeight: 600,
                           color: "var(--text3)",

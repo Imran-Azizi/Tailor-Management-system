@@ -415,7 +415,7 @@ export default function CreateRakht() {
           <div
             style={{
               display: "flex",
-              justifyContent: "flex-end",
+              justifyContent: "end",
               gap: 10,
               marginTop: 18,
             }}

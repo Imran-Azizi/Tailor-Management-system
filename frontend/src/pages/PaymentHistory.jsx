@@ -446,7 +446,7 @@ export default function PaymentHistory() {
                 size={14}
                 style={{
                   position: "absolute",
-                  left: 10,
+                  insetInlineStart: 10,
                   top: "50%",
                   transform: "translateY(-50%)",
                   color: "var(--text3)",
@@ -454,7 +454,7 @@ export default function PaymentHistory() {
               />
               <input
                 className="inp"
-                style={{ paddingLeft: 32 }}
+                style={{ paddingInlineStart: 32 }}
                 value={search}
                 placeholder={t("rakht.paymentHistorySearch", {
                   defaultValue: "Search by company or recorded user",
@@ -510,7 +510,7 @@ export default function PaymentHistory() {
                 size={14}
                 style={{
                   position: "absolute",
-                  left: 10,
+                  insetInlineStart: 10,
                   top: "50%",
                   transform: "translateY(-50%)",
                   color: "var(--text3)",
@@ -520,7 +520,7 @@ export default function PaymentHistory() {
               <input
                 className="inp"
                 type="date"
-                style={{ paddingLeft: 32 }}
+                style={{ paddingInlineStart: 32 }}
                 value={fromDate}
                 onChange={(event) => {
                   setFromDate(event.target.value);
@@ -539,7 +539,7 @@ export default function PaymentHistory() {
                 size={14}
                 style={{
                   position: "absolute",
-                  left: 10,
+                  insetInlineStart: 10,
                   top: "50%",
                   transform: "translateY(-50%)",
                   color: "var(--text3)",
@@ -549,7 +549,7 @@ export default function PaymentHistory() {
               <input
                 className="inp"
                 type="date"
-                style={{ paddingLeft: 32 }}
+                style={{ paddingInlineStart: 32 }}
                 value={toDate}
                 onChange={(event) => {
                   setToDate(event.target.value);
@@ -588,7 +588,7 @@ export default function PaymentHistory() {
           >
             <LuFilter
               size={12}
-              style={{ marginRight: 4, verticalAlign: "middle" }}
+              style={{ marginInlineEnd: 4, verticalAlign: "middle" }}
             />
             {t("common.filters", { defaultValue: "Filters" })}:{" "}
             {activeFilterCount}

@@ -2,7 +2,7 @@ import { LuBadgeCheck, LuPrinter, LuScissors } from "react-icons/lu";
 import { useTranslation } from "react-i18next";
 import {
   CustomerBill,
-  getOrderDisplayName,
+  getOrderLabelParts,
   TailorBill,
   getBillLanguageSettings,
   getMeasurementsFromOrder,
@@ -153,7 +153,7 @@ export default function Step5PrintCenter({ data }) {
                   }}
                 >
                   <span className="badge bg-gold" style={{ fontSize: 11 }}>
-                    {getOrderDisplayName(order, currentLanguage)}
+                    {getOrderLabelParts(order, currentLanguage).fullLabel}
                   </span>
                 </div>
               )}
@@ -232,7 +232,7 @@ export default function Step5PrintCenter({ data }) {
                       "linear-gradient(135deg, #2B211A 0%, #584332 100%)",
                     color: "#fff",
                     transition: "opacity .15s",
-                    borderLeft: "1px solid rgba(255,255,255,0.1)",
+                    borderInlineStart: "1px solid rgba(255,255,255,0.1)",
                   }}
                   onMouseEnter={(e) => (e.currentTarget.style.opacity = ".88")}
                   onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
@@ -266,7 +266,7 @@ export default function Step5PrintCenter({ data }) {
               <div
                 style={{
                   position: "absolute",
-                  left: "-9999px",
+                  insetInlineStart: "-9999px",
                   top: 0,
                   pointerEvents: "none",
                   zIndex: -1,

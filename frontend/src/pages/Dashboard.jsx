@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import {
   LineChart,
   Line,
@@ -32,7 +33,11 @@ import { useTranslation } from "react-i18next";
 import api from "../lib/api.js";
 import { formatCurrency } from "../lib/currency.js";
 import { formatDateLocale } from "../lib/locale.js";
-import { getOrderDisplayName, getOrderTypeLabel } from "../lib/orderType.js";
+import {
+  getOrderLabelParts,
+  getOrderPrimaryDisplayName,
+  getOrderTypeLabel,
+} from "../lib/orderType.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
 import { formatMonthYearLabel } from "../lib/months.js";
@@ -88,6 +93,7 @@ const Tip = ({ active, payload, label, language, t }) => {
 export default function Dashboard() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
+  const navigate = useNavigate();
   const { isAdmin, isFinance, user } = useAuth();
   const { viewMonth, viewYear } = useMonth();
 
@@ -208,6 +214,7 @@ export default function Dashboard() {
           Icon={LuTrendingUp}
           accent="#DC2626"
           sub={t("dashboardPage.remainingBalance")}
+          onClick={() => navigate("/orders/remaining")}
         />
         <StatCard
           label={t(
@@ -418,12 +425,16 @@ export default function Dashboard() {
                   </td>
                   <td>
                     <span style={{ fontWeight: 500 }}>
-                      {o.customer.firstName}
+                      {getOrderPrimaryDisplayName(
+                        o,
+                        o.customer.firstName,
+                        language,
+                      )}
                     </span>
                   </td>
                   <td>
                     <span className={`badge bg-${TV[o.type] || "gold"}`}>
-                      {getOrderDisplayName(o, language)}
+                      {getOrderLabelParts(o, language).baseTypeLabel}
                     </span>
                   </td>
                   <td style={{ fontWeight: 500 }}>

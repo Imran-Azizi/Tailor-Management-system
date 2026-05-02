@@ -18,6 +18,7 @@ import {
   LuUserCheck,
   LuWalletCards,
   LuFileText,
+  LuDatabaseBackup,
 } from "react-icons/lu";
 
 const ROLE_ACCENT = {
@@ -223,6 +224,13 @@ const ADMIN_SECTIONS = [
         fallback: "User Management",
         path: "/users",
         icon: LuShieldCheck,
+      },
+      {
+        key: "backupManagement",
+        label: "backup.title",
+        fallback: "Backup Management",
+        path: "/backups",
+        icon: LuDatabaseBackup,
       },
       {
         key: "designs",

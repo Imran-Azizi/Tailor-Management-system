@@ -132,7 +132,7 @@ export default function Notifications() {
                 display: "flex",
                 alignItems: "flex-start",
                 gap: 14,
-                borderLeft: !n.isRead
+                borderInlineStart: !n.isRead
                   ? "3px solid var(--primary)"
                   : "3px solid transparent",
                 cursor: n?.orderId ? "pointer" : "default",
@@ -196,7 +196,7 @@ export default function Notifications() {
                           fontFamily: "monospace",
                           fontWeight: 400,
                           color: "var(--primary)",
-                          marginLeft: 6,
+                          marginInlineStart: 6,
                         }}
                       >
                         #{n.order.customer.billNumber}

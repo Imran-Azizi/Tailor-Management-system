@@ -16,6 +16,8 @@ import { formatCurrency } from "../../lib/currency.js";
 import { resolveRakhtColorHex } from "../../lib/rakhtColors.js";
 import {
   getOrderDisplayName as getLocalizedOrderDisplayName,
+  getOrderLabelParts as getLocalizedOrderLabelParts,
+  getOrderPrimaryDisplayName as getLocalizedOrderPrimaryDisplayName,
   getOrderTypeLabel as getLocalizedOrderTypeLabel,
 } from "../../lib/orderType.js";
 
@@ -178,7 +180,7 @@ const BILL_EXTRA_TEXT = {
   },
 };
 
-const PRINT_SHOP_HEADER_NAME = "Khan Rahimi";
+const PRINT_SHOP_HEADER_NAME = "Hoshmand Safi";
 const AFGHANISTAN_TIMEZONE = "Asia/Kabul";
 
 export function getBillLanguageSettings(language) {
@@ -190,7 +192,7 @@ export function getBillLanguageSettings(language) {
         ? "dari"
         : "en";
 
-  const isRtl = false;
+  const isRtl = langCode === "dari" || langCode === "pashto";
   const locale =
     langCode === "en" ? "en-US" : langCode === "dari" ? "fa-AF" : "ps-AF";
 
@@ -198,7 +200,7 @@ export function getBillLanguageSettings(language) {
     langCode,
     locale,
     htmlLang: locale,
-    dir: "ltr",
+    dir: isRtl ? "rtl" : "ltr",
     isRtl,
     fontFamily: "'Inter','Noto Naskh Arabic','Noto Sans Arabic',sans-serif",
     text: BILL_TEXT[langCode],
@@ -211,6 +213,19 @@ export function getOrderTypeLabel(type, language) {
 
 export function getOrderDisplayName(order, language, options) {
   return getLocalizedOrderDisplayName(order, language, options);
+}
+
+function getOrderLabelParts(order, language, options) {
+  return getLocalizedOrderLabelParts(order, language, options);
+}
+
+function getOrderPrimaryDisplayName(order, customerName, language, options) {
+  return getLocalizedOrderPrimaryDisplayName(
+    order,
+    customerName,
+    language,
+    options,
+  );
 }
 
 function formatMoney(amount, language) {
@@ -232,6 +247,20 @@ function toEnglishDigits(value) {
   return toAsciiDigits(String(value));
 }
 
+function withLatinDigitsLocale(locale) {
+  const base = String(locale || "en-US");
+  if (/-u-/.test(base)) {
+    return /\bnu-latn\b/.test(base) ? base : `${base}-nu-latn`;
+  }
+  return `${base}-u-nu-latn`;
+}
+
+function getPrintDateLocale(settings) {
+  if (settings?.langCode === "dari") return "fa-AF-u-ca-persian";
+  if (settings?.langCode === "pashto") return "ps-AF-u-ca-persian";
+  return settings?.locale || "en-US";
+}
+
 function formatMeasurementValue(value) {
   const numeric = Number(value);
   if (Number.isFinite(numeric)) {
@@ -240,7 +269,7 @@ function formatMeasurementValue(value) {
   return toEnglishDigits(value);
 }
 
-function formatDateWithEnglishDigits(dateInput, locale, timeZone) {
+function formatDateWithEnglishDigits(dateInput, settings, timeZone) {
   const value = dateInput ? new Date(dateInput) : new Date();
   if (Number.isNaN(value.getTime())) return "-";
   const options = {
@@ -249,21 +278,27 @@ function formatDateWithEnglishDigits(dateInput, locale, timeZone) {
     day: "2-digit",
   };
   if (timeZone) options.timeZone = timeZone;
-  const fmt = new Intl.DateTimeFormat(`${locale}-u-nu-latn`, options);
+  const fmt = new Intl.DateTimeFormat(
+    withLatinDigitsLocale(getPrintDateLocale(settings)),
+    options,
+  );
   return fmt.format(value);
 }
 
-function formatTimeWithEnglishDigits(dateInput, locale, timeZone) {
+function formatTimeWithEnglishDigits(dateInput, settings, timeZone) {
   const value = dateInput ? new Date(dateInput) : new Date();
   if (Number.isNaN(value.getTime())) return "-";
   const options = {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
-    hour12: false,
+    hourCycle: "h23",
   };
   if (timeZone) options.timeZone = timeZone;
-  const fmt = new Intl.DateTimeFormat(`${locale}-u-nu-latn`, options);
+  const fmt = new Intl.DateTimeFormat(
+    withLatinDigitsLocale(getPrintDateLocale(settings)),
+    options,
+  );
   return fmt.format(value);
 }
 
@@ -277,13 +312,13 @@ function formatFieldKey(key, t) {
 }
 
 function getPrintDateTime(settings, timestamp) {
-  const isAfghanNow =
+  const isAfghanLocale =
     settings.langCode === "dari" || settings.langCode === "pashto";
-  const source = isAfghanNow ? new Date() : timestamp || Date.now();
-  const zone = isAfghanNow ? AFGHANISTAN_TIMEZONE : undefined;
+  const source = timestamp || Date.now();
+  const zone = isAfghanLocale ? AFGHANISTAN_TIMEZONE : undefined;
   return {
-    date: formatDateWithEnglishDigits(source, settings.locale, zone),
-    time: formatTimeWithEnglishDigits(source, settings.locale, zone),
+    date: formatDateWithEnglishDigits(source, settings, zone),
+    time: formatTimeWithEnglishDigits(source, settings, zone),
   };
 }
 
@@ -390,7 +425,13 @@ export function CustomerBill({ customer, order }) {
   const paid = order?.paidAmount || 0;
   const remaining = Math.max(0, order?.remaining ?? total - discount - paid);
   const qty = order?.quantity || 1;
-  const orderTypeLabel = getOrderDisplayName(order, settings.langCode);
+  const orderLabelParts = getOrderLabelParts(order, settings.langCode);
+  const orderTypeLabel = orderLabelParts.baseTypeLabel;
+  const customerNameLabel = getOrderPrimaryDisplayName(
+    order,
+    customer?.firstName,
+    settings.langCode,
+  );
   const { date, time } = getPrintDateTime(
     settings,
     order?.createdAt || Date.now(),
@@ -442,7 +483,7 @@ export function CustomerBill({ customer, order }) {
         >
           <p className={tableHeadClass}>{txt.name}</p>
           <p className="mt-0.5 font-semibold text-slate-900">
-            {customer?.firstName || "-"}
+            {customerNameLabel}
           </p>
         </div>
         <div
@@ -581,16 +622,26 @@ export function CustomerCombinedBill({ customer, orders = [] }) {
   const rowItems = safeOrders.map((order, index) => {
     const typeKey = order?.type || "ITEM";
     typeIndex[typeKey] = (typeIndex[typeKey] || 0) + 1;
-    const itemLabel = getOrderDisplayName(order, settings.langCode, {
+    const { baseTypeLabel } = getOrderLabelParts(order, settings.langCode, {
       totalByType: typeCountTotals[typeKey],
       sequenceByType: typeIndex[typeKey],
     });
+    const customerNameLabel = getOrderPrimaryDisplayName(
+      order,
+      customerName,
+      settings.langCode,
+      {
+        totalByType: typeCountTotals[typeKey],
+        sequenceByType: typeIndex[typeKey],
+      },
+    );
     const totalPrice = Number(order?.totalPrice || 0);
     return {
       order,
       index,
       typeKey,
-      itemLabel,
+      itemLabel: baseTypeLabel,
+      customerNameLabel,
       qty: Number(order?.quantity || 1),
       amount: totalPrice,
       boxName:
@@ -724,7 +775,7 @@ export function CustomerCombinedBill({ customer, orders = [] }) {
                 <td
                   className={`border-b border-r border-slate-800 px-1.5 py-1 align-top font-semibold ${alignClass}`}
                 >
-                  {customerName}
+                  <div>{row.customerNameLabel}</div>
                 </td>
                 <td className="border-b border-r border-slate-800 px-1.5 py-1 align-top font-semibold [direction:ltr] [unicode-bidi:embed]">
                   {customerPhone}
@@ -917,21 +968,15 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
   const dateValue = order?.createdAt || Date.now();
   const { date, time } = getPrintDateTime(settings, dateValue);
   const billLabel = getOrderItemLabel(order, itemLabel, settings);
-  const normalizedBillLabel = String(billLabel || "")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
-  const orderNameText =
-    typeof order?.orderName === "string" ? order.orderName.trim() : "";
-  const normalizedOrderName = String(orderNameText || "")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
-  const shouldRenderOrderNameNote =
-    Boolean(orderNameText) && normalizedOrderName !== normalizedBillLabel;
+  const orderLabelParts = getOrderLabelParts(order, settings.langCode);
+  const orderTypeLabel = orderLabelParts.baseTypeLabel;
+  const orderCustomName = orderLabelParts.customName;
+  const customerNameLabel = getOrderPrimaryDisplayName(
+    order,
+    customer?.firstName,
+    settings.langCode,
+  );
   const customerBarcode = customer?.billNumber || "-";
-  const orderBarcode =
-    order?.id || `${customer?.billNumber || "0"}-${order?.type || "item"}`;
   const alignClass = settings.isRtl ? "text-right" : "text-left";
   const tableHeadClass = settings.isRtl
     ? "text-[10px] font-extrabold text-slate-700"
@@ -1013,14 +1058,16 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
         >
           <p className={tableHeadClass}>{txt.name}</p>
           <p className="mt-0.5 font-semibold text-slate-900">
-            {customer?.firstName || "-"}
+            {customerNameLabel}
           </p>
         </div>
         <div
           className={`border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
         >
           <p className={tableHeadClass}>{t("orders.orderType")}</p>
-          <p className="mt-0.5 font-semibold text-slate-900">{billLabel}</p>
+          <p className="mt-0.5 font-semibold text-slate-900">
+            {orderTypeLabel}
+          </p>
         </div>
         <div className={`border-b border-slate-800 px-2 py-1.5 ${alignClass}`}>
           <p className={tableHeadClass}>{txt.qty}</p>
@@ -1150,27 +1197,9 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
         </div>
       </div>
 
-      {/* Order notes (optional) */}
-      {shouldRenderOrderNameNote && (
-        <div
-          className={`border-b border-slate-800 bg-amber-50 px-2 py-1.5 text-[10px] ${alignClass}`}
-        >
-          <span className="font-extrabold text-amber-700">
-            {t("createOrder.additionalStyleInfo", { defaultValue: "Notes" })}
-            :{" "}
-          </span>
-          <span className="text-slate-800">{orderNameText}</span>
-        </div>
-      )}
-
-      {/* Barcodes */}
-      <div className="grid grid-cols-2 border-b border-slate-800">
-        <div className="border-r border-slate-800 px-2 py-1.5">
-          <Barcode value={customerBarcode} />
-        </div>
-        <div className="px-2 py-1.5">
-          <Barcode value={orderBarcode} />
-        </div>
+      {/* Barcode */}
+      <div className="border-b border-slate-800 px-2 py-1.5">
+        <Barcode value={customerBarcode} />
       </div>
 
       {/* Footer */}
@@ -1178,7 +1207,9 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
         <div className={`border-r border-slate-800 px-2 py-1.5 ${alignClass}`}>
           <span className="font-extrabold">{txt.date}</span>: {date}
         </div>
-        <div className={`px-2 py-1.5 text-right`}>
+        <div
+          className={`px-2 py-1.5 ${settings.isRtl ? "text-left" : "text-right"}`}
+        >
           <span className="font-extrabold [direction:ltr] [unicode-bidi:embed]">
             {time}
           </span>
@@ -1363,7 +1394,7 @@ export function OrderDocumentPack({ customer, order, previewId }) {
               {t("orders.printPackCopy")}
             </p>
           </div>
-          <div style={{ textAlign: "right" }}>
+          <div style={{ textAlign: "end" }}>
             <div style={{ fontSize: 12, color: "rgba(255,255,255,.72)" }}>
               {t("orders.billNumber")}
             </div>

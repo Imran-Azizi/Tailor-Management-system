@@ -8,7 +8,7 @@ import { getApiErrorMessage } from "../lib/feedback.js";
 import { parseNumberLocale } from "../lib/normalize.js";
 import { formatCurrency } from "../lib/currency.js";
 import {
-  getOrderDisplayName,
+  getOrderLabelParts,
   getOrderTypeLabel,
   getOrderTypeOptions,
 } from "../lib/orderType.js";
@@ -524,6 +524,7 @@ export default function AssignOrders() {
               ) : (
                 <div style={{ display: "grid", gap: 10 }}>
                   {matchedOrders.map((order, idx) => {
+                    const orderLabel = getOrderLabelParts(order, language);
                     const active = selectedOrderId === order.id;
                     return (
                       <button
@@ -573,7 +574,7 @@ export default function AssignOrders() {
                                   number: idx + 1,
                                 },
                               )}{" "}
-                              - {getOrderDisplayName(order, language)}
+                              - {orderLabel.baseTypeLabel}
                             </p>
                             <p
                               style={{
@@ -582,7 +583,7 @@ export default function AssignOrders() {
                                 marginTop: 2,
                               }}
                             >
-                              {order.orderName ||
+                              {orderLabel.customName ||
                                 t("assignment.noOrderName", "No custom name")}
                             </p>
                           </div>

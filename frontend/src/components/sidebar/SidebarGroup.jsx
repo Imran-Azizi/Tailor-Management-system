@@ -114,9 +114,7 @@ export default function SidebarGroup({
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[18px]">
                   <item.icon />
                 </span>
-                <span
-                  className={`min-w-0 flex-1 truncate ${isRtl ? "text-right" : "text-left"}`}
-                >
+                <span className="min-w-0 flex-1 truncate text-start">
                   {item.text}
                 </span>
                 <span

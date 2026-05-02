@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import { LuReceipt, LuSearch } from "react-icons/lu";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { parseNumberLocale } from "../lib/normalize.js";
-import { getOrderDisplayName } from "../lib/orderType.js";
+import { getOrderLabelParts } from "../lib/orderType.js";
 import {
   Card,
   EmptyState,
@@ -87,14 +87,47 @@ function stateStyle(tone) {
   };
 }
 
+function isReportRtl(language = "en") {
+  const l = String(language || "en").toLowerCase();
+  return (
+    l.startsWith("dari") ||
+    l.startsWith("fa") ||
+    l.startsWith("pashto") ||
+    l.startsWith("ps")
+  );
+}
+
 export default function AssignOrdersReport() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language || "en";
+  const isRtl = isReportRtl(language);
 
   const [billNumber, setBillNumber] = useState("");
   const [loading, setLoading] = useState(false);
   const [lookupResult, setLookupResult] = useState(null);
   const [isOrderNotFound, setIsOrderNotFound] = useState(false);
+
+  const customerNameByBill = useMemo(() => {
+    const map = {};
+    const orders = Array.isArray(lookupResult?.orders)
+      ? lookupResult.orders
+      : [];
+
+    orders.forEach((order) => {
+      const bill = order?.customer?.billNumber;
+      if (bill === null || bill === undefined) return;
+
+      const orderCustomerName = String(order?.customer?.firstName || "").trim();
+      if (
+        orderCustomerName &&
+        (!map[bill] || orderCustomerName.length > map[bill].length)
+      ) {
+        map[bill] = orderCustomerName;
+      }
+    });
+
+    return map;
+  }, [lookupResult, language]);
 
   const searchByBill = async () => {
     const parsedBill = parseNumberLocale(billNumber);
@@ -140,6 +173,11 @@ export default function AssignOrdersReport() {
         maxWidth: 920,
         margin: "0 auto",
         width: "100%",
+        direction: isRtl ? "rtl" : "ltr",
+        textAlign: isRtl ? "right" : "left",
+        fontFamily: isRtl
+          ? "'Noto Naskh Arabic', 'Noto Sans Arabic', 'Inter', sans-serif"
+          : undefined,
       }}
     >
       <PageHeader
@@ -157,6 +195,7 @@ export default function AssignOrdersReport() {
             gap: 12,
             gridTemplateColumns: "minmax(0, 1fr) auto",
             alignItems: "end",
+            direction: isRtl ? "rtl" : "ltr",
           }}
         >
           <Field label={t("orders.billNumber", "Bill Number")} required>
@@ -219,8 +258,20 @@ export default function AssignOrdersReport() {
             <Card title={t("common.allOrders", "All Orders")}>
               <div style={{ display: "grid", gap: 10 }}>
                 {(lookupResult.orders || []).map((order) => {
+                  const orderLabel = getOrderLabelParts(order, language);
                   const state = resolveOrderState(order);
                   const localizedStatus = getLocalizedStatusMessage(t, state);
+                  const billNumber = order?.customer?.billNumber;
+                  const resolvedRealCustomerName =
+                    String(order?.customer?.firstName || "").trim() ||
+                    String(lookupResult?.customer?.firstName || "").trim() ||
+                    (billNumber !== null && billNumber !== undefined
+                      ? String(customerNameByBill[billNumber] || "").trim()
+                      : "") ||
+                    "-";
+                  const displayCustomerName =
+                    String(orderLabel.customName || "").trim() ||
+                    resolvedRealCustomerName;
                   return (
                     <div
                       key={order.id}
@@ -237,21 +288,30 @@ export default function AssignOrdersReport() {
                         style={{
                           display: "flex",
                           alignItems: "center",
-                          gap: 8,
+                          gap: 10,
                           flexWrap: "wrap",
                         }}
                       >
                         <span
                           style={{
                             fontSize: 14,
-                            fontWeight: 700,
+                            fontWeight: 800,
                             color: "var(--text1)",
                           }}
                         >
-                          {getOrderDisplayName(order, language)}
+                          {displayCustomerName}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 700,
+                            color: "var(--text2)",
+                          }}
+                        >
+                          {orderLabel.baseTypeLabel}
                         </span>
                         <span className="badge bg-gray">
-                          #{order?.customer?.billNumber ?? "-"}
+                          #{billNumber ?? "-"}
                         </span>
                       </div>
 

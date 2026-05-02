@@ -18,65 +18,85 @@ export const StatCard = ({
   sub,
   Icon,
   accent = "var(--primary)",
-}) => (
-  <div className="stat-card">
-    <div
-      style={{
-        display: "flex",
-        alignItems: "flex-start",
-        justifyContent: "space-between",
-        gap: 10,
-      }}
+  onClick,
+}) => {
+  const isInteractive = typeof onClick === "function";
+  const WrapperTag = isInteractive ? "button" : "div";
+
+  return (
+    <WrapperTag
+      className={`stat-card${isInteractive ? " stat-card--interactive" : ""}`}
+      onClick={onClick}
+      type={isInteractive ? "button" : undefined}
+      style={
+        isInteractive
+          ? {
+              width: "100%",
+              textAlign: "start",
+              fontFamily: "inherit",
+              appearance: "none",
+            }
+          : undefined
+      }
     >
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p
-          style={{
-            fontSize: 11.5,
-            fontWeight: 600,
-            color: "var(--text3)",
-            textTransform: "uppercase",
-            letterSpacing: ".06em",
-            marginBottom: 8,
-          }}
-        >
-          {label}
-        </p>
-        <p
-          style={{
-            fontSize: 24,
-            fontWeight: 700,
-            color: accent,
-            letterSpacing: "-.02em",
-            lineHeight: 1,
-          }}
-        >
-          {value}
-        </p>
-        {sub && (
-          <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 6 }}>
-            {sub}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 10,
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p
+            style={{
+              fontSize: 11.5,
+              fontWeight: 600,
+              color: "var(--text3)",
+              textTransform: "uppercase",
+              letterSpacing: ".06em",
+              marginBottom: 8,
+            }}
+          >
+            {label}
           </p>
+          <p
+            style={{
+              fontSize: 24,
+              fontWeight: 700,
+              color: accent,
+              letterSpacing: "-.02em",
+              lineHeight: 1,
+            }}
+          >
+            {value}
+          </p>
+          {sub && (
+            <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 6 }}>
+              {sub}
+            </p>
+          )}
+        </div>
+        {Icon && (
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 10,
+              background: "var(--surface2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <Icon size={20} style={{ color: accent }} />
+          </div>
         )}
       </div>
-      {Icon && (
-        <div
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 10,
-            background: "var(--surface2)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
-        >
-          <Icon size={20} style={{ color: accent }} />
-        </div>
-      )}
-    </div>
-  </div>
-);
+    </WrapperTag>
+  );
+};
 
 export const Spinner = () => (
   <div
@@ -134,7 +154,7 @@ export const NotificationText = ({
       {...props}
       style={{
         direction: rtl ? "rtl" : "ltr",
-        textAlign: rtl ? "right" : "left",
+        textAlign: "start",
         unicodeBidi: "plaintext",
         ...style,
       }}

@@ -1,17 +1,19 @@
 export const MONTHS = [
-  { value: 1, labelEn: "January", labelDari: "حمل", labelPashto: "وری" },
-  { value: 2, labelEn: "February", labelDari: "ثور", labelPashto: "غویی" },
-  { value: 3, labelEn: "March", labelDari: "جوزا", labelPashto: "غبرګولی" },
-  { value: 4, labelEn: "April", labelDari: "سرطان", labelPashto: "چنګاښ" },
-  { value: 5, labelEn: "May", labelDari: "اسد", labelPashto: "زمری" },
-  { value: 6, labelEn: "June", labelDari: "سنبله", labelPashto: "وږی" },
-  { value: 7, labelEn: "July", labelDari: "میزان", labelPashto: "تله" },
-  { value: 8, labelEn: "August", labelDari: "عقرب", labelPashto: "لړم" },
-  { value: 9, labelEn: "September", labelDari: "قوس", labelPashto: "لیندۍ" },
-  { value: 10, labelEn: "October", labelDari: "جدی", labelPashto: "مرغومی" },
-  { value: 11, labelEn: "November", labelDari: "دلو", labelPashto: "سلواغه" },
-  { value: 12, labelEn: "December", labelDari: "حوت", labelPashto: "کب" },
+  { value: 1, labelEn: "Hamal", labelDari: "حمل", labelPashto: "وری" },
+  { value: 2, labelEn: "Sawr", labelDari: "ثور", labelPashto: "غویی" },
+  { value: 3, labelEn: "Jawza", labelDari: "جوزا", labelPashto: "غبرګولی" },
+  { value: 4, labelEn: "Saratan", labelDari: "سرطان", labelPashto: "چنګاښ" },
+  { value: 5, labelEn: "Asad", labelDari: "اسد", labelPashto: "زمری" },
+  { value: 6, labelEn: "Sunbula", labelDari: "سنبله", labelPashto: "وږی" },
+  { value: 7, labelEn: "Mizan", labelDari: "میزان", labelPashto: "تله" },
+  { value: 8, labelEn: "Aqrab", labelDari: "عقرب", labelPashto: "لړم" },
+  { value: 9, labelEn: "Qaws", labelDari: "قوس", labelPashto: "لیندۍ" },
+  { value: 10, labelEn: "Jadi", labelDari: "جدی", labelPashto: "مرغومی" },
+  { value: 11, labelEn: "Dalwa", labelDari: "دلو", labelPashto: "سلواغه" },
+  { value: 12, labelEn: "Hut", labelDari: "حوت", labelPashto: "کب" },
 ];
+
+const AFGHANISTAN_TIMEZONE = "Asia/Kabul";
 
 const normalizeNumber = (value) => {
   if (typeof value !== "string") return String(value || "");
@@ -57,6 +59,7 @@ export function getMonthLabel(monthValue, language) {
 export function getCurrentAfghanMonthYear(date = new Date()) {
   try {
     const formatter = new Intl.DateTimeFormat("fa-AF-u-ca-persian-nu-latn", {
+      timeZone: AFGHANISTAN_TIMEZONE,
       month: "numeric",
       year: "numeric",
     });
@@ -90,9 +93,6 @@ export function getDisplayMonthYearForLanguage(month, year, language) {
   const m = Number(month);
   const y = Number(year);
   if (!Number.isFinite(m) || !Number.isFinite(y)) return { month: m, year: y };
-  if (language === "dari" || language === "pashto") {
-    return gregorianToAfghanMonthYear(m, y);
-  }
   return { month: m, year: y };
 }
 

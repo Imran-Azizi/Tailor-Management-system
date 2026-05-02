@@ -1,12 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import toast from "react-hot-toast";
 import Select from "react-select";
 import { LuRuler } from "react-icons/lu";
 import api from "../../lib/api.js";
 import { Field } from "../ui/index.jsx";
 import { getOrderTypeLabel } from "../../lib/orderType.js";
+import { isRtlLanguage as detectRtlLanguage } from "../../lib/locale.js";
+import {
+  MONEY_SCALE,
+  METER_SCALE,
+  toScaledNumber,
+  mulScaled,
+  subScaled,
+  maxScaled,
+  formatScaled,
+} from "../../lib/decimal.js";
 
 const emptySelection = {
   companyName: "",
@@ -18,19 +27,19 @@ const emptySelection = {
 };
 
 const getTonRemainingMeters = (ton) => {
-  const totalMeters = Number(ton?.totalMeters || 0);
-  const usedMeters = Number(ton?.usedMeters || 0);
-  if (!Number.isFinite(totalMeters) || totalMeters <= 0) return 0;
-  if (!Number.isFinite(usedMeters) || usedMeters <= 0) {
-    return Math.round(Math.max(0, totalMeters));
-  }
-  return Math.round(Math.max(0, totalMeters - usedMeters));
+  return maxScaled(
+    subScaled(ton?.totalMeters || 0, ton?.usedMeters || 0, METER_SCALE),
+    0,
+    METER_SCALE,
+  );
 };
 
-const round2 = (value) => {
-  const numeric = Number(value || 0);
-  if (!Number.isFinite(numeric)) return 0;
-  return Math.round((numeric + Number.EPSILON) * 100) / 100;
+const sanitizeDecimalInput = (raw) => {
+  const normalized = String(raw ?? "").replace(/,/g, ".");
+  const cleaned = normalized.replace(/[^\d.]/g, "");
+  const parts = cleaned.split(".");
+  if (parts.length <= 1) return cleaned;
+  return `${parts[0]}.${parts.slice(1).join("")}`;
 };
 
 export default function Step2RakhtSelection({
@@ -42,6 +51,7 @@ export default function Step2RakhtSelection({
 }) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
+  const isRtlLanguage = detectRtlLanguage(language);
 
   const { data: rakhtRows = [], isLoading } = useQuery({
     queryKey: ["rakht-list"],
@@ -125,15 +135,6 @@ export default function Step2RakhtSelection({
   const handleSubmit = (event) => {
     event.preventDefault();
 
-    if (!selectionItems.length) {
-      toast.error(
-        t("createOrder.selectAtLeastOne", {
-          defaultValue: "Please select at least one order type.",
-        }),
-      );
-      return;
-    }
-
     const rakhtSelections = [];
 
     for (const item of selectionItems) {
@@ -141,38 +142,26 @@ export default function Step2RakhtSelection({
       const companyName = current.companyName || "";
       const brandName = current.brandName || "";
       const rakhtTonId = current.rakhtTonId || "";
-      const requiredMeters = Number(current.requiredMeters || 0);
-      const piecePrice = Number(current.piecePrice || 0);
-      const priceForCustomer = Number(current.priceForCustomer || 0);
+      const requiredMeters = toScaledNumber(
+        current.requiredMeters || 0,
+        METER_SCALE,
+      );
+      const piecePrice = toScaledNumber(current.piecePrice || 0, MONEY_SCALE);
+      const priceForCustomer = toScaledNumber(
+        current.priceForCustomer || 0,
+        MONEY_SCALE,
+      );
 
-      const orderTypeLabel =
-        item.label || getOrderTypeLabel(item.type, language);
+      const hasAnyInput =
+        Boolean(companyName) ||
+        Boolean(brandName) ||
+        Boolean(rakhtTonId) ||
+        String(current.requiredMeters || "").trim() !== "" ||
+        String(current.piecePrice || "").trim() !== "" ||
+        String(current.priceForCustomer || "").trim() !== "";
 
-      if (
-        !companyName ||
-        !brandName ||
-        !rakhtTonId ||
-        requiredMeters <= 0 ||
-        !Number.isFinite(piecePrice) ||
-        piecePrice <= 0
-      ) {
-        toast.error(
-          t("createOrder.completeRakhtSelectionForItem", {
-            type: orderTypeLabel,
-            defaultValue: `Please complete Rakht selection for ${orderTypeLabel}.`,
-          }),
-        );
-        return;
-      }
-
-      if (!Number.isFinite(priceForCustomer) || priceForCustomer <= 0) {
-        toast.error(
-          t("createOrder.priceForCustomerRequired", {
-            type: orderTypeLabel,
-            defaultValue: `Please enter Price for Customer for ${orderTypeLabel}.`,
-          }),
-        );
-        return;
+      if (!hasAnyInput) {
+        continue;
       }
 
       const selectedRakht = (rakhtRows || []).find(
@@ -180,38 +169,20 @@ export default function Step2RakhtSelection({
           item.companyName === companyName && item.brandName === brandName,
       );
 
-      if (!selectedRakht) {
-        toast.error(
-          t("createOrder.selectRakhtFirst", {
-            defaultValue: "Please select company and brand first.",
-          }),
-        );
-        return;
-      }
+      if (!selectedRakht) continue;
 
       const ton = (selectedRakht.tons || []).find(
         (entry) => entry.id === rakhtTonId,
       );
-      if (!ton) {
-        toast.error(
-          t("createOrder.selectTonFirst", {
-            defaultValue: "Please choose a color first.",
-          }),
-        );
-        return;
-      }
+      if (!ton) continue;
 
       const tonAvailable = getTonRemainingMeters(ton);
+      const safeRequiredMeters = maxScaled(requiredMeters, 0, METER_SCALE);
+      const safePiecePrice = maxScaled(piecePrice, 0, MONEY_SCALE);
+      const safePriceForCustomer = maxScaled(priceForCustomer, 0, MONEY_SCALE);
 
-      if (requiredMeters > tonAvailable) {
-        toast.error(
-          t("createOrder.insufficientRakhtMeters", {
-            available: tonAvailable,
-            defaultValue: `Insufficient meters. Available: ${tonAvailable}`,
-          }),
-        );
-        return;
-      }
+      if (safeRequiredMeters <= 0) continue;
+      if (safeRequiredMeters > tonAvailable) continue;
 
       rakhtSelections.push({
         type: item.type,
@@ -222,10 +193,14 @@ export default function Step2RakhtSelection({
         rakhtBrandName: selectedRakht.brandName,
         rakhtColor: ton.name,
         rakhtColorHex: ton.colorHex,
-        requiredMeters,
-        piecePrice,
-        priceForCustomer,
-        totalPriceForCustomer: round2(priceForCustomer * requiredMeters),
+        requiredMeters: safeRequiredMeters,
+        piecePrice: safePiecePrice,
+        priceForCustomer: safePriceForCustomer,
+        totalPriceForCustomer: mulScaled(
+          safePriceForCustomer,
+          safeRequiredMeters,
+          MONEY_SCALE,
+        ),
       });
     }
 
@@ -263,9 +238,18 @@ export default function Step2RakhtSelection({
             const companyName = current.companyName || "";
             const brandName = current.brandName || "";
             const rakhtTonId = current.rakhtTonId || "";
-            const requiredMeters = Number(current.requiredMeters || 0);
-            const piecePrice = Number(current.piecePrice || 0);
-            const priceForCustomer = Number(current.priceForCustomer || 0);
+            const requiredMeters = toScaledNumber(
+              current.requiredMeters || 0,
+              METER_SCALE,
+            );
+            const piecePrice = toScaledNumber(
+              current.piecePrice || 0,
+              MONEY_SCALE,
+            );
+            const priceForCustomer = toScaledNumber(
+              current.priceForCustomer || 0,
+              MONEY_SCALE,
+            );
 
             const filteredByCompany = (rakhtRows || []).filter(
               (item) => item.companyName === companyName,
@@ -305,20 +289,31 @@ export default function Step2RakhtSelection({
               ? getTonRemainingMeters(selectedTon)
               : 0;
 
-            const remainingAfter = Math.round(
-              Math.max(0, availableMeters - requiredMeters),
+            const safeRequiredMeters = maxScaled(
+              requiredMeters,
+              0,
+              METER_SCALE,
             );
-            const computedTotalPrice =
-              Number.isFinite(piecePrice) && Number.isFinite(requiredMeters)
-                ? round2(piecePrice * Math.max(0, requiredMeters))
-                : 0;
-            const computedTotalPriceForCustomer =
-              Number.isFinite(priceForCustomer) &&
-              Number.isFinite(requiredMeters)
-                ? round2(priceForCustomer * Math.max(0, requiredMeters))
-                : 0;
-            const rakhtBenefit =
-              computedTotalPriceForCustomer - computedTotalPrice;
+            const remainingAfter = maxScaled(
+              subScaled(availableMeters, safeRequiredMeters, METER_SCALE),
+              0,
+              METER_SCALE,
+            );
+            const computedTotalPrice = mulScaled(
+              piecePrice,
+              safeRequiredMeters,
+              MONEY_SCALE,
+            );
+            const computedTotalPriceForCustomer = mulScaled(
+              priceForCustomer,
+              safeRequiredMeters,
+              MONEY_SCALE,
+            );
+            const rakhtBenefit = subScaled(
+              computedTotalPriceForCustomer,
+              computedTotalPrice,
+              MONEY_SCALE,
+            );
 
             const typeLabel = item.label;
 
@@ -342,7 +337,6 @@ export default function Step2RakhtSelection({
                 <div style={{ display: "grid", gap: 14 }}>
                   <Field
                     label={t("rakht.companyName", { defaultValue: "Company" })}
-                    required
                   >
                     <Select
                       classNamePrefix="rs"
@@ -380,7 +374,6 @@ export default function Step2RakhtSelection({
 
                   <Field
                     label={t("rakht.brandName", { defaultValue: "Brand Name" })}
-                    required
                   >
                     <Select
                       classNamePrefix="rs"
@@ -420,7 +413,6 @@ export default function Step2RakhtSelection({
                     label={t("rakht.chooseColor", {
                       defaultValue: "Choose Color",
                     })}
-                    required
                   >
                     <Select
                       classNamePrefix="rs"
@@ -495,19 +487,19 @@ export default function Step2RakhtSelection({
                     label={t("rakht.requiredMeters", {
                       defaultValue: "Required Meters",
                     })}
-                    required
                   >
                     <div className="iw">
                       <LuRuler size={14} className="ico" />
                       <input
-                        type="number"
-                        min="0.01"
-                        step="0.01"
+                        type="text"
+                        inputMode="decimal"
                         className="inp"
                         value={current.requiredMeters || ""}
                         onChange={(event) =>
                           updateSelection(item.key, {
-                            requiredMeters: event.target.value,
+                            requiredMeters: sanitizeDecimalInput(
+                              event.target.value,
+                            ),
                           })
                         }
                       />
@@ -555,7 +547,10 @@ export default function Step2RakhtSelection({
                           className="inp"
                           value={
                             computedTotalPrice > 0
-                              ? computedTotalPrice.toLocaleString("en-US")
+                              ? computedTotalPrice.toLocaleString("en-US", {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })
                               : "0"
                           }
                           readOnly
@@ -581,19 +576,19 @@ export default function Step2RakhtSelection({
                       label={t("rakht.priceForCustomer", {
                         defaultValue: "Price for Customer / m",
                       })}
-                      required
                     >
                       <div className="iw">
                         <LuRuler size={14} className="ico" />
                         <input
-                          type="number"
-                          min="0"
-                          step="1"
+                          type="text"
+                          inputMode="decimal"
                           className="inp"
                           value={current.priceForCustomer || ""}
                           onChange={(event) =>
                             updateSelection(item.key, {
-                              priceForCustomer: event.target.value,
+                              priceForCustomer: sanitizeDecimalInput(
+                                event.target.value,
+                              ),
                             })
                           }
                         />
@@ -614,6 +609,10 @@ export default function Step2RakhtSelection({
                             computedTotalPriceForCustomer > 0
                               ? computedTotalPriceForCustomer.toLocaleString(
                                   "en-US",
+                                  {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  },
                                 )
                               : "0"
                           }
@@ -634,27 +633,38 @@ export default function Step2RakhtSelection({
                     <>
                       <div
                         className={`info-box ${requiredMeters > 0 && requiredMeters > availableMeters ? "ib-red" : "ib-gold"}`}
-                        style={{ marginTop: 2 }}
+                        style={{
+                          marginTop: 2,
+                          display: "flex",
+                          justifyContent: isRtlLanguage
+                            ? "flex-end"
+                            : "flex-start",
+                        }}
                       >
                         <div
                           style={{
                             display: "grid",
                             gridTemplateColumns:
-                              "repeat(auto-fit, minmax(150px, 1fr))",
+                              "repeat(auto-fit, minmax(190px, 1fr))",
                             gap: 10,
+                            width: "100%",
+                            maxWidth: 760,
+                            direction: isRtlLanguage ? "rtl" : "ltr",
+                            textAlign: isRtlLanguage ? "right" : "left",
+                            justifyItems: isRtlLanguage ? "end" : "start",
                           }}
                         >
                           <span>
                             {t("rakht.availableMeters", {
                               defaultValue: "Available",
                             })}
-                            : {availableMeters}
+                            : {formatScaled(availableMeters, { scale: 2 })}
                           </span>
                           <span>
                             {t("rakht.remainingAfterSelection", {
                               defaultValue: "Remaining after selection",
                             })}
-                            : {remainingAfter}
+                            : {formatScaled(remainingAfter, { scale: 2 })}
                           </span>
                           <span>
                             {t("rakht.companyName", {
@@ -667,6 +677,9 @@ export default function Step2RakhtSelection({
                               display: "inline-flex",
                               alignItems: "center",
                               gap: 8,
+                              flexDirection: isRtlLanguage
+                                ? "row-reverse"
+                                : "row",
                             }}
                           >
                             <span
@@ -694,6 +707,10 @@ export default function Step2RakhtSelection({
                               :{" "}
                               {computedTotalPriceForCustomer.toLocaleString(
                                 "en-US",
+                                {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                },
                               )}
                             </span>
                           )}
@@ -709,7 +726,11 @@ export default function Step2RakhtSelection({
                             {t("rakht.benefit", {
                               defaultValue: "Rakht Benefit",
                             })}
-                            : {rakhtBenefit.toLocaleString("en-US")}
+                            :{" "}
+                            {rakhtBenefit.toLocaleString("en-US", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
                           </span>
                         </div>
                       </div>
@@ -724,8 +745,10 @@ export default function Step2RakhtSelection({
                           }}
                         >
                           {t("createOrder.insufficientRakhtMeters", {
-                            available: availableMeters,
-                            defaultValue: `Insufficient meters. Available: ${availableMeters}`,
+                            available: formatScaled(availableMeters, {
+                              scale: 2,
+                            }),
+                            defaultValue: `Insufficient meters. Available: ${formatScaled(availableMeters, { scale: 2 })}`,
                           })}
                         </div>
                       ) : null}

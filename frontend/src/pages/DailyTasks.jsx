@@ -18,7 +18,10 @@ import {
 import api from "../lib/api.js";
 import { buildSelectStyles } from "../lib/dailyTasks.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
-import { getOrderDisplayName } from "../lib/orderType.js";
+import {
+  getOrderLabelParts,
+  getOrderPrimaryDisplayName,
+} from "../lib/orderType.js";
 import { Field, PageHeader } from "../components/ui/index.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 
@@ -457,7 +460,12 @@ function DailyTaskForm({ onSuccess }) {
                 >
                   {foundOrders.map((order) => {
                     const isSelected = selectedOrderIds.includes(order.id);
-                    const typeLabel = getOrderDisplayName(order, language);
+                    const orderLabel = getOrderLabelParts(order, language);
+                    const primaryName = getOrderPrimaryDisplayName(
+                      order,
+                      lookupCustomer?.customerName,
+                      language,
+                    );
                     return (
                       <label
                         key={order.id}
@@ -481,7 +489,7 @@ function DailyTaskForm({ onSuccess }) {
                           }
                         />
                         <span style={{ fontSize: 13, fontWeight: 600 }}>
-                          {typeLabel}
+                          {orderLabel.baseTypeLabel} - {primaryName}
                         </span>
                       </label>
                     );
@@ -503,7 +511,18 @@ function DailyTaskForm({ onSuccess }) {
                           (item) => item.id === orderId,
                         );
                         const typeLabel = order
-                          ? getOrderDisplayName(order, language)
+                          ? (() => {
+                              const orderLabel = getOrderLabelParts(
+                                order,
+                                language,
+                              );
+                              const primaryName = getOrderPrimaryDisplayName(
+                                order,
+                                lookupCustomer?.customerName,
+                                language,
+                              );
+                              return `${orderLabel.baseTypeLabel} - ${primaryName}`;
+                            })()
                           : t("common.type", "Type");
                         return (
                           <Field

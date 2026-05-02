@@ -302,7 +302,7 @@ function LangMenu({ onClose }) {
       style={{
         position: "absolute",
         top: "110%",
-        right: 0,
+        insetInlineEnd: 0,
         background: "var(--surface)",
         border: "1px solid var(--border)",
         borderRadius: 10,
@@ -333,7 +333,7 @@ function LangMenu({ onClose }) {
           <span style={{ fontSize: 11, fontWeight: 800 }}>{l.flag}</span>
           {l.label}
           {current === l.code && (
-            <LuCheck size={12} style={{ marginLeft: "auto" }} />
+            <LuCheck size={12} style={{ marginInlineStart: "auto" }} />
           )}
         </div>
       ))}
@@ -357,7 +357,7 @@ function UserMenu({ roleColor, onClose }) {
       style={{
         position: "absolute",
         top: "110%",
-        right: 0,
+        insetInlineEnd: 0,
         background: "var(--surface)",
         border: "1px solid var(--border)",
         borderRadius: 12,
@@ -446,6 +446,7 @@ export default function WorkerLayout() {
   const unreadNotifs = Array.isArray(unreadNotifsRaw) ? unreadNotifsRaw : [];
 
   const currentLang = (i18n.resolvedLanguage || "en").slice(0, 2).toUpperCase();
+  const isRtl = (i18n.dir?.() || "ltr") === "rtl";
 
   return (
     <div
@@ -475,7 +476,7 @@ export default function WorkerLayout() {
             display: "flex",
             alignItems: "center",
             gap: 10,
-            marginRight: "auto",
+            marginInlineEnd: "auto",
           }}
         >
           <div
@@ -544,7 +545,7 @@ export default function WorkerLayout() {
               style={{
                 position: "absolute",
                 top: -5,
-                right: -5,
+                insetInlineEnd: -5,
                 minWidth: 17,
                 height: 17,
                 borderRadius: 99,
@@ -620,6 +621,7 @@ export default function WorkerLayout() {
           width: "100%",
           margin: "0 auto",
           padding: "28px 20px",
+          textAlign: isRtl ? "right" : "left",
         }}
       >
         <Outlet />

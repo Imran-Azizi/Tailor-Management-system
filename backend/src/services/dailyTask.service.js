@@ -1,18 +1,17 @@
 import { prisma } from "../lib/prisma.js";
+import {
+  getAfghanMonthDateRange,
+  getCurrentAfghanMonthYear,
+} from "../lib/afghanistanDate.js";
 import { recalculateOrderBenefit } from "./order.service.js";
 
 const CREATOR_SELECT = { id: true, name: true, accountType: true };
 
-const getCurrentGregorianMonthYear = () => ({
-  month: new Date().getMonth() + 1,
-  year: new Date().getFullYear(),
-});
-
 const assertTaskDateCurrentMonth = (taskDate) => {
-  const current = getCurrentGregorianMonthYear();
-  const d = new Date(taskDate);
-  const taskMonth = d.getMonth() + 1;
-  const taskYear = d.getFullYear();
+  const current = getCurrentAfghanMonthYear();
+  const { month: taskMonth, year: taskYear } = getCurrentAfghanMonthYear(
+    new Date(taskDate),
+  );
   if (taskMonth !== current.month || taskYear !== current.year) {
     throw Object.assign(
       new Error("New entries are allowed only in the current month."),
@@ -22,10 +21,10 @@ const assertTaskDateCurrentMonth = (taskDate) => {
 };
 
 const assertTaskDateReadOnly = (taskDate) => {
-  const current = getCurrentGregorianMonthYear();
-  const d = new Date(taskDate);
-  const taskMonth = d.getMonth() + 1;
-  const taskYear = d.getFullYear();
+  const current = getCurrentAfghanMonthYear();
+  const { month: taskMonth, year: taskYear } = getCurrentAfghanMonthYear(
+    new Date(taskDate),
+  );
   if (taskMonth !== current.month || taskYear !== current.year) {
     throw Object.assign(
       new Error(
@@ -67,9 +66,23 @@ function endOfWeek(date) {
   return endOfDay(start);
 }
 
-function resolveReportRange({ reportType = "monthly", date, from, to }) {
+function resolveReportRange({
+  reportType = "monthly",
+  date,
+  from,
+  to,
+  month,
+  year,
+}) {
   const anchorDate = parseDateInput(date) || new Date();
   const currentType = String(reportType || "monthly").toLowerCase();
+  const parsedMonth = month != null ? Number(month) : null;
+  const parsedYear = year != null ? Number(year) : null;
+  const hasSelectedMonth =
+    parsedMonth &&
+    parsedYear &&
+    Number.isFinite(parsedMonth) &&
+    Number.isFinite(parsedYear);
 
   if (currentType === "custom") {
     const parsedFrom = parseDateInput(from);
@@ -104,6 +117,17 @@ function resolveReportRange({ reportType = "monthly", date, from, to }) {
   }
 
   if (currentType === "yearly") {
+    if (parsedYear && Number.isFinite(parsedYear)) {
+      const yearStart = getAfghanMonthDateRange({ month: 1, year: parsedYear });
+      const yearEnd = getAfghanMonthDateRange({ month: 12, year: parsedYear });
+      return {
+        reportType: currentType,
+        from: yearStart.start,
+        to: yearEnd.end,
+        granularity: "month",
+      };
+    }
+
     const start = new Date(anchorDate.getFullYear(), 0, 1, 0, 0, 0, 0);
     const end = new Date(anchorDate.getFullYear(), 11, 31, 23, 59, 59, 999);
     return {
@@ -114,24 +138,24 @@ function resolveReportRange({ reportType = "monthly", date, from, to }) {
     };
   }
 
-  const monthStart = new Date(
-    anchorDate.getFullYear(),
-    anchorDate.getMonth(),
-    1,
-    0,
-    0,
-    0,
-    0,
-  );
-  const monthEnd = new Date(
-    anchorDate.getFullYear(),
-    anchorDate.getMonth() + 1,
-    0,
-    23,
-    59,
-    59,
-    999,
-  );
+  const monthRange = hasSelectedMonth
+    ? getAfghanMonthDateRange({ month: parsedMonth, year: parsedYear })
+    : null;
+
+  const monthStart =
+    monthRange?.start ||
+    new Date(anchorDate.getFullYear(), anchorDate.getMonth(), 1, 0, 0, 0, 0);
+  const monthEnd =
+    monthRange?.end ||
+    new Date(
+      anchorDate.getFullYear(),
+      anchorDate.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999,
+    );
 
   return {
     reportType: "monthly",
@@ -280,8 +304,10 @@ export const getDailyTasks = async ({
     Number.isFinite(parsedMonth) &&
     Number.isFinite(parsedYear)
   ) {
-    const monthStart = new Date(parsedYear, parsedMonth - 1, 1, 0, 0, 0, 0);
-    const monthEnd = new Date(parsedYear, parsedMonth, 0, 23, 59, 59, 999);
+    const { start: monthStart, end: monthEnd } = getAfghanMonthDateRange({
+      month: parsedMonth,
+      year: parsedYear,
+    });
     where.taskDate = { gte: monthStart, lte: monthEnd };
   }
 
@@ -387,8 +413,22 @@ export const deleteDailyTask = async (id) => {
   });
 };
 
-export const getDailyTaskReport = async ({ reportType, date, from, to }) => {
-  const resolved = resolveReportRange({ reportType, date, from, to });
+export const getDailyTaskReport = async ({
+  reportType,
+  date,
+  from,
+  to,
+  month,
+  year,
+}) => {
+  const resolved = resolveReportRange({
+    reportType,
+    date,
+    from,
+    to,
+    month,
+    year,
+  });
 
   const tasks = await prisma.dailyTask.findMany({
     where: {
@@ -417,6 +457,8 @@ export const getDailyTaskReport = async ({ reportType, date, from, to }) => {
       from: resolved.from.toISOString(),
       to: resolved.to.toISOString(),
       date: parseDateInput(date)?.toISOString() || null,
+      month: month != null ? Number(month) : null,
+      year: year != null ? Number(year) : null,
       granularity: resolved.granularity,
     },
     summary: {

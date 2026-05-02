@@ -19,7 +19,10 @@ import {
 import api from "../lib/api.js";
 import { parseNumberLocale } from "../lib/normalize.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
-import { getOrderDisplayName } from "../lib/orderType.js";
+import {
+  getOrderLabelParts,
+  getOrderPrimaryDisplayName,
+} from "../lib/orderType.js";
 import { formatUserNotificationMessage } from "../lib/notifications.js";
 import { formatDateTimeLocale, formatSystemDate } from "../lib/locale.js";
 import { formatCurrency } from "../lib/currency.js";
@@ -310,7 +313,7 @@ function ConfirmActionModal({ config, pending, onClose, onConfirm }) {
           style={{
             marginTop: 16,
             display: "flex",
-            justifyContent: "flex-end",
+            justifyContent: "end",
             gap: 8,
           }}
         >
@@ -336,6 +339,12 @@ function ConfirmActionModal({ config, pending, onClose, onConfirm }) {
 
 function OrderDetailsModal({ order, language, t, onClose }) {
   if (!order) return null;
+  const orderLabel = getOrderLabelParts(order, language);
+  const orderPrimaryName = getOrderPrimaryDisplayName(
+    order,
+    order.customer?.firstName,
+    language,
+  );
   const payment = getRolePaymentState(order, order?.assignedTo?.accountType);
   const measure = getMeasure(order);
   const paidToWorker = payment.status === "PAID_TO_WORKER";
@@ -366,7 +375,7 @@ function OrderDetailsModal({ order, language, t, onClose }) {
     color: "var(--text3)",
     textTransform: "uppercase",
     letterSpacing: ".04em",
-    textAlign: "left",
+    textAlign: "start",
     padding: "9px 10px",
     background: "var(--surface2)",
     borderBottom: "1px solid var(--border)",
@@ -410,13 +419,12 @@ function OrderDetailsModal({ order, language, t, onClose }) {
         >
           <div>
             <h3 style={{ margin: 0, fontSize: 19, fontWeight: 800 }}>
-              {order.customer?.firstName || "-"}
+              {orderPrimaryName}
             </h3>
             <p
               style={{ margin: "6px 0 0", fontSize: 13, color: "var(--text3)" }}
             >
-              #{order.customer?.billNumber || "-"} -{" "}
-              {getOrderDisplayName(order, language)}
+              #{order.customer?.billNumber || "-"} - {orderLabel.baseTypeLabel}
             </p>
           </div>
           <button className="btn btn-outline btn-sm" onClick={onClose}>
@@ -1057,6 +1065,7 @@ export default function WorkerPanel() {
   const confirmConfig = useMemo(() => {
     if (!confirmAction?.order) return null;
     const { order } = confirmAction;
+    const orderLabel = getOrderLabelParts(order, language);
     if (confirmAction.type === "receive") {
       return {
         title: t("workerPanel.receiveOrder", "Receive Order"),
@@ -1108,11 +1117,21 @@ export default function WorkerPanel() {
           </div>
           <div>
             <b>{t("workerPanel.orderType", "Order Type")}:</b>{" "}
-            {getOrderDisplayName(order, language)}
+            {orderLabel.baseTypeLabel}
           </div>
+          {orderLabel.customName ? (
+            <div>
+              <b>{t("createOrder.nameNewSet", "Measurement Name")}:</b>{" "}
+              {orderLabel.customName}
+            </div>
+          ) : null}
           <div>
             <b>{t("common.customer", "Customer")}:</b>{" "}
-            {order.customer?.firstName || "-"}
+            {getOrderPrimaryDisplayName(
+              order,
+              order.customer?.firstName,
+              language,
+            )}
           </div>
           <div style={{ color: "#15803d", fontWeight: 700 }}>
             {t(
@@ -1126,6 +1145,7 @@ export default function WorkerPanel() {
   }, [confirmAction, language, t, user?.name]);
 
   const renderOrderCard = (order, source = "list") => {
+    const orderLabel = getOrderLabelParts(order, language);
     const status = getStatus(order, user?.accountType);
     const isCompleted =
       isWorkerCompletedForRole(order, user?.accountType) ||
@@ -1166,26 +1186,18 @@ export default function WorkerPanel() {
               flexShrink: 0,
             }}
           >
-            {getOrderDisplayName(order, language)}
+            {orderLabel.baseTypeLabel}
           </span>
-          {order.orderName && (
-            <div
-              style={{
-                fontSize: 11,
-                color: "var(--text3)",
-                textAlign: "right",
-                flexShrink: 0,
-              }}
-            >
-              {order.orderName}
-            </div>
-          )}
         </div>
 
         {/* ── Customer identity block ── */}
         <div style={{ display: "grid", gap: 2 }}>
           <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text1)" }}>
-            {order.customer?.firstName || "-"}
+            {getOrderPrimaryDisplayName(
+              order,
+              order.customer?.firstName,
+              language,
+            )}
           </div>
           <div
             style={{
@@ -1254,7 +1266,7 @@ export default function WorkerPanel() {
               style={{
                 fontSize: 11,
                 color: "var(--text3)",
-                marginLeft: 4,
+                marginInlineStart: 4,
                 fontWeight: 400,
               }}
             >
@@ -1350,6 +1362,7 @@ export default function WorkerPanel() {
   };
 
   const renderSearchResultCard = (order) => {
+    const orderLabel = getOrderLabelParts(order, language);
     const receivedByCurrentUser =
       getRoleOrderState(order, user?.accountType).receivedById === user?.id;
     const canReceive = canOrderBeReceived(order);
@@ -1363,7 +1376,11 @@ export default function WorkerPanel() {
         <div style={{ display: "grid", gap: 4 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text1)" }}>
             {t("common.customer", "Customer")}:{" "}
-            {order.customer?.firstName || "-"}
+            {getOrderPrimaryDisplayName(
+              order,
+              order.customer?.firstName,
+              language,
+            )}
           </div>
           <div style={{ fontSize: 12, color: "var(--text2)" }}>
             {t("orders.billNumber", "Bill Number")}: #
@@ -1371,7 +1388,7 @@ export default function WorkerPanel() {
           </div>
           <div style={{ fontSize: 12, color: "var(--text2)" }}>
             {t("workerPanel.orderType", "Order Type")}:{" "}
-            {getOrderDisplayName(order, language)}
+            {orderLabel.baseTypeLabel}
           </div>
           {(order?.rakhtBrandName || order?.rakhtColor) && (
             <div className="order-mobile-rakht">
@@ -1596,7 +1613,7 @@ export default function WorkerPanel() {
                 size={14}
                 style={{
                   position: "absolute",
-                  left: 10,
+                  insetInlineStart: 10,
                   top: "50%",
                   transform: "translateY(-50%)",
                   color: "var(--text3)",
@@ -1604,7 +1621,7 @@ export default function WorkerPanel() {
               />
               <input
                 className="inp"
-                style={{ paddingLeft: 32 }}
+                style={{ paddingInlineStart: 32 }}
                 value={billSearch}
                 onChange={(e) => setBillSearch(e.target.value)}
                 placeholder={t(
@@ -1680,6 +1697,7 @@ export default function WorkerPanel() {
           {newAssignedOrders.length > 0 && (
             <div style={{ padding: 12, display: "grid", gap: 8 }}>
               {newAssignedOrders.slice(0, 6).map((order) => {
+                const orderLabel = getOrderLabelParts(order, language);
                 const canReceive = canOrderBeReceived(order);
 
                 return (
@@ -1705,11 +1723,17 @@ export default function WorkerPanel() {
                           color: "var(--text1)",
                         }}
                       >
-                        {order.customer?.firstName || "-"} #
-                        {order.customer?.billNumber || "-"}
+                        #{order.customer?.billNumber || "-"}
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--text2)" }}>
+                        {getOrderPrimaryDisplayName(
+                          order,
+                          order.customer?.firstName,
+                          language,
+                        )}
                       </div>
                       <div style={{ fontSize: 12, color: "var(--text3)" }}>
-                        {getOrderDisplayName(order, language)}
+                        {orderLabel.baseTypeLabel}
                       </div>
                       {order.assignmentPrice != null && (
                         <div

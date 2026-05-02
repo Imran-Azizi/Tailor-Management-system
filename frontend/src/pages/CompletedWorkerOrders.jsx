@@ -15,7 +15,10 @@ import {
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { parseNumberLocale } from "../lib/normalize.js";
-import { getOrderDisplayName } from "../lib/orderType.js";
+import {
+  getOrderLabelParts,
+  getOrderPrimaryDisplayName,
+} from "../lib/orderType.js";
 import { formatDateLocale } from "../lib/locale.js";
 import { formatCurrency } from "../lib/currency.js";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -33,6 +36,7 @@ import {
 } from "../components/ui/index.jsx";
 
 const LIMIT = 15;
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 function paymentBadge(status, t) {
   if (status === "PAID_TO_WORKER") {
@@ -49,10 +53,64 @@ function getPaymentRowKey(order) {
   return order?.rowId || `${order?.id}:${order?.workerRole || "WORKER"}`;
 }
 
+function getPaymentEditUiState(order) {
+  const isAlreadyPaid = order?.workerPaymentStatus === "PAID_TO_WORKER";
+  const canEditWithinWindow = Boolean(order?.canEditWorkerPayment);
+  const expiresAt = order?.workerPaymentEditExpiresAt
+    ? new Date(order.workerPaymentEditExpiresAt)
+    : null;
+  const fallbackPaidAt = order?.workerPaidAt
+    ? new Date(order.workerPaidAt)
+    : null;
+  const fallbackExpiresAt =
+    !expiresAt &&
+    isAlreadyPaid &&
+    fallbackPaidAt &&
+    Number.isFinite(fallbackPaidAt.getTime())
+      ? new Date(fallbackPaidAt.getTime() + DAY_IN_MS)
+      : null;
+  const effectiveExpiresAt = expiresAt || fallbackExpiresAt;
+
+  if (!isAlreadyPaid) {
+    return {
+      isAlreadyPaid,
+      canEditWithinWindow: false,
+      isExpired: false,
+      canSubmit: true,
+      canEditAmount: true,
+      actionLabel: "save",
+      effectiveExpiresAt: null,
+    };
+  }
+
+  if (canEditWithinWindow) {
+    return {
+      isAlreadyPaid,
+      canEditWithinWindow: true,
+      isExpired: false,
+      canSubmit: true,
+      canEditAmount: true,
+      actionLabel: "edit",
+      effectiveExpiresAt,
+    };
+  }
+
+  return {
+    isAlreadyPaid,
+    canEditWithinWindow: false,
+    isExpired: true,
+    canSubmit: false,
+    canEditAmount: false,
+    actionLabel: "expired",
+    effectiveExpiresAt,
+  };
+}
+
 export default function CompletedWorkerOrders() {
   const { t, i18n } = useTranslation();
   const qc = useQueryClient();
   const language = i18n.resolvedLanguage || i18n.language || "en";
+  const isRtl = (i18n.dir?.() || "ltr") === "rtl";
   const { isAdmin } = useAuth();
   const { viewMonth, viewYear } = useMonth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -134,6 +192,11 @@ export default function CompletedWorkerOrders() {
       qc.invalidateQueries({ queryKey: ["completed-worker-orders"] });
       qc.invalidateQueries({ queryKey: ["worker-panel-orders"] });
       qc.invalidateQueries({ queryKey: ["worker-panel-transaction-summary"] });
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["order-detail"] });
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["analytics"] });
+      qc.invalidateQueries({ queryKey: ["analytics-dashboard"] });
       setConfirmPayment(null);
       toast.success(
         t(
@@ -210,6 +273,17 @@ export default function CompletedWorkerOrders() {
   };
 
   const handleSavePayment = (order) => {
+    const editUiState = getPaymentEditUiState(order);
+    if (!editUiState.canSubmit) {
+      toast.error(
+        t(
+          "completedWorkerOrders.paymentEditExpired",
+          "Edit window expired. Payments can only be updated within 24 hours.",
+        ),
+      );
+      return;
+    }
+
     const rowKey = getPaymentRowKey(order);
     const rawValue = pendingPayments[rowKey];
     const parsedAmount = parseNumberLocale(String(rawValue ?? ""));
@@ -224,7 +298,11 @@ export default function CompletedWorkerOrders() {
       return;
     }
 
-    setConfirmPayment({ order, amount: parsedAmount });
+    setConfirmPayment({
+      order,
+      amount: parsedAmount,
+      mode: editUiState.canEditWithinWindow ? "edit" : "create",
+    });
   };
 
   const submitConfirmedPayment = () => {
@@ -392,7 +470,7 @@ export default function CompletedWorkerOrders() {
                 size={14}
                 style={{
                   position: "absolute",
-                  left: 10,
+                  insetInlineStart: 10,
                   top: "50%",
                   transform: "translateY(-50%)",
                   color: "var(--text3)",
@@ -406,7 +484,7 @@ export default function CompletedWorkerOrders() {
                   "completedWorkerOrders.searchPlaceholder",
                   "Search by worker, customer, or bill number",
                 )}
-                style={{ paddingLeft: 32 }}
+                style={{ paddingInlineStart: 32 }}
               />
             </div>
           </div>
@@ -591,9 +669,10 @@ export default function CompletedWorkerOrders() {
               </thead>
               <tbody>
                 {rows.map((order) => {
+                  const orderLabel = getOrderLabelParts(order, language);
                   const rowKey = getPaymentRowKey(order);
-                  const isAlreadyPaid =
-                    order.workerPaymentStatus === "PAID_TO_WORKER";
+                  const editUiState = getPaymentEditUiState(order);
+                  const isAlreadyPaid = editUiState.isAlreadyPaid;
                   const paymentInputValue =
                     pendingPayments[rowKey] ??
                     (order.workerPaymentAmount != null
@@ -623,14 +702,18 @@ export default function CompletedWorkerOrders() {
                       <td>
                         <div style={{ display: "grid", gap: 3 }}>
                           <strong style={{ color: "var(--text1)" }}>
-                            {order.customer?.firstName || "-"}
+                            {getOrderPrimaryDisplayName(
+                              order,
+                              order.customer?.firstName,
+                              language,
+                            )}
                           </strong>
                           <span style={{ fontSize: 12, color: "var(--text3)" }}>
                             {order.customer?.phoneNumber || "-"}
                           </span>
                         </div>
                       </td>
-                      <td>{getOrderDisplayName(order, language)}</td>
+                      <td>{orderLabel.baseTypeLabel}</td>
                       <td>
                         {formatDateLocale(
                           order.completedAt || order.updatedAt,
@@ -659,9 +742,31 @@ export default function CompletedWorkerOrders() {
                               "Enter amount",
                             )}
                             inputMode="decimal"
-                            disabled={isAlreadyPaid}
+                            disabled={!editUiState.canEditAmount}
                             style={{ minWidth: 140 }}
                           />
+                          {isAlreadyPaid && editUiState.canEditWithinWindow ? (
+                            <div
+                              style={{
+                                marginTop: 4,
+                                fontSize: 11,
+                                color: "var(--text3)",
+                              }}
+                            >
+                              {t(
+                                "completedWorkerOrders.editWindowUntil",
+                                "Editable until {{time}}",
+                                {
+                                  time: editUiState.effectiveExpiresAt
+                                    ? formatDateLocale(
+                                        editUiState.effectiveExpiresAt,
+                                        language,
+                                      )
+                                    : "-",
+                                },
+                              )}
+                            </div>
+                          ) : null}
                         </div>
                       </td>
                       <td>
@@ -669,15 +774,19 @@ export default function CompletedWorkerOrders() {
                           type="button"
                           className={`btn btn-primary btn-sm payment-btn ${isAlreadyPaid ? "is-paid" : ""}`}
                           onClick={() => handleSavePayment(order)}
-                          disabled={payWorkerMut.isPending || isAlreadyPaid}
+                          disabled={
+                            payWorkerMut.isPending || !editUiState.canSubmit
+                          }
                         >
                           <LuCircleDollarSign size={14} />
-                          {isAlreadyPaid
-                            ? t("completedWorkerOrders.paymentLocked", "Paid")
-                            : t(
+                          {!isAlreadyPaid
+                            ? t(
                                 "completedWorkerOrders.savePayment",
                                 "Save Payment",
-                              )}
+                              )
+                            : editUiState.canEditWithinWindow
+                              ? t("common.edit", "Edit")
+                              : t("completedWorkerOrders.expired", "Expired")}
                         </button>
                       </td>
                     </tr>
@@ -703,8 +812,12 @@ export default function CompletedWorkerOrders() {
           setConfirmPayment(null);
         }}
         title={t(
-          "completedWorkerOrders.confirmPaymentTitle",
-          "Confirm Payment",
+          confirmPayment?.mode === "edit"
+            ? "completedWorkerOrders.confirmEditPaymentTitle"
+            : "completedWorkerOrders.confirmPaymentTitle",
+          confirmPayment?.mode === "edit"
+            ? "Confirm Payment Update"
+            : "Confirm Payment",
         )}
         maxW={500}
       >
@@ -712,8 +825,12 @@ export default function CompletedWorkerOrders() {
           <div style={{ display: "grid", gap: 12 }}>
             <p style={{ margin: 0, color: "var(--text2)", fontSize: 13 }}>
               {t(
-                "completedWorkerOrders.confirmPaymentMessage",
-                "This payment will be locked after confirmation and cannot be updated.",
+                confirmPayment.mode === "edit"
+                  ? "completedWorkerOrders.confirmEditPaymentMessage"
+                  : "completedWorkerOrders.confirmPaymentMessage",
+                confirmPayment.mode === "edit"
+                  ? "This payment update is allowed only within 24 hours from the original payment time."
+                  : "This payment can be updated for up to 24 hours after confirmation.",
               )}
             </p>
 
@@ -742,12 +859,28 @@ export default function CompletedWorkerOrders() {
               </div>
               <div>
                 <b>{t("common.customer", "Customer")}:</b>{" "}
-                {confirmPayment.order.customer?.firstName || "-"}
+                {getOrderPrimaryDisplayName(
+                  confirmPayment.order,
+                  confirmPayment.order.customer?.firstName,
+                  language,
+                )}
               </div>
               <div>
                 <b>{t("workerPanel.orderType", "Order Type")}:</b>{" "}
-                {getOrderDisplayName(confirmPayment.order, language)}
+                {
+                  getOrderLabelParts(confirmPayment.order, language)
+                    .baseTypeLabel
+                }
               </div>
+              {getOrderLabelParts(confirmPayment.order, language).customName ? (
+                <div>
+                  <b>{t("createOrder.nameNewSet", "Measurement Name")}:</b>{" "}
+                  {
+                    getOrderLabelParts(confirmPayment.order, language)
+                      .customName
+                  }
+                </div>
+              ) : null}
               <div>
                 <b>
                   {t("completedWorkerOrders.paymentAmount", "Payment Amount")}:
@@ -757,7 +890,11 @@ export default function CompletedWorkerOrders() {
             </div>
 
             <div
-              style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}
+              style={{
+                display: "flex",
+                justifyContent: isRtl ? "flex-start" : "flex-end",
+                gap: 8,
+              }}
             >
               <button
                 type="button"
@@ -777,8 +914,12 @@ export default function CompletedWorkerOrders() {
                 {payWorkerMut.isPending
                   ? t("common.loading", "Loading...")
                   : t(
-                      "completedWorkerOrders.confirmPayment",
-                      "Confirm Payment",
+                      confirmPayment.mode === "edit"
+                        ? "completedWorkerOrders.confirmEditPayment"
+                        : "completedWorkerOrders.confirmPayment",
+                      confirmPayment.mode === "edit"
+                        ? "Confirm Update"
+                        : "Confirm Payment",
                     )}
               </button>
             </div>

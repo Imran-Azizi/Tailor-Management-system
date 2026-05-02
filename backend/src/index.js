@@ -15,7 +15,9 @@ import analyticsRoutes from "./routes/analytics.routes.js";
 import transactionRoutes from "./routes/transaction.routes.js";
 import dailyTaskRoutes from "./routes/dailyTask.routes.js";
 import rakhtRoutes from "./routes/rakht.routes.js";
+import backupRoutes from "./routes/backup.routes.js";
 import { startCronJobs } from "./cron/notifications.cron.js";
+import { startBackupCron } from "./cron/backup.cron.js";
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -49,6 +51,7 @@ app.use("/api/analytics", analyticsRoutes);
 app.use("/api/transactions", transactionRoutes);
 app.use("/api/daily-tasks", dailyTaskRoutes);
 app.use("/api/rakhts", rakhtRoutes);
+app.use("/api/backups", backupRoutes);
 
 // Health check
 app.get("/api/health", (req, res) =>
@@ -58,6 +61,7 @@ app.get("/api/health", (req, res) =>
 app.use(errorHandler);
 
 startCronJobs();
+startBackupCron();
 
 /**
  * Kill any external process holding the given port.

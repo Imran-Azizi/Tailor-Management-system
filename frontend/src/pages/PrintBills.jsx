@@ -12,6 +12,10 @@ import {
   printElement,
 } from "../components/order/OrderDocumentPack.jsx";
 import {
+  getOrderLabelParts,
+  getOrderPrimaryDisplayName,
+} from "../lib/orderType.js";
+import {
   parseNumberLocale,
   normalizeText,
   normalizePhone,
@@ -218,7 +222,11 @@ export default function PrintBills() {
     `preview-tailor-${order?.id || `${order?.type || "order"}-${index}`}`;
 
   const orders = customer?.orders || [];
-  const orderMeta = buildOrderItemMeta(orders, currentLanguage);
+  const orderMeta = buildOrderItemMeta(
+    orders,
+    currentLanguage,
+    customer?.firstName,
+  );
   const isBillEmergency = orders.some((order) => order.isEmergency);
   const emergencyTypes = Array.from(
     new Set(orders.map((order) => getOrderDisplayName(order, currentLanguage))),
@@ -460,7 +468,7 @@ export default function PrintBills() {
                   {orders.length > 0 && (
                     <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
                       {orderMeta.map((meta) => {
-                        const { order, index, itemLabel } = meta;
+                        const { order, index, itemLabel, primaryName } = meta;
                         const isSelected = selectedOrder?.id === order.id;
                         return (
                           <div
@@ -483,6 +491,17 @@ export default function PrintBills() {
                                 >
                                   {itemLabel}
                                 </span>
+                                {primaryName ? (
+                                  <span
+                                    style={{
+                                      fontSize: 12,
+                                      color: "var(--text2)",
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    {primaryName}
+                                  </span>
+                                ) : null}
                               </div>
                               <button
                                 type="button"
@@ -619,7 +638,7 @@ export default function PrintBills() {
   );
 }
 
-function buildOrderItemMeta(orders = [], language) {
+function buildOrderItemMeta(orders = [], language, customerName) {
   const typeCounts = {};
   const totalByType = (orders || []).reduce((acc, order) => {
     const typeKey = order?.type || "ITEM";
@@ -632,14 +651,20 @@ function buildOrderItemMeta(orders = [], language) {
     typeCounts[typeKey] = (typeCounts[typeKey] || 0) + 1;
     const itemNumber = typeCounts[typeKey];
 
+    const parts = getOrderLabelParts(order, language, {
+      totalByType: totalByType[typeKey],
+      sequenceByType: itemNumber,
+    });
     return {
       order,
       index,
       itemNumber,
-      itemLabel: getOrderDisplayName(order, language, {
+      itemLabel: parts.baseTypeLabel,
+      primaryName: getOrderPrimaryDisplayName(order, customerName, language, {
         totalByType: totalByType[typeKey],
         sequenceByType: itemNumber,
       }),
+      fullLabel: parts.fullLabel,
     };
   });
 }

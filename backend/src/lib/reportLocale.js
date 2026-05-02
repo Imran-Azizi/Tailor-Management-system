@@ -5,10 +5,12 @@ export function normalizeReportLanguage(language = "en") {
   return "en";
 }
 
+const AFGHANISTAN_TIMEZONE = "Asia/Kabul";
+
 export function getReportLocaleTag(language = "en") {
   const normalized = normalizeReportLanguage(language);
-  if (normalized === "dari") return "fa-AF-u-nu-latn";
-  if (normalized === "pashto") return "ps-AF-u-nu-latn";
+  if (normalized === "dari") return "fa-AF-u-ca-persian-nu-latn";
+  if (normalized === "pashto") return "ps-AF-u-ca-persian-nu-latn";
   return "en-US-u-nu-latn";
 }
 
@@ -17,16 +19,47 @@ export function isRtlReportLanguage(language = "en") {
   return normalized === "dari" || normalized === "pashto";
 }
 
+function hasTimeParts(options = {}) {
+  return (
+    options.hour !== undefined ||
+    options.minute !== undefined ||
+    options.second !== undefined ||
+    options.dayPeriod !== undefined
+  );
+}
+
+function withReportDateDefaults(language = "en", options = {}) {
+  const normalized = normalizeReportLanguage(language);
+  const next = { ...options };
+
+  if (
+    (normalized === "dari" || normalized === "pashto") &&
+    !next.timeZone
+  ) {
+    next.timeZone = AFGHANISTAN_TIMEZONE;
+  }
+
+  if (
+    hasTimeParts(next) &&
+    next.hour12 === undefined &&
+    next.hourCycle === undefined
+  ) {
+    next.hourCycle = "h23";
+  }
+
+  return next;
+}
+
 export function formatReportDateTime(value, language = "en", options = {}) {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
   return new Intl.DateTimeFormat(getReportLocaleTag(language), {
     year: "numeric",
-    month: "short",
+    month: "long",
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
-    ...options,
+    ...withReportDateDefaults(language, options),
   }).format(date);
 }
 
@@ -53,7 +86,7 @@ export const REPORT_TEXT = {
       orderRecords: "Order Records",
       noOrders: "No orders found for this month.",
       continued: "continued",
-      footerPrefix: "Khan Rahimi Tailor System",
+      footerPrefix: "Hoshmand Safi Tailor System",
       totals: "TOTALS",
       columns: {
         num: "#",

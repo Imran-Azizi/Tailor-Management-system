@@ -38,11 +38,29 @@ export function getOrderTypeOptions(language = "en") {
   }));
 }
 
+function getOrderTypeTotals(order = {}, options = {}) {
+  const parsedTotal = Number(order.orderTypeTotal ?? options.totalByType ?? 1);
+  const parsedSequence = Number(
+    order.orderTypeSequence ?? options.sequenceByType ?? 1,
+  );
+
+  const total =
+    Number.isFinite(parsedTotal) && parsedTotal > 0 ? parsedTotal : 1;
+  const sequence =
+    Number.isFinite(parsedSequence) && parsedSequence > 0 ? parsedSequence : 1;
+
+  return { total, sequence };
+}
+
 function normalizeNameForCompare(value) {
   return String(value || "")
     .toLowerCase()
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function namesMatch(a, b) {
+  return normalizeNameForCompare(a) === normalizeNameForCompare(b);
 }
 
 function escapeRegex(value) {
@@ -56,21 +74,89 @@ function stripRepeatedBasePrefix(customName, baseLabel) {
   return match?.[1]?.trim() || "";
 }
 
-export function getOrderDisplayName(order, language = "en", options = {}) {
-  if (!order || typeof order !== "object") return "-";
+function isNumericOnlyLabel(value) {
+  return /^\d+$/.test(String(value || "").trim());
+}
 
-  const typeLabel = getOrderTypeLabel(order.type, language);
-  const parsedTotal = Number(order.orderTypeTotal ?? options.totalByType ?? 1);
-  const parsedSequence = Number(
-    order.orderTypeSequence ?? options.sequenceByType ?? 1,
+function isDefaultGeneratedName(rawName, typeLabel, sequencedLabel) {
+  const normalizedRaw = normalizeNameForCompare(rawName);
+  const normalizedType = normalizeNameForCompare(typeLabel);
+  const normalizedSequenced = normalizeNameForCompare(sequencedLabel);
+
+  if (!normalizedRaw) return false;
+  if (
+    normalizedRaw === normalizedType ||
+    normalizedRaw === normalizedSequenced
+  ) {
+    return true;
+  }
+
+  const compactRaw = normalizedRaw.replace(/\s+/g, "");
+  const compactType = normalizedType.replace(/\s+/g, "");
+  const compactSequenced = normalizedSequenced.replace(/\s+/g, "");
+  if (compactRaw === compactType || compactRaw === compactSequenced) {
+    return true;
+  }
+
+  return false;
+}
+
+function getTypeLabelCandidates(order, language = "en", options = {}) {
+  const type = order?.type;
+  const { sequence } = getOrderTypeTotals(order, options);
+  const candidates = new Set();
+
+  const addLabel = (label) => {
+    const clean = String(label || "").trim();
+    if (!clean) return;
+    candidates.add(clean);
+    if (Number.isFinite(sequence) && sequence > 0) {
+      candidates.add(`${clean} ${sequence}`);
+    }
+  };
+
+  addLabel(getOrderTypeBaseLabel(order, language));
+  addLabel(getOrderTypeWithSequenceLabel(order, language, options));
+
+  if (type && ORDER_TYPE_LABELS.en?.[type]) {
+    Object.values(ORDER_TYPE_LABELS).forEach((labels) => {
+      addLabel(labels?.[type]);
+    });
+  }
+
+  return Array.from(candidates);
+}
+
+function isDefaultGeneratedByAnyLabel(rawName, labelCandidates = []) {
+  return labelCandidates.some((label) =>
+    isDefaultGeneratedName(rawName, label, label),
   );
+}
 
-  const total =
-    Number.isFinite(parsedTotal) && parsedTotal > 0 ? parsedTotal : 1;
-  const sequence =
-    Number.isFinite(parsedSequence) && parsedSequence > 0 ? parsedSequence : 1;
+export function getOrderTypeBaseLabel(orderOrType, language = "en") {
+  if (
+    orderOrType &&
+    typeof orderOrType === "object" &&
+    !Array.isArray(orderOrType)
+  ) {
+    return getOrderTypeLabel(orderOrType.type, language);
+  }
+  return getOrderTypeLabel(orderOrType, language);
+}
 
-  const baseLabel = total > 1 ? `${typeLabel} ${sequence}` : typeLabel;
+export function getOrderTypeWithSequenceLabel(
+  order,
+  language = "en",
+  options = {},
+) {
+  if (!order || typeof order !== "object") return "-";
+  const typeLabel = getOrderTypeBaseLabel(order, language);
+  const { total, sequence } = getOrderTypeTotals(order, options);
+  return total > 1 ? `${typeLabel} ${sequence}` : typeLabel;
+}
+
+export function getOrderCustomName(order, language = "en", options = {}) {
+  if (!order || typeof order !== "object") return "";
 
   const rawCustomName =
     typeof order.orderName === "string"
@@ -79,26 +165,88 @@ export function getOrderDisplayName(order, language = "en", options = {}) {
         ? order.orderDisplayName.trim()
         : "";
 
-  if (!rawCustomName) return baseLabel;
+  if (!rawCustomName) return "";
 
-  const normalizedBase = normalizeNameForCompare(baseLabel);
-  const normalizedCustom = normalizeNameForCompare(rawCustomName);
-  if (!normalizedCustom || normalizedCustom === normalizedBase) {
-    return baseLabel;
+  const typeLabel = getOrderTypeBaseLabel(order, language);
+  const baseWithSequence = getOrderTypeWithSequenceLabel(
+    order,
+    language,
+    options,
+  );
+  const labelCandidates = getTypeLabelCandidates(order, language, options);
+  const normalizedRaw = normalizeNameForCompare(rawCustomName);
+
+  if (!normalizedRaw) return "";
+  if (
+    isDefaultGeneratedName(rawCustomName, typeLabel, baseWithSequence) ||
+    isDefaultGeneratedByAnyLabel(rawCustomName, labelCandidates)
+  ) {
+    return "";
   }
+  if (isNumericOnlyLabel(rawCustomName)) return "";
 
-  const strippedCustom = stripRepeatedBasePrefix(rawCustomName, baseLabel);
-  if (strippedCustom) {
-    const normalizedStripped = normalizeNameForCompare(strippedCustom);
-    if (normalizedStripped && normalizedStripped !== normalizedBase) {
-      return `${baseLabel} - ${strippedCustom}`;
+  for (const candidate of labelCandidates) {
+    const stripped = stripRepeatedBasePrefix(rawCustomName, candidate);
+    if (stripped) {
+      const normalized = normalizeNameForCompare(stripped);
+      const isSameAsKnownType = labelCandidates.some(
+        (label) => normalized === normalizeNameForCompare(label),
+      );
+
+      if (normalized && !isSameAsKnownType && !isNumericOnlyLabel(stripped)) {
+        return stripped;
+      }
+      return "";
     }
-    return baseLabel;
   }
 
-  if (normalizedCustom === normalizeNameForCompare(typeLabel)) {
-    return baseLabel;
+  return rawCustomName;
+}
+
+export function getOrderLabelParts(order, language = "en", options = {}) {
+  const baseTypeLabel = getOrderTypeBaseLabel(order, language);
+  const typeWithSequenceLabel = getOrderTypeWithSequenceLabel(
+    order,
+    language,
+    options,
+  );
+  const customName = getOrderCustomName(order, language, options);
+  const fullLabel = customName
+    ? `${typeWithSequenceLabel} - ${customName}`
+    : typeWithSequenceLabel;
+
+  return {
+    baseTypeLabel,
+    typeWithSequenceLabel,
+    customName,
+    fullLabel,
+  };
+}
+
+export function getOrderPrimaryDisplayName(
+  order,
+  customerName,
+  language = "en",
+  options = {},
+) {
+  const parts = getOrderLabelParts(order, language, options);
+  const customName = String(parts.customName || "").trim();
+  const fallbackName = String(customerName || "").trim();
+  const showCustomerNameWithCustom =
+    options.showCustomerNameWithCustom === true;
+
+  if (customName) {
+    if (showCustomerNameWithCustom && fallbackName) {
+      if (namesMatch(customName, fallbackName)) return fallbackName;
+      return `${fallbackName} - ${customName}`;
+    }
+    return customName;
   }
 
-  return `${baseLabel} - ${rawCustomName}`;
+  return fallbackName || "-";
+}
+
+export function getOrderDisplayName(order, language = "en", options = {}) {
+  if (!order || typeof order !== "object") return "-";
+  return getOrderLabelParts(order, language, options).fullLabel;
 }

@@ -16,18 +16,8 @@ export default function Step1CustomerInfo({ onNext, initial = {} }) {
   const [matchedCustomer, setMatchedCustomer] = useState(null);
   const schema = z.object({
     customerId: z.string().optional(),
-    firstName: z
-      .string()
-      .min(
-        1,
-        t("createOrder.fieldRequired", { field: t("createOrder.firstName") }),
-      ),
-    phoneNumber: z
-      .string()
-      .min(
-        7,
-        t("createOrder.fieldRequired", { field: t("createOrder.phoneNumber") }),
-      ),
+    firstName: z.string().optional(),
+    phoneNumber: z.string().optional(),
   });
 
   const {
@@ -61,16 +51,9 @@ export default function Step1CustomerInfo({ onNext, initial = {} }) {
     const raw = (phoneNumber || "").trim();
     const normalized = normalizePhone(raw) || "";
 
-    // require at least 7 digits for a valid phone lookup
+    // Keep lookup optional: short values simply skip auto-search.
     const digitCount = (normalized.replace(/\D/g, "") || "").length;
     if (digitCount < 7) {
-      if (!silent) {
-        toast.error(
-          t("createOrder.fieldRequired", {
-            field: t("createOrder.phoneNumber"),
-          }),
-        );
-      }
       return;
     }
 
@@ -145,7 +128,6 @@ export default function Step1CustomerInfo({ onNext, initial = {} }) {
         <Field
           label={t("createOrder.firstName")}
           error={errors.firstName?.message}
-          required
         >
           <div className="iw">
             <LuUser size={14} className="ico" />
@@ -161,7 +143,6 @@ export default function Step1CustomerInfo({ onNext, initial = {} }) {
         <Field
           label={t("createOrder.phoneNumber")}
           error={errors.phoneNumber?.message}
-          required
         >
           <div
             style={{

@@ -20,7 +20,7 @@ export default function SidebarItem({
   const Icon = item.icon;
   const badge = badgeText(badgeValue);
   const isChild = depth > 0;
-  const paddingClass = isChild ? (isRtl ? "pr-3 pl-2" : "pl-3 pr-2") : "px-3";
+  const paddingClass = isChild ? "ps-3 pe-2" : "px-3";
   const linkEnd = item.end ?? isChild;
   const active = isRouteActive(location.pathname, item.path, linkEnd);
 
@@ -73,9 +73,7 @@ export default function SidebarItem({
 
       {!collapsed && (
         <>
-          <span
-            className={`min-w-0 flex-1 truncate ${isRtl ? "text-right" : "text-left"}`}
-          >
+          <span className="min-w-0 flex-1 truncate text-start">
             {item.text}
           </span>
           {badge && (
@@ -95,7 +93,7 @@ export default function SidebarItem({
 
       {collapsed && badge && (
         <span
-          className={`absolute top-1.5 inline-flex min-w-[0.9rem] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-4 ${isRtl ? "left-2" : "right-2"}`}
+          className="absolute top-1.5 end-2 inline-flex min-w-[0.9rem] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-4"
           style={{ background: accent, color: "white" }}
           aria-hidden="true"
         >

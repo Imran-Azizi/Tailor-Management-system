@@ -11,12 +11,12 @@ const optionalText = z.preprocess((value) => {
 
 const orderItemSchema = z.object({
   orderItemKey: optionalText,
-  type: z.enum(["OUTFIT", "WASKAT", "KORTY", "YAKHANQAQ"]),
+  type: z.enum(["OUTFIT", "WASKAT", "KORTY", "YAKHANQAQ"]).optional(),
   orderName: optionalText,
-  totalPrice: z.number().min(0),
-  discount: z.number().min(0).default(0),
-  paidAmount: z.number().min(0),
-  quantity: z.number().int().min(1).default(1),
+  totalPrice: z.number().min(0).optional().default(0),
+  discount: z.number().min(0).optional().default(0),
+  paidAmount: z.number().min(0).optional().default(0),
+  quantity: z.number().int().min(1).optional().default(1),
   isEmergency: z.boolean().default(false),
   emergencyExpiry: z.string().optional().nullable(),
   isForeignOrder: z.boolean().default(false),
@@ -30,27 +30,28 @@ const orderBillItemSchema = orderItemSchema.extend({
 
 const rakhtSelectionSchema = z.object({
   orderItemKey: optionalText,
-  type: z.enum(["OUTFIT", "WASKAT", "KORTY", "YAKHANQAQ"]),
-  rakhtId: z.string().min(1, "Rakht is required"),
-  rakhtTonId: z.string().min(1, "Rakht ton is required"),
-  requiredMeters: z.number().positive("Required meters must be positive"),
-  piecePrice: z.number().positive("Piece price must be positive"),
-  priceForCustomer: z.number().positive("Price for customer must be positive"),
+  type: z.enum(["OUTFIT", "WASKAT", "KORTY", "YAKHANQAQ"]).optional(),
+  rakhtId: optionalText,
+  rakhtTonId: optionalText,
+  requiredMeters: z.number().nonnegative().optional(),
+  piecePrice: z.number().nonnegative().optional(),
+  priceForCustomer: z.number().nonnegative().optional(),
   totalPriceForCustomer: z.number().min(0).optional(),
 });
 
 export const createOrderSchema = z.object({
-  customerInfo: z.object({
-    customerId: optionalText,
-    firstName: optionalText,
-    phoneNumber: optionalText,
-  }),
+  customerInfo: z
+    .object({
+      customerId: optionalText,
+      firstName: optionalText,
+      phoneNumber: optionalText,
+    })
+    .optional()
+    .default({}),
   entryMonth: z.number().int().min(1).max(12).optional().nullable(),
   entryYear: z.number().int().min(1300).max(2200).optional().nullable(),
-  rakhtSelections: z
-    .array(rakhtSelectionSchema)
-    .min(1, "At least one Rakht selection is required"),
-  orders: z.array(orderItemSchema).min(1, "At least one order item required"),
+  rakhtSelections: z.array(rakhtSelectionSchema).optional().default([]),
+  orders: z.array(orderItemSchema).optional().default([]),
 });
 
 export const updateOrderSchema = z.object({

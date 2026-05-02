@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { parseNumberLocale } from "../../lib/normalize.js";
 import { useTranslation } from "react-i18next";
-import toast from "react-hot-toast";
 import { formatCurrency } from "../../lib/currency.js";
 import { getOrderTypeLabel } from "../../lib/orderType.js";
 
@@ -216,7 +215,7 @@ function BillingCard({ entry, value, onChange, billingKey }) {
           style={{
             marginTop: 12,
             display: "flex",
-            justifyContent: "flex-end",
+            justifyContent: "end",
             gap: 16,
             fontSize: 12,
           }}
@@ -296,40 +295,12 @@ export default function Step4Billing({
       const entry = billingEntries[index];
       const item = billing[entry.billingKey] || DEFAULT_BILLING;
       const rawPrice = parseNumberLocale(item.totalPrice);
-      const pricePerItem = toWholeAmount(rawPrice);
+      const pricePerItem = toWholeAmount(rawPrice || 0);
       const totalPrice = pricePerItem;
       const discount = toWholeAmount(parseNumberLocale(item.discount || "0"));
       const paidAmount = toWholeAmount(
         parseNumberLocale(item.paidAmount || "0"),
       );
-      const label =
-        entry.displayName ||
-        `${getOrderTypeLabel(entry.type, language)} ${index + 1}`;
-
-      if (Number.isNaN(rawPrice) || pricePerItem <= 0) {
-        const message = t("createOrder.validTotalPrice", { label });
-        setError(message);
-        toast.error(message);
-        return;
-      }
-      if (discount < 0 || paidAmount < 0) {
-        const message = t("createOrder.nonNegativeAmounts", { label });
-        setError(message);
-        toast.error(message);
-        return;
-      }
-      if (discount > totalPrice) {
-        const message = t("createOrder.discountTooHigh", { label });
-        setError(message);
-        toast.error(message);
-        return;
-      }
-      if (paidAmount > totalPrice - discount) {
-        const message = t("createOrder.paidTooHigh", { label });
-        setError(message);
-        toast.error(message);
-        return;
-      }
       normalizedBilling[entry.billingKey] = {
         ...item,
         totalPrice: String(pricePerItem),

@@ -201,14 +201,14 @@ function UserModal({ user, onClose, onSaved }) {
                 size={14}
                 style={{
                   position: "absolute",
-                  left: 10,
+                  insetInlineStart: 10,
                   top: "50%",
                   transform: "translateY(-50%)",
                   color: "var(--text3)",
                 }}
               />
               <input
-                style={{ ...inputStyle, paddingLeft: 32 }}
+                style={{ ...inputStyle, paddingInlineStart: 32 }}
                 value={form.phoneNumber}
                 onChange={(e) => set("phoneNumber", e.target.value)}
                 placeholder="0700000000"
@@ -274,14 +274,18 @@ function UserModal({ user, onClose, onSaved }) {
                   size={14}
                   style={{
                     position: "absolute",
-                    left: 10,
+                    insetInlineStart: 10,
                     top: "50%",
                     transform: "translateY(-50%)",
                     color: "var(--text3)",
                   }}
                 />
                 <input
-                  style={{ ...inputStyle, paddingLeft: 32, paddingRight: 36 }}
+                  style={{
+                    ...inputStyle,
+                    paddingInlineStart: 32,
+                    paddingInlineEnd: 36,
+                  }}
                   type={showPw ? "text" : "password"}
                   value={form.password}
                   onChange={(e) => set("password", e.target.value)}
@@ -292,7 +296,7 @@ function UserModal({ user, onClose, onSaved }) {
                   onClick={() => setShowPw((s) => !s)}
                   style={{
                     position: "absolute",
-                    right: 8,
+                    insetInlineEnd: 8,
                     top: "50%",
                     transform: "translateY(-50%)",
                     background: "none",

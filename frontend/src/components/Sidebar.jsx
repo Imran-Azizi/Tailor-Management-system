@@ -135,8 +135,7 @@ export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
       style={{
         background:
           "radial-gradient(900px 420px at -20% -10%, rgba(59,130,246,0.22), transparent), radial-gradient(700px 300px at 120% 10%, rgba(16,185,129,0.12), transparent), linear-gradient(180deg, #081224 0%, #0C172B 34%, #0F172A 100%)",
-        borderRight: isRtl ? undefined : "1px solid rgba(148,163,184,.2)",
-        borderLeft: isRtl ? "1px solid rgba(148,163,184,.2)" : undefined,
+        borderInlineEnd: "1px solid rgba(148,163,184,.2)",
       }}
     >
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(255,255,255,0.06),transparent_26%,transparent)]" />

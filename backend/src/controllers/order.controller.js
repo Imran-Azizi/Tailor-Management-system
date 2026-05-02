@@ -20,6 +20,7 @@ const QICHIKAR_NOT_COMPLETED_MESSAGE =
   "This order cannot be received yet. Waiting for the Qichikar (cutting) worker to complete their work first.";
 const COMPLETED_REASSIGN_BLOCK_MESSAGE =
   "This order completed, you can not assign it again";
+const WORKER_PAYMENT_EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 const getRoleFieldKeys = (accountType) => {
   if (accountType === "QICHIKAR") {
@@ -900,11 +901,26 @@ export const payWorkerForCompletedOrder = async (req, res, next) => {
     if (!["QICHIKAR", "DOKHT"].includes(completedWorker.accountType)) {
       return res.status(400).json({ error: "Assigned user is not a worker." });
     }
-    if (order[paymentStatusField] === "PAID_TO_WORKER") {
+    const isPaidAlready = order[paymentStatusField] === "PAID_TO_WORKER";
+    const paidAtValue = order[paidAtField] || order.workerPaidAt || null;
+    let isEditWindowOpen = false;
+    if (isPaidAlready && paidAtValue) {
+      const paidAtMs = new Date(paidAtValue).getTime();
+      isEditWindowOpen =
+        Number.isFinite(paidAtMs) &&
+        Date.now() - paidAtMs <= WORKER_PAYMENT_EDIT_WINDOW_MS;
+    }
+
+    if (isPaidAlready && !isEditWindowOpen) {
       return res.status(409).json({
-        error: `${paymentRole === "DOKHT" ? "Dokht" : "Qichikar"} payment is already confirmed and cannot be updated.`,
+        error: "Payment edit window has expired. Payments can only be updated within 24 hours.",
+        code: "PAYMENT_EDIT_WINDOW_EXPIRED",
       });
     }
+
+    const now = new Date();
+    const persistedPaidAt =
+      isPaidAlready && paidAtValue ? new Date(paidAtValue) : now;
 
     const updated = await prisma.order.update({
       where: { id: orderId },
@@ -912,12 +928,12 @@ export const payWorkerForCompletedOrder = async (req, res, next) => {
         assignedToId: completedWorker.id,
         [paymentAmountField]: paymentAmount,
         [paymentStatusField]: "PAID_TO_WORKER",
-        [paidAtField]: new Date(),
+        [paidAtField]: persistedPaidAt,
         [paidByIdField]: req.user.id,
         // Keep legacy fields updated for backward compatibility in legacy screens.
         workerPaymentAmount: paymentAmount,
         workerPaymentStatus: "PAID_TO_WORKER",
-        workerPaidAt: new Date(),
+        workerPaidAt: persistedPaidAt,
         workerPaidById: req.user.id,
       },
       include: {
@@ -932,7 +948,9 @@ export const payWorkerForCompletedOrder = async (req, res, next) => {
     await service.recalculateOrderBenefit(orderId);
 
     const roleLabel = paymentRole === "DOKHT" ? "Dokht" : "Qichikar";
-    const payoutMsg = `Admin paid your completed ${roleLabel} order - Bill #${order.customer.billNumber} (${order.customer.firstName}) - Amount: ${Number(paymentAmount).toLocaleString()} AF.`;
+    const payoutMsg = isPaidAlready
+      ? `Admin updated your completed ${roleLabel} payment - Bill #${order.customer.billNumber} (${order.customer.firstName}) - New Amount: ${Number(paymentAmount).toLocaleString()} AF.`
+      : `Admin paid your completed ${roleLabel} order - Bill #${order.customer.billNumber} (${order.customer.firstName}) - Amount: ${Number(paymentAmount).toLocaleString()} AF.`;
 
     await prisma.userNotification.create({
       data: {
@@ -988,6 +1006,12 @@ export const getMonthlyReport = async (req, res, next) => {
     );
 
     res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Cache-Control",
+      "no-store, no-cache, must-revalidate, proxy-revalidate",
+    );
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
     res.setHeader(
       "Content-Disposition",
       `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodedFilename}`,

@@ -45,48 +45,6 @@ const NUMERIC_MEASUREMENT_FIELDS = new Set([
   "pachaPatlon",
 ]);
 
-const REQUIRED_MEASUREMENT_FIELDS = {
-  OUTFIT: [
-    "height",
-    "shoulder",
-    "sleeve",
-    "neck",
-    "chest",
-    "armpit",
-    "waist",
-    "skirt",
-    "tenban",
-    "pantLeg",
-    "arm",
-    "calf",
-  ],
-  WASKAT: ["height", "shoulder", "neck", "chest", "waist", "sorain"],
-  KORTY: [
-    "height",
-    "arm",
-    "shoulder",
-    "neck",
-    "sleeve",
-    "patlonHeight",
-    "kamerPatlon",
-    "doroBaghlePatlon",
-    "waist",
-    "sorainPatlon",
-    "sorain",
-    "patPatlon",
-    "pachaPatlon",
-  ],
-  YAKHANQAQ: [
-    "height",
-    "sleeve",
-    "shoulder",
-    "neck",
-    "armpit",
-    "sorain",
-    "chest",
-  ],
-};
-
 const STEPS = [
   { label: "Customer" },
   { label: "Order Types" },
@@ -392,17 +350,6 @@ export default function CreateOrder() {
       return;
     }
 
-    const measurementError = validateMeasurementsBeforeSubmit(
-      merged.orderTypes || [],
-      merged.measurements || {},
-    );
-    if (measurementError) {
-      setError(measurementError);
-      toast.error(measurementError);
-      setStep(2);
-      return;
-    }
-
     const boxCheck = await checkBoxAvailability(merged.orderTypes || []);
     if (!boxCheck.available) {
       toast.error(boxCheck.error);
@@ -695,40 +642,6 @@ function sanitize(m) {
     }
   }
   return out;
-}
-
-function validateMeasurementsBeforeSubmit(orderTypes, measurements) {
-  for (let i = 0; i < orderTypes.length; i += 1) {
-    const entry = orderTypes[i];
-    const sets = normalizeMeasurementSets(measurements?.[i]);
-    const required = REQUIRED_MEASUREMENT_FIELDS[entry.type] || [];
-    for (let setIndex = 0; setIndex < sets.length; setIndex += 1) {
-      const currentSet = sets[setIndex];
-      const sanitized = sanitize(currentSet);
-      const missing = required.filter((field) => {
-        const value = sanitized[field];
-        return (
-          value === undefined ||
-          value === null ||
-          (typeof value === "number" && isNaN(value))
-        );
-      });
-      if (missing.length) {
-        const label =
-          currentSet?.__name?.trim() ||
-          buildDefaultItemName(entry.type, setIndex + 1);
-        return i18n.t("createOrder.completeMeasurements", {
-          type: getOrderTypeLabel(
-            entry.type,
-            i18n.resolvedLanguage || i18n.language || "en",
-          ),
-          label,
-          defaultValue: `Please complete required measurements for ${label}.`,
-        });
-      }
-    }
-  }
-  return "";
 }
 
 function getOrderTypeDisplayName(type) {

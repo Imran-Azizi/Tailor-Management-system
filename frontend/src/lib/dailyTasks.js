@@ -58,10 +58,14 @@ export async function downloadDailyTaskReportPdf({
   reportType,
   date,
   language,
+  month,
+  year,
 }) {
-  const params = { reportType };
+  const params = { reportType, _ts: Date.now() };
   if (date) params.date = date;
   if (language) params.lang = language;
+  if (month != null) params.month = month;
+  if (year != null) params.year = year;
 
   const response = await api.get("/daily-tasks/report/pdf", {
     params,

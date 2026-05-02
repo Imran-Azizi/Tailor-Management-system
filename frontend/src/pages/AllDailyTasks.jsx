@@ -124,7 +124,7 @@ function StatBanner({ label, value, Icon, accent, sub }) {
         style={{
           position: "absolute",
           top: 0,
-          left: 0,
+          insetInlineStart: 0,
           width: 3,
           height: "100%",
           background: accent,
@@ -148,7 +148,7 @@ function StatBanner({ label, value, Icon, accent, sub }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <p
           style={{
-            fontSize: 11.5,
+            textAlign: "end",
             fontWeight: 600,
             color: "var(--text3)",
             textTransform: "uppercase",
@@ -194,16 +194,30 @@ function ActionMenu({
   const menuRef = useRef(null);
   const triggerRef = useRef(null);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const isRtl =
+    typeof document !== "undefined" ? document.dir === "rtl" : false;
 
   const placeMenu = () => {
     if (!triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
-    const width = 148;
-    const left = Math.max(
-      8,
-      Math.min(window.innerWidth - width - 8, rect.right - width),
-    );
-    const top = Math.min(window.innerHeight - 12, rect.bottom + 6);
+    const menuWidth = 164;
+    const menuItemHeight = 36;
+    const itemsCount = canManage ? 3 : 1;
+    const menuHeight =
+      itemsCount * menuItemHeight + (!isEditable && canManage ? 42 : 8);
+
+    const minLeft = 8;
+    const maxLeft = Math.max(minLeft, window.innerWidth - menuWidth - 8);
+    const desiredLeft = isRtl ? rect.left : rect.right - menuWidth;
+    const left = Math.max(minLeft, Math.min(maxLeft, desiredLeft));
+
+    const preferredTop = rect.bottom + 6;
+    const maxTop = window.innerHeight - menuHeight - 8;
+    const top =
+      preferredTop <= maxTop
+        ? preferredTop
+        : Math.max(8, rect.top - menuHeight - 6);
+
     setMenuPos({ top, left });
   };
 
@@ -212,8 +226,12 @@ function ActionMenu({
     placeMenu();
 
     const handleClickOutside = (event) => {
-      if (!menuRef.current) return;
-      if (!menuRef.current.contains(event.target)) setOpen(false);
+      if (
+        !menuRef.current?.contains(event.target) &&
+        !triggerRef.current?.contains(event.target)
+      ) {
+        setOpen(false);
+      }
     };
 
     const handleViewportChange = () => placeMenu();
@@ -270,6 +288,7 @@ function ActionMenu({
             zIndex: 999,
             overflow: "hidden",
             animation: "fadeUp .12s ease",
+            direction: isRtl ? "rtl" : "ltr",
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -489,7 +508,7 @@ function TaskRow({
           whiteSpace: "nowrap",
           color: "var(--text3)",
           fontSize: 13,
-          textAlign: isRtlNote ? "right" : "left",
+          textAlign: "start",
           direction: isRtlNote ? "rtl" : "ltr",
           unicodeBidi: "plaintext",
           fontFamily: isRtlNote
@@ -500,7 +519,7 @@ function TaskRow({
         {task.note || <span style={{ opacity: 0.35 }}>—</span>}
       </td>
       <td
-        style={{ textAlign: "right", width: 72 }}
+        style={{ textAlign: "end", width: 72 }}
         onClick={(e) => e.stopPropagation()}
       >
         <ActionMenu
@@ -604,7 +623,7 @@ function TaskCard({
             flexShrink: 0,
           }}
         >
-          <LuBadgeCheck size={12} style={{ marginRight: 4 }} />
+          <LuBadgeCheck size={12} style={{ marginInlineEnd: 4 }} />
           {formatMoney(task.amount)}
         </span>
       </div>
@@ -888,7 +907,13 @@ export default function AllDailyTasks() {
 
   const reportMutation = useMutation({
     mutationFn: ({ reportType, date }) =>
-      downloadDailyTaskReportPdf({ reportType, date, language }),
+      downloadDailyTaskReportPdf({
+        reportType,
+        date,
+        language,
+        month: viewMonth,
+        year: viewYear,
+      }),
     onSuccess: (_, vars) => {
       toast.success(
         t("dailyTasks.reportGenerated", "Report PDF generated successfully."),
@@ -1249,7 +1274,7 @@ export default function AllDailyTasks() {
                       </div>
                     </th>
                     <th>{t("dailyTasks.note")}</th>
-                    <th style={{ width: 72, textAlign: "right" }}>
+                    <th style={{ width: 72, textAlign: "end" }}>
                       {t("common.actions", "Actions")}
                     </th>
                   </tr>
@@ -1397,7 +1422,7 @@ export default function AllDailyTasks() {
           <div
             style={{
               display: "flex",
-              justifyContent: "flex-end",
+              justifyContent: "end",
               gap: 8,
               marginTop: 16,
               borderTop: "1px solid var(--border)",

@@ -27,6 +27,7 @@ import {
 } from "../../lib/locale.js";
 import { Modal, ConfirmDeleteModal, StatCard } from "../ui/index.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { useMonth } from "../../context/MonthContext.jsx";
 import {
   TON_QTY_OPTIONS,
   buildTonsForQuantity,
@@ -39,6 +40,7 @@ export default function RakhtManager() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language || "en";
   const { isAdmin } = useAuth();
+  const { viewMonth, viewYear } = useMonth();
   const qc = useQueryClient();
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -56,8 +58,16 @@ export default function RakhtManager() {
   const [form, setForm] = useState(emptyForm());
 
   const { data: rows = [], isLoading } = useQuery({
-    queryKey: ["rakht-list"],
-    queryFn: () => api.get("/rakhts").then((res) => res.data),
+    queryKey: ["rakht-list", { viewMonth, viewYear }],
+    queryFn: () =>
+      api
+        .get("/rakhts", {
+          params: {
+            month: viewMonth,
+            year: viewYear,
+          },
+        })
+        .then((res) => res.data),
   });
 
   const { data: viewDetails, isLoading: isViewLoading } = useQuery({
@@ -1010,7 +1020,7 @@ export default function RakhtManager() {
             <input className="inp" value={payNowLabel} readOnly />
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <div style={{ display: "flex", justifyContent: "end", gap: 8 }}>
             <button
               type="button"
               className="btn btn-outline"

@@ -1,39 +1,5 @@
 import { prisma } from "./prisma.js";
-
-const normalizeNumber = (value) => {
-  if (typeof value !== "string") return String(value || "");
-  const map = {
-    "۰": "0",
-    "۱": "1",
-    "۲": "2",
-    "۳": "3",
-    "۴": "4",
-    "۵": "5",
-    "۶": "6",
-    "۷": "7",
-    "۸": "8",
-    "۹": "9",
-    "٠": "0",
-    "١": "1",
-    "٢": "2",
-    "٣": "3",
-    "٤": "4",
-    "٥": "5",
-    "٦": "6",
-    "٧": "7",
-    "٨": "8",
-    "٩": "9",
-  };
-  return value.replace(/[۰-۹٠-٩]/g, (char) => map[char] || char);
-};
-
-export const getCurrentAfghanMonthYear = (date = new Date()) => {
-  // Project policy: month gating uses Gregorian month/year.
-  return {
-    month: date.getMonth() + 1,
-    year: date.getFullYear(),
-  };
-};
+import { getCurrentAfghanMonthYear } from "./afghanistanDate.js";
 
 export const getNextMonthYear = ({ month, year }) => {
   const safeMonth = Number(month);
@@ -117,7 +83,7 @@ export const getMonthPolicy = async ({ tx = prisma } = {}) => {
     : current;
 
   return {
-    calendar: "GREGORIAN",
+    calendar: "AFGHAN_PERSIAN",
     currentMonth: current.month,
     currentYear: current.year,
     isCurrentMonthCompleted,

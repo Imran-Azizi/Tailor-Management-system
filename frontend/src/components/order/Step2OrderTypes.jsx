@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import toast from "react-hot-toast";
 import {
   LuCheck,
   LuX,
@@ -34,13 +33,6 @@ function normalizeEmergencyHour(value) {
     return "08";
   }
   return String(Math.floor(numeric)).padStart(2, "0");
-}
-
-function isPastDate(value) {
-  if (!value) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return new Date(value) < today;
 }
 
 export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
@@ -121,26 +113,6 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
   };
 
   const validateBeforeContinue = () => {
-    if (!entries.length) {
-      toast.error(t("createOrder.selectAtLeastOne"));
-      return;
-    }
-
-    if (billEmergency) {
-      if (!billEmergencyExpiry) {
-        const message = t("createOrder.expiryRequired");
-        setBillEmergencyError(message);
-        toast.error(message);
-        return;
-      }
-      if (isPastDate(billEmergencyExpiry)) {
-        const message = t("createOrder.expiryPast");
-        setBillEmergencyError(message);
-        toast.error(message);
-        return;
-      }
-    }
-
     const normalizedEntries = entries.map((entry) => ({
       ...entry,
       isEmergency: billEmergency,
@@ -178,7 +150,7 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
                   style={{
                     position: "absolute",
                     top: 10,
-                    right: 10,
+                    insetInlineEnd: 10,
                     background: "var(--primary)",
                     color: "#fff",
                     borderRadius: "50%",
@@ -495,7 +467,6 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
         <button
           type="button"
           onClick={validateBeforeContinue}
-          disabled={!entries.length}
           className="btn btn-gold"
           style={{ flex: 1 }}
         >

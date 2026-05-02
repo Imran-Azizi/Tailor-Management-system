@@ -1,5 +1,17 @@
 import { prisma } from "../lib/prisma.js";
 import { normalizeText } from "../lib/normalize.js";
+import {
+  MONEY_SCALE,
+  METER_SCALE,
+  toNumberScaled,
+  addScaled,
+  subScaled,
+  mulScaled,
+  divScaled,
+  maxScaled,
+  sumScaled,
+} from "../lib/decimal.js";
+import { getAfghanMonthDateRange } from "../lib/afghanistanDate.js";
 
 const DEFAULT_COLOR_HEX = "#94A3B8";
 
@@ -10,9 +22,7 @@ const normalizeHexColor = (value, fallback = DEFAULT_COLOR_HEX) => {
 };
 
 const toNonNegativeInt = (value) => {
-  const numeric = Number(value || 0);
-  if (!Number.isFinite(numeric)) return 0;
-  return Math.max(0, Math.trunc(numeric));
+  return maxScaled(toNumberScaled(value, MONEY_SCALE), 0, MONEY_SCALE);
 };
 
 const toPositiveInt = (value) => {
@@ -21,43 +31,38 @@ const toPositiveInt = (value) => {
 };
 
 const toPositiveNumber = (value) => {
-  const numeric = Number(value || 0);
-  if (!Number.isFinite(numeric)) return 0;
+  const numeric = toNumberScaled(value, METER_SCALE);
   return numeric > 0 ? numeric : 0;
 };
 
 const round2 = (value) => {
-  const numeric = Number(value || 0);
-  if (!Number.isFinite(numeric)) return 0;
-  return Math.round(numeric * 100) / 100;
+  return toNumberScaled(value, MONEY_SCALE);
 };
 
 const safeDivide = (num, den) => {
-  const a = Number(num || 0);
-  const b = Number(den || 0);
-  if (!Number.isFinite(a) || !Number.isFinite(b) || b <= 0) return 0;
-  return a / b;
+  return divScaled(num || 0, den || 0, MONEY_SCALE);
 };
 
 const withComputedFields = (rakht) => ({
   ...rakht,
-  tonPrice: round2(safeDivide(rakht.totalPrice, rakht.tonQuantity)),
-  remainingMoney: Math.max(
+  tonPrice: divScaled(rakht.totalPrice, rakht.tonQuantity, MONEY_SCALE),
+  remainingMoney: maxScaled(
+    subScaled(rakht.totalPrice, rakht.givenMoney, MONEY_SCALE),
     0,
-    toNonNegativeInt(rakht.totalPrice) - toNonNegativeInt(rakht.givenMoney),
+    MONEY_SCALE,
   ),
   tons: (rakht.tons || []).map((ton) => ({
     ...ton,
-    tonTotalPrice: round2(safeDivide(rakht.totalPrice, rakht.tonQuantity)),
-    purchasePricePerMeter: round2(
-      safeDivide(
-        safeDivide(rakht.totalPrice, rakht.tonQuantity),
-        toPositiveNumber(ton.totalMeters),
-      ),
+    tonTotalPrice: divScaled(rakht.totalPrice, rakht.tonQuantity, MONEY_SCALE),
+    purchasePricePerMeter: divScaled(
+      divScaled(rakht.totalPrice, rakht.tonQuantity, MONEY_SCALE),
+      toPositiveNumber(ton.totalMeters),
+      MONEY_SCALE,
     ),
-    availableMeters: Math.max(
+    availableMeters: maxScaled(
+      subScaled(ton.totalMeters, ton.usedMeters, METER_SCALE),
       0,
-      toNonNegativeInt(ton.totalMeters) - toNonNegativeInt(ton.usedMeters),
+      METER_SCALE,
     ),
   })),
 });
@@ -76,27 +81,33 @@ const buildRakhtRevenueBaseWhere = (financeUserId) => ({
 const ORDER_TYPE_VALUES = ["OUTFIT", "WASKAT", "KORTY", "YAKHANQAQ"];
 
 const deriveRakhtOrderFinancials = (order) => {
-  const meters = Number(order.rakhtRequiredMeters || 0);
-  const costPerMeter = Number(order.rakhtPiecePrice || 0);
-  const sellingPerMeterRaw = Number(order.rakhtCustomerPricePerMeter || 0);
-  const sellingTotalRaw = Number(order.rakhtTotalCustomerPrice || 0);
+  const meters = toNumberScaled(order.rakhtRequiredMeters || 0, METER_SCALE);
+  const costPerMeter = toNumberScaled(order.rakhtPiecePrice || 0, MONEY_SCALE);
+  const sellingPerMeterRaw = toNumberScaled(
+    order.rakhtCustomerPricePerMeter || 0,
+    MONEY_SCALE,
+  );
+  const sellingTotalRaw = toNumberScaled(
+    order.rakhtTotalCustomerPrice || 0,
+    MONEY_SCALE,
+  );
 
-  const totalCost = meters * costPerMeter;
+  const totalCost = mulScaled(meters, costPerMeter, MONEY_SCALE);
   const totalSelling =
     sellingTotalRaw > 0
       ? sellingTotalRaw
       : sellingPerMeterRaw > 0
-        ? sellingPerMeterRaw * meters
+        ? mulScaled(sellingPerMeterRaw, meters, MONEY_SCALE)
         : totalCost;
 
   const sellingPerMeter =
     sellingPerMeterRaw > 0
       ? sellingPerMeterRaw
       : meters > 0
-        ? safeDivide(totalSelling, meters)
+        ? divScaled(totalSelling, meters, MONEY_SCALE)
         : 0;
 
-  const benefit = totalSelling - totalCost;
+  const benefit = subScaled(totalSelling, totalCost, MONEY_SCALE);
 
   return {
     meters: round2(meters),
@@ -134,6 +145,8 @@ export const getRakhtRevenueSummaryWithFilters = async ({
   orderType,
   fromDate,
   toDate,
+  month = null,
+  year = null,
   minMeters,
   maxMeters,
   page = 1,
@@ -168,23 +181,47 @@ export const getRakhtRevenueSummaryWithFilters = async ({
     };
   }
 
-  const createdAtFilter = {};
-  if (fromDate) {
-    const parsedFrom = new Date(fromDate);
-    if (!Number.isNaN(parsedFrom.getTime())) {
-      parsedFrom.setHours(0, 0, 0, 0);
-      createdAtFilter.gte = parsedFrom;
+  const parsedMonth = month != null ? Number(month) : null;
+  const parsedYear = year != null ? Number(year) : null;
+  const hasMonthFilter =
+    parsedMonth &&
+    parsedYear &&
+    Number.isFinite(parsedMonth) &&
+    Number.isFinite(parsedYear);
+
+  if (hasMonthFilter) {
+    const { start, end } = getAfghanMonthDateRange({
+      month: parsedMonth,
+      year: parsedYear,
+    });
+    where.AND = [
+      ...(where.AND || []),
+      {
+        OR: [
+          { entryMonth: parsedMonth, entryYear: parsedYear },
+          { entryMonth: null, createdAt: { gte: start, lte: end } },
+        ],
+      },
+    ];
+  } else {
+    const createdAtFilter = {};
+    if (fromDate) {
+      const parsedFrom = new Date(fromDate);
+      if (!Number.isNaN(parsedFrom.getTime())) {
+        parsedFrom.setHours(0, 0, 0, 0);
+        createdAtFilter.gte = parsedFrom;
+      }
     }
-  }
-  if (toDate) {
-    const parsedTo = new Date(toDate);
-    if (!Number.isNaN(parsedTo.getTime())) {
-      parsedTo.setHours(23, 59, 59, 999);
-      createdAtFilter.lte = parsedTo;
+    if (toDate) {
+      const parsedTo = new Date(toDate);
+      if (!Number.isNaN(parsedTo.getTime())) {
+        parsedTo.setHours(23, 59, 59, 999);
+        createdAtFilter.lte = parsedTo;
+      }
     }
-  }
-  if (Object.keys(createdAtFilter).length) {
-    where.createdAt = createdAtFilter;
+    if (Object.keys(createdAtFilter).length) {
+      where.createdAt = createdAtFilter;
+    }
   }
 
   if (normalizedSearch) {
@@ -298,10 +335,10 @@ export const getRakhtRevenueSummaryWithFilters = async ({
   let totalCost = 0;
 
   for (const row of allRows) {
-    totalMetersSold += row.meters;
-    totalRevenue += row.benefit;
-    totalSelling += row.totalSelling;
-    totalCost += row.totalCost;
+    totalMetersSold = addScaled(totalMetersSold, row.meters, METER_SCALE);
+    totalRevenue = addScaled(totalRevenue, row.benefit, MONEY_SCALE);
+    totalSelling = addScaled(totalSelling, row.totalSelling, MONEY_SCALE);
+    totalCost = addScaled(totalCost, row.totalCost, MONEY_SCALE);
 
     const companyExisting = byCompanyMap.get(row.companyName) || {
       companyName: row.companyName,
@@ -313,13 +350,30 @@ export const getRakhtRevenueSummaryWithFilters = async ({
       avgSellingPricePerMeter: 0,
     };
     companyExisting.orderCount += 1;
-    companyExisting.metersSold += row.meters;
-    companyExisting.totalSelling += row.totalSelling;
-    companyExisting.totalCost += row.totalCost;
-    companyExisting.revenue += row.benefit;
-    companyExisting.avgSellingPricePerMeter = safeDivide(
+    companyExisting.metersSold = addScaled(
+      companyExisting.metersSold,
+      row.meters,
+      METER_SCALE,
+    );
+    companyExisting.totalSelling = addScaled(
+      companyExisting.totalSelling,
+      row.totalSelling,
+      MONEY_SCALE,
+    );
+    companyExisting.totalCost = addScaled(
+      companyExisting.totalCost,
+      row.totalCost,
+      MONEY_SCALE,
+    );
+    companyExisting.revenue = addScaled(
+      companyExisting.revenue,
+      row.benefit,
+      MONEY_SCALE,
+    );
+    companyExisting.avgSellingPricePerMeter = divScaled(
       companyExisting.totalSelling,
       companyExisting.metersSold,
+      MONEY_SCALE,
     );
     byCompanyMap.set(row.companyName, companyExisting);
 
@@ -333,13 +387,30 @@ export const getRakhtRevenueSummaryWithFilters = async ({
       avgSellingPricePerMeter: 0,
     };
     tonExisting.orderCount += 1;
-    tonExisting.metersSold += row.meters;
-    tonExisting.totalSelling += row.totalSelling;
-    tonExisting.totalCost += row.totalCost;
-    tonExisting.revenue += row.benefit;
-    tonExisting.avgSellingPricePerMeter = safeDivide(
+    tonExisting.metersSold = addScaled(
+      tonExisting.metersSold,
+      row.meters,
+      METER_SCALE,
+    );
+    tonExisting.totalSelling = addScaled(
+      tonExisting.totalSelling,
+      row.totalSelling,
+      MONEY_SCALE,
+    );
+    tonExisting.totalCost = addScaled(
+      tonExisting.totalCost,
+      row.totalCost,
+      MONEY_SCALE,
+    );
+    tonExisting.revenue = addScaled(
+      tonExisting.revenue,
+      row.benefit,
+      MONEY_SCALE,
+    );
+    tonExisting.avgSellingPricePerMeter = divScaled(
       tonExisting.totalSelling,
       tonExisting.metersSold,
+      MONEY_SCALE,
     );
     byTonMap.set(row.tonName, tonExisting);
   }
@@ -372,8 +443,12 @@ export const getRakhtRevenueSummaryWithFilters = async ({
     totalRevenue: round2(totalRevenue),
     totalSelling: round2(totalSelling),
     totalCost: round2(totalCost),
-    avgSellingPricePerMeter: round2(safeDivide(totalSelling, totalMetersSold)),
-    avgBenefitPerMeter: round2(safeDivide(totalRevenue, totalMetersSold)),
+    avgSellingPricePerMeter: divScaled(
+      totalSelling,
+      totalMetersSold,
+      MONEY_SCALE,
+    ),
+    avgBenefitPerMeter: divScaled(totalRevenue, totalMetersSold, MONEY_SCALE),
     byCompany,
     byTon,
     details,
@@ -392,8 +467,26 @@ export const getRakhtRevenueSummaryWithFilters = async ({
   };
 };
 
-export const getAllRakht = async () => {
+export const getAllRakht = async ({ month = null, year = null } = {}) => {
+  const parsedMonth = month != null ? Number(month) : null;
+  const parsedYear = year != null ? Number(year) : null;
+  const where = {};
+
+  if (
+    parsedMonth &&
+    parsedYear &&
+    Number.isFinite(parsedMonth) &&
+    Number.isFinite(parsedYear)
+  ) {
+    const { start, end } = getAfghanMonthDateRange({
+      month: parsedMonth,
+      year: parsedYear,
+    });
+    where.date = { gte: start, lte: end };
+  }
+
   const rows = await prisma.rakht.findMany({
+    where,
     include: { tons: { orderBy: { createdAt: "asc" } } },
     orderBy: [{ brandName: "asc" }, { createdAt: "desc" }],
   });
@@ -548,8 +641,12 @@ export const getRakhtPaymentHistory = async ({
     Number.isFinite(parsedMonth) &&
     Number.isFinite(parsedYear)
   ) {
-    paidAtFilter.gte = new Date(parsedYear, parsedMonth - 1, 1, 0, 0, 0, 0);
-    paidAtFilter.lte = new Date(parsedYear, parsedMonth, 0, 23, 59, 59, 999);
+    const { start, end } = getAfghanMonthDateRange({
+      month: parsedMonth,
+      year: parsedYear,
+    });
+    paidAtFilter.gte = start;
+    paidAtFilter.lte = end;
   } else {
     if (fromDate) {
       const parsedFrom = new Date(fromDate);
@@ -648,16 +745,20 @@ export const createRakht = async (payload) => {
       tonQuantity: toPositiveInt(rest.tonQuantity),
       totalPrice: toNonNegativeInt(rest.totalPrice),
       givenMoney: toNonNegativeInt(rest.givenMoney || 0),
-      remainingMoney: Math.max(
+      remainingMoney: maxScaled(
+        subScaled(rest.totalPrice, rest.givenMoney || 0, MONEY_SCALE),
         0,
-        toNonNegativeInt(rest.totalPrice) -
-          toNonNegativeInt(rest.givenMoney || 0),
+        MONEY_SCALE,
       ),
       tons: {
         create: tons.map((ton) => ({
           name: normalizeText(ton.name),
           colorHex: normalizeHexColor(ton.colorHex),
-          totalMeters: toPositiveInt(ton.totalMeters),
+          totalMeters: maxScaled(
+            toPositiveNumber(ton.totalMeters),
+            0.01,
+            METER_SCALE,
+          ),
         })),
       },
     },
@@ -696,7 +797,11 @@ export const updateRakht = async (id, payload) => {
     rest.givenMoney !== undefined
       ? toNonNegativeInt(rest.givenMoney)
       : toNonNegativeInt(existing.givenMoney);
-  const remainingMoney = Math.max(0, totalPrice - givenMoney);
+  const remainingMoney = maxScaled(
+    subScaled(totalPrice, givenMoney, MONEY_SCALE),
+    0,
+    MONEY_SCALE,
+  );
 
   const updateData = {
     companyName,
@@ -713,7 +818,11 @@ export const updateRakht = async (id, payload) => {
       create: tons.map((ton) => ({
         name: normalizeText(ton.name),
         colorHex: normalizeHexColor(ton.colorHex),
-        totalMeters: toPositiveInt(ton.totalMeters),
+        totalMeters: maxScaled(
+          toPositiveNumber(ton.totalMeters),
+          0.01,
+          METER_SCALE,
+        ),
       })),
     };
   }
@@ -814,9 +923,9 @@ export const payRemainingMoneyByCompany = async ({
     throw Object.assign(new Error("Company not found"), { status: 404 });
   }
 
-  const totalRemaining = rows.reduce(
-    (sum, row) => sum + Math.max(0, Number(row.remainingMoney || 0)),
-    0,
+  const totalRemaining = sumScaled(
+    rows.map((row) => maxScaled(row.remainingMoney || 0, 0, MONEY_SCALE)),
+    MONEY_SCALE,
   );
 
   if (totalRemaining <= 0) {
@@ -834,15 +943,19 @@ export const payRemainingMoneyByCompany = async ({
     );
   }
 
-  const totalPriceBefore = rows.reduce(
-    (sum, row) => sum + toNonNegativeInt(row.totalPrice),
-    0,
+  const totalPriceBefore = sumScaled(
+    rows.map((row) => toNonNegativeInt(row.totalPrice)),
+    MONEY_SCALE,
   );
-  const totalPaidBefore = rows.reduce(
-    (sum, row) => sum + toNonNegativeInt(row.givenMoney),
-    0,
+  const totalPaidBefore = sumScaled(
+    rows.map((row) => toNonNegativeInt(row.givenMoney)),
+    MONEY_SCALE,
   );
-  const remainingBefore = Math.max(0, totalPriceBefore - totalPaidBefore);
+  const remainingBefore = maxScaled(
+    subScaled(totalPriceBefore, totalPaidBefore, MONEY_SCALE),
+    0,
+    MONEY_SCALE,
+  );
 
   let balance = payAmount;
 
@@ -850,14 +963,18 @@ export const payRemainingMoneyByCompany = async ({
     for (const row of rows) {
       if (balance <= 0) break;
 
-      const rowRemaining = Math.max(0, Number(row.remainingMoney || 0));
+      const rowRemaining = maxScaled(row.remainingMoney || 0, 0, MONEY_SCALE);
       if (rowRemaining <= 0) continue;
 
-      const applied = Math.min(balance, rowRemaining);
-      const nextGiven = toNonNegativeInt(row.givenMoney) + applied;
-      const nextRemaining = Math.max(
+      const applied = toNumberScaled(
+        Math.min(balance, rowRemaining),
+        MONEY_SCALE,
+      );
+      const nextGiven = addScaled(row.givenMoney || 0, applied, MONEY_SCALE);
+      const nextRemaining = maxScaled(
+        subScaled(row.totalPrice || 0, nextGiven, MONEY_SCALE),
         0,
-        toNonNegativeInt(row.totalPrice) - nextGiven,
+        MONEY_SCALE,
       );
 
       await tx.rakht.update({
@@ -868,22 +985,30 @@ export const payRemainingMoneyByCompany = async ({
         },
       });
 
-      balance -= applied;
+      balance = maxScaled(
+        subScaled(balance, applied, MONEY_SCALE),
+        0,
+        MONEY_SCALE,
+      );
     }
 
     const refreshedInTx = await tx.rakht.findMany({
       where: { companyName: normalizedCompany },
     });
 
-    const totalPriceAfter = refreshedInTx.reduce(
-      (sum, row) => sum + toNonNegativeInt(row.totalPrice),
-      0,
+    const totalPriceAfter = sumScaled(
+      refreshedInTx.map((row) => toNonNegativeInt(row.totalPrice)),
+      MONEY_SCALE,
     );
-    const totalPaidAfter = refreshedInTx.reduce(
-      (sum, row) => sum + toNonNegativeInt(row.givenMoney),
-      0,
+    const totalPaidAfter = sumScaled(
+      refreshedInTx.map((row) => toNonNegativeInt(row.givenMoney)),
+      MONEY_SCALE,
     );
-    const remainingAfter = Math.max(0, totalPriceAfter - totalPaidAfter);
+    const remainingAfter = maxScaled(
+      subScaled(totalPriceAfter, totalPaidAfter, MONEY_SCALE),
+      0,
+      MONEY_SCALE,
+    );
 
     const history = await tx.rakhtPaymentHistory.create({
       data: {

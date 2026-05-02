@@ -1,5 +1,7 @@
 import { toAsciiDigits } from "./normalize.js";
 
+const AFGHANISTAN_TIMEZONE = "Asia/Kabul";
+
 export function normalizeLanguage(language = "en") {
   const lang = String(language || "en").toLowerCase();
   if (lang.startsWith("dari") || lang.startsWith("fa")) return "dari";
@@ -8,15 +10,44 @@ export function normalizeLanguage(language = "en") {
 }
 
 export function isRtlLanguage(language = "en") {
-  // Project-wide policy: keep UI layout LTR for all supported languages.
-  return false;
+  const normalized = normalizeLanguage(language);
+  return normalized === "dari" || normalized === "pashto";
 }
 
 export function getLocaleTag(language = "en") {
   const normalized = normalizeLanguage(language);
-  if (normalized === "dari") return "fa-AF-u-nu-latn";
-  if (normalized === "pashto") return "ps-AF-u-nu-latn";
+  if (normalized === "dari") return "fa-AF-u-ca-persian-nu-latn";
+  if (normalized === "pashto") return "ps-AF-u-ca-persian-nu-latn";
   return "en-US-u-nu-latn";
+}
+
+function usesAfghanLocalFormat(language = "en") {
+  const normalized = normalizeLanguage(language);
+  return normalized === "dari" || normalized === "pashto";
+}
+
+function hasTimeParts(options = {}) {
+  return (
+    options.hour !== undefined ||
+    options.minute !== undefined ||
+    options.second !== undefined ||
+    options.dayPeriod !== undefined
+  );
+}
+
+function withDateLocaleDefaults(language = "en", options = {}) {
+  const next = { ...options };
+  if (usesAfghanLocalFormat(language) && !next.timeZone) {
+    next.timeZone = AFGHANISTAN_TIMEZONE;
+  }
+  if (
+    hasTimeParts(next) &&
+    next.hour12 === undefined &&
+    next.hourCycle === undefined
+  ) {
+    next.hourCycle = "h23";
+  }
+  return next;
 }
 
 export function formatDateLocale(value, language = "en", options = {}) {
@@ -24,7 +55,10 @@ export function formatDateLocale(value, language = "en", options = {}) {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
   return toAsciiDigits(
-    new Intl.DateTimeFormat(getLocaleTag(language), options).format(date),
+    new Intl.DateTimeFormat(
+      getLocaleTag(language),
+      withDateLocaleDefaults(language, options),
+    ).format(date),
   );
 }
 
@@ -33,7 +67,7 @@ export function formatSystemDate(value, language = "en", options = {}) {
   const defaultOptions =
     normalized === "en"
       ? { month: "2-digit", day: "2-digit", year: "numeric" }
-      : { year: "numeric", month: "short", day: "2-digit" };
+      : { year: "numeric", month: "long", day: "2-digit" };
   return formatDateLocale(value, language, {
     ...defaultOptions,
     ...options,
@@ -53,7 +87,7 @@ export function formatSystemDateTime(value, language = "en", options = {}) {
         }
       : {
           year: "numeric",
-          month: "short",
+          month: "long",
           day: "2-digit",
           hour: "2-digit",
           minute: "2-digit",
@@ -65,14 +99,7 @@ export function formatSystemDateTime(value, language = "en", options = {}) {
 }
 
 export function formatDateTimeLocale(value, language = "en", options = {}) {
-  return formatDateLocale(value, language, {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    ...options,
-  });
+  return formatSystemDateTime(value, language, options);
 }
 
 export function formatDateThenTimeLocale(
@@ -109,7 +136,7 @@ export function formatNumberLocale(value, language = "en", options = {}) {
 export function applyDocumentLocale(language = "en") {
   if (typeof document === "undefined") return;
   const normalized = normalizeLanguage(language);
-  const dir = "ltr";
+  const dir = isRtlLanguage(normalized) ? "rtl" : "ltr";
   const htmlLang =
     normalized === "en" ? "en-US" : normalized === "dari" ? "fa-AF" : "ps-AF";
   document.documentElement.setAttribute("lang", htmlLang);

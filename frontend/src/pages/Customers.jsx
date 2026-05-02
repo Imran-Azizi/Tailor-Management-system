@@ -122,14 +122,14 @@ export default function Customers({ openCreate = false }) {
                 size={13}
                 style={{
                   position: "absolute",
-                  left: 11,
+                  insetInlineStart: 11,
                   color: "var(--text3)",
                   pointerEvents: "none",
                 }}
               />
               <input
                 className="inp"
-                style={{ paddingLeft: 32, height: 36 }}
+                style={{ paddingInlineStart: 32, height: 36 }}
                 placeholder={t("customersPage.searchPlaceholder")}
                 value={search}
                 onChange={(e) => {
@@ -353,7 +353,7 @@ export default function Customers({ openCreate = false }) {
               <input
                 {...register("phoneNumber")}
                 className={`inp${errors.phoneNumber ? " err" : ""}`}
-                style={{ paddingLeft: 36 }}
+                style={{ paddingInlineStart: 36 }}
                 placeholder="0700000001"
               />
             </div>

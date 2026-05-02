@@ -39,6 +39,7 @@ import CreateRakht from "./pages/CreateRakht.jsx";
 import AllRakhts from "./pages/AllRakhts.jsx";
 import PaymentHistory from "./pages/PaymentHistory.jsx";
 import RakhtRevenue from "./pages/RakhtRevenue.jsx";
+import BackupManagement from "./pages/BackupManagement.jsx";
 
 function RoleBasedRedirect() {
   const { user } = useAuth();
@@ -100,6 +101,10 @@ export default function App() {
                 <Route
                   path="orders/completed"
                   element={<AllOrders filter="completed" />}
+                />
+                <Route
+                  path="orders/remaining"
+                  element={<AllOrders filter="remaining" />}
                 />
                 <Route
                   path="orders/assignments"
@@ -244,6 +249,14 @@ export default function App() {
                   element={
                     <RoleRoute roles={["ADMIN"]}>
                       <UserManagement />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="backups"
+                  element={
+                    <RoleRoute roles={["ADMIN"]}>
+                      <BackupManagement />
                     </RoleRoute>
                   }
                 />

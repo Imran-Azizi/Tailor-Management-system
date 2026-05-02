@@ -19,6 +19,7 @@ import {
   Spinner,
   StatCard,
 } from "../components/ui/index.jsx";
+import { useMonth } from "../context/MonthContext.jsx";
 
 function formatMeters(value) {
   return Number(value || 0).toLocaleString(undefined, {
@@ -41,6 +42,7 @@ export default function RakhtRevenue() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language || "en";
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const { viewMonth, viewYear } = useMonth();
 
   const queryParams = useMemo(() => {
     const params = {
@@ -53,9 +55,11 @@ export default function RakhtRevenue() {
     if (filters.brandName) params.brandName = filters.brandName;
     if (filters.tonName) params.tonName = filters.tonName;
     if (filters.orderType) params.orderType = filters.orderType;
+    params.month = viewMonth;
+    params.year = viewYear;
 
     return params;
-  }, [filters]);
+  }, [filters, viewMonth, viewYear]);
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["rakht-revenue-summary", queryParams],

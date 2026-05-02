@@ -6,7 +6,7 @@ import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { parseNumberLocale } from "../lib/normalize.js";
 import { formatCurrency } from "../lib/currency.js";
-import { getOrderDisplayName } from "../lib/orderType.js";
+import { getOrderLabelParts } from "../lib/orderType.js";
 import {
   Card,
   EmptyState,
@@ -397,6 +397,7 @@ export default function ClothesDeliveryToCustomer() {
                   </thead>
                   <tbody>
                     {orders.map((o, idx) => {
+                      const orderLabel = getOrderLabelParts(o, language);
                       const remaining = Number(o.remaining || 0);
                       const isCompleted = Boolean(o.isCompleted);
                       const readyToReceive = !isCompleted && remaining <= 0.001;
@@ -415,7 +416,12 @@ export default function ClothesDeliveryToCustomer() {
                               isRtl ? "text-right" : "text-left"
                             }`}
                           >
-                            {getOrderDisplayName(o, language)}
+                            <div>{orderLabel.baseTypeLabel}</div>
+                            {orderLabel.customName ? (
+                              <div className="mt-0.5 text-xs text-slate-500">
+                                {orderLabel.customName}
+                              </div>
+                            ) : null}
                           </td>
                           <td className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-900 [direction:ltr] [unicode-bidi:embed]">
                             {formatMoney(o.totalPrice, language)}

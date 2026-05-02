@@ -156,7 +156,7 @@ export default function Login() {
         style={{
           position: "fixed",
           top: 16,
-          right: 20,
+          insetInlineEnd: 20,
           display: "flex",
           alignItems: "center",
           gap: 8,

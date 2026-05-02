@@ -337,7 +337,7 @@ export default function DailyTaskDetails() {
           style={{
             position: "absolute",
             top: -40,
-            right: -40,
+            insetInlineEnd: -40,
             width: 160,
             height: 160,
             borderRadius: "50%",
@@ -349,7 +349,7 @@ export default function DailyTaskDetails() {
           style={{
             position: "absolute",
             bottom: -20,
-            right: 80,
+            insetInlineEnd: 80,
             width: 100,
             height: 100,
             borderRadius: "50%",

@@ -17,6 +17,7 @@ import {
   LuShieldCheck,
   LuChevronDown,
   LuX,
+  LuArrowLeft,
   LuArrowRight,
   LuCircleDollarSign,
   LuFileText,
@@ -80,6 +81,7 @@ function SystemNotifPanel({
   const qc = useQueryClient();
   const navigate = useNavigate();
   const language = i18n.resolvedLanguage || i18n.language || "en";
+  const isRtl = (i18n.dir?.() || "ltr") === "rtl";
 
   // Emergency order alerts (Notification model)
   const { data: emergency = [] } = useQuery({
@@ -277,7 +279,11 @@ function SystemNotifPanel({
                           }}
                         >
                           {t("navbar.viewOrder", "View & Pay")}
-                          <LuArrowRight size={11} />
+                          {isRtl ? (
+                            <LuArrowLeft size={11} />
+                          ) : (
+                            <LuArrowRight size={11} />
+                          )}
                         </p>
                       )}
                     </div>
@@ -659,6 +665,7 @@ function NotificationSidebar({
 // ─── Month Selection ──────────────────────────────────────────────────────────
 
 function MonthDropdown({ onClose }) {
+  const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language || "en";
   const {
@@ -701,7 +708,12 @@ function MonthDropdown({ onClose }) {
     setReportLoading(true);
     try {
       const response = await api.get("/orders/report/monthly", {
-        params: { month: viewMonth, year: viewYear, lang: language },
+        params: {
+          month: viewMonth,
+          year: viewYear,
+          lang: language,
+          _ts: Date.now(),
+        },
         responseType: "blob",
       });
       const monthLabel = formatMonthYearLabel(viewMonth, viewYear, language);
@@ -824,17 +836,19 @@ function MonthDropdown({ onClose }) {
 
       {isAdmin && (
         <div className="month-dd-footer">
-          <button
-            type="button"
-            className="month-report-btn"
-            disabled={reportLoading}
-            onClick={handleGenerateReport}
-          >
-            {reportLoading ? <Spinner size={12} /> : <LuDownload size={12} />}
-            {reportLoading
-              ? t("report.generating", "Generating...")
-              : t("report.generate", "Generate Report")}
-          </button>
+          <div className="month-footer-actions">
+            <button
+              type="button"
+              className="month-report-btn"
+              disabled={reportLoading}
+              onClick={handleGenerateReport}
+            >
+              {reportLoading ? <Spinner size={12} /> : <LuDownload size={12} />}
+              {reportLoading
+                ? t("report.generating", "Generating...")
+                : t("report.generate", "Generate Report")}
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -911,10 +925,11 @@ function LangDropdown({ onClose }) {
 }
 
 function UserDropdown({ onClose }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
   const roleColor = ROLE_COLORS[user?.accountType] || "var(--text3)";
+  const isRtl = (i18n.dir?.() || "ltr") === "rtl";
 
   const handleLogout = async () => {
     await logout();
@@ -923,20 +938,45 @@ function UserDropdown({ onClose }) {
   };
 
   return (
-    <div className="dd-menu" style={{ width: 210, insetInlineEnd: 0 }}>
+    <div
+      className="dd-menu user-dd-menu"
+      style={{
+        width: 210,
+        ...(isRtl
+          ? { insetInlineStart: 0, insetInlineEnd: "auto" }
+          : { insetInlineEnd: 0, insetInlineStart: "auto" }),
+        direction: isRtl ? "rtl" : "ltr",
+      }}
+    >
       <div
+        className="user-dd-head"
         style={{
           padding: "12px 14px",
           borderBottom: "1px solid var(--border)",
         }}
       >
-        <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text1)" }}>
+        <p
+          style={{
+            fontSize: 14,
+            fontWeight: 700,
+            color: "var(--text1)",
+            textAlign: "start",
+          }}
+        >
           {user?.name}
         </p>
-        <p style={{ fontSize: 11, color: "var(--text3)", marginTop: 2 }}>
+        <p
+          style={{
+            fontSize: 11,
+            color: "var(--text3)",
+            marginTop: 2,
+            textAlign: "start",
+          }}
+        >
           {user?.phoneNumber}
         </p>
         <span
+          className="user-dd-role"
           style={{
             fontSize: 11,
             fontWeight: 700,
@@ -953,7 +993,7 @@ function UserDropdown({ onClose }) {
       </div>
       {isAdmin && (
         <div
-          className="dd-item"
+          className="dd-item user-dd-item"
           onClick={() => {
             navigate("/users");
             onClose();
@@ -964,7 +1004,7 @@ function UserDropdown({ onClose }) {
         </div>
       )}
       <div
-        className="dd-item"
+        className="dd-item user-dd-item"
         onClick={handleLogout}
         style={{ color: "var(--danger)" }}
       >
@@ -977,6 +1017,8 @@ function UserDropdown({ onClose }) {
 
 export default function Navbar({ onHamburger, pageTitle }) {
   const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language || "en";
+  const isRtl = (i18n.dir?.() || "ltr") === "rtl";
   const { dark, toggle } = useTheme();
   const { user, isWorker, isAdmin, isDokan, isFinance, canManageOrders } =
     useAuth();
@@ -1205,7 +1247,7 @@ export default function Navbar({ onHamburger, pageTitle }) {
         {/* User avatar + dropdown */}
         <div className="dd-wrap" ref={userRef}>
           <button
-            className="nav-btn"
+            className="nav-btn user-dd-trigger"
             onClick={() => {
               setUserOpen((o) => !o);
               setNotifOpen(false);
@@ -1361,7 +1403,11 @@ export default function Navbar({ onHamburger, pageTitle }) {
               {formatSystemDateTime(selectedDraft.updatedAt, language)}
             </div>
             <div
-              style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}
+              style={{
+                display: "flex",
+                justifyContent: isRtl ? "flex-start" : "flex-end",
+                gap: 8,
+              }}
             >
               <button
                 type="button"

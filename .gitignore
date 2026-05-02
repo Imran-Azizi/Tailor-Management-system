@@ -40,3 +40,10 @@ Thumbs.db
 # ─── Coverage ────────────────────────────────────────────────────
 coverage/
 .nyc_output/
+
+# ─── Backup Artifacts ─────────────────────────────────────────────
+backend/tmp/backups/
+backend/storage/backup/
+*.dump
+*.dump.enc
+*.restore-test
