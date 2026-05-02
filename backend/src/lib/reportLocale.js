@@ -165,7 +165,7 @@ export const REPORT_TEXT = {
       orderRecords: "فهرست سفارش ها",
       noOrders: "برای این ماه سفارشی ثبت نشده است.",
       continued: "ادامه",
-      footerPrefix: "سیستم خیاطی خان رحیمی",
+      footerPrefix: "سیستم خیاطی هوشمند صافی",
       totals: "مجموع",
       columns: {
         num: "#",
@@ -248,7 +248,7 @@ export const REPORT_TEXT = {
       orderRecords: "د فرمایشونو جدول",
       noOrders: "د دې میاشتې لپاره فرمایش ونه موندل شو.",
       continued: "دوام",
-      footerPrefix: "خان رحيمي خیاطي سیستم",
+      footerPrefix: "هوشمند صافي خیاطي سیستم",
       totals: "ټول",
       columns: {
         num: "#",

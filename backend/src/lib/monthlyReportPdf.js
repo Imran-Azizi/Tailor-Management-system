@@ -381,23 +381,43 @@ function summaryRow(
   isRtl,
   valueColor = "#0F172A",
 ) {
-  wt(
-    doc,
-    label,
-    40,
-    y,
-    { width: 220, align: rtlAwareAlign(isRtl, "left") },
-    fkFont,
-    "#475569",
-    false,
-    11.5,
-  );
-  // Value is always numbers/ASCII — no shaping needed
-  doc
-    .font("Helvetica-Bold")
-    .fontSize(11.5)
-    .fillColor(valueColor)
-    .text(value, 260, y, { width: 335, align: rtlAwareAlign(isRtl, "left") });
+  if (isRtl) {
+    // RTL: value (numbers, always LTR) on LEFT, label (Arabic text) on RIGHT
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(11.5)
+      .fillColor(valueColor)
+      .text(value, 40, y, { width: 200, align: "left" });
+    wt(
+      doc,
+      label,
+      240,
+      y,
+      { width: 560, align: "right" },
+      fkFont,
+      "#475569",
+      false,
+      11.5,
+    );
+  } else {
+    wt(
+      doc,
+      label,
+      40,
+      y,
+      { width: 220, align: "left" },
+      fkFont,
+      "#475569",
+      false,
+      11.5,
+    );
+    // Value is always numbers/ASCII — no shaping needed
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(11.5)
+      .fillColor(valueColor)
+      .text(value, 260, y, { width: 335, align: "left" });
+  }
   return y + 16;
 }
 
@@ -535,16 +555,20 @@ function drawDashboardStatsCards(
         .roundedRect(x, cardY, cardWidth, cardHeight, 5)
         .lineWidth(0.6)
         .stroke("#E2E8F0");
-      doc.rect(x, cardY, 3, cardHeight).fill(card.accent || "#1D4ED8");
+      // RTL: accent bar on the right side of the card; LTR: on the left
+      const accentBarX = isRtl ? x + cardWidth - 3 : x;
+      doc.rect(accentBarX, cardY, 3, cardHeight).fill(card.accent || "#1D4ED8");
       doc.restore();
 
+      const cardTextX = x + 8;
+      const cardTextW = cardWidth - 16;
       wt(
         doc,
         card.label || "-",
-        x + 8,
+        cardTextX,
         cardY + 7,
         {
-          width: cardWidth - 16,
+          width: cardTextW,
           align: rtlAwareAlign(isRtl, "left"),
         },
         fkFont,
@@ -553,12 +577,13 @@ function drawDashboardStatsCards(
         8.6,
       );
 
+      // Numeric values (AF amounts) — always render LTR; align matches card direction
       doc
         .font("Helvetica-Bold")
         .fontSize(10.6)
         .fillColor("#0F172A")
-        .text(card.value, x + 8, cardY + 23, {
-          width: cardWidth - 16,
+        .text(card.value, cardTextX, cardY + 23, {
+          width: cardTextW,
           align: rtlAwareAlign(isRtl, "left"),
         });
     });
@@ -669,6 +694,12 @@ export async function buildMonthlyReportPdf({
 
     // ── Summary ───────────────────────────────────────────────────────────────
     let y = 80;
+
+    // Light background panel with top accent stripe for the summary section
+    doc.save();
+    doc.roundedRect(TABLE_X, y - 4, TABLE_W, 128, 5).fill("#F8FAFC");
+    doc.rect(TABLE_X, y - 4, TABLE_W, 3).fill("#3B82F6");
+    doc.restore();
 
     wt(
       doc,
