@@ -200,6 +200,12 @@ function rtlAwareAlign(isRtl, fallback = "left") {
   return isRtl ? "right" : fallback;
 }
 
+function rtlSafeNumber(value, isRtl) {
+  const raw = String(value ?? "");
+  if (!isRtl) return raw;
+  return `\u200E${raw}\u200E`;
+}
+
 function mirrorColumns(columns, tableX, tableWidth) {
   return Object.fromEntries(
     Object.entries(columns).map(([key, col]) => [
@@ -607,7 +613,7 @@ export async function buildMonthlyReportPdf({
 
     wt(
       doc,
-      `${labels.title} — ${monthName(month, language)} ${year}`,
+      `${labels.title} — ${monthName(month, language)} ${rtlSafeNumber(year, isRtl)}`,
       40,
       18,
       { width: pageW - 80, align: rtlAwareAlign(isRtl, "left") },
@@ -816,7 +822,7 @@ export async function buildMonthlyReportPdf({
     // ── Footer ────────────────────────────────────────────────────────────────
     wt(
       doc,
-      `${labels.footerPrefix} — ${labels.title} ${monthName(month, language)} ${year}`,
+      `${labels.footerPrefix} — ${labels.title} ${monthName(month, language)} ${rtlSafeNumber(year, isRtl)}`,
       40,
       doc.page.height - 26,
       { width: pageW - 80, align: isRtl ? "right" : "center" },

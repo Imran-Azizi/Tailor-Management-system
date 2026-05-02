@@ -7,6 +7,56 @@ export function normalizeReportLanguage(language = "en") {
 
 const AFGHANISTAN_TIMEZONE = "Asia/Kabul";
 
+const WEEKDAY_MAP_DARI = {
+  Sun: "یکشنبه",
+  Mon: "دوشنبه",
+  Tue: "سه‌شنبه",
+  Wed: "چهارشنبه",
+  Thu: "پنجشنبه",
+  Fri: "جمعه",
+  Sat: "شنبه",
+};
+
+const WEEKDAY_MAP_PASHTO = {
+  Sun: "یکشنبې",
+  Mon: "دوشنبې",
+  Tue: "سې شنبې",
+  Wed: "څلورشنبې",
+  Thu: "پنجشنبې",
+  Fri: "جمعه",
+  Sat: "شنبه",
+};
+
+const JALALI_MONTHS_DARI = [
+  "حمل",
+  "ثور",
+  "جوزا",
+  "سرطان",
+  "اسد",
+  "سنبله",
+  "میزان",
+  "عقرب",
+  "قوس",
+  "جدی",
+  "دلو",
+  "حوت",
+];
+
+const JALALI_MONTHS_PASHTO = [
+  "وری",
+  "غویی",
+  "غبرګولی",
+  "چنګاښ",
+  "زمری",
+  "وږی",
+  "تله",
+  "لړم",
+  "لیندۍ",
+  "مرغومی",
+  "سلواغه",
+  "کب",
+];
+
 export function getReportLocaleTag(language = "en") {
   const normalized = normalizeReportLanguage(language);
   if (normalized === "dari") return "fa-AF-u-ca-persian-nu-latn";
@@ -68,23 +118,51 @@ export function formatMonthlyReportHeaderDateTime(value, language = "en") {
     return formatReportDateTime(date, language);
   }
 
-  const locale = getReportLocaleTag(language);
-  const datePart = new Intl.DateTimeFormat(locale, {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: AFGHANISTAN_TIMEZONE,
-  }).format(date);
+  try {
+    const locale = getReportLocaleTag(language);
+    const weekdayShort = new Intl.DateTimeFormat("en-US", {
+      weekday: "short",
+      timeZone: AFGHANISTAN_TIMEZONE,
+    }).format(date);
 
-  const timePart = new Intl.DateTimeFormat(locale, {
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-    timeZone: AFGHANISTAN_TIMEZONE,
-  }).format(date);
+    const jalaliParts = new Intl.DateTimeFormat("fa-AF-u-ca-persian-nu-latn", {
+      day: "numeric",
+      month: "numeric",
+      year: "numeric",
+      timeZone: AFGHANISTAN_TIMEZONE,
+    }).formatToParts(date);
 
-  return `${datePart} — ${timePart}`;
+    const day = jalaliParts.find((part) => part.type === "day")?.value;
+    const monthRaw = jalaliParts.find((part) => part.type === "month")?.value;
+    const year = jalaliParts.find((part) => part.type === "year")?.value;
+
+    const monthIndex = Math.max(1, Math.min(12, Number(monthRaw || 1))) - 1;
+    const monthName =
+      normalized === "pashto"
+        ? JALALI_MONTHS_PASHTO[monthIndex]
+        : JALALI_MONTHS_DARI[monthIndex];
+
+    const weekdayName =
+      normalized === "pashto"
+        ? WEEKDAY_MAP_PASHTO[weekdayShort] || weekdayShort
+        : WEEKDAY_MAP_DARI[weekdayShort] || weekdayShort;
+
+    const timePart = new Intl.DateTimeFormat(locale, {
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZone: AFGHANISTAN_TIMEZONE,
+    }).format(date);
+
+    if (!day || !year) {
+      return formatReportDateTime(date, language);
+    }
+
+    const datePart = `${weekdayName}، ${day} ${monthName} ${year}`;
+    return `${datePart} — ${timePart}`;
+  } catch {
+    return formatReportDateTime(date, language);
+  }
 }
 
 export function formatReportNumber(value, language = "en", options = {}) {
