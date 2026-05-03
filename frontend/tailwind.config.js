@@ -1,6 +1,21 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ['./index.html', './src/**/*.{js,jsx}'],
+  content: ['./index.html', './src/**/*.{js,jsx,ts,tsx}'],
+  safelist: [
+    'print-a6-sheet',
+    'text-right',
+    'text-left',
+    'flex-row',
+    'flex-row-reverse',
+    'grid-cols-2',
+    'grid-cols-3',
+    'grid-cols-4',
+    '[direction:ltr]',
+    '[unicode-bidi:embed]',
+    'bg-slate-50/40',
+    'bg-blue-50/70',
+    'border-blue-500',
+  ],
   darkMode: 'class',
   theme: {
     extend: {

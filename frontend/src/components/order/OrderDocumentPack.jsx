@@ -1243,21 +1243,41 @@ export function printElement(id, options = {}) {
     ? "'Noto Naskh Arabic','Noto Sans Arabic','Inter',sans-serif"
     : "'Inter','Noto Sans Arabic',sans-serif";
 
-  const styleNodes = Array.from(
-    document.querySelectorAll("link[rel='stylesheet'], style"),
+  const stylesheetLinks = Array.from(
+    document.querySelectorAll("link[rel='stylesheet']"),
   )
+    .map((link) => {
+      const href = link.href;
+      if (!href) return "";
+      const media = link.media ? ` media=\"${link.media}\"` : "";
+      const crossOrigin = link.crossOrigin
+        ? ` crossorigin=\"${link.crossOrigin}\"`
+        : "";
+      return `<link rel=\"stylesheet\" href=\"${href}\"${media}${crossOrigin}>`;
+    })
+    .filter(Boolean)
+    .join("\n");
+
+  const inlineStyleNodes = Array.from(document.querySelectorAll("style"))
     .map((node) => node.outerHTML)
     .join("\n");
+
+  const baseHref =
+    options.baseHref ||
+    document.baseURI ||
+    `${window.location.origin}${window.location.pathname}`;
 
   printWindow.document.write(`
     <html lang="${lang}" dir="${dir}">
       <head>
         <meta charset="UTF-8" />
+        <base href="${baseHref}" />
         <title>${title}</title>
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Naskh+Arabic:wght@400;600;700&family=Noto+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
-        ${styleNodes}
+        ${stylesheetLinks}
+        ${inlineStyleNodes}
         <style>
           *{box-sizing:border-box}
           @page{size:A6 portrait;margin:0}
@@ -1289,14 +1309,70 @@ export function printElement(id, options = {}) {
     printWindow.close();
   };
 
-  const fontsReady = printWindow.document.fonts?.ready;
-  if (fontsReady && typeof fontsReady.then === "function") {
-    fontsReady
-      .then(() => setTimeout(printNow, 180))
-      .catch(() => setTimeout(printNow, 350));
-  } else {
-    setTimeout(printNow, 350);
-  }
+  const waitForStyles = () => {
+    const links = Array.from(
+      printWindow.document.querySelectorAll("link[rel='stylesheet']"),
+    );
+    if (!links.length) return Promise.resolve();
+
+    return Promise.all(
+      links.map(
+        (link) =>
+          new Promise((resolve) => {
+            if (link.sheet) {
+              resolve();
+              return;
+            }
+            const done = () => {
+              link.removeEventListener("load", done);
+              link.removeEventListener("error", done);
+              resolve();
+            };
+            link.addEventListener("load", done, { once: true });
+            link.addEventListener("error", done, { once: true });
+            setTimeout(done, 1600);
+          }),
+      ),
+    );
+  };
+
+  const waitForImages = () => {
+    const images = Array.from(printWindow.document.images || []);
+    if (!images.length) return Promise.resolve();
+
+    return Promise.all(
+      images.map(
+        (img) =>
+          new Promise((resolve) => {
+            if (img.complete) {
+              resolve();
+              return;
+            }
+            const done = () => {
+              img.removeEventListener("load", done);
+              img.removeEventListener("error", done);
+              resolve();
+            };
+            img.addEventListener("load", done, { once: true });
+            img.addEventListener("error", done, { once: true });
+            setTimeout(done, 1200);
+          }),
+      ),
+    );
+  };
+
+  const waitForFonts = () => {
+    const fontsReady = printWindow.document.fonts?.ready;
+    if (fontsReady && typeof fontsReady.then === "function") {
+      return fontsReady.catch(() => undefined);
+    }
+    return Promise.resolve();
+  };
+
+  Promise.all([waitForStyles(), waitForFonts(), waitForImages()])
+    .catch(() => undefined)
+    .finally(() => setTimeout(printNow, 220));
+
   return true;
 }
 export async function exportPdf(id, filename) {

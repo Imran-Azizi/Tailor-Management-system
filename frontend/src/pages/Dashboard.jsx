@@ -189,11 +189,15 @@ export default function Dashboard() {
           </p>
           <div className="dashboard-net-card__breakdown">
             <div className="dashboard-net-card__chip">
-              <span>{t("dashboardPage.totalRakhtRevenue", "Total Rakht Revenue")}</span>
+              <span>
+                {t("dashboardPage.totalRakhtRevenue", "Total Rakht Revenue")}
+              </span>
               <strong>{formatCurrency(totalRakhtRevenue, language)}</strong>
             </div>
             <div className="dashboard-net-card__chip">
-              <span>{t("dashboardPage.totalOrderBenefit", "Total Order Benefit")}</span>
+              <span>
+                {t("dashboardPage.totalOrderBenefit", "Total Order Benefit")}
+              </span>
               <strong>{formatCurrency(totalOrderBenefit, language)}</strong>
             </div>
           </div>
