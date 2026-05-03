@@ -1404,7 +1404,11 @@ export function PrintSafeSheet({ id, children, className = "" }) {
     "mx-auto w-full max-w-[560px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[var(--sh-md)] print:max-w-[148mm] print:rounded-none print:border-0 print:shadow-none";
 
   return (
-    <div id={id} data-print-safe="true" className={`${baseClassName} ${className}`.trim()}>
+    <div
+      id={id}
+      data-print-safe="true"
+      className={`${baseClassName} ${className}`.trim()}
+    >
       {children}
     </div>
   );
