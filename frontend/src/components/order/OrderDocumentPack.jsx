@@ -1426,29 +1426,16 @@ export async function exportPdf(id, filename) {
 
 function DetailField({ label, value, Icon }) {
   return (
-    <div className="print-detail-field">
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 8,
-        }}
-      >
-        <span
-          style={{
-            fontSize: 12,
-            fontWeight: 700,
-            color: "#475569",
-            textTransform: "uppercase",
-            letterSpacing: ".06em",
-          }}
-        >
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-bold uppercase tracking-[0.06em] text-white/80">
           {label}
         </span>
-        {Icon && <Icon size={15} style={{ color: "#0F6CBD" }} />}
+        {Icon && <Icon size={15} className="text-sky-100" />}
       </div>
-      <div className="print-detail-value">{value || "-"}</div>
+      <div className="flex min-h-[50px] items-center rounded-lg border border-white/25 bg-white/15 px-3.5 text-[15px] font-bold text-white">
+        {value || "-"}
+      </div>
     </div>
   );
 }
@@ -1463,55 +1450,37 @@ export function OrderDocumentPack({ customer, order, previewId }) {
   const tailorId = `${previewId}-tailor`;
   const orderTypeLabel = getOrderDisplayName(order, settings.langCode);
   const txt = settings.text;
+  const isRtl = settings.isRtl;
+  const headlineAlign = isRtl ? "text-right" : "text-left";
+  const heroBillAlign = isRtl ? "text-left" : "text-right";
+  const actionTextAlign = isRtl ? "text-right" : "text-left";
 
   return (
-    <div className="order-doc-pack">
-      <div className="order-doc-summary">
-        <div className="order-doc-hero">
-          <div>
-            <span className="order-doc-hero-badge">
+    <div className="grid gap-4">
+      <div className="rounded-xl bg-blue-600 p-5 text-white shadow-[0_20px_40px_rgba(37,99,235,.2)]">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className={headlineAlign}>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-bold">
               {t("orders.professionalPrintPack")}
             </span>
-            <h3
-              style={{
-                fontSize: 24,
-                fontWeight: 900,
-                lineHeight: 1.15,
-                marginTop: 10,
-              }}
-            >
+            <h3 className="mt-2.5 text-2xl font-black leading-[1.15]">
               {t("orders.orderDocuments")}
             </h3>
-            <p
-              style={{
-                fontSize: 14,
-                color: "rgba(255,255,255,.84)",
-                maxWidth: 520,
-                marginTop: 8,
-              }}
-            >
+            <p className="mt-2 max-w-[520px] text-sm text-white/85">
               {t("orders.printPackCopy")}
             </p>
           </div>
-          <div style={{ textAlign: "end" }}>
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,.72)" }}>
+          <div className={heroBillAlign}>
+            <div className="text-xs text-white/75">
               {t("orders.billNumber")}
             </div>
-            <div
-              style={{
-                fontSize: 34,
-                fontWeight: 900,
-                lineHeight: 1,
-                direction: "ltr",
-                unicodeBidi: "embed",
-              }}
-            >
+            <div className="text-[34px] font-black leading-none [direction:ltr] [unicode-bidi:embed]">
               #{toEnglishDigits(customer?.billNumber)}
             </div>
           </div>
         </div>
 
-        <div className="order-doc-grid">
+        <div className="mt-[18px] grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <DetailField
             label={t("common.phone", "Phone")}
             value={toEnglishDigits(customer?.phoneNumber)}
@@ -1530,16 +1499,18 @@ export function OrderDocumentPack({ customer, order, previewId }) {
         </div>
       </div>
 
-      <div className="order-doc-actions">
-        <div className="order-doc-action-card">
-          <div>
-            <p className="order-doc-action-title">{txt.printBillForCustomer}</p>
-            <p className="order-doc-action-copy">{txt.customerBillCopy}</p>
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <div className="rounded-xl border border-slate-200 bg-white p-[18px]">
+          <div className={actionTextAlign}>
+            <p className="text-[15px] font-bold text-slate-900">
+              {txt.printBillForCustomer}
+            </p>
+            <p className="mt-1 text-[13px] text-slate-500">{txt.customerBillCopy}</p>
           </div>
-          <div className="order-doc-action-row">
+          <div className="mt-[14px] grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
             <button
               type="button"
-              className="print-center-btn"
+              className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-md border-0 bg-emerald-600 px-4 font-semibold text-white shadow-[0_8px_20px_rgba(5,150,105,.2)] transition duration-150 hover:-translate-y-[1px] hover:opacity-90"
               onClick={() =>
                 printElement(customerId, {
                   dir: settings.dir,
@@ -1553,7 +1524,7 @@ export function OrderDocumentPack({ customer, order, previewId }) {
             </button>
             <button
               type="button"
-              className="print-center-side-btn"
+              className="inline-flex min-h-[50px] items-center justify-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-[14px] font-semibold text-blue-900 transition duration-150 hover:-translate-y-[1px] hover:opacity-90"
               onClick={() =>
                 exportPdf(
                   customerId,
@@ -1567,15 +1538,17 @@ export function OrderDocumentPack({ customer, order, previewId }) {
           </div>
         </div>
 
-        <div className="order-doc-action-card">
-          <div>
-            <p className="order-doc-action-title">{txt.printBillForTailor}</p>
-            <p className="order-doc-action-copy">{txt.tailorBillCopy}</p>
+        <div className="rounded-xl border border-slate-200 bg-white p-[18px]">
+          <div className={actionTextAlign}>
+            <p className="text-[15px] font-bold text-slate-900">
+              {txt.printBillForTailor}
+            </p>
+            <p className="mt-1 text-[13px] text-slate-500">{txt.tailorBillCopy}</p>
           </div>
-          <div className="order-doc-action-row">
+          <div className="mt-[14px] grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
             <button
               type="button"
-              className="print-center-btn"
+              className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-md border-0 bg-emerald-600 px-4 font-semibold text-white shadow-[0_8px_20px_rgba(5,150,105,.2)] transition duration-150 hover:-translate-y-[1px] hover:opacity-90"
               onClick={() =>
                 printElement(tailorId, {
                   dir: settings.dir,
@@ -1589,7 +1562,7 @@ export function OrderDocumentPack({ customer, order, previewId }) {
             </button>
             <button
               type="button"
-              className="print-center-side-btn"
+              className="inline-flex min-h-[50px] items-center justify-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-[14px] font-semibold text-blue-900 transition duration-150 hover:-translate-y-[1px] hover:opacity-90"
               onClick={() =>
                 exportPdf(
                   tailorId,
@@ -1604,7 +1577,7 @@ export function OrderDocumentPack({ customer, order, previewId }) {
         </div>
       </div>
 
-      <div className="order-doc-preview-grid">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <div id={customerId}>
           <CustomerBill customer={customer} order={order} />
         </div>
