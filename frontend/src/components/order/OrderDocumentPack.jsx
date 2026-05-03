@@ -1247,6 +1247,8 @@ export function printElement(id, options = {}) {
     "en";
 
   const title = options.title || "Order Document";
+  const includeWrapper = options.includeWrapper !== false;
+  const printMarkup = includeWrapper ? element.outerHTML : element.innerHTML;
   const isRtl = dir === "rtl";
   const bodyFont = isRtl
     ? "'Noto Naskh Arabic','Noto Sans Arabic','Inter',sans-serif"
@@ -1319,7 +1321,7 @@ export function printElement(id, options = {}) {
         </style>
       </head>
       <body dir="${dir}">
-        ${element.innerHTML}
+        ${printMarkup}
       </body>
     </html>
   `);
@@ -1396,6 +1398,18 @@ export function printElement(id, options = {}) {
 
   return true;
 }
+
+export function PrintSafeSheet({ id, children, className = "" }) {
+  const baseClassName =
+    "mx-auto w-full max-w-[560px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[var(--sh-md)] print:max-w-[148mm] print:rounded-none print:border-0 print:shadow-none";
+
+  return (
+    <div id={id} data-print-safe="true" className={`${baseClassName} ${className}`.trim()}>
+      {children}
+    </div>
+  );
+}
+
 export async function exportPdf(id, filename) {
   try {
     const { default: jsPDF } = await import("jspdf");
@@ -1580,16 +1594,16 @@ export function OrderDocumentPack({ customer, order, previewId }) {
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <div id={customerId}>
+        <PrintSafeSheet id={customerId}>
           <CustomerBill customer={customer} order={order} />
-        </div>
-        <div id={tailorId}>
+        </PrintSafeSheet>
+        <PrintSafeSheet id={tailorId}>
           <TailorBill
             customer={customer}
             order={order}
             measurements={measurements}
           />
-        </div>
+        </PrintSafeSheet>
       </div>
     </div>
   );

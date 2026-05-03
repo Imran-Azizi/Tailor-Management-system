@@ -5,6 +5,7 @@ import api from "../lib/api.js";
 import toast from "react-hot-toast";
 import {
   CustomerCombinedBill,
+  PrintSafeSheet,
   TailorBill,
   getOrderDisplayName,
   getBillLanguageSettings,
@@ -615,13 +616,14 @@ export default function PrintBills() {
       <div style={{ display: "none" }}>
         {customer && orders.length > 0 && (
           <div>
-            <div id="preview-customer">
+            <PrintSafeSheet id="preview-customer" className="max-w-[148mm]">
               <CustomerCombinedBill customer={customer} orders={orders} />
-            </div>
+            </PrintSafeSheet>
             {orderMeta.map(({ order, index, itemLabel }) => (
-              <div
+              <PrintSafeSheet
                 key={order.id || `${order.type}-${index}`}
                 id={getTailorPreviewId(order, index)}
+                className="max-w-[148mm]"
               >
                 <TailorBill
                   customer={customer}
@@ -629,7 +631,7 @@ export default function PrintBills() {
                   measurements={getMeasurementsFromOrder(order)}
                   itemLabel={itemLabel}
                 />
-              </div>
+              </PrintSafeSheet>
             ))}
           </div>
         )}
