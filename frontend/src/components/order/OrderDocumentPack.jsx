@@ -1285,9 +1285,7 @@ export function printElement(id, options = {}) {
     .map((node) => node.outerHTML)
     .join("\n");
 
-  const baseHref =
-    options.baseHref ||
-    `${window.location.origin}/`;
+  const baseHref = options.baseHref || `${window.location.origin}/`;
 
   printWindow.document.write(`
     <html lang="${lang}" dir="${dir}">
@@ -1505,7 +1503,9 @@ export function OrderDocumentPack({ customer, order, previewId }) {
             <p className="text-[15px] font-bold text-slate-900">
               {txt.printBillForCustomer}
             </p>
-            <p className="mt-1 text-[13px] text-slate-500">{txt.customerBillCopy}</p>
+            <p className="mt-1 text-[13px] text-slate-500">
+              {txt.customerBillCopy}
+            </p>
           </div>
           <div className="mt-[14px] grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
             <button
@@ -1543,7 +1543,9 @@ export function OrderDocumentPack({ customer, order, previewId }) {
             <p className="text-[15px] font-bold text-slate-900">
               {txt.printBillForTailor}
             </p>
-            <p className="mt-1 text-[13px] text-slate-500">{txt.tailorBillCopy}</p>
+            <p className="mt-1 text-[13px] text-slate-500">
+              {txt.tailorBillCopy}
+            </p>
           </div>
           <div className="mt-[14px] grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
             <button
