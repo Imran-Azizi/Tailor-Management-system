@@ -36,17 +36,22 @@ async function main() {
       create: { name },
     });
 
-  await Promise.all([
-    ...yakhanStyles.map((name) => upsertByName(prisma.yakhan, name)),
-    ...astinStyles.map((name) => upsertByName(prisma.astin, name)),
-    ...damanStyles.map((name) => upsertByName(prisma.daman, name)),
-    ...jibRows.map((name) => upsertByName(prisma.jibRow, name)),
-    ...jibBaghles.map((name) => upsertByName(prisma.jibBaghle, name)),
-    ...jibTenbans.map((name) => upsertByName(prisma.jibTenban, name)),
-    ...patyShips.map((name) => upsertByName(prisma.patyShip, name)),
-    ...buttonShips.map((name) => upsertByName(prisma.buttonShip, name)),
-    ...tenbanShips.map((name) => upsertByName(prisma.tenbanShip, name)),
-  ]);
+  // Seed sequentially to avoid exhausting limited DB pool connections in hosted environments.
+  const seedNames = async (model, names) => {
+    for (const name of names) {
+      await upsertByName(model, name);
+    }
+  };
+
+  await seedNames(prisma.yakhan, yakhanStyles);
+  await seedNames(prisma.astin, astinStyles);
+  await seedNames(prisma.daman, damanStyles);
+  await seedNames(prisma.jibRow, jibRows);
+  await seedNames(prisma.jibBaghle, jibBaghles);
+  await seedNames(prisma.jibTenban, jibTenbans);
+  await seedNames(prisma.patyShip, patyShips);
+  await seedNames(prisma.buttonShip, buttonShips);
+  await seedNames(prisma.tenbanShip, tenbanShips);
 
   console.log("✅ Design styles seeded");
 
