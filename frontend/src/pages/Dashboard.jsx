@@ -133,8 +133,10 @@ export default function Dashboard() {
         ? formatMonthYearLabel(item.monthNumber, item.monthYear, language)
         : item.month,
   }));
-  const netBenefit =
-    Number(d.totalRakhtRevenue ?? 0) + Number(d.totalOrderBenefit ?? 0);
+  const totalRakhtRevenue = Number(d.totalRakhtRevenue ?? 0) || 0;
+  const totalOrderBenefit = Number(d.totalOrderBenefit ?? 0) || 0;
+  const netBenefit = totalRakhtRevenue + totalOrderBenefit;
+  const netBenefitIsPositive = netBenefit >= 0;
 
   return (
     <div className="page">
@@ -167,95 +169,45 @@ export default function Dashboard() {
       )}
 
       <section
-        style={{
-          marginBottom: 18,
-          borderRadius: 24,
-          padding: "22px 24px",
-          border: "1px solid rgba(124,58,237,0.18)",
-          background:
-            "linear-gradient(135deg, rgba(124,58,237,0.12) 0%, rgba(59,130,246,0.08) 52%, rgba(255,255,255,0.96) 100%)",
-          boxShadow: "0 16px 32px -22px rgba(15,23,42,0.35)",
-          overflow: "hidden",
-        }}
+        className={`dashboard-net-card${netBenefitIsPositive ? "" : " dashboard-net-card--negative"}`}
+        dir={isRtl ? "rtl" : "ltr"}
       >
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 18,
-            textAlign: isRtl ? "right" : "left",
-            direction: isRtl ? "rtl" : "ltr",
-          }}
-        >
-          <div style={{ flex: "1 1 320px", minWidth: 0 }}>
-            <p
-              style={{
-                margin: 0,
-                marginBottom: 10,
-                fontSize: 13,
-                fontWeight: 800,
-                letterSpacing: ".04em",
-                color: "#5B21B6",
-                textTransform: "uppercase",
-              }}
-            >
-              {t("dashboardPage.netBenefit", "Net Benefit")}
-            </p>
-            <p
-              style={{
-                margin: 0,
-                fontSize: "clamp(2rem, 4vw, 3rem)",
-                lineHeight: 1,
-                fontWeight: 800,
-                letterSpacing: "-.04em",
-                color: "#4C1D95",
-                wordBreak: "break-word",
-              }}
-            >
-              {formatCurrency(netBenefit, language)}
-            </p>
-            <p
-              style={{
-                margin: 0,
-                marginTop: 10,
-                fontSize: 13,
-                color: "var(--text3)",
-                maxWidth: 560,
-              }}
-            >
-              {t(
-                "dashboardPage.netBenefitSub",
-                "Total Rakht Revenue + Total Order Benefit",
-              )}
-            </p>
-          </div>
-
-          <div
-            style={{
-              width: 72,
-              height: 72,
-              borderRadius: 20,
-              background: "rgba(255,255,255,0.78)",
-              border: "1px solid rgba(124,58,237,0.12)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.65)",
-            }}
-            aria-hidden="true"
+        <div className="dashboard-net-card__main">
+          <p
+            className={`dashboard-net-card__label${isRtl ? " dashboard-net-card__label--rtl" : ""}`}
           >
-            <LuBadgeDollarSign size={34} style={{ color: "#7C3AED" }} />
+            {t("dashboardPage.netBenefit", "Net Benefit")}
+          </p>
+          <p className="dashboard-net-card__value">
+            {formatCurrency(netBenefit, language)}
+          </p>
+          <p className="dashboard-net-card__sub">
+            {t(
+              "dashboardPage.netBenefitSub",
+              "Total Rakht Revenue + Total Order Benefit",
+            )}
+          </p>
+          <div className="dashboard-net-card__breakdown">
+            <div className="dashboard-net-card__chip">
+              <span>{t("dashboardPage.totalRakhtRevenue", "Total Rakht Revenue")}</span>
+              <strong>{formatCurrency(totalRakhtRevenue, language)}</strong>
+            </div>
+            <div className="dashboard-net-card__chip">
+              <span>{t("dashboardPage.totalOrderBenefit", "Total Order Benefit")}</span>
+              <strong>{formatCurrency(totalOrderBenefit, language)}</strong>
+            </div>
           </div>
+        </div>
+
+        <div className="dashboard-net-card__icon" aria-hidden="true">
+          <LuBadgeDollarSign size={34} />
         </div>
       </section>
 
       <div className="dashboard-top-stats" style={{ marginBottom: 14 }}>
         <StatCard
           label={t("dashboardPage.totalRakhtRevenue", "Total Rakht Revenue")}
-          value={formatCurrency(d.totalRakhtRevenue ?? 0, language)}
+          value={formatCurrency(totalRakhtRevenue, language)}
           Icon={LuBadgeDollarSign}
           accent="#0F766E"
           sub={t(
@@ -265,7 +217,7 @@ export default function Dashboard() {
         />
         <StatCard
           label={t("dashboardPage.totalOrderBenefit", "Total Order Benefit")}
-          value={formatCurrency(d.totalOrderBenefit ?? 0, language)}
+          value={formatCurrency(totalOrderBenefit, language)}
           Icon={LuTrendingUp}
           accent="#1D4ED8"
           sub={t(
