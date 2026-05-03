@@ -345,6 +345,7 @@ export default function CustomerTransactions() {
             position: "relative",
             display: "flex",
             alignItems: "center",
+            width: "min(100%, 220px)",
           }}
         >
           <LuSearch
@@ -358,7 +359,7 @@ export default function CustomerTransactions() {
           />
           <input
             className="inp"
-            style={{ paddingInlineStart: 32, width: 200, height: 36 }}
+            style={{ paddingInlineStart: 32, width: "100%", height: 36 }}
             placeholder={t("orders.searchCustomers")}
             value={search}
             onChange={(e) => {

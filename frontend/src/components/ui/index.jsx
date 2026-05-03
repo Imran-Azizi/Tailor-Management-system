@@ -187,7 +187,11 @@ export const Modal = ({ open, onClose, title, children, maxW = 480 }) => {
       className="modal-bg"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="modal-box" dir={docDir} style={{ maxWidth: maxW }}>
+      <div
+        className="modal-box w-[95vw] sm:w-full"
+        dir={docDir}
+        style={{ maxWidth: maxW }}
+      >
         <div className="modal-hd">
           <h2>{title}</h2>
           <button
@@ -204,7 +208,7 @@ export const Modal = ({ open, onClose, title, children, maxW = 480 }) => {
             ×
           </button>
         </div>
-        <div className="modal-body">{children}</div>
+        <div className="modal-body modal-content">{children}</div>
       </div>
     </div>
   );

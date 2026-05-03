@@ -759,7 +759,12 @@ function MonthDropdown({ onClose }) {
   return (
     <div
       className="dd-menu month-dd"
-      style={{ minWidth: 270, insetInlineStart: 0, insetInlineEnd: "auto" }}
+      style={{
+        minWidth: "min(270px, 92vw)",
+        width: "min(320px, 92vw)",
+        insetInlineStart: 0,
+        insetInlineEnd: "auto",
+      }}
     >
       <div className="month-dd-header">
         <LuCalendarCheck size={13} />
@@ -941,7 +946,7 @@ function UserDropdown({ onClose }) {
     <div
       className="dd-menu user-dd-menu"
       style={{
-        width: 210,
+        width: "min(210px, 90vw)",
         ...(isRtl
           ? { insetInlineStart: 0, insetInlineEnd: "auto" }
           : { insetInlineEnd: 0, insetInlineStart: "auto" }),
@@ -1312,7 +1317,7 @@ export default function Navbar({ onHamburger, pageTitle }) {
         ) : drafts.length === 0 ? (
           <EmptyState message={t("orders.noDrafts", "No saved drafts")} />
         ) : (
-          <div style={{ overflowX: "auto" }}>
+          <div className="tbl-wrap">
             <table className="tbl">
               <thead>
                 <tr>
@@ -1403,10 +1408,9 @@ export default function Navbar({ onHamburger, pageTitle }) {
               {formatSystemDateTime(selectedDraft.updatedAt, language)}
             </div>
             <div
+              className="modal-actions"
               style={{
-                display: "flex",
                 justifyContent: isRtl ? "flex-start" : "flex-end",
-                gap: 8,
               }}
             >
               <button

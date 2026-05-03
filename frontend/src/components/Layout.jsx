@@ -52,6 +52,18 @@ export default function Layout() {
   useEffect(() => {
     setMobileOpen(false);
   }, [loc.pathname]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    const prevOverflow = document.body.style.overflow;
+    if (mobileOpen) {
+      document.body.style.overflow = "hidden";
+    }
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [mobileOpen]);
+
   const titleKey =
     Object.entries(TITLES)
       .sort((a, b) => b[0].length - a[0].length)
@@ -76,7 +88,7 @@ export default function Layout() {
           onHamburger={() => setMobileOpen((o) => !o)}
           pageTitle={t(titleKey)}
         />
-        <main style={{ flex: 1 }}>
+        <main className="min-w-0" style={{ flex: 1 }}>
           <Outlet />
         </main>
       </div>

@@ -472,6 +472,7 @@ export default function WorkerLayout() {
 
   return (
     <div
+      className="worker-shell"
       style={{
         minHeight: "100vh",
         background: "var(--bg)",
@@ -480,6 +481,7 @@ export default function WorkerLayout() {
       }}
     >
       <header
+        className="worker-navbar"
         style={{
           background: "var(--surface)",
           borderBottom: "1px solid var(--border)",
@@ -494,6 +496,7 @@ export default function WorkerLayout() {
         }}
       >
         <div
+          className="worker-brand"
           style={{
             display: "flex",
             alignItems: "center",
@@ -532,6 +535,7 @@ export default function WorkerLayout() {
         </div>
 
         <div
+          className="worker-month-wrap"
           style={{
             display: "flex",
             alignItems: "center",
@@ -577,111 +581,120 @@ export default function WorkerLayout() {
         </div>
 
         <div
-          style={{ position: "relative" }}
-          ref={langRef}
-          onMouseDown={(e) => e.stopPropagation()}
+          className="worker-controls"
+          style={{ display: "flex", alignItems: "center", gap: 8 }}
         >
+          <div
+            style={{ position: "relative" }}
+            ref={langRef}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => {
+                setLangOpen((o) => !o);
+                setUserOpen(false);
+              }}
+              style={btnStyle}
+            >
+              <LuLanguages size={14} />
+              <span style={{ fontWeight: 700, fontSize: 12 }}>
+                {currentLang}
+              </span>
+            </button>
+            {langOpen && <LangMenu onClose={() => setLangOpen(false)} />}
+          </div>
+
+          <button onClick={toggle} style={btnStyle}>
+            {dark ? <LuSun size={15} /> : <LuMoon size={15} />}
+          </button>
+
           <button
             onClick={() => {
-              setLangOpen((o) => !o);
+              setNotifOpen(true);
+              setLangOpen(false);
               setUserOpen(false);
             }}
-            style={btnStyle}
+            style={{ ...btnStyle, position: "relative" }}
           >
-            <LuLanguages size={14} />
-            <span style={{ fontWeight: 700, fontSize: 12 }}>{currentLang}</span>
+            <LuBell size={17} />
+            {unreadNotifs.length > 0 && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: -5,
+                  insetInlineEnd: -5,
+                  minWidth: 17,
+                  height: 17,
+                  borderRadius: 99,
+                  background: "var(--notif-dot-bg)",
+                  color: "var(--notif-dot-text)",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "0 4px",
+                }}
+              >
+                {unreadNotifs.length > 9 ? "9+" : unreadNotifs.length}
+              </span>
+            )}
           </button>
-          {langOpen && <LangMenu onClose={() => setLangOpen(false)} />}
-        </div>
 
-        <button onClick={toggle} style={btnStyle}>
-          {dark ? <LuSun size={15} /> : <LuMoon size={15} />}
-        </button>
-
-        <button
-          onClick={() => {
-            setNotifOpen(true);
-            setLangOpen(false);
-            setUserOpen(false);
-          }}
-          style={{ ...btnStyle, position: "relative" }}
-        >
-          <LuBell size={17} />
-          {unreadNotifs.length > 0 && (
-            <span
-              style={{
-                position: "absolute",
-                top: -5,
-                insetInlineEnd: -5,
-                minWidth: 17,
-                height: 17,
-                borderRadius: 99,
-                background: "var(--notif-dot-bg)",
-                color: "var(--notif-dot-text)",
-                fontSize: 10,
-                fontWeight: 700,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "0 4px",
-              }}
-            >
-              {unreadNotifs.length > 9 ? "9+" : unreadNotifs.length}
-            </span>
-          )}
-        </button>
-
-        <div
-          style={{ position: "relative" }}
-          ref={userRef}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <button
-            onClick={() => {
-              setUserOpen((o) => !o);
-              setNotifOpen(false);
-              setLangOpen(false);
-            }}
-            style={{ ...btnStyle, gap: 7, padding: "5px 10px" }}
+          <div
+            style={{ position: "relative" }}
+            ref={userRef}
+            onMouseDown={(e) => e.stopPropagation()}
           >
-            <div
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: "50%",
-                background: roleColor + "28",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
+            <button
+              onClick={() => {
+                setUserOpen((o) => !o);
+                setNotifOpen(false);
+                setLangOpen(false);
               }}
+              style={{ ...btnStyle, gap: 7, padding: "5px 10px" }}
             >
-              <LuUser size={14} style={{ color: roleColor }} />
-            </div>
-            <span
-              style={{
-                fontSize: 13,
-                fontWeight: 600,
-                maxWidth: 100,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-                color: "var(--text1)",
-              }}
-            >
-              {user?.name}
-            </span>
-            <LuChevronDown size={12} style={{ color: "var(--text3)" }} />
-          </button>
-          {userOpen && (
-            <UserMenu
-              roleColor={roleColor}
-              onClose={() => setUserOpen(false)}
-            />
-          )}
+              <div
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: "50%",
+                  background: roleColor + "28",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <LuUser size={14} style={{ color: roleColor }} />
+              </div>
+              <span
+                className="worker-user-name"
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  maxWidth: 100,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  color: "var(--text1)",
+                }}
+              >
+                {user?.name}
+              </span>
+              <LuChevronDown size={12} style={{ color: "var(--text3)" }} />
+            </button>
+            {userOpen && (
+              <UserMenu
+                roleColor={roleColor}
+                onClose={() => setUserOpen(false)}
+              />
+            )}
+          </div>
         </div>
       </header>
 
       <main
+        className="worker-main"
         style={{
           flex: 1,
           maxWidth: 1140,

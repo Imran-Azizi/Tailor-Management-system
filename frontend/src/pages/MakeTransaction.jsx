@@ -160,7 +160,10 @@ export default function MakeTransaction() {
   };
 
   return (
-    <div style={{ maxWidth: 640, margin: "0 auto", paddingBottom: 40 }}>
+    <div
+      className="page"
+      style={{ maxWidth: 760, margin: "0 auto", paddingBottom: 40 }}
+    >
       <div
         style={{
           display: "flex",
@@ -198,7 +201,7 @@ export default function MakeTransaction() {
           background: "var(--surface)",
           border: "1px solid var(--border)",
           borderRadius: 14,
-          padding: "28px 32px",
+          padding: "clamp(14px, 3.8vw, 32px)",
           boxShadow: "var(--sh)",
         }}
       >
