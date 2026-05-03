@@ -1252,6 +1252,20 @@ export function printElement(id, options = {}) {
     ? "'Noto Naskh Arabic','Noto Sans Arabic','Inter',sans-serif"
     : "'Inter','Noto Sans Arabic',sans-serif";
 
+  // Serialize accessible stylesheets so print styles still work if popup CSS links fail in production.
+  const serializedCss = Array.from(document.styleSheets || [])
+    .map((sheet) => {
+      try {
+        return Array.from(sheet.cssRules || [])
+          .map((rule) => rule.cssText)
+          .join("\n");
+      } catch {
+        return "";
+      }
+    })
+    .filter(Boolean)
+    .join("\n");
+
   const stylesheetLinks = Array.from(
     document.querySelectorAll("link[rel='stylesheet']"),
   )
@@ -1273,8 +1287,7 @@ export function printElement(id, options = {}) {
 
   const baseHref =
     options.baseHref ||
-    document.baseURI ||
-    `${window.location.origin}${window.location.pathname}`;
+    `${window.location.origin}/`;
 
   printWindow.document.write(`
     <html lang="${lang}" dir="${dir}">
@@ -1287,6 +1300,7 @@ export function printElement(id, options = {}) {
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Naskh+Arabic:wght@400;600;700&family=Noto+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
         ${stylesheetLinks}
         ${inlineStyleNodes}
+        <style>${serializedCss}</style>
         <style>
           *{box-sizing:border-box}
           @page{size:A6 portrait;margin:0}
