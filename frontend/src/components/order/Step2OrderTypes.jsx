@@ -10,6 +10,7 @@ import {
   LuScissorsLineDashed,
 } from "react-icons/lu";
 import { getOrderTypeLabel } from "../../lib/orderType.js";
+import styles from "./Step2OrderTypes.module.css";
 
 const TYPES = [
   { id: "OUTFIT", Icon: LuShirt },
@@ -53,6 +54,7 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
     normalizeEmergencyHour(initialEmergencyEntry?.emergencyHour),
   );
   const [billEmergencyError, setBillEmergencyError] = useState("");
+  const [selectionError, setSelectionError] = useState("");
   const [isForeignOrder, setIsForeignOrder] = useState(
     initialEntries.some((entry) => entry?.isForeignOrder),
   );
@@ -66,9 +68,9 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
     if (selectedTypes.has(id)) {
       setEntries((current) => current.filter((entry) => entry.type !== id));
       setBillEmergencyError("");
+      setSelectionError("");
       return;
     }
-
     setEntries((current) => [
       ...current,
       {
@@ -79,48 +81,80 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
         isForeignOrder,
       },
     ]);
+    setBillEmergencyError("");
+    setSelectionError("");
+  };
+
+  const syncEmergencyToEntries = (checked, expiry, hour) => {
+    const normalizedHour = normalizeEmergencyHour(hour);
+    setEntries((current) =>
+      current.map((entry) => ({
+        ...entry,
+        isEmergency: checked,
+        emergencyExpiry: checked ? expiry || "" : "",
+        emergencyHour: checked ? normalizedHour : "08",
+      })),
+    );
+  };
+
+  const syncForeignFlagToEntries = (checked) => {
+    setEntries((current) =>
+      current.map((entry) => ({
+        ...entry,
+        isForeignOrder: checked,
+      })),
+    );
   };
 
   const removeEntry = (idx) => {
     setEntries((current) => current.filter((_, index) => index !== idx));
+    setSelectionError("");
     setBillEmergencyError("");
   };
 
   const removeType = (type) => {
     setEntries((current) => current.filter((entry) => entry.type !== type));
+    setSelectionError("");
     setBillEmergencyError("");
   };
 
-  const syncEmergencyToEntries = (isEmergency, expiry, hour) => {
-    const normalizedHour = normalizeEmergencyHour(hour);
-    setEntries((current) =>
-      current.map((entry) => ({
-        ...entry,
-        isEmergency,
-        emergencyExpiry: isEmergency ? expiry : "",
-        emergencyHour: isEmergency ? normalizedHour : "08",
-      })),
-    );
-  };
-
-  const syncForeignFlagToEntries = (isForeign) => {
-    setEntries((current) =>
-      current.map((entry) => ({
-        ...entry,
-        isForeignOrder: isForeign,
-      })),
-    );
-  };
-
   const validateBeforeContinue = () => {
+    if (!entries.length) {
+      setSelectionError(t("createOrder.selectAtLeastOne"));
+      return;
+    }
+
+    if (billEmergency) {
+      if (!billEmergencyExpiry) {
+        setBillEmergencyError(t("createOrder.expiryRequired"));
+        return;
+      }
+
+      const normalizedHour = normalizeEmergencyHour(billEmergencyHour);
+      const expiryDateTime = new Date(
+        `${billEmergencyExpiry}T${normalizedHour}:00:00`,
+      );
+
+      if (
+        Number.isNaN(expiryDateTime.getTime()) ||
+        expiryDateTime.getTime() < Date.now()
+      ) {
+        setBillEmergencyError(t("createOrder.expiryPast"));
+        return;
+      }
+    }
+
     const normalizedEntries = entries.map((entry) => ({
       ...entry,
       isEmergency: billEmergency,
       emergencyExpiry: billEmergency ? billEmergencyExpiry : "",
-      emergencyHour: billEmergency ? billEmergencyHour : "08",
+      emergencyHour: billEmergency
+        ? normalizeEmergencyHour(billEmergencyHour)
+        : "08",
       isForeignOrder,
     }));
 
+    setSelectionError("");
     setBillEmergencyError("");
     onNext({ orderTypes: normalizedEntries });
   };
@@ -178,30 +212,29 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
         })}
       </div>
 
+      {selectionError ? <p className="err-msg">{selectionError}</p> : null}
+
       {entries.length > 0 && (
         <div className="selected-order-stack" style={{ marginBottom: 18 }}>
           <div className="selected-order-card">
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 16,
-                marginBottom: 16,
-              }}
-            >
+            <div className={styles.controlsGrid}>
               {/* Emergency Order */}
               <div>
                 <div
                   className="selected-order-head"
-                  style={{ marginBottom: 10 }}
+                  style={{ marginBottom: 0 }}
                 >
-                  <div
-                    style={{ display: "flex", alignItems: "center", gap: 8 }}
-                  >
-                    <span className="badge bg-red" style={{ fontSize: 10 }}>
+                  <div className={styles.foreignHeadRow}>
+                    <span
+                      className={`badge bg-red ${styles["hide-on-mobile"]}`}
+                      style={{ fontSize: 10 }}
+                    >
                       {t("createOrder.priority")}
                     </span>
-                    <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                    <span
+                      className={styles["hide-on-mobile"]}
+                      style={{ fontSize: 12, color: "var(--text3)" }}
+                    >
                       {t("createOrder.emergencyOrder")}
                     </span>
                   </div>
@@ -232,13 +265,7 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
 
                 {billEmergency && (
                   <div className="order-expiry-wrap">
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr 1fr",
-                        gap: 12,
-                      }}
-                    >
+                    <div className={styles.expiryGrid}>
                       <div>
                         <label className="lbl lbl-r" style={{ fontSize: 11 }}>
                           {t("createOrder.emergencyExpiryDate")}
@@ -299,33 +326,7 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
 
               {/* Foreign Order */}
               <div>
-                <div
-                  className="selected-order-head"
-                  style={{ marginBottom: 10 }}
-                >
-                  <div
-                    style={{ display: "flex", alignItems: "center", gap: 8 }}
-                  >
-                    <span className="badge bg-blue" style={{ fontSize: 10 }}>
-                      {t("createOrder.shipping", { defaultValue: "SHIPPING" })}
-                    </span>
-                    <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                      {t("createOrder.sendToForeignCountry", {
-                        defaultValue: "Send to Foreign Country",
-                      })}
-                    </span>
-                  </div>
-                </div>
-
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    fontSize: 14,
-                    color: "var(--text2)",
-                  }}
-                >
+                <label className={styles.foreignToggle}>
                   <input
                     type="checkbox"
                     checked={isForeignOrder}
@@ -335,7 +336,7 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
                       syncForeignFlagToEntries(checked);
                     }}
                   />
-                  <span>
+                  <span className={styles.foreignToggleText}>
                     {t("createOrder.sendToForeignCountry", {
                       defaultValue: "Send to Foreign Country",
                     })}
@@ -370,21 +371,42 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
                       flexWrap: "wrap",
                     }}
                   >
-                    <span className="badge bg-gold" style={{ fontSize: 11 }}>
+                    <span
+                      className={`badge bg-gold ${styles["hide-on-mobile"]}`}
+                      style={{ fontSize: 11 }}
+                    >
                       {getOrderTypeLabel(entry.type, language)}
                     </span>
-                    <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                    <span
+                      className={styles["hide-on-mobile"]}
+                      style={{ fontSize: 12, color: "var(--text3)" }}
+                    >
                       {t("createOrder.configureOrder")}
                     </span>
                     {billEmergency && (
-                      <span className="badge bg-red" style={{ fontSize: 10 }}>
+                      <span
+                        className={`badge bg-red ${styles["hide-on-mobile"]}`}
+                        style={{ fontSize: 10 }}
+                      >
                         {t("createOrder.emergencyShort")}
                       </span>
                     )}
                     {isForeignOrder && (
-                      <span className="badge bg-blue" style={{ fontSize: 10 }}>
+                      <span className={styles.foreignShort}>
+                        <svg
+                          width="15"
+                          height="15"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          className={styles.foreignShortIcon}
+                        >
+                          <path
+                            fill="#2563eb"
+                            d="M21.5 12.5a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-8.25-4.25a.75.75 0 0 0-1.5 0v3.19l-2.72 2.72a.75.75 0 1 0 1.06 1.06l2.94-2.94V8.25Z"
+                          />
+                        </svg>
                         {t("createOrder.foreignShort", {
-                          defaultValue: "FOREIGN",
+                          defaultValue: "ارسال به کشور خارجی",
                         })}
                       </span>
                     )}

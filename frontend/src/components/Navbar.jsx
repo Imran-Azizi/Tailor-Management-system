@@ -668,6 +668,7 @@ function MonthDropdown({ onClose }) {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language || "en";
+  const isRtl = (i18n.dir?.() || "ltr") === "rtl";
   const {
     viewMonth,
     viewYear,
@@ -758,12 +759,13 @@ function MonthDropdown({ onClose }) {
 
   return (
     <div
-      className="dd-menu month-dd"
+      className={`dd-menu month-dd absolute z-50 ${isRtl ? "left-0 right-auto" : "right-0 left-auto"} min-w-[270px]`}
       style={{
         minWidth: "min(270px, 92vw)",
         width: "min(320px, 92vw)",
-        insetInlineStart: 0,
-        insetInlineEnd: "auto",
+        maxWidth: "calc(100vw - 16px)",
+        maxHeight: "min(70vh, 520px)",
+        overflowY: "auto",
       }}
     >
       <div className="month-dd-header">
@@ -898,6 +900,7 @@ function MonthSelector() {
 
 function LangDropdown({ onClose }) {
   const { t, i18n } = useTranslation();
+  const isRtl = (i18n.dir?.() || "ltr") === "rtl";
   const langs = [
     { code: "en", label: t("common.english"), flag: "EN" },
     { code: "dari", label: t("common.dari"), flag: "DR" },
@@ -906,7 +909,14 @@ function LangDropdown({ onClose }) {
   const current = i18n.resolvedLanguage || i18n.language || "en";
 
   return (
-    <div className="dd-menu">
+    <div
+      className={`dd-menu absolute z-50 ${isRtl ? "left-0 right-auto" : "right-0 left-auto"} min-w-[180px]`}
+      style={{
+        maxWidth: "calc(100vw - 16px)",
+        maxHeight: "min(70vh, 420px)",
+        overflowY: "auto",
+      }}
+    >
       <div className="dd-hd">{t("common.language")}</div>
       {langs.map((lang) => (
         <div
@@ -944,12 +954,12 @@ function UserDropdown({ onClose }) {
 
   return (
     <div
-      className="dd-menu user-dd-menu"
+      className={`dd-menu user-dd-menu absolute z-50 ${isRtl ? "left-0 right-auto" : "right-0 left-auto"} min-w-[210px]`}
       style={{
         width: "min(210px, 90vw)",
-        ...(isRtl
-          ? { insetInlineStart: 0, insetInlineEnd: "auto" }
-          : { insetInlineEnd: 0, insetInlineStart: "auto" }),
+        maxHeight: "min(70vh, 420px)",
+        overflowY: "auto",
+        maxWidth: "calc(100vw - 16px)",
         direction: isRtl ? "rtl" : "ltr",
       }}
     >

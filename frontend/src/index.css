@@ -176,10 +176,11 @@ input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
 
 /* NAVBAR */
 .navbar{
-  position:sticky;top:0;z-index:30;height:var(--nav-h);
+  position:sticky;top:0;z-index:70;height:var(--nav-h);
   background:var(--surface);border-bottom:1px solid var(--border);
   display:flex;align-items:center;gap:8px;padding:0 clamp(10px,2.1vw,24px);
   box-shadow:var(--sh);
+  overflow:visible;
 }
 [dir="rtl"] .navbar{direction:rtl}
 @media(max-width:640px){.navbar{padding:0 14px;gap:6px}}
@@ -212,7 +213,7 @@ input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
 @media(max-width:520px){.nav-btn .nbl{display:none}}
 
 /* DROPDOWN */
-.dd-wrap{position:relative}
+.dd-wrap{position:relative;overflow:visible}
 .dd-menu{
   position:absolute;top:calc(100% + 6px);inset-inline-end:0;min-width:180px;
   background:var(--surface);border:1px solid var(--border);
@@ -220,7 +221,7 @@ input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
   overflow:hidden;animation:fadeUp .12s ease;
   max-inline-size:calc(100vw - 16px);
 }
-[dir="rtl"] .dd-menu{inset-inline-end:auto;inset-inline-start:0}
+[dir="rtl"] .dd-menu{direction:rtl}
 .dd-hd{padding:8px 14px 6px;border-bottom:1px solid var(--border);font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text3)}
 .dd-item{
   display:flex;align-items:center;gap:8px;padding:9px 14px;
@@ -243,6 +244,7 @@ input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
 .user-dd-menu{
   min-width:210px;
   text-align:start;
+  max-inline-size:calc(100vw - 16px);
 }
 .user-dd-head{
   background:linear-gradient(180deg,color-mix(in srgb,var(--surface2) 72%,transparent),transparent);
@@ -264,6 +266,8 @@ input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
 }
 [dir="rtl"] .user-dd-menu{
   text-align:right;
+  inset-inline-start:auto;
+  inset-inline-end:0;
 }
 [dir="rtl"] .user-dd-head{
   text-align:right;
@@ -296,6 +300,13 @@ input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
 .month-dd{padding-bottom:10px}
 @media(max-width:640px){
   .month-selector-wrap{display:none}
+  .user-dd-menu{
+    width:min(240px,calc(100vw - 16px)) !important;
+    max-height:calc(100vh - var(--nav-h) - 16px) !important;
+  }
+  .dd-menu{
+    max-inline-size:calc(100vw - 12px);
+  }
 }
 
 /* Dropdown header */

@@ -6,22 +6,31 @@ const ORDER_TYPE_LABELS = {
     WASKAT: "Waskat",
     KORTY: "Korty",
     YAKHANQAQ: "YakhanQaq",
+    FOREIGN_SHIPPING: "Send to Foreign Country",
   },
   dari: {
     OUTFIT: "پیراهن تنبان",
     WASKAT: "واسکت",
     KORTY: "کُرتی",
     YAKHANQAQ: "یخن قاق",
+    FOREIGN_SHIPPING: "ارسال به کشور خارجی",
   },
   pashto: {
     OUTFIT: "پیرهن تنبان",
     WASKAT: "واسکت",
     KORTY: "کرتی",
     YAKHANQAQ: "یخن قاق",
+    FOREIGN_SHIPPING: "بهر ته لیږل",
   },
 };
 
-export const ORDER_TYPE_VALUES = ["OUTFIT", "WASKAT", "KORTY", "YAKHANQAQ"];
+export const ORDER_TYPE_VALUES = [
+  "OUTFIT",
+  "WASKAT",
+  "KORTY",
+  "YAKHANQAQ",
+  "FOREIGN_SHIPPING",
+];
 
 export function getOrderTypeLabel(type, language = "en") {
   if (!type) return "-";
