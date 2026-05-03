@@ -5,7 +5,6 @@ import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import {
   LuCalendarCheck,
-  LuCircleDollarSign,
   LuRefreshCcw,
   LuSearch,
   LuSquareCheckBig,
@@ -34,6 +33,7 @@ import {
   Spinner,
   StatCard,
 } from "../components/ui/index.jsx";
+import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 
 const LIMIT = 15;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -433,7 +433,7 @@ export default function CompletedWorkerOrders() {
         <StatCard
           label={t("completedWorkerOrders.paidOrders", "Paid Orders")}
           value={stats.paidOrders}
-          Icon={LuCircleDollarSign}
+          Icon={AfCurrencyIcon}
           accent="#15803D"
         />
         <StatCard
@@ -448,7 +448,7 @@ export default function CompletedWorkerOrders() {
             minimumFractionDigits: 0,
             maximumFractionDigits: 0,
           })}
-          Icon={LuCircleDollarSign}
+          Icon={AfCurrencyIcon}
           accent="#7C3AED"
         />
       </div>
@@ -778,7 +778,7 @@ export default function CompletedWorkerOrders() {
                             payWorkerMut.isPending || !editUiState.canSubmit
                           }
                         >
-                          <LuCircleDollarSign size={14} />
+                          <AfCurrencyIcon size={14} />
                           {!isAlreadyPaid
                             ? t(
                                 "completedWorkerOrders.savePayment",
@@ -910,7 +910,7 @@ export default function CompletedWorkerOrders() {
                 onClick={submitConfirmedPayment}
                 disabled={payWorkerMut.isPending}
               >
-                <LuCircleDollarSign size={14} />
+                <AfCurrencyIcon size={14} />
                 {payWorkerMut.isPending
                   ? t("common.loading", "Loading...")
                   : t(

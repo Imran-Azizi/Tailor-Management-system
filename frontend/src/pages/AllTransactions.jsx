@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import {
   LuArrowRightLeft,
-  LuBadgeDollarSign,
   LuBuilding2,
   LuCalendarCheck,
   LuCalendarDays,
@@ -33,6 +32,7 @@ import {
   Spinner,
   StatCard,
 } from "../components/ui/index.jsx";
+import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 
 const ACCOUNT_TYPE_COLOR = {
   ADMIN: "#2563EB",
@@ -441,7 +441,7 @@ export default function AllTransactions() {
           label={t("transaction.totalAmount", "Total Amount")}
           value={formatMoney(totalAmount, language)}
           sub={t("transaction.currentPageTotal", "Current page total")}
-          Icon={LuBadgeDollarSign}
+          Icon={AfCurrencyIcon}
           accent="#0F766E"
         />
       </div>

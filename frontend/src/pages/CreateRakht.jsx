@@ -2,12 +2,13 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { LuFactory, LuBadgeDollarSign, LuCalendar } from "react-icons/lu";
+import { LuFactory, LuCalendar } from "react-icons/lu";
 import Select from "react-select";
 import toast from "react-hot-toast";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { formatSystemDate } from "../lib/locale.js";
+import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import { PageHeader } from "../components/ui/index.jsx";
 import {
   TON_QTY_OPTIONS,
@@ -339,7 +340,7 @@ export default function CreateRakht() {
                 {t("rakht.totalPrice", { defaultValue: "Total Price" })}
               </label>
               <div className="iw">
-                <LuBadgeDollarSign size={14} className="ico" />
+                <AfCurrencyIcon size={14} className="ico" />
                 <input
                   className="inp"
                   type="number"
@@ -360,7 +361,7 @@ export default function CreateRakht() {
                 {t("rakht.givenMoney", { defaultValue: "Given Money" })}
               </label>
               <div className="iw">
-                <LuBadgeDollarSign size={14} className="ico" />
+                <AfCurrencyIcon size={14} className="ico" />
                 <input
                   className="inp"
                   type="number"
@@ -384,7 +385,7 @@ export default function CreateRakht() {
                 className="iw"
                 style={{ background: "var(--surface2)", opacity: 0.85 }}
               >
-                <LuBadgeDollarSign size={14} className="ico" />
+                <AfCurrencyIcon size={14} className="ico" />
                 <input
                   className="inp"
                   readOnly

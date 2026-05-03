@@ -29,6 +29,7 @@
     "react-router-dom": "^6.24.0",
     "react-select": "^5.8.0",
     "recharts": "^2.12.7",
+    "tailor-system": "file:..",
     "zod": "^3.23.8"
   },
   "devDependencies": {

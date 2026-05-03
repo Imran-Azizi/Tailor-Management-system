@@ -10,7 +10,6 @@ import Select from "react-select";
 import {
   LuClipboardList,
   LuUsers,
-  LuBadgeDollarSign,
   LuFileText,
   LuList,
   LuSend,
@@ -24,6 +23,7 @@ import {
 } from "../lib/orderType.js";
 import { Field, PageHeader } from "../components/ui/index.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
+import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 
 // ─── Zod schema ───────────────────────────────────────────────────────────────
 const schema = z

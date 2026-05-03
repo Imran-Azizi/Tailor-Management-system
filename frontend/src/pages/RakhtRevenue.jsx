@@ -1,13 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import {
-  LuBadgeDollarSign,
-  LuFactory,
-  LuFilter,
-  LuRuler,
-  LuShoppingBag,
-} from "react-icons/lu";
+import { LuFactory, LuFilter, LuRuler, LuShoppingBag } from "react-icons/lu";
 import api from "../lib/api.js";
 import { formatCurrency } from "../lib/currency.js";
 import { formatDateLocale } from "../lib/locale.js";
@@ -19,6 +13,7 @@ import {
   Spinner,
   StatCard,
 } from "../components/ui/index.jsx";
+import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
 
 function formatMeters(value) {
@@ -114,7 +109,7 @@ export default function RakhtRevenue() {
         <StatCard
           label={t("rakht.totalRevenue", { defaultValue: "Total Revenue" })}
           value={formatCurrency(summary.totalRevenue, language)}
-          Icon={LuBadgeDollarSign}
+          Icon={AfCurrencyIcon}
           accent="#0F766E"
           sub={t("rakht.benefit", { defaultValue: "Rakht Benefit" })}
         />

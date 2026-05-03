@@ -6,7 +6,6 @@ import {
   LuArrowLeft,
   LuUser,
   LuUsers,
-  LuBadgeDollarSign,
   LuCalendarDays,
   LuFileText,
   LuClipboardList,
@@ -24,6 +23,7 @@ import {
   PageHeader,
   Spinner,
 } from "../components/ui/index.jsx";
+import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import { useState } from "react";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -480,7 +480,7 @@ export default function DailyTaskDetails() {
             accent="#7C3AED"
           />
           <DetailField
-            Icon={LuBadgeDollarSign}
+            Icon={AfCurrencyIcon}
             label={t("dailyTasks.amount")}
             value={formatMoney(task.amount)}
             accent="#16A34A"

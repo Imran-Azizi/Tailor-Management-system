@@ -17,7 +17,6 @@ import {
 } from "recharts";
 import {
   LuShoppingBag,
-  LuDollarSign,
   LuSquareCheck,
   LuClock,
   LuTriangleAlert,
@@ -27,7 +26,6 @@ import {
   LuCalendarCheck,
   LuUser,
   LuUsers,
-  LuBadgeDollarSign,
 } from "react-icons/lu";
 import { useTranslation } from "react-i18next";
 import api from "../lib/api.js";
@@ -47,6 +45,7 @@ import {
   PageHeader,
   Card,
 } from "../components/ui/index.jsx";
+import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 
 const TC = {
   OUTFIT: "#2563EB",
@@ -187,49 +186,12 @@ export default function Dashboard() {
               "Total Rakht Revenue + Total Order Benefit",
             )}
           </p>
-          <div className="dashboard-net-card__breakdown">
-            <div className="dashboard-net-card__chip">
-              <span>
-                {t("dashboardPage.totalRakhtRevenue", "Total Rakht Revenue")}
-              </span>
-              <strong>{formatCurrency(totalRakhtRevenue, language)}</strong>
-            </div>
-            <div className="dashboard-net-card__chip">
-              <span>
-                {t("dashboardPage.totalOrderBenefit", "Total Order Benefit")}
-              </span>
-              <strong>{formatCurrency(totalOrderBenefit, language)}</strong>
-            </div>
-          </div>
         </div>
 
         <div className="dashboard-net-card__icon" aria-hidden="true">
-          <LuBadgeDollarSign size={34} />
+          <AfCurrencyIcon size={34} />
         </div>
       </section>
-
-      <div className="dashboard-top-stats" style={{ marginBottom: 14 }}>
-        <StatCard
-          label={t("dashboardPage.totalRakhtRevenue", "Total Rakht Revenue")}
-          value={formatCurrency(totalRakhtRevenue, language)}
-          Icon={LuBadgeDollarSign}
-          accent="#0F766E"
-          sub={t(
-            "dashboardPage.totalRakhtRevenueSub",
-            "Aggregated from Rakht Benefit across all stored orders.",
-          )}
-        />
-        <StatCard
-          label={t("dashboardPage.totalOrderBenefit", "Total Order Benefit")}
-          value={formatCurrency(totalOrderBenefit, language)}
-          Icon={LuTrendingUp}
-          accent="#1D4ED8"
-          sub={t(
-            "dashboardPage.totalOrderBenefitSub",
-            "Sum of persisted order benefit based on profit calculation logic.",
-          )}
-        />
-      </div>
 
       <div className="g-stats" style={{ marginBottom: 20 }}>
         <StatCard
@@ -242,7 +204,7 @@ export default function Dashboard() {
         <StatCard
           label={t("dashboardPage.totalAmount")}
           value={formatCurrency(d.totalRevenue, language)}
-          Icon={LuDollarSign}
+          Icon={AfCurrencyIcon}
           accent="#16A34A"
           sub={t("dashboardPage.yearOrders", { count: d.yearOrders })}
         />
@@ -284,7 +246,7 @@ export default function Dashboard() {
         <StatCard
           label={t("dashboardPage.totalLoan", "Total Loan")}
           value={formatCurrency(d.totalLoan ?? 0, language)}
-          Icon={LuDollarSign}
+          Icon={AfCurrencyIcon}
           accent="#D97706"
           sub={t("transaction.loanOption", "Loan")}
         />

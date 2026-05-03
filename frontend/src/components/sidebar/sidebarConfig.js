@@ -1,7 +1,6 @@
 import {
   LuArchive,
   LuArrowRightLeft,
-  LuBadgeDollarSign,
   LuBell,
   LuClipboardList,
   LuFactory,
@@ -20,6 +19,7 @@ import {
   LuFileText,
   LuDatabaseBackup,
 } from "react-icons/lu";
+import AfCurrencyIcon from "../ui/AfCurrencyIcon.jsx";
 
 const ROLE_ACCENT = {
   ADMIN: "#2563EB",
@@ -185,7 +185,7 @@ const ADMIN_SECTIONS = [
             label: "rakht.totalRevenue",
             fallback: "Total Revenue",
             path: "/rakhts/revenue",
-            icon: LuBadgeDollarSign,
+            icon: AfCurrencyIcon,
           },
         ],
       },
@@ -391,7 +391,7 @@ const DOKAN_SECTIONS = [
             label: "rakht.totalRevenue",
             fallback: "Total Revenue",
             path: "/rakhts/revenue",
-            icon: LuBadgeDollarSign,
+            icon: AfCurrencyIcon,
           },
         ],
       },

@@ -6,7 +6,6 @@ import {
   LuPencil,
   LuTrash2,
   LuFactory,
-  LuBadgeDollarSign,
   LuCalendar,
   LuWallet,
   LuChartColumn,
@@ -16,6 +15,7 @@ import {
   LuHistory,
   LuEye,
 } from "react-icons/lu";
+import AfCurrencyIcon from "../ui/AfCurrencyIcon.jsx";
 import Select from "react-select";
 import toast from "react-hot-toast";
 import api from "../../lib/api.js";
@@ -393,7 +393,7 @@ export default function RakhtManager() {
         <StatCard
           label={t("rakht.totalPrice", { defaultValue: "Total Price" })}
           value={Math.round(stats.totalPrice).toLocaleString()}
-          Icon={LuBadgeDollarSign}
+          Icon={AfCurrencyIcon}
           accent="#7C3AED"
         />
         <StatCard
@@ -405,7 +405,7 @@ export default function RakhtManager() {
         <StatCard
           label={t("rakht.remainingMoney", { defaultValue: "Remaining" })}
           value={Math.round(stats.totalRemaining).toLocaleString()}
-          Icon={LuBadgeDollarSign}
+          Icon={AfCurrencyIcon}
           accent="#B45309"
         />
       </div>
@@ -1306,7 +1306,7 @@ export default function RakhtManager() {
                 {t("rakht.totalPrice", { defaultValue: "Total Price" })}
               </label>
               <div className="iw">
-                <LuBadgeDollarSign size={14} className="ico" />
+                <AfCurrencyIcon size={14} className="ico" />
                 <input
                   className="inp"
                   type="number"
@@ -1327,7 +1327,7 @@ export default function RakhtManager() {
                 {t("rakht.givenMoney", { defaultValue: "Given Money" })}
               </label>
               <div className="iw">
-                <LuBadgeDollarSign size={14} className="ico" />
+                <AfCurrencyIcon size={14} className="ico" />
                 <input
                   className="inp"
                   type="number"
@@ -1353,7 +1353,7 @@ export default function RakhtManager() {
               className="iw"
               style={{ background: "var(--surface2)", opacity: 0.8 }}
             >
-              <LuBadgeDollarSign size={14} className="ico" />
+              <AfCurrencyIcon size={14} className="ico" />
               <input
                 className="inp"
                 readOnly

@@ -6,7 +6,6 @@ import toast from "react-hot-toast";
 import Select from "react-select";
 import {
   LuBadgeCheck,
-  LuBadgeDollarSign,
   LuCalendarCheck,
   LuCalendarDays,
   LuChevronDown,
@@ -28,6 +27,7 @@ import {
   LuChevronRight,
   LuTrash2,
 } from "react-icons/lu";
+import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
 import api from "../lib/api.js";
@@ -491,7 +491,7 @@ function TaskRow({
             letterSpacing: ".01em",
           }}
         >
-          <LuBadgeCheck size={12} />
+          <AfCurrencyIcon size={12} />
           {formatMoney(task.amount, language)}
         </span>
       </td>
@@ -715,6 +715,7 @@ function TaskCard({
 export default function AllDailyTasks() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
+  const isRtl = (i18n.dir?.() || "ltr") === "rtl";
   const { isAdmin } = useAuth();
   const { viewMonth, viewYear, getMonthAccessMode } = useMonth();
   const navigate = useNavigate();
@@ -727,6 +728,12 @@ export default function AllDailyTasks() {
   const [editTask, setEditTask] = useState(null);
   const [deleteTask, setDeleteTask] = useState(null);
   const reportMenuRef = useRef(null);
+  const reportMenuButtonRef = useRef(null);
+  const [reportMenuPos, setReportMenuPos] = useState({
+    top: 0,
+    left: 8,
+    width: 268,
+  });
   const [editForm, setEditForm] = useState({
     fromName: "",
     recipientName: "",
@@ -947,6 +954,21 @@ export default function AllDailyTasks() {
     reportMutation.mutate({ reportType, date });
   };
 
+  const placeReportMenu = () => {
+    if (!reportMenuButtonRef.current || typeof window === "undefined") return;
+
+    const rect = reportMenuButtonRef.current.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+    const gutter = 8;
+    const width = Math.min(292, Math.max(220, viewportWidth - gutter * 2));
+    const desiredLeft = isRtl ? rect.right - width : rect.left;
+    const maxLeft = Math.max(gutter, viewportWidth - width - gutter);
+    const left = Math.max(gutter, Math.min(maxLeft, desiredLeft));
+    const top = Math.max(gutter, rect.bottom + 6);
+
+    setReportMenuPos({ top, left, width });
+  };
+
   useEffect(() => {
     if (!openMenu && !reportMenuOpen) return;
     const close = () => {
@@ -970,6 +992,20 @@ export default function AllDailyTasks() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [reportMenuOpen]);
 
+  useEffect(() => {
+    if (!reportMenuOpen) return;
+
+    placeReportMenu();
+    const handleViewportChange = () => placeReportMenu();
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
+
+    return () => {
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
+    };
+  }, [reportMenuOpen, isRtl]);
+
   return (
     <div className="page" style={{ paddingBottom: 40 }}>
       <PageHeader
@@ -978,10 +1014,17 @@ export default function AllDailyTasks() {
         action={
           <div ref={reportMenuRef} style={{ position: "relative" }}>
             <button
+              ref={reportMenuButtonRef}
               type="button"
               className="btn btn-outline btn-sm dt-toolbar-btn"
               style={{ gap: 6, minWidth: 136, height: 38 }}
-              onClick={() => setReportMenuOpen((prev) => !prev)}
+              onClick={() => {
+                setReportMenuOpen((prev) => {
+                  const next = !prev;
+                  if (next) placeReportMenu();
+                  return next;
+                });
+              }}
               disabled={!isAdmin || reportMutation.isPending}
             >
               <LuFileText size={14} />
@@ -990,7 +1033,15 @@ export default function AllDailyTasks() {
             </button>
 
             {reportMenuOpen && isAdmin && (
-              <div className="dt-report-dropdown">
+              <div
+                className="dt-report-dropdown"
+                style={{
+                  position: "fixed",
+                  top: reportMenuPos.top,
+                  left: reportMenuPos.left,
+                  width: reportMenuPos.width,
+                }}
+              >
                 <div
                   style={{
                     display: "flex",
@@ -1102,7 +1153,7 @@ export default function AllDailyTasks() {
         <StatBanner
           label={t("dailyTasks.totalAmount")}
           value={formatMoney(summaryTotalAmount, language)}
-          Icon={LuBadgeDollarSign}
+          Icon={AfCurrencyIcon}
           accent="#16A34A"
           sub={`${tasks.length} ${t("dailyTasks.taskCount", "tasks on page")}`}
         />
@@ -1258,7 +1309,7 @@ export default function AllDailyTasks() {
                           gap: 5,
                         }}
                       >
-                        <LuBadgeDollarSign size={12} />
+                        <AfCurrencyIcon size={12} />
                         {t("dailyTasks.amount")}
                       </div>
                     </th>

@@ -176,7 +176,15 @@ export const Badge = ({ children, v = "gold" }) => (
   <span className={`badge ${BV[v] || "bg-gold"}`}>{children}</span>
 );
 
-export const Modal = ({ open, onClose, title, children, maxW = 480 }) => {
+export const Modal = ({
+  open,
+  onClose,
+  title,
+  children,
+  maxW = 480,
+  boxClassName = "",
+  bodyClassName = "",
+}) => {
   if (!open) return null;
   const docDir =
     typeof document !== "undefined"
@@ -188,7 +196,7 @@ export const Modal = ({ open, onClose, title, children, maxW = 480 }) => {
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        className="modal-box w-[95vw] sm:w-full"
+        className={`modal-box w-[95vw] sm:w-full ${boxClassName}`.trim()}
         dir={docDir}
         style={{ maxWidth: maxW }}
       >
@@ -208,7 +216,9 @@ export const Modal = ({ open, onClose, title, children, maxW = 480 }) => {
             ×
           </button>
         </div>
-        <div className="modal-body modal-content">{children}</div>
+        <div className={`modal-body modal-content ${bodyClassName}`.trim()}>
+          {children}
+        </div>
       </div>
     </div>
   );

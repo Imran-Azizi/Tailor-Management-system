@@ -14,7 +14,6 @@ import {
   LuCalendarCheck,
   LuChevronDown,
   LuX,
-  LuCircleDollarSign,
 } from "react-icons/lu";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTheme } from "../context/ThemeContext.jsx";
@@ -27,6 +26,7 @@ import {
   getDisplayMonthLabelForLanguage,
   getDisplayYearForLanguage,
 } from "../lib/months.js";
+import AfCurrencyIcon from "./ui/AfCurrencyIcon.jsx";
 import { NotificationText } from "./ui/index.jsx";
 
 const ROLE_CONFIG = {
@@ -163,7 +163,7 @@ function WorkerNotifDrawer({ open, roleColor, onClose }) {
                     borderBottom: "1px solid var(--border)",
                   }}
                 >
-                  <LuCircleDollarSign
+                  <AfCurrencyIcon
                     size={12}
                     style={{ color: "var(--success)" }}
                   />
@@ -181,7 +181,7 @@ function WorkerNotifDrawer({ open, roleColor, onClose }) {
                 </div>
                 {paymentNotifs.map((n) => (
                   <div key={n.id} className="notif-panel-item">
-                    <LuCircleDollarSign
+                    <AfCurrencyIcon
                       size={14}
                       style={{
                         color: "var(--success)",

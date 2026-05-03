@@ -5,7 +5,6 @@ import Select from "react-select";
 import toast from "react-hot-toast";
 import {
   LuArrowUpDown,
-  LuBadgeDollarSign,
   LuCalendarCheck,
   LuCalendarDays,
   LuDownload,
@@ -30,6 +29,7 @@ import {
   PageHeader,
   Spinner,
 } from "../components/ui/index.jsx";
+import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 
 const PAGE_SIZE = 20;
 

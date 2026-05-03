@@ -26,8 +26,8 @@ export default function ClothesDeliveryToCustomer() {
   const language = i18n.resolvedLanguage || i18n.language;
   const normalizedLanguage = String(language || "en").toLowerCase();
   const isEnglish = normalizedLanguage.startsWith("en");
-  const isRtl = false;
-  const dir = "ltr";
+  const isRtl = (i18n.dir?.() || "ltr") === "rtl";
+  const dir = isRtl ? "rtl" : "ltr";
   const receiveButtonText = isEnglish ? "Receive" : "رسید";
   const completedStatusText = t("orders.done", "Completed");
 
@@ -309,7 +309,7 @@ export default function ClothesDeliveryToCustomer() {
             </div>
 
             <Card noPad>
-              <div className="border-b border-slate-200 bg-gradient-to-r from-slate-50 via-white to-blue-50 px-4 py-4 sm:px-5">
+              <div className="delivery-customer-head border-b border-slate-200 bg-gradient-to-r from-slate-50 via-white to-blue-50 px-4 py-4 sm:px-5">
                 <div
                   className={`flex flex-col gap-3 sm:items-center sm:justify-between ${
                     isRtl ? "sm:flex-row-reverse" : "sm:flex-row"
@@ -356,7 +356,7 @@ export default function ClothesDeliveryToCustomer() {
                 </div>
               </div>
 
-              <div className="tbl-wrap">
+              <div className="tbl-wrap delivery-results-table">
                 <table
                   className="min-w-full border-separate border-spacing-0"
                   style={{ minWidth: 640 }}
@@ -503,6 +503,119 @@ export default function ClothesDeliveryToCustomer() {
                     })}
                   </tbody>
                 </table>
+              </div>
+
+              <div className="delivery-results-mobile">
+                {orders.map((o, idx) => {
+                  const orderLabel = getOrderLabelParts(o, language);
+                  const remaining = Number(o.remaining || 0);
+                  const isCompleted = Boolean(o.isCompleted);
+                  const readyToReceive = !isCompleted && remaining <= 0.001;
+
+                  return (
+                    <article
+                      key={`mobile-${o.id}`}
+                      className="delivery-order-card"
+                    >
+                      <div className="delivery-order-card-head">
+                        <div>
+                          <p className="delivery-order-card-kicker">
+                            {t("delivery.orderLabel", { number: idx + 1 })}
+                          </p>
+                          <h4 className="delivery-order-card-type">
+                            {orderLabel.baseTypeLabel}
+                          </h4>
+                          {orderLabel.customName ? (
+                            <p className="delivery-order-card-custom">
+                              {orderLabel.customName}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div>
+                          {isCompleted ? (
+                            <span className="inline-flex items-center rounded-full bg-rose-100 px-3 py-1 text-xs font-bold text-rose-700">
+                              {completedStatusText}
+                            </span>
+                          ) : readyToReceive ? (
+                            <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
+                              {t("delivery.readyToReceive", "Ready to receive")}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+                              {t("delivery.notFullyPaidBadge", "Not Completed")}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="delivery-order-card-stats">
+                        <div className="delivery-order-card-stat">
+                          <span>{t("common.total", "Total")}</span>
+                          <strong className="[direction:ltr] [unicode-bidi:embed]">
+                            {formatMoney(o.totalPrice, language)}
+                          </strong>
+                        </div>
+                        <div className="delivery-order-card-stat">
+                          <span>{t("createOrder.discount", "Discount")}</span>
+                          <strong className="[direction:ltr] [unicode-bidi:embed]">
+                            {formatMoney(o.discount, language)}
+                          </strong>
+                        </div>
+                        <div className="delivery-order-card-stat">
+                          <span>{t("common.paid", "Paid")}</span>
+                          <strong className="text-emerald-700 [direction:ltr] [unicode-bidi:embed]">
+                            {formatMoney(o.paidAmount, language)}
+                          </strong>
+                        </div>
+                        <div className="delivery-order-card-stat">
+                          <span>{t("common.remaining", "Remaining")}</span>
+                          <strong className="text-rose-700 [direction:ltr] [unicode-bidi:embed]">
+                            {formatMoney(o.remaining, language)}
+                          </strong>
+                        </div>
+                      </div>
+
+                      <div className="delivery-order-card-actions">
+                        {isCompleted ? (
+                          <span className="text-sm text-slate-500">-</span>
+                        ) : readyToReceive ? (
+                          <button
+                            type="button"
+                            className="inline-flex h-10 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                            onClick={() => submitPayment(o)}
+                            disabled={paying}
+                          >
+                            {receiveButtonText}
+                          </button>
+                        ) : (
+                          <>
+                            <input
+                              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                              value={payments[o.id] ?? ""}
+                              onChange={(e) =>
+                                setPayments((p) => ({
+                                  ...p,
+                                  [o.id]: e.target.value,
+                                }))
+                              }
+                              inputMode="decimal"
+                              placeholder={String(remaining)}
+                              disabled={paying}
+                            />
+                            <button
+                              type="button"
+                              className="inline-flex h-10 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                              onClick={() => submitPayment(o)}
+                              disabled={paying}
+                            >
+                              {receiveButtonText}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             </Card>
           </div>

@@ -7,7 +7,6 @@ import {
   LuCheck,
   LuCircleAlert,
   LuClipboardList,
-  LuCircleDollarSign,
   LuEye,
   LuHash,
   LuPhone,
@@ -29,6 +28,7 @@ import { formatCurrency } from "../lib/currency.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
 import { formatMonthYearLabel } from "../lib/months.js";
+import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import { NotificationText } from "../components/ui/index.jsx";
 
 const ROLE_CONFIG = {
@@ -1582,7 +1582,7 @@ export default function WorkerPanel() {
                 fontSize: 20,
               }}
             >
-              <LuCircleDollarSign size={18} />$
+              <AfCurrencyIcon size={18} />
               {totalCompletedPayments.toLocaleString()}
             </div>
           </div>
@@ -1612,7 +1612,7 @@ export default function WorkerPanel() {
                 fontSize: 20,
               }}
             >
-              <LuCircleDollarSign size={18} />$
+              <AfCurrencyIcon size={18} />
               {totalLoanAmount.toLocaleString()}
             </div>
           </div>
@@ -1642,7 +1642,8 @@ export default function WorkerPanel() {
                 fontSize: 20,
               }}
             >
-              <LuCircleDollarSign size={18} />${currentMoney.toLocaleString()}
+              <AfCurrencyIcon size={18} />
+              {currentMoney.toLocaleString()}
             </div>
           </div>
         </div>

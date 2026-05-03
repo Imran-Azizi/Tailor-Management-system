@@ -981,10 +981,11 @@ function DesignCard({ model }) {
   const bg = `${model.color}12`;
 
   return (
-    <div className="card" style={{ overflow: "hidden" }}>
+    <div className="card designs-card" style={{ overflow: "hidden" }}>
       <div style={{ height: 3, background: model.color }} />
       <div style={{ padding: 16 }}>
         <div
+          className="designs-card-head"
           style={{
             display: "flex",
             alignItems: "center",
@@ -1030,10 +1031,11 @@ function DesignCard({ model }) {
             {t("designs.noStyles", { defaultValue: "No styles yet" })}
           </p>
         ) : (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          <div className="designs-chip-wrap" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {data.map((item) => (
               <div
                 key={item.id}
+                className="designs-chip"
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -1189,6 +1191,7 @@ export default function Designs() {
       />
 
       <div
+        className="design-tabs"
         style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}
       >
         {PAGE_TABS.map((tab) => (
@@ -1196,7 +1199,7 @@ export default function Designs() {
             key={tab}
             type="button"
             onClick={() => setActiveTab(tab)}
-            className={activeTab === tab ? "btn btn-gold" : "btn btn-outline"}
+            className={`design-tab-btn ${activeTab === tab ? "btn btn-gold" : "btn btn-outline"}`}
             style={{ minWidth: 100, flex: "1 1 auto" }}
           >
             {tabLabels[tab]}
@@ -1207,7 +1210,7 @@ export default function Designs() {
       {activeTab === "CONTRIBUTOR" ? (
         <ContributorSection />
       ) : (
-        <div className="g-designs">
+        <div className="g-designs designs-grid">
           {modelsToShow.length === 0 ? (
             <p
               style={{

@@ -19,7 +19,6 @@ import {
   LuX,
   LuArrowLeft,
   LuArrowRight,
-  LuCircleDollarSign,
   LuFileText,
   LuEye,
   LuPencil,
@@ -52,6 +51,7 @@ import {
   formatMonthYearLabel,
   MONTHS,
 } from "../lib/months.js";
+import AfCurrencyIcon from "./ui/AfCurrencyIcon.jsx";
 import { EmptyState, Modal, NotificationText, Spinner } from "./ui/index.jsx";
 
 function useOutside(ref, fn) {
@@ -477,10 +477,7 @@ function UserNotifPanel({ onClose }) {
                   borderBottom: "1px solid var(--border)",
                 }}
               >
-                <LuCircleDollarSign
-                  size={12}
-                  style={{ color: "var(--success)" }}
-                />
+                <AfCurrencyIcon size={12} style={{ color: "var(--success)" }} />
                 <span
                   style={{
                     fontSize: 11,
@@ -495,7 +492,7 @@ function UserNotifPanel({ onClose }) {
               </div>
               {paymentNotifs.map((n) => (
                 <div key={n.id} className="notif-panel-item">
-                  <LuCircleDollarSign
+                  <AfCurrencyIcon
                     size={14}
                     style={{
                       color: "var(--success)",
@@ -954,9 +951,9 @@ function UserDropdown({ onClose }) {
 
   return (
     <div
-      className={`dd-menu user-dd-menu absolute z-50 ${isRtl ? "left-0 right-auto" : "right-0 left-auto"} min-w-[210px]`}
+      className="dd-menu user-dd-menu absolute z-50 min-w-[210px]"
       style={{
-        width: "min(210px, 90vw)",
+        width: "min(240px, calc(100vw - 16px))",
         maxHeight: "min(70vh, 420px)",
         overflowY: "auto",
         maxWidth: "calc(100vw - 16px)",

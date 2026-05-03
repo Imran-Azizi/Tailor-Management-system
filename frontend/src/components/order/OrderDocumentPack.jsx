@@ -965,6 +965,7 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
     i18n.resolvedLanguage || i18n.language,
   );
   const txt = settings.text;
+  const extraTxt = BILL_EXTRA_TEXT[settings.langCode] || BILL_EXTRA_TEXT.en;
   const dateValue = order?.createdAt || Date.now();
   const { date, time } = getPrintDateTime(settings, dateValue);
   const billLabel = getOrderItemLabel(order, itemLabel, settings);
@@ -976,6 +977,8 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
     customer?.firstName,
     settings.langCode,
   );
+  const orderBoxName =
+    order?.box?.boxName || order?.foreignBox?.boxName || extraTxt.notAssigned;
   const customerBarcode = customer?.billNumber || "-";
   const alignClass = settings.isRtl ? "text-right" : "text-left";
   const tableHeadClass = settings.isRtl
@@ -1043,8 +1046,8 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
         time={time}
       />
 
-      {/* Customer info strip — 4 columns: Bill# | Name | Order Type | Qty */}
-      <div className="grid grid-cols-4 bg-slate-100 text-[9px] text-slate-800">
+      {/* Customer info strip — 5 columns: Bill# | Name | Order Type | Box | Qty */}
+      <div className="grid grid-cols-5 bg-slate-100 text-[9px] text-slate-800">
         <div
           className={`border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
         >
@@ -1068,6 +1071,12 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
           <p className="mt-0.5 font-semibold text-slate-900">
             {orderTypeLabel}
           </p>
+        </div>
+        <div
+          className={`border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
+        >
+          <p className={tableHeadClass}>{extraTxt.box}</p>
+          <p className="mt-0.5 font-semibold text-slate-900">{orderBoxName}</p>
         </div>
         <div className={`border-b border-slate-800 px-2 py-1.5 ${alignClass}`}>
           <p className={tableHeadClass}>{txt.qty}</p>

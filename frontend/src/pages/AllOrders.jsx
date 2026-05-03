@@ -9,7 +9,6 @@ import {
   LuClipboardList,
   LuPhone,
   LuReceipt,
-  LuBadgeDollarSign,
   LuUserCheck,
   LuEllipsisVertical,
   LuX,
@@ -48,6 +47,7 @@ import {
   EmptyState,
   ConfirmDeleteModal,
 } from "../components/ui/index.jsx";
+import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import { OrderDocumentPack } from "../components/order/OrderDocumentPack.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
@@ -363,19 +363,22 @@ function OrderViewModal({ orderId, open, onClose }) {
       onClose={onClose}
       title={t("orders.orderDetails")}
       maxW={1100}
+      boxClassName="order-details-modal-box"
+      bodyClassName="order-details-modal-body"
     >
       {isLoading ? (
         <Spinner />
       ) : data == null ? (
         <EmptyState message="Order not found" />
       ) : (
-        <div style={{ display: "grid", gap: 18 }}>
+        <div className="order-details-shell">
           <div
             className="order-view-top-grid"
             style={{ gridTemplateColumns: "1fr" }}
           >
             <div className="order-view-spotlight">
               <div
+                className="order-details-hero"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -401,7 +404,10 @@ function OrderViewModal({ orderId, open, onClose }) {
                       <Badge v="red">{t("orders.emergencyBadge")}</Badge>
                     )}
                   </div>
-                  <h3 style={{ fontSize: 24, fontWeight: 900 }}>
+                  <h3
+                    className="order-details-title"
+                    style={{ fontSize: 24, fontWeight: 900 }}
+                  >
                     {detailPrimaryName}
                   </h3>
                   <p
@@ -416,11 +422,15 @@ function OrderViewModal({ orderId, open, onClose }) {
                     })}
                   </p>
                 </div>
-                <div style={{ textAlign: "end" }}>
+                <div
+                  className="order-details-bill"
+                  style={{ textAlign: "end" }}
+                >
                   <div style={{ fontSize: 12, color: "var(--text3)" }}>
                     {t("orders.billNumber")}
                   </div>
                   <div
+                    className="order-details-bill-number"
                     style={{
                       fontSize: 30,
                       fontWeight: 900,
@@ -524,7 +534,7 @@ function OrderViewModal({ orderId, open, onClose }) {
           </div>
 
           <div
-            className="card"
+            className="card order-details-benefit-card"
             style={{
               border: "1px solid var(--border)",
               borderRadius: 12,
@@ -537,6 +547,7 @@ function OrderViewModal({ orderId, open, onClose }) {
             </h4>
 
             <div
+              className="order-details-benefit-summary"
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
@@ -585,7 +596,10 @@ function OrderViewModal({ orderId, open, onClose }) {
               </div>
             </div>
 
-            <div className="tbl-wrap" style={{ overflowX: "auto" }}>
+            <div
+              className="tbl-wrap order-details-expenses-table"
+              style={{ overflowX: "auto" }}
+            >
               <table className="tbl" style={{ minWidth: 620 }}>
                 <thead>
                   <tr>
@@ -626,6 +640,56 @@ function OrderViewModal({ orderId, open, onClose }) {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            <div className="order-details-expenses-mobile">
+              {(benefitDetails?.expenses || []).length === 0 ? (
+                <div className="order-details-expense-empty">
+                  {t("orders.noExpenses", "No expenses recorded yet.")}
+                </div>
+              ) : (
+                (benefitDetails?.expenses || []).map((entry) => (
+                  <div
+                    key={`m-${entry.key}`}
+                    className="order-details-expense-card"
+                  >
+                    <div className="order-details-expense-row">
+                      <span>{t("common.description", "Description")}</span>
+                      <strong>{entry.label || "-"}</strong>
+                    </div>
+                    <div className="order-details-expense-row">
+                      <span>{t("common.user", "User")}</span>
+                      <strong>{entry.userName || "-"}</strong>
+                    </div>
+                    <div className="order-details-expense-row">
+                      <span>{t("common.type", "Order Type")}</span>
+                      <strong>
+                        {entry.orderType
+                          ? getOrderTypeLabel(entry.orderType, language)
+                          : "-"}
+                      </strong>
+                    </div>
+                    <div className="order-details-expense-row">
+                      <span>{t("common.source", "Source")}</span>
+                      <strong>{entry.source || "-"}</strong>
+                    </div>
+                    <div className="order-details-expense-row">
+                      <span>{t("common.amount", "Amount")}</span>
+                      <strong>
+                        {formatMoney(entry.amount || 0, language)}
+                      </strong>
+                    </div>
+                    <div className="order-details-expense-row">
+                      <span>{t("common.date", "Date")}</span>
+                      <strong>
+                        {entry.paidAt
+                          ? formatSystemDate(entry.paidAt, language)
+                          : "-"}
+                      </strong>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -1060,7 +1124,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
         </div>
         <div className="order-dashboard-card order-dashboard-card--paid">
           <span className="order-dashboard-icon">
-            <LuBadgeDollarSign size={16} />
+            <AfCurrencyIcon size={16} />
           </span>
           <div className="order-dashboard-copy">
             <div className="order-dashboard-label">
