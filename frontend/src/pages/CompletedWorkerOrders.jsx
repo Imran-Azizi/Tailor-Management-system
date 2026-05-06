@@ -872,15 +872,6 @@ export default function CompletedWorkerOrders() {
                     .baseTypeLabel
                 }
               </div>
-              {getOrderLabelParts(confirmPayment.order, language).customName ? (
-                <div>
-                  <b>{t("createOrder.nameNewSet", "Measurement Name")}:</b>{" "}
-                  {
-                    getOrderLabelParts(confirmPayment.order, language)
-                      .customName
-                  }
-                </div>
-              ) : null}
               <div>
                 <b>
                   {t("completedWorkerOrders.paymentAmount", "Payment Amount")}:

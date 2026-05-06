@@ -15,6 +15,10 @@ import {
 } from "../components/ui/index.jsx";
 
 function resolveOrderState(order) {
+  if (order?.isDamageOrder) {
+    return { key: "DAMAGE_ORDER", tone: "danger", workerName: "" };
+  }
+
   if (order?.isCompleted) {
     return { key: "COMPLETED", tone: "success", workerName: "" };
   }
@@ -40,6 +44,9 @@ function resolveOrderState(order) {
 }
 
 function getLocalizedStatusMessage(t, state) {
+  if (state.key === "DAMAGE_ORDER") {
+    return t("orders.damageOrderStatus", "Damage Order");
+  }
   if (state.key === "WITH_QICHIKAR") {
     return t("assignment.statusWithQichikar", {
       defaultValue: "With Qichikar {{name}}",
@@ -59,6 +66,13 @@ function getLocalizedStatusMessage(t, state) {
 }
 
 function stateStyle(tone) {
+  if (tone === "danger") {
+    return {
+      color: "#991B1B",
+      background: "#FEF2F2",
+      border: "1px solid #FECACA",
+    };
+  }
   if (tone === "success") {
     return {
       color: "#15803D",
@@ -168,7 +182,7 @@ export default function AssignOrdersReport() {
 
   return (
     <div
-      className="page"
+      className="page report-root leading-relaxed tracking-normal"
       style={{
         maxWidth: 920,
         margin: "0 auto",
@@ -176,7 +190,7 @@ export default function AssignOrdersReport() {
         direction: isRtl ? "rtl" : "ltr",
         textAlign: isRtl ? "right" : "left",
         fontFamily: isRtl
-          ? "'Noto Naskh Arabic', 'Noto Sans Arabic', 'Inter', sans-serif"
+          ? "'Vazirmatn', 'Noto Sans Arabic', 'Noto Naskh Arabic', sans-serif"
           : undefined,
       }}
     >

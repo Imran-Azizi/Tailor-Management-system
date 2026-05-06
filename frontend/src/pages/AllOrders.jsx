@@ -22,14 +22,7 @@ import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { parseNumberLocale } from "../lib/normalize.js";
 import { formatCurrency } from "../lib/currency.js";
-import {
-  MONEY_SCALE,
-  METER_SCALE,
-  toScaledNumber,
-  mulScaled,
-  subScaled,
-  formatScaled,
-} from "../lib/decimal.js";
+import { MONEY_SCALE } from "../lib/decimal.js";
 import {
   getOrderDisplayName,
   getOrderLabelParts,
@@ -68,6 +61,11 @@ function isCompletedForWorkerType(order, workerType) {
   if (workerType === "QICHIKAR") return Boolean(order.qichikarCompletedAt);
   if (workerType === "DOKHT") return Boolean(order.dokhtCompletedAt);
   return false;
+}
+
+function getAllOrdersItemName(order, language) {
+  const parts = getOrderLabelParts(order, language);
+  return parts.customName || parts.baseTypeLabel;
 }
 
 function AssignModal({ order, onClose, onAssigned }) {
@@ -177,11 +175,9 @@ function AssignModal({ order, onClose, onAssigned }) {
         </div>
         <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 16 }}>
           <strong>
-            {getOrderPrimaryDisplayName(
+            {getAllOrdersItemName(
               order,
-              order.customer?.firstName,
               i18n.resolvedLanguage || i18n.language,
-              { showCustomerNameWithCustom: true },
             )}
           </strong>{" "}
           - Bill #{order.customer?.billNumber} |{" "}
@@ -325,19 +321,8 @@ function formatMoney(value, language) {
   });
 }
 
-function getOrderRakhtBenefit(order) {
-  const customerTotal = toScaledNumber(
-    order?.rakhtTotalCustomerPrice || 0,
-    MONEY_SCALE,
-  );
-  const requiredMeters = toScaledNumber(
-    order?.rakhtRequiredMeters || 0,
-    METER_SCALE,
-  );
-  const piecePrice = toScaledNumber(order?.rakhtPiecePrice || 0, MONEY_SCALE);
-  const purchaseTotal = mulScaled(piecePrice, requiredMeters, MONEY_SCALE);
-
-  return subScaled(customerTotal, purchaseTotal, MONEY_SCALE);
+function getBenefitEntryDate(entry) {
+  return entry?.date || entry?.paidAt || null;
 }
 
 function OrderViewModal({ orderId, open, onClose }) {
@@ -350,12 +335,17 @@ function OrderViewModal({ orderId, open, onClose }) {
   });
   const benefitDetails = data?.benefitDetails;
   const detailOrderLabel = getOrderLabelParts(data, language);
+  const detailCustomerName = String(data?.customer?.firstName || "").trim();
+  const detailItemName =
+    detailOrderLabel.customName || detailOrderLabel.typeWithSequenceLabel;
   const detailPrimaryName = getOrderPrimaryDisplayName(
     data,
-    data?.customer?.firstName,
+    detailCustomerName || detailOrderLabel.typeWithSequenceLabel,
     language,
-    { showCustomerNameWithCustom: true },
   );
+  const detailCreatedAt = data?.createdAt
+    ? formatSystemDateTime(data.createdAt, language)
+    : "-";
 
   return (
     <Modal
@@ -369,7 +359,7 @@ function OrderViewModal({ orderId, open, onClose }) {
       {isLoading ? (
         <Spinner />
       ) : data == null ? (
-        <EmptyState message="Order not found" />
+        <EmptyState message={t("orders.orderNotFound", "Order not found")} />
       ) : (
         <div className="order-details-shell">
           <div
@@ -400,6 +390,11 @@ function OrderViewModal({ orderId, open, onClose }) {
                     <Badge v={TV[data.type] || "gold"}>
                       {detailOrderLabel.baseTypeLabel}
                     </Badge>
+                    {data.isDamageOrder && (
+                      <Badge v="red">
+                        {t("orders.damageOrderStatus", "Damage Order")}
+                      </Badge>
+                    )}
                     {data.isEmergency && (
                       <Badge v="red">{t("orders.emergencyBadge")}</Badge>
                     )}
@@ -417,9 +412,7 @@ function OrderViewModal({ orderId, open, onClose }) {
                       marginTop: 4,
                     }}
                   >
-                    {t("orders.createdOn", {
-                      date: formatSystemDateTime(data.createdAt, language),
-                    })}
+                    {t("orders.createdOn", { date: detailCreatedAt })}
                   </p>
                 </div>
                 <div
@@ -442,39 +435,31 @@ function OrderViewModal({ orderId, open, onClose }) {
                 </div>
               </div>
 
-              <div style={{ marginTop: 14 }}>
+              <div className="order-details-info-grid">
+                <div className="order-details-info-card">
+                  <span>{t("orders.customerName", "Customer Name")}</span>
+                  <strong>{detailCustomerName || "-"}</strong>
+                </div>
+                <div className="order-details-info-card">
+                  <span>{t("orders.itemName", "Item Name")}</span>
+                  <strong>{detailItemName || "-"}</strong>
+                </div>
+                <div className="order-details-info-card">
+                  <span>{t("orders.orderType", "Order Type")}</span>
+                  <strong>
+                    {detailOrderLabel.typeWithSequenceLabel || "-"}
+                  </strong>
+                </div>
+                <div className="order-details-info-card">
+                  <span>{t("common.phone", "Phone")}</span>
+                  <strong className="order-details-ltr-value">
+                    {data.customer?.phoneNumber || "-"}
+                  </strong>
+                </div>
+              </div>
+
+              <div className="order-details-kpi-block">
                 <div className="order-view-kpi-grid">
-                  <div className="order-view-kpi-item">
-                    <span>{t("common.phone", "Phone")}</span>
-                    <strong>{data.customer?.phoneNumber || "-"}</strong>
-                  </div>
-                  <div className="order-view-kpi-item">
-                    <span>
-                      {t("createOrder.rakhtSelection", {
-                        defaultValue: "Rakht",
-                      })}
-                    </span>
-                    <strong>
-                      {data.rakhtBrandName
-                        ? `${data.rakhtBrandName} / ${data.rakhtColor || "-"}`
-                        : "-"}
-                    </strong>
-                  </div>
-                  <div className="order-view-kpi-item">
-                    <span>
-                      {t("rakht.requiredMeters", {
-                        defaultValue: "Required Meters",
-                      })}
-                    </span>
-                    <strong>
-                      {data.rakhtRequiredMeters != null
-                        ? formatScaled(data.rakhtRequiredMeters, {
-                            scale: 2,
-                            trim: false,
-                          })
-                        : "-"}
-                    </strong>
-                  </div>
                   <div className="order-view-kpi-item">
                     <span>{t("common.total", "Total")}</span>
                     <strong>{formatMoney(data.totalPrice, language)}</strong>
@@ -515,19 +500,6 @@ function OrderViewModal({ orderId, open, onClose }) {
                       )}
                     </strong>
                   </div>
-                  <div className="order-view-kpi-item order-view-kpi-item--benefit">
-                    <span>{t("rakht.benefit", "Rakht Benefit")}</span>
-                    <strong
-                      style={{
-                        color:
-                          Number(getOrderRakhtBenefit(data) || 0) >= 0
-                            ? "#15803D"
-                            : "#DC2626",
-                      }}
-                    >
-                      {formatMoney(getOrderRakhtBenefit(data), language)}
-                    </strong>
-                  </div>
                 </div>
               </div>
             </div>
@@ -557,7 +529,7 @@ function OrderViewModal({ orderId, open, onClose }) {
             >
               <div>
                 <div style={{ fontSize: 11, color: "var(--text3)" }}>
-                  {t("common.total", "Total Order Price")}
+                  {t("orders.totalOrderPrice", "Total Order Price")}
                 </div>
                 <strong>
                   {formatMoney(
@@ -604,9 +576,7 @@ function OrderViewModal({ orderId, open, onClose }) {
                 <thead>
                   <tr>
                     <th>{t("common.description", "Description")}</th>
-                    <th>{t("common.user", "User")}</th>
                     <th>{t("common.type", "Order Type")}</th>
-                    <th>{t("common.source", "Source")}</th>
                     <th>{t("common.amount", "Amount")}</th>
                     <th>{t("common.date", "Date")}</th>
                   </tr>
@@ -614,25 +584,32 @@ function OrderViewModal({ orderId, open, onClose }) {
                 <tbody>
                   {(benefitDetails?.expenses || []).length === 0 ? (
                     <tr>
-                      <td colSpan={6} style={{ textAlign: "center" }}>
+                      <td colSpan={4} style={{ textAlign: "center" }}>
                         {t("orders.noExpenses", "No expenses recorded yet.")}
                       </td>
                     </tr>
                   ) : (
                     (benefitDetails?.expenses || []).map((entry) => (
                       <tr key={entry.key}>
-                        <td>{entry.label || "-"}</td>
-                        <td>{entry.userName || "-"}</td>
+                        <td>
+                          {entry.labelKey
+                            ? t(entry.labelKey, {
+                                defaultValue: entry.label || "-",
+                              })
+                            : entry.label || "-"}
+                        </td>
                         <td>
                           {entry.orderType
                             ? getOrderTypeLabel(entry.orderType, language)
                             : "-"}
                         </td>
-                        <td>{entry.source || "-"}</td>
                         <td>{formatMoney(entry.amount || 0, language)}</td>
                         <td>
-                          {entry.paidAt
-                            ? formatSystemDate(entry.paidAt, language)
+                          {getBenefitEntryDate(entry)
+                            ? formatSystemDate(
+                                getBenefitEntryDate(entry),
+                                language,
+                              )
                             : "-"}
                         </td>
                       </tr>
@@ -655,11 +632,13 @@ function OrderViewModal({ orderId, open, onClose }) {
                   >
                     <div className="order-details-expense-row">
                       <span>{t("common.description", "Description")}</span>
-                      <strong>{entry.label || "-"}</strong>
-                    </div>
-                    <div className="order-details-expense-row">
-                      <span>{t("common.user", "User")}</span>
-                      <strong>{entry.userName || "-"}</strong>
+                      <strong>
+                        {entry.labelKey
+                          ? t(entry.labelKey, {
+                              defaultValue: entry.label || "-",
+                            })
+                          : entry.label || "-"}
+                      </strong>
                     </div>
                     <div className="order-details-expense-row">
                       <span>{t("common.type", "Order Type")}</span>
@@ -670,10 +649,6 @@ function OrderViewModal({ orderId, open, onClose }) {
                       </strong>
                     </div>
                     <div className="order-details-expense-row">
-                      <span>{t("common.source", "Source")}</span>
-                      <strong>{entry.source || "-"}</strong>
-                    </div>
-                    <div className="order-details-expense-row">
                       <span>{t("common.amount", "Amount")}</span>
                       <strong>
                         {formatMoney(entry.amount || 0, language)}
@@ -682,8 +657,11 @@ function OrderViewModal({ orderId, open, onClose }) {
                     <div className="order-details-expense-row">
                       <span>{t("common.date", "Date")}</span>
                       <strong>
-                        {entry.paidAt
-                          ? formatSystemDate(entry.paidAt, language)
+                        {getBenefitEntryDate(entry)
+                          ? formatSystemDate(
+                              getBenefitEntryDate(entry),
+                              language,
+                            )
                           : "-"}
                       </strong>
                     </div>
@@ -861,6 +839,8 @@ export default function AllOrders({ filter, mode = "orders" }) {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [searchFilter, setSearchFilter] = useState("");
+  const [searchBill, setSearchBill] = useState("");
+  const [searchBillFilter, setSearchBillFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("ALL");
   const orderTypeFilterOptions = useMemo(
     () =>
@@ -889,6 +869,8 @@ export default function AllOrders({ filter, mode = "orders" }) {
 
     setSearch("");
     setSearchFilter(incomingSearch);
+    setSearchBill("");
+    setSearchBillFilter("");
     setPage(1);
 
     navigate(location.pathname, { replace: true, state: {} });
@@ -901,6 +883,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
       remainingOnly,
       page,
       searchFilter,
+      searchBillFilter,
       typeFilter,
       viewMonth,
       viewYear,
@@ -913,6 +896,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
             page,
             limit: 20,
             search: searchFilter,
+            searchBill: searchBillFilter,
             type: typeFilter === "ALL" ? undefined : typeFilter,
             hasRemaining: remainingOnly ? true : undefined,
             month: isAdmin || isFinance ? viewMonth : undefined,
@@ -973,11 +957,32 @@ export default function AllOrders({ filter, mode = "orders" }) {
     "common.completed",
     t("sidebar.completed", "Completed"),
   );
+  const damageOrderStatusLabel = t("orders.damageOrderStatus", "Damage Order");
+
+  const getStatusBadgeMeta = (order) => {
+    if (order?.isDamageOrder) {
+      return { variant: "red", label: damageOrderStatusLabel };
+    }
+
+    const isCompletedStatus =
+      statusFilter === "completed" || order?.isCompleted;
+    return {
+      variant: isCompletedStatus ? "red" : "amber",
+      label: isCompletedStatus
+        ? completedStatusLabel
+        : t("delivery.notFullyPaidBadge", "Not Completed"),
+    };
+  };
 
   const orders = data?.data || [];
   const totalPages = Math.max(1, Math.ceil((data?.total || 0) / 20));
   const subtitle = data
-    ? t("ui.pageSummary", { page, pages: totalPages, total: data.total })
+    ? t("ui.pageSummary", {
+        page,
+        pages: totalPages,
+        total: data.total,
+        defaultValue: "Page {{page}} of {{pages}} · {{total}} total",
+      })
     : "";
 
   const billEmergencyMeta = useMemo(() => {
@@ -1067,6 +1072,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
               page,
               pages: totalPages,
               total: data?.total || 0,
+              defaultValue: "Page {{page}} of {{pages}} · {{total}} total",
             })}
           />
         </div>
@@ -1087,6 +1093,23 @@ export default function AllOrders({ filter, mode = "orders" }) {
                 setSearchFilter(value);
                 setPage(1);
               }}
+            />
+          </div>
+
+          <div className="all-orders-search">
+            <LuReceipt size={14} className="all-orders-search-icon" />
+            <input
+              className="inp all-orders-search-input"
+              aria-label={t("orders.billNumber", "Bill Number")}
+              placeholder={t("orders.billNumber", "Bill Number")}
+              value={searchBill}
+              onChange={(e) => {
+                const { value } = e.target;
+                setSearchBill(value);
+                setSearchBillFilter(value);
+                setPage(1);
+              }}
+              inputMode="numeric"
             />
           </div>
 
@@ -1168,7 +1191,6 @@ export default function AllOrders({ filter, mode = "orders" }) {
                         t("common.type", "Type"),
                         t("common.total", "Total"),
                         t("orders.totalBenefit", "Total Benefit"),
-                        t("rakht.benefit", "Rakht Benefit"),
                         t("createOrder.discount", "Discount"),
                         t("common.paid", "Paid"),
                         t("common.remaining", "Remaining"),
@@ -1183,7 +1205,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
                   <tbody>
                     {orders.length === 0 ? (
                       <tr>
-                        <td colSpan={12}>
+                        <td colSpan={11}>
                           <EmptyState
                             message={t("orders.noOrders")}
                             Icon={LuClipboardList}
@@ -1206,7 +1228,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
                           billEmergencyMeta.firstOrderIdByBill[billNumber] ===
                             o.id;
                         return (
-                          <tr key={o.id}>
+                          <tr key={o.id} className="all-orders-table-row">
                             <td>
                               <span className="order-bill-chip">
                                 #{o.customer?.billNumber}
@@ -1218,31 +1240,11 @@ export default function AllOrders({ filter, mode = "orders" }) {
                                   o,
                                   resolvedCustomerName,
                                   language,
-                                  { showCustomerNameWithCustom: true },
                                 )}
                               </div>
                               <div className="order-customer-phone">
                                 {o.customer?.phoneNumber}
                               </div>
-                              {(o?.rakhtBrandName || o?.rakhtColor) && (
-                                <div className="order-rakht-inline">
-                                  <span className="order-rakht-chip order-rakht-chip--brand">
-                                    {o.rakhtBrandName || "-"}
-                                  </span>
-                                  <span className="order-rakht-chip order-rakht-chip--color">
-                                    {o.rakhtColor || "-"}
-                                  </span>
-                                  {o?.rakhtRequiredMeters != null && (
-                                    <span className="order-rakht-chip order-rakht-chip--meters">
-                                      {formatScaled(o.rakhtRequiredMeters, {
-                                        scale: 2,
-                                        trim: false,
-                                      })}
-                                      m
-                                    </span>
-                                  )}
-                                </div>
-                              )}
                             </td>
                             <td>
                               <Badge v={TV[o.type] || "gold"}>
@@ -1256,11 +1258,6 @@ export default function AllOrders({ filter, mode = "orders" }) {
                               className={`order-money-cell ${Number(o.totalBenefit || 0) >= 0 ? "order-money-cell--paid" : "order-money-cell--remaining"}`}
                             >
                               {formatMoney(o.totalBenefit || 0, language)}
-                            </td>
-                            <td
-                              className={`order-money-cell ${Number(getOrderRakhtBenefit(o) || 0) >= 0 ? "order-money-cell--paid" : "order-money-cell--remaining"}`}
-                            >
-                              {formatMoney(getOrderRakhtBenefit(o), language)}
                             </td>
                             <td className="order-money-cell order-money-cell--discount">
                               {formatMoney(o.discount, language)}
@@ -1283,20 +1280,11 @@ export default function AllOrders({ filter, mode = "orders" }) {
                                   </Badge>
                                 )}
                                 {(() => {
-                                  const isCompletedStatus =
-                                    statusFilter === "completed" ||
-                                    o.isCompleted;
+                                  const statusMeta = getStatusBadgeMeta(o);
 
                                   return (
-                                    <Badge
-                                      v={isCompletedStatus ? "red" : "amber"}
-                                    >
-                                      {isCompletedStatus
-                                        ? completedStatusLabel
-                                        : t(
-                                            "delivery.notFullyPaidBadge",
-                                            "Not Completed",
-                                          )}
+                                    <Badge v={statusMeta.variant}>
+                                      {statusMeta.label}
                                     </Badge>
                                   );
                                 })()}
@@ -1306,14 +1294,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
                               {formatSystemDate(o.createdAt, language)}
                             </td>
                             <td>
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 8,
-                                  justifyContent: "end",
-                                }}
-                              >
+                              <div className="order-actions-row">
                                 {isAdmin && (
                                   <button
                                     type="button"
@@ -1388,13 +1369,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
                         <span className="order-mobile-bill">
                           #{o.customer?.billNumber}
                         </span>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                          }}
-                        >
+                        <div className="order-mobile-head-actions">
                           {isAdmin && (
                             <button
                               type="button"
@@ -1427,32 +1402,11 @@ export default function AllOrders({ filter, mode = "orders" }) {
                           o,
                           resolvedCustomerName,
                           language,
-                          { showCustomerNameWithCustom: true },
                         )}
                       </div>
                       <div className="order-mobile-phone">
                         {o.customer?.phoneNumber}
                       </div>
-
-                      {(o?.rakhtBrandName || o?.rakhtColor) && (
-                        <div className="order-mobile-rakht">
-                          <span className="order-rakht-chip order-rakht-chip--brand">
-                            {o.rakhtBrandName || "-"}
-                          </span>
-                          <span className="order-rakht-chip order-rakht-chip--color">
-                            {o.rakhtColor || "-"}
-                          </span>
-                          {o?.rakhtRequiredMeters != null && (
-                            <span className="order-rakht-chip order-rakht-chip--meters">
-                              {formatScaled(o.rakhtRequiredMeters, {
-                                scale: 2,
-                                trim: false,
-                              })}
-                              m
-                            </span>
-                          )}
-                        </div>
-                      )}
 
                       <div className="order-mobile-badges">
                         <Badge v={TV[o.type] || "gold"}>
@@ -1464,17 +1418,11 @@ export default function AllOrders({ filter, mode = "orders" }) {
                           </Badge>
                         )}
                         {(() => {
-                          const isCompletedStatus =
-                            statusFilter === "completed" || o.isCompleted;
+                          const statusMeta = getStatusBadgeMeta(o);
 
                           return (
-                            <Badge v={isCompletedStatus ? "red" : "amber"}>
-                              {isCompletedStatus
-                                ? completedStatusLabel
-                                : t(
-                                    "delivery.notFullyPaidBadge",
-                                    "Not Completed",
-                                  )}
+                            <Badge v={statusMeta.variant}>
+                              {statusMeta.label}
                             </Badge>
                           );
                         })()}
@@ -1497,20 +1445,6 @@ export default function AllOrders({ filter, mode = "orders" }) {
                             className={`order-mobile-value${Number(o.totalBenefit || 0) < 0 ? " order-mobile-value--remaining" : " order-mobile-value--paid"}`}
                           >
                             {formatMoney(o.totalBenefit || 0, language)}
-                          </div>
-                        </div>
-                        <div className="order-mobile-metric">
-                          <div className="order-mobile-label">
-                            {t("rakht.benefit", "Rakht Benefit")}
-                          </div>
-                          <div
-                            className={`order-mobile-value${
-                              Number(getOrderRakhtBenefit(o) || 0) < 0
-                                ? " order-mobile-value--remaining"
-                                : " order-mobile-value--paid"
-                            }`}
-                          >
-                            {formatMoney(getOrderRakhtBenefit(o), language)}
                           </div>
                         </div>
                         <div className="order-mobile-metric">

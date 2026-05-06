@@ -306,17 +306,8 @@ function LangMenu({ onClose }) {
 
   return (
     <div
-      style={{
-        position: "absolute",
-        top: "110%",
-        insetInlineEnd: 0,
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
-        borderRadius: 10,
-        boxShadow: "var(--sh-md)",
-        minWidth: 150,
-        zIndex: 300,
-      }}
+      className="absolute top-[110%] z-[300] min-w-[150px] rounded-[10px] border border-[var(--border)] bg-[var(--surface)] shadow-md"
+      style={{ insetInlineEnd: 0 }}
     >
       {langs.map((l) => (
         <div
@@ -361,17 +352,8 @@ function UserMenu({ roleColor, onClose }) {
 
   return (
     <div
-      style={{
-        position: "absolute",
-        top: "110%",
-        insetInlineEnd: 0,
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
-        borderRadius: 12,
-        boxShadow: "var(--sh-lg)",
-        width: 210,
-        zIndex: 300,
-      }}
+      className="absolute top-[110%] z-[300] w-[min(90vw,210px)] rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-lg"
+      style={{ insetInlineEnd: 0 }}
     >
       <div
         style={{
@@ -473,36 +455,15 @@ export default function WorkerLayout() {
   return (
     <div
       className="worker-shell"
-      style={{
-        minHeight: "100vh",
-        background: "var(--bg)",
-        display: "flex",
-        flexDirection: "column",
-      }}
+      style={{ minHeight: "100vh", background: "var(--bg)" }}
     >
       <header
-        className="worker-navbar"
-        style={{
-          background: "var(--surface)",
-          borderBottom: "1px solid var(--border)",
-          padding: "0 24px",
-          height: 60,
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          position: "sticky",
-          top: 0,
-          zIndex: 100,
-        }}
+        className="worker-navbar sticky top-0 z-[100] flex min-h-[60px] flex-wrap items-center gap-2 px-3 py-2 sm:px-4 lg:flex-nowrap lg:px-6"
+        style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)" }}
       >
         <div
-          className="worker-brand"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            marginInlineEnd: "auto",
-          }}
+          className="worker-brand flex min-w-0 flex-1 items-center gap-2.5"
+          style={{ marginInlineEnd: "auto" }}
         >
           <div
             style={{
@@ -535,20 +496,13 @@ export default function WorkerLayout() {
         </div>
 
         <div
-          className="worker-month-wrap"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "6px 8px",
-            borderRadius: 10,
-            border: "1px solid var(--border)",
-            background: "var(--surface2)",
-          }}
+          className="worker-month-wrap order-3 flex w-full items-center gap-2 overflow-x-auto rounded-xl px-2 py-1.5 lg:order-none lg:w-auto"
+          style={{ border: "1px solid var(--border)", background: "var(--surface2)" }}
           title={t("navbar.viewDataByMonth", "View Data by Month")}
         >
           <LuCalendarCheck size={14} style={{ color: "var(--text2)" }} />
           <select
+            className="min-w-[120px]"
             value={viewMonth}
             onChange={(e) => setViewMonth(Number(e.target.value))}
             style={workerMonthSelectStyle}
@@ -568,6 +522,7 @@ export default function WorkerLayout() {
             ))}
           </select>
           <select
+            className="min-w-[100px]"
             value={viewYear}
             onChange={(e) => setViewYear(Number(e.target.value))}
             style={workerMonthSelectStyle}
@@ -580,10 +535,7 @@ export default function WorkerLayout() {
           </select>
         </div>
 
-        <div
-          className="worker-controls"
-          style={{ display: "flex", alignItems: "center", gap: 8 }}
-        >
+        <div className="worker-controls ms-auto flex flex-wrap items-center justify-end gap-2">
           <div
             style={{ position: "relative" }}
             ref={langRef}
@@ -594,7 +546,7 @@ export default function WorkerLayout() {
                 setLangOpen((o) => !o);
                 setUserOpen(false);
               }}
-              style={btnStyle}
+              className="worker-nav-btn"
             >
               <LuLanguages size={14} />
               <span style={{ fontWeight: 700, fontSize: 12 }}>
@@ -604,7 +556,7 @@ export default function WorkerLayout() {
             {langOpen && <LangMenu onClose={() => setLangOpen(false)} />}
           </div>
 
-          <button onClick={toggle} style={btnStyle}>
+          <button onClick={toggle} className="worker-nav-btn">
             {dark ? <LuSun size={15} /> : <LuMoon size={15} />}
           </button>
 
@@ -614,7 +566,7 @@ export default function WorkerLayout() {
               setLangOpen(false);
               setUserOpen(false);
             }}
-            style={{ ...btnStyle, position: "relative" }}
+            className="worker-nav-btn relative"
           >
             <LuBell size={17} />
             {unreadNotifs.length > 0 && (
@@ -652,7 +604,7 @@ export default function WorkerLayout() {
                 setNotifOpen(false);
                 setLangOpen(false);
               }}
-              style={{ ...btnStyle, gap: 7, padding: "5px 10px" }}
+              className="worker-nav-btn gap-2 px-2.5 py-1.5"
             >
               <div
                 style={{
@@ -694,15 +646,8 @@ export default function WorkerLayout() {
       </header>
 
       <main
-        className="worker-main"
-        style={{
-          flex: 1,
-          maxWidth: 1140,
-          width: "100%",
-          margin: "0 auto",
-          padding: "28px 20px",
-          textAlign: isRtl ? "right" : "left",
-        }}
+        className="worker-main mx-auto w-full max-w-[1140px] min-w-0 flex-1 px-3 py-4 sm:px-4 sm:py-5 lg:px-5 lg:py-7"
+        style={{ textAlign: isRtl ? "right" : "left" }}
       >
         <Outlet />
       </main>
@@ -715,18 +660,6 @@ export default function WorkerLayout() {
     </div>
   );
 }
-
-const btnStyle = {
-  background: "var(--surface2)",
-  border: "1px solid var(--border)",
-  borderRadius: 8,
-  padding: "7px 10px",
-  cursor: "pointer",
-  color: "var(--text2)",
-  display: "flex",
-  alignItems: "center",
-  gap: 5,
-};
 
 const workerMonthSelectStyle = {
   border: "1px solid var(--border)",

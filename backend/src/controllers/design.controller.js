@@ -21,6 +21,13 @@ const MODEL_MAP = {
   patyship: "patyShip",
   buttonship: "buttonShip",
   tenbanship: "tenbanShip",
+  outfitdesign: "outfitDesign",
+  yakhanqaqneck: "yakhanQaqNeck",
+  yakhanqaqsleeve: "yakhanQaqSleeve",
+  yakhanqaqskirt: "yakhanQaqSkirt",
+  yakhanqaqdesign: "yakhanQaqDesignOption",
+  yakhanqaqbutton: "yakhanQaqButtonShip",
+  yakhanqaqpant: "yakhanQaqPantShip",
 };
 
 const getModel = (name) => {
@@ -308,6 +315,13 @@ export const getAllDesigns = async (req, res, next) => {
       patyShip,
       buttonShip,
       tenbanShip,
+      outfitDesign,
+      yakhanQaqNeck,
+      yakhanQaqSleeve,
+      yakhanQaqSkirt,
+      yakhanQaqDesign,
+      yakhanQaqButton,
+      yakhanQaqPant,
     ] = await Promise.all([
       prisma.yakhan.findMany({ orderBy: { name: "asc" } }),
       prisma.astin.findMany({ orderBy: { name: "asc" } }),
@@ -321,6 +335,13 @@ export const getAllDesigns = async (req, res, next) => {
       prisma.patyShip.findMany({ orderBy: { name: "asc" } }),
       prisma.buttonShip.findMany({ orderBy: { name: "asc" } }),
       prisma.tenbanShip.findMany({ orderBy: { name: "asc" } }),
+      prisma.outfitDesign.findMany({ orderBy: { name: "asc" } }),
+      prisma.yakhanQaqNeck.findMany({ orderBy: { name: "asc" } }),
+      prisma.yakhanQaqSleeve.findMany({ orderBy: { name: "asc" } }),
+      prisma.yakhanQaqSkirt.findMany({ orderBy: { name: "asc" } }),
+      prisma.yakhanQaqDesignOption.findMany({ orderBy: { name: "asc" } }),
+      prisma.yakhanQaqButtonShip.findMany({ orderBy: { name: "asc" } }),
+      prisma.yakhanQaqPantShip.findMany({ orderBy: { name: "asc" } }),
     ]);
     res.json({
       yakhan,
@@ -335,6 +356,13 @@ export const getAllDesigns = async (req, res, next) => {
       patyShip,
       buttonShip,
       tenbanShip,
+      outfitDesign,
+      yakhanQaqNeck,
+      yakhanQaqSleeve,
+      yakhanQaqSkirt,
+      yakhanQaqDesign,
+      yakhanQaqButton,
+      yakhanQaqPant,
     });
   } catch (e) {
     next(e);

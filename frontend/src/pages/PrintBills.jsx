@@ -476,8 +476,8 @@ export default function PrintBills() {
                             key={order.id || `${order.type}-${index}`}
                             className={`rounded-xl border px-3 py-3 shadow-sm transition ${
                               isSelected
-                                ? "border-blue-500 bg-blue-50/70"
-                                : "border-slate-200 bg-white"
+                                ? "border-amber-500 bg-amber-100/70 dark:border-amber-400 dark:bg-amber-900/20"
+                                : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
                             }`}
                           >
                             <div
@@ -528,14 +528,14 @@ export default function PrintBills() {
                                   alignItems: "center",
                                 }}
                               >
-                                <span
-                                  style={{
-                                    fontSize: 10,
-                                    fontWeight: 800,
-                                    color: "#92400E",
-                                    textTransform: "uppercase",
-                                    letterSpacing: ".08em",
-                                  }}
+                                  <span
+                                    style={{
+                                      fontSize: 10,
+                                      fontWeight: 800,
+                                      color: "var(--warning-strong)",
+                                      textTransform: "uppercase",
+                                      letterSpacing: ".08em",
+                                    }}
                                 >
                                   {t("createOrder.rakhtSelection", {
                                     defaultValue: "Rakht",
@@ -544,9 +544,9 @@ export default function PrintBills() {
                                 <span
                                   className="badge"
                                   style={{
-                                    background: "#FEF3C7",
-                                    color: "#92400E",
-                                    border: "1px solid #FCD34D",
+                                    background: "var(--warning-soft)",
+                                    color: "var(--warning-strong)",
+                                    border: "1px solid var(--warning-soft-border)",
                                   }}
                                 >
                                   {order.rakhtBrandName || "-"}
@@ -554,9 +554,9 @@ export default function PrintBills() {
                                 <span
                                   className="badge"
                                   style={{
-                                    background: "#EFF6FF",
-                                    color: "#1D4ED8",
-                                    border: "1px solid #BFDBFE",
+                                    background: "var(--info-soft)",
+                                    color: "var(--info)",
+                                    border: "1px solid var(--info-soft-border)",
                                     display: "inline-flex",
                                     alignItems: "center",
                                     gap: 6,
@@ -586,7 +586,7 @@ export default function PrintBills() {
                                     style={{
                                       fontSize: 11,
                                       fontWeight: 700,
-                                      color: "#0F172A",
+                                      color: "var(--text1)",
                                     }}
                                   >
                                     {Number(order.rakhtRequiredMeters).toFixed(

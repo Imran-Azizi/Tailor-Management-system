@@ -95,9 +95,15 @@ export async function drawArabicText(
 
     // Get the glyph's SVG outline path
     const { path } = glyph;
-    if (!path) continue;
+    if (!path) {
+      curX += pos.xAdvance * scale;
+      continue;
+    }
     const svgPath = path.toSVG();
-    if (!svgPath || svgPath.trim() === "M0 0" || svgPath.length < 5) continue;
+    if (!svgPath || svgPath.trim() === "M0 0" || svgPath.length < 5) {
+      curX += pos.xAdvance * scale;
+      continue;
+    }
 
     // Apply transform:
     //   scale X by +scale (horizontal direction preserved)
@@ -168,9 +174,15 @@ export function drawArabicTextSync(
     const glyphY = baselineY - pos.yOffset * scale;
 
     const { path } = glyph;
-    if (!path) continue;
+    if (!path) {
+      curX += pos.xAdvance * scale;
+      continue;
+    }
     const svgPath = path.toSVG();
-    if (!svgPath || svgPath.length < 5) continue;
+    if (!svgPath || svgPath.length < 5) {
+      curX += pos.xAdvance * scale;
+      continue;
+    }
 
     doc.save();
     doc.transform(scale, 0, 0, -scale, glyphX, glyphY);

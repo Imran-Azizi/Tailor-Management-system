@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+﻿import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import JsBarcode from "jsbarcode";
@@ -11,9 +11,13 @@ import {
   LuScissors,
 } from "react-icons/lu";
 import { SHOP_CONFIG } from "../../config/shopConfig.js";
-import { toAsciiDigits } from "../../lib/normalize.js";
+import { parseNumberLocale, toAsciiDigits } from "../../lib/normalize.js";
 import { formatCurrency } from "../../lib/currency.js";
 import { resolveRakhtColorHex } from "../../lib/rakhtColors.js";
+import {
+  getMeasurementFieldLabel,
+  getStyleFieldLabel,
+} from "./measurementLabels.js";
 import {
   getOrderDisplayName as getLocalizedOrderDisplayName,
   getOrderLabelParts as getLocalizedOrderLabelParts,
@@ -50,18 +54,18 @@ const ORDER_TYPE_LABELS = {
     OUTFIT: "Outfit",
     WASKAT: "Waskat",
     KORTY: "Korty",
-    YAKHANQAQ: "YakhanQaq",
+    YAKHANQAQ: "Yakhan Qaq",
   },
   dari: {
     OUTFIT: "پیراهن تنبان",
     WASKAT: "واسکت",
-    KORTY: "کُرتی",
+    KORTY: "کرتی",
     YAKHANQAQ: "یخن قاق",
   },
   pashto: {
-    OUTFIT: "پيراهن تنبان",
+    OUTFIT: "پیراهن تنبان",
     WASKAT: "واسکټ",
-    KORTY: "کورتي",
+    KORTY: "کورټۍ",
     YAKHANQAQ: "یخن قاق",
   },
 };
@@ -106,10 +110,10 @@ const BILL_TEXT = {
     discount: "تخفیف",
     paidAmount: "مبلغ پرداخت‌شده",
     remaining: "باقی‌مانده",
-    paidInFull: "تکمیل شد",
+    paidInFull: "تکمیل‌شده",
     customerInformation: "معلومات مشتری",
     measurementInformation: "معلومات اندازه‌گیری",
-    stylesInformation: "معلومات سبک",
+    stylesInformation: "معلومات دیزاین",
     date: "تاریخ",
     name: "نام",
     phone: "شماره تماس",
@@ -117,35 +121,35 @@ const BILL_TEXT = {
     yes: "بلی",
     printBillForCustomer: "چاپ بل مشتری",
     printBillForTailor: "چاپ بل خیاط",
-    customerBillCopy: "رسید A5 با خلاصه بل و تفکیک مالی",
-    tailorBillCopy: "کاپی داخلی با اندازه‌ها و جزئیات سبک",
+    customerBillCopy: "رسید A5 با خلاصه بل و جزئیات مالی",
+    tailorBillCopy: "کاپی داخلی با اندازه‌ها و جزئیات دیزاین",
     orderDocumentTitle: "سند سفارش",
   },
   pashto: {
-    customerBill: "د مشتری بل",
-    tailorCopy: "د خياط کاپي",
-    customerName: "د مشتری نوم",
+    customerBill: "د پېرودونکي بل",
+    tailorCopy: "د خیاط کاپي",
+    customerName: "د پېرودونکي نوم",
     billNo: "د بل شمېره",
-    qty: "تعداد",
+    qty: "شمېر",
     value: "ارزښت",
-    financialSummary: "مالي لنډيز",
-    totalPrice: "ټوله بيه",
+    financialSummary: "مالي لنډیز",
+    totalPrice: "ټوله بیه",
     discount: "تخفیف",
     paidAmount: "ورکړل شوې پیسې",
     remaining: "پاتې",
     paidInFull: "بشپړ شوی",
-    customerInformation: "د مشتری معلومات",
+    customerInformation: "د پېرودونکي معلومات",
     measurementInformation: "د اندازو معلومات",
-    stylesInformation: "د سټایل معلومات",
+    stylesInformation: "د ډیزاین معلومات",
     date: "نېټه",
     name: "نوم",
     phone: "د تماس شمېره",
-    quantity: "تعداد",
+    quantity: "شمېر",
     yes: "هو",
-    printBillForCustomer: "د مشتری بل چاپ",
-    printBillForTailor: "د خياط بل چاپ",
-    customerBillCopy: "A5 رسيد د بل لنډيز او مالي جزیاتو سره",
-    tailorBillCopy: "داخلي کاپي د اندازو او سټایل جزياتو سره",
+    printBillForCustomer: "د پېرودونکي بل چاپ",
+    printBillForTailor: "د خیاط بل چاپ",
+    customerBillCopy: "A5 رسید د بل لنډیز او مالي جزئیاتو سره",
+    tailorBillCopy: "داخلي کاپي د اندازو او ډیزاین جزئیاتو سره",
     orderDocumentTitle: "د فرمایش سند",
   },
 };
@@ -179,7 +183,6 @@ const BILL_EXTRA_TEXT = {
     notAssigned: "نه دی ټاکل شوی",
   },
 };
-
 const PRINT_SHOP_HEADER_NAME = "Hoshmand Safi";
 const AFGHANISTAN_TIMEZONE = "Asia/Kabul";
 
@@ -247,6 +250,13 @@ function toEnglishDigits(value) {
   return toAsciiDigits(String(value));
 }
 
+function normalizeShopPrintStyleValue(value) {
+  const text = String(value || "").trim();
+  if (!text) return "-";
+
+  return text.replace(/^(?:دیزاین|ډیزاین|Design|Style)\s+/i, "").trim();
+}
+
 function withLatinDigitsLocale(locale) {
   const base = String(locale || "en-US");
   if (/-u-/.test(base)) {
@@ -302,13 +312,10 @@ function formatTimeWithEnglishDigits(dateInput, settings, timeZone) {
   return fmt.format(value);
 }
 
-function formatFieldKey(key, t) {
-  return t(`createOrder.fields.${key}`, {
-    defaultValue: key
-      .replace(/([A-Z])/g, " $1")
-      .replace(/^./, (s) => s.toUpperCase())
-      .trim(),
-  });
+function isValuePositive(value) {
+  const parsed = parseNumberLocale(value);
+  if (parsed == null || !Number.isFinite(parsed)) return true;
+  return parsed > 0;
 }
 
 function getPrintDateTime(settings, timestamp) {
@@ -358,7 +365,7 @@ function PrintBillHeader({ settings, title, date, time }) {
               {SHOP_CONFIG.address}
             </p>
             <p className="text-[10px] text-slate-600">
-              {(SHOP_CONFIG.phones || []).join(" • ")}
+              {(SHOP_CONFIG.phones || []).join(" â€¢ ")}
             </p>
           </div>
         </div>
@@ -468,7 +475,7 @@ export function CustomerBill({ customer, order }) {
         </div>
       )}
 
-      {/* Customer info strip — 4 columns */}
+      {/* Customer info strip â€” 4 columns */}
       <div className="grid grid-cols-4 bg-slate-100 text-[9px] text-slate-800">
         <div
           className={`border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
@@ -929,7 +936,10 @@ function getOrderedMeasurementRows(entries, t) {
     sorted.push(item);
   }
 
-  return sorted.map(([key, value]) => [formatFieldKey(key, t), value]);
+  return sorted.map(([key, value]) => [
+    getMeasurementFieldLabel(t, key),
+    value,
+  ]);
 }
 
 function getOrderItemLabel(order, itemLabel, settings) {
@@ -993,9 +1003,12 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
       value !== null,
   );
 
-  const numericEntries = allEntries.filter(([key]) => NUMERIC_FIELDS.has(key));
+  const numericEntries = allEntries.filter(
+    ([key, value]) => NUMERIC_FIELDS.has(key) && isValuePositive(value),
+  );
   const styleEntries = allEntries.filter(
-    ([key, value]) => !NUMERIC_FIELDS.has(key) && value !== false,
+    ([key, value]) =>
+      !NUMERIC_FIELDS.has(key) && value !== false && isValuePositive(value),
   );
 
   // Build separate measurement rows (with formatted values)
@@ -1005,8 +1018,10 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
 
   // Build separate style rows
   const styleRows = styleEntries.map(([key, value]) => [
-    formatFieldKey(key, t),
-    typeof value === "boolean" ? txt.yes : toEnglishDigits(String(value)),
+    getStyleFieldLabel(t, key),
+    typeof value === "boolean"
+      ? txt.yes
+      : normalizeShopPrintStyleValue(toEnglishDigits(String(value))),
   ]);
 
   // Zip measurement and style rows, padding the shorter array with empty entries
@@ -1046,7 +1061,7 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
         time={time}
       />
 
-      {/* Customer info strip — 5 columns: Bill# | Name | Order Type | Box | Qty */}
+      {/* Customer info strip â€” 5 columns: Bill# | Name | Order Type | Box | Qty */}
       <div className="grid grid-cols-5 bg-slate-100 text-[9px] text-slate-800">
         <div
           className={`border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
@@ -1086,7 +1101,7 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
         </div>
       </div>
 
-      {/* Measurements + Styles table — 4 columns */}
+      {/* Measurements + Styles table â€” 4 columns */}
       <table className="w-full border-collapse table-fixed">
         <thead>
           {/* Section group header */}
@@ -1401,7 +1416,7 @@ export function printElement(id, options = {}) {
 
 export function PrintSafeSheet({ id, children, className = "" }) {
   const baseClassName =
-    "mx-auto w-full max-w-[560px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[var(--sh-md)] print:max-w-[148mm] print:rounded-none print:border-0 print:shadow-none";
+    "mx-auto w-full max-w-[560px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[var(--sh-md)] dark:border-slate-700 dark:bg-slate-900 print:max-w-[148mm] print:rounded-none print:border-gray-300 print:bg-white print:text-black print:shadow-none";
 
   return (
     <div
@@ -1473,10 +1488,10 @@ export function OrderDocumentPack({ customer, order, previewId }) {
 
   return (
     <div className="grid gap-4">
-      <div className="rounded-xl bg-blue-600 p-5 text-white shadow-[0_20px_40px_rgba(37,99,235,.2)]">
+      <div className="rounded-xl bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 p-5 text-white shadow-[0_20px_40px_rgba(15,23,42,.35)] dark:from-slate-800 dark:via-slate-900 dark:to-slate-950">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className={headlineAlign}>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-bold">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/35 bg-amber-300/20 px-3 py-1 text-xs font-bold text-amber-100">
               {t("orders.professionalPrintPack")}
             </span>
             <h3 className="mt-2.5 text-2xl font-black leading-[1.15]">
@@ -1516,19 +1531,19 @@ export function OrderDocumentPack({ customer, order, previewId }) {
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <div className="rounded-xl border border-slate-200 bg-white p-[18px]">
+        <div className="rounded-xl border border-slate-200 bg-white p-[18px] dark:border-slate-700 dark:bg-slate-900">
           <div className={actionTextAlign}>
-            <p className="text-[15px] font-bold text-slate-900">
+            <p className="text-[15px] font-bold text-gray-900 dark:text-slate-100">
               {txt.printBillForCustomer}
             </p>
-            <p className="mt-1 text-[13px] text-slate-500">
+            <p className="mt-1 text-[13px] text-slate-500 dark:text-slate-400">
               {txt.customerBillCopy}
             </p>
           </div>
           <div className="mt-[14px] grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
             <button
               type="button"
-              className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-md border-0 bg-emerald-600 px-4 font-semibold text-white shadow-[0_8px_20px_rgba(5,150,105,.2)] transition duration-150 hover:-translate-y-[1px] hover:opacity-90"
+              className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-md border-0 bg-amber-500 px-4 font-semibold text-white shadow-[0_8px_20px_rgba(180,120,24,.28)] transition duration-150 hover:-translate-y-[1px] hover:bg-amber-600"
               onClick={() =>
                 printElement(customerId, {
                   dir: settings.dir,
@@ -1542,7 +1557,7 @@ export function OrderDocumentPack({ customer, order, previewId }) {
             </button>
             <button
               type="button"
-              className="inline-flex min-h-[50px] items-center justify-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-[14px] font-semibold text-blue-900 transition duration-150 hover:-translate-y-[1px] hover:opacity-90"
+              className="inline-flex min-h-[50px] items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-[14px] font-semibold text-slate-700 transition duration-150 hover:-translate-y-[1px] hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
               onClick={() =>
                 exportPdf(
                   customerId,
@@ -1556,19 +1571,19 @@ export function OrderDocumentPack({ customer, order, previewId }) {
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-[18px]">
+        <div className="rounded-xl border border-slate-200 bg-white p-[18px] dark:border-slate-700 dark:bg-slate-900">
           <div className={actionTextAlign}>
-            <p className="text-[15px] font-bold text-slate-900">
+            <p className="text-[15px] font-bold text-gray-900 dark:text-slate-100">
               {txt.printBillForTailor}
             </p>
-            <p className="mt-1 text-[13px] text-slate-500">
+            <p className="mt-1 text-[13px] text-slate-500 dark:text-slate-400">
               {txt.tailorBillCopy}
             </p>
           </div>
           <div className="mt-[14px] grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
             <button
               type="button"
-              className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-md border-0 bg-emerald-600 px-4 font-semibold text-white shadow-[0_8px_20px_rgba(5,150,105,.2)] transition duration-150 hover:-translate-y-[1px] hover:opacity-90"
+              className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-md border-0 bg-amber-500 px-4 font-semibold text-white shadow-[0_8px_20px_rgba(180,120,24,.28)] transition duration-150 hover:-translate-y-[1px] hover:bg-amber-600"
               onClick={() =>
                 printElement(tailorId, {
                   dir: settings.dir,
@@ -1582,7 +1597,7 @@ export function OrderDocumentPack({ customer, order, previewId }) {
             </button>
             <button
               type="button"
-              className="inline-flex min-h-[50px] items-center justify-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-[14px] font-semibold text-blue-900 transition duration-150 hover:-translate-y-[1px] hover:opacity-90"
+              className="inline-flex min-h-[50px] items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-[14px] font-semibold text-slate-700 transition duration-150 hover:-translate-y-[1px] hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
               onClick={() =>
                 exportPdf(
                   tailorId,

@@ -28,6 +28,27 @@ const stripRepeatedBasePrefix = (customName, baseLabel) => {
   return match?.[1]?.trim() || "";
 };
 
+const isRedundantOrderLabel = (name, typeLabel, sequence) => {
+  const normalizeCompact = (value) =>
+    String(value || "")
+      .toLowerCase()
+      .replace(/[\s\-_]+/g, "")
+      .trim();
+
+  const n = normalizeCompact(name);
+  if (!n) return true;
+
+  const seq =
+    Number.isFinite(Number(sequence)) && Number(sequence) > 0
+      ? String(Number(sequence))
+      : "1";
+  const typeN = normalizeCompact(typeLabel);
+  const canonicalA = normalizeCompact(`${typeLabel} ${seq}`);
+  const canonicalB = normalizeCompact(`${seq} ${typeLabel}`);
+
+  return n === typeN || n === canonicalA || n === canonicalB;
+};
+
 const buildOrderDisplayName = ({
   type,
   orderName,
@@ -47,6 +68,9 @@ const buildOrderDisplayName = ({
     typeof orderName === "string" ? normalizeText(orderName) || "" : "";
 
   if (!customName) return baseLabel;
+  if (isRedundantOrderLabel(customName, typeLabel, normalizedSequence)) {
+    return baseLabel;
+  }
 
   const normalizedBase = normalizeNameForCompare(baseLabel);
   const normalizedCustom = normalizeNameForCompare(customName);
@@ -56,6 +80,9 @@ const buildOrderDisplayName = ({
 
   const strippedCustom = stripRepeatedBasePrefix(customName, baseLabel);
   if (strippedCustom) {
+    if (isRedundantOrderLabel(strippedCustom, typeLabel, normalizedSequence)) {
+      return baseLabel;
+    }
     const normalizedStripped = normalizeNameForCompare(strippedCustom);
     if (normalizedStripped && normalizedStripped !== normalizedBase) {
       return `${baseLabel} - ${strippedCustom}`;

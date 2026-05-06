@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon src/index.js",
+    "prisma:generate": "prisma generate",
     "start": "prisma generate && prisma migrate deploy && node prisma/seed.js && node src/index.js",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
@@ -31,7 +32,6 @@
     "nodemailer": "^8.0.7",
     "pdfkit": "^0.18.0",
     "tailor-system": "file:..",
-    "twilio": "^6.0.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

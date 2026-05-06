@@ -36,13 +36,13 @@ const ROLE_CONFIG = {
     color: "#DB2777",
     colorBg: "#DB277714",
     colorBd: "#DB277730",
-    label: "Dokht",
+    labelKey: "workerPanel.dokhtLabel",
   },
   QICHIKAR: {
     color: "#D97706",
     colorBg: "#D9770614",
     colorBd: "#D9770630",
-    label: "Qichikar",
+    labelKey: "workerPanel.qichikarLabel",
   },
 };
 
@@ -53,48 +53,48 @@ const TYPE_COLORS = {
   YAKHANQAQ: "#DC2626",
 };
 
-const NUM_LABELS = {
-  height: "Height",
-  shoulder: "Shoulder",
-  sleeve: "Sleeve",
-  neck: "Neck",
-  chest: "Chest",
-  armpit: "Armpit",
-  waist: "Waist",
-  skirt: "Skirt",
-  tenban: "Tenban",
-  pantLeg: "Pant Leg",
-  arm: "Arm",
-  calf: "Calf",
-  sorain: "Sorain",
-  patlonHeight: "Patlon H.",
-  kamerPatlon: "Kamer",
-  doroBaghlePatlon: "Doro Baghle",
-  sorainPatlon: "Sorain P.",
-  patPatlon: "Pat Patlon",
-  pachaPatlon: "Pacha",
+const NUM_LABEL_KEYS = {
+  height: "createOrder.fields.height",
+  shoulder: "createOrder.fields.shoulder",
+  sleeve: "createOrder.fields.sleeve",
+  neck: "createOrder.fields.neck",
+  chest: "createOrder.fields.chest",
+  armpit: "createOrder.fields.armpit",
+  waist: "createOrder.fields.waist",
+  skirt: "createOrder.fields.skirt",
+  tenban: "createOrder.fields.tenban",
+  pantLeg: "createOrder.fields.pantLeg",
+  arm: "createOrder.fields.arm",
+  calf: "createOrder.fields.calf",
+  sorain: "createOrder.fields.sorain",
+  patlonHeight: "createOrder.fields.patlonHeight",
+  kamerPatlon: "createOrder.fields.kamerPatlon",
+  doroBaghlePatlon: "createOrder.fields.doroBaghlePatlon",
+  sorainPatlon: "createOrder.fields.sorainPatlon",
+  patPatlon: "createOrder.fields.patPatlon",
+  pachaPatlon: "createOrder.fields.pachaPatlon",
 };
 
-const STYLE_LABELS = {
-  neckStyle: "Neck Style",
-  sleeveStyle: "Sleeve Style",
-  sleeveSize: "Sleeve Size",
-  skirtStyle: "Skirt Style",
-  waskatStyle: "Style",
-  shoulderState: "Shoulder State",
-  outfitDesign: "Design",
-  outfitStyle: "Style",
-  buttonStyle: "Buttons",
-  pantStyle: "Pants",
-  style: "Style",
-  yakhanQaqDesign: "Design",
-  additionalStyleInfo: "Notes",
+const STYLE_LABEL_KEYS = {
+  neckStyle: "createOrder.fields.neckStyle",
+  sleeveStyle: "createOrder.fields.sleeveStyle",
+  sleeveSize: "createOrder.fields.sleeveSize",
+  skirtStyle: "createOrder.fields.skirtStyle",
+  waskatStyle: "createOrder.fields.waskatStyle",
+  shoulderState: "createOrder.fields.shoulderState",
+  outfitDesign: "createOrder.fields.outfitDesign",
+  outfitStyle: "createOrder.fields.outfitStyle",
+  buttonStyle: "createOrder.fields.buttonStyle",
+  pantStyle: "createOrder.fields.pantStyle",
+  style: "createOrder.fields.style",
+  yakhanQaqDesign: "createOrder.fields.yakhanQaqDesign",
+  additionalStyleInfo: "createOrder.fields.additionalStyleInfo",
 };
 
-const BOOL_LABELS = {
-  frontPocket: "Front Pocket",
-  sidePocket: "Side Pocket",
-  underPocket: "Under Pocket",
+const BOOL_LABEL_KEYS = {
+  frontPocket: "createOrder.fields.frontPocket",
+  sidePocket: "createOrder.fields.sidePocket",
+  underPocket: "createOrder.fields.underPocket",
 };
 
 function getMeasure(order) {
@@ -160,18 +160,23 @@ function isWorkerCompletedForRole(order, accountType) {
 }
 
 function getStatus(order, accountType) {
+  if (order?.isDamageOrder) return "damageOrder";
   if (isWorkerCompletedForRole(order, accountType)) return "completed";
   if (getRoleOrderState(order, accountType).inProgress) return "inProgress";
   return "assigned";
 }
 
 function statusColor(status) {
+  if (status === "damageOrder") return "#B91C1C";
   if (status === "completed") return "#DC2626";
   if (status === "inProgress") return "#2563EB";
   return "#D97706";
 }
 
 function statusLabel(status, t) {
+  if (status === "damageOrder") {
+    return t("orders.damageOrderStatus", "Damage Order");
+  }
   if (status === "completed") {
     return t("workerPanel.statusCompleted", "Completed");
   }
@@ -184,6 +189,15 @@ function statusLabel(status, t) {
 function fmtDate(value, language) {
   if (!value) return "-";
   return formatSystemDate(value, language);
+}
+
+function formatTrimmedNumber(value, maximumFractionDigits = 2) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "-";
+  return num.toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits,
+  });
 }
 
 function getRolePaymentState(order, accountType) {
@@ -265,60 +279,22 @@ function ConfirmActionModal({ config, pending, onClose, onConfirm }) {
 
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-        padding: 16,
-      }}
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-3 sm:p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div
-        className="card"
-        style={{
-          width: "100%",
-          maxWidth: 520,
-          padding: 18,
-          borderRadius: 12,
-          border: "1px solid var(--border)",
-          background: "var(--surface)",
-        }}
-      >
-        <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>
+      <div className="card w-full max-w-[520px] rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-lg sm:p-5">
+        <h3 className="m-0 text-base font-extrabold sm:text-lg">
           {config.title}
         </h3>
-        <p
-          style={{ margin: "10px 0 14px", color: "var(--text2)", fontSize: 13 }}
-        >
+        <p className="mb-3 mt-2 text-xs text-[var(--text2)] sm:mb-4 sm:text-sm">
           {config.message}
         </p>
         {config.preview && (
-          <div
-            style={{
-              border: "1px solid var(--border)",
-              background: "var(--surface2)",
-              borderRadius: 8,
-              padding: 10,
-              display: "grid",
-              gap: 6,
-              fontSize: 13,
-            }}
-          >
+          <div className="grid gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface2)] p-2.5 text-xs sm:text-sm">
             {config.preview}
           </div>
         )}
-        <div
-          style={{
-            marginTop: 16,
-            display: "flex",
-            justifyContent: "end",
-            gap: 8,
-          }}
-        >
+        <div className="mt-4 flex flex-col justify-end gap-2 sm:flex-row">
           <button
             className="btn btn-outline"
             onClick={onClose}
@@ -355,13 +331,13 @@ function OrderDetailsModal({ order, language, t, onClose }) {
     : order?.assignmentPrice != null
       ? Number(order.assignmentPrice)
       : 0;
-  const measurementRows = Object.entries(NUM_LABELS).filter(
+  const measurementRows = Object.entries(NUM_LABEL_KEYS).filter(
     ([key]) => measure[key] != null,
   );
-  const styleRows = Object.entries(STYLE_LABELS).filter(
+  const styleRows = Object.entries(STYLE_LABEL_KEYS).filter(
     ([key]) => measure[key],
   );
-  const booleanRows = Object.entries(BOOL_LABELS).filter(
+  const booleanRows = Object.entries(BOOL_LABEL_KEYS).filter(
     ([key]) => measure[key] === true,
   );
 
@@ -392,74 +368,52 @@ function OrderDetailsModal({ order, language, t, onClose }) {
 
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-        padding: 16,
-      }}
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-3 sm:p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 760,
-          maxHeight: "90vh",
-          overflowY: "auto",
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-          borderRadius: 12,
-          padding: 18,
-        }}
-      >
-        <div
-          style={{ display: "flex", justifyContent: "space-between", gap: 10 }}
-        >
+      <div className="w-full max-h-[90vh] max-w-[760px] overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-lg sm:p-5">
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
           <div>
-            <h3 style={{ margin: 0, fontSize: 19, fontWeight: 800 }}>
+            <h3 className="m-0 text-lg font-extrabold sm:text-xl">
               {orderPrimaryName}
             </h3>
-            <p
-              style={{ margin: "6px 0 0", fontSize: 13, color: "var(--text3)" }}
-            >
+            <p className="mt-1.5 text-xs text-[var(--text3)] sm:text-sm">
               #{order.customer?.billNumber || "-"} - {orderLabel.baseTypeLabel}
             </p>
           </div>
           <button className="btn btn-outline btn-sm" onClick={onClose}>
-            Close
+            {t("common.close", "Close")}
           </button>
         </div>
 
-        <div style={{ marginTop: 16 }}>
+        <div className="mt-4">
           <div style={tableWrapStyle}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>{t("workerPanel.price", "Price")}</th>
-                  <th style={thStyle}>
-                    {t("workerPanel.updatedOn", "Updated")}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td style={{ ...tdStyle, borderBottom: "none" }}>
-                    ${priceValue.toLocaleString()}
-                  </td>
-                  <td style={{ ...tdStyle, borderBottom: "none" }}>
-                    {fmtDate(payment.paidAt || order.updatedAt, language)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>{t("workerPanel.price", "Price")}</th>
+                    <th style={thStyle}>
+                      {t("workerPanel.updatedOn", "Updated")}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style={{ ...tdStyle, borderBottom: "none" }}>
+                      {formatCurrency(priceValue, language)}
+                    </td>
+                    <td style={{ ...tdStyle, borderBottom: "none" }}>
+                      {fmtDate(payment.paidAt || order.updatedAt, language)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
-        <div style={{ marginTop: 14 }}>
+        <div className="mt-3.5">
           <p
             style={{
               fontSize: 12,
@@ -473,53 +427,55 @@ function OrderDetailsModal({ order, language, t, onClose }) {
             })}
           </p>
           <div style={tableWrapStyle}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>{t("common.field", "Field")}</th>
-                  <th style={thStyle}>{t("common.value", "Value")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  [
-                    t("rakht.brandName", { defaultValue: "Brand" }),
-                    order?.rakhtBrandName || "-",
-                  ],
-                  [
-                    t("rakht.color", { defaultValue: "Color" }),
-                    order?.rakhtColor || "-",
-                  ],
-                  [
-                    t("rakht.requiredMeters", {
-                      defaultValue: "Required Meters",
-                    }),
-                    order?.rakhtRequiredMeters != null
-                      ? Number(order.rakhtRequiredMeters).toFixed(2)
-                      : "-",
-                  ],
-                ].map(([field, value], index, arr) => (
-                  <tr key={field}>
-                    <td style={tdStyle}>{field}</td>
-                    <td
-                      style={{
-                        ...tdStyle,
-                        borderBottom:
-                          index === arr.length - 1
-                            ? "none"
-                            : tdStyle.borderBottom,
-                      }}
-                    >
-                      {value}
-                    </td>
+            <div className="overflow-x-auto">
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>{t("common.field", "Field")}</th>
+                    <th style={thStyle}>{t("common.value", "Value")}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {[
+                    [
+                      t("rakht.brandName", { defaultValue: "Brand" }),
+                      order?.rakhtBrandName || "-",
+                    ],
+                    [
+                      t("rakht.color", { defaultValue: "Color" }),
+                      order?.rakhtColor || "-",
+                    ],
+                    [
+                      t("rakht.requiredMeters", {
+                        defaultValue: "Required Meters",
+                      }),
+                      order?.rakhtRequiredMeters != null
+                        ? formatTrimmedNumber(order.rakhtRequiredMeters, 2)
+                        : "-",
+                    ],
+                  ].map(([field, value], index, arr) => (
+                    <tr key={field}>
+                      <td style={tdStyle}>{field}</td>
+                      <td
+                        style={{
+                          ...tdStyle,
+                          borderBottom:
+                            index === arr.length - 1
+                              ? "none"
+                              : tdStyle.borderBottom,
+                        }}
+                      >
+                        {value}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
-        <div style={{ marginTop: 14 }}>
+        <div className="mt-3.5">
           <p
             style={{
               fontSize: 12,
@@ -531,47 +487,49 @@ function OrderDetailsModal({ order, language, t, onClose }) {
             {t("createOrder.measurements", "Measurements")}
           </p>
           <div style={tableWrapStyle}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>{t("common.field", "Field")}</th>
-                  <th style={thStyle}>{t("common.value", "Value")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {measurementRows.length ? (
-                  measurementRows.map(([key, label], index) => (
-                    <tr key={key}>
-                      <td style={tdStyle}>{label}</td>
+            <div className="overflow-x-auto">
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>{t("common.field", "Field")}</th>
+                    <th style={thStyle}>{t("common.value", "Value")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {measurementRows.length ? (
+                    measurementRows.map(([key, tKey], index) => (
+                      <tr key={key}>
+                        <td style={tdStyle}>{t(tKey)}</td>
+                        <td
+                          style={{
+                            ...tdStyle,
+                            borderBottom:
+                              index === measurementRows.length - 1
+                                ? "none"
+                                : tdStyle.borderBottom,
+                          }}
+                        >
+                          {measure[key]}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
                       <td
-                        style={{
-                          ...tdStyle,
-                          borderBottom:
-                            index === measurementRows.length - 1
-                              ? "none"
-                              : tdStyle.borderBottom,
-                        }}
+                        style={{ ...tdStyle, borderBottom: "none" }}
+                        colSpan={2}
                       >
-                        {measure[key]}
+                        -
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td
-                      style={{ ...tdStyle, borderBottom: "none" }}
-                      colSpan={2}
-                    >
-                      -
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
-        <div style={{ marginTop: 14 }}>
+        <div className="mt-3.5">
           <p
             style={{
               fontSize: 12,
@@ -583,48 +541,442 @@ function OrderDetailsModal({ order, language, t, onClose }) {
             {t("createOrder.styleOptions", "Styling Details")}
           </p>
           <div style={tableWrapStyle}>
+            <div className="overflow-x-auto">
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>{t("common.field", "Field")}</th>
+                    <th style={thStyle}>{t("common.value", "Value")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...styleRows, ...booleanRows].length ? (
+                    [...styleRows, ...booleanRows].map(
+                      ([key, tKey], index, arr) => (
+                        <tr key={key}>
+                          <td style={tdStyle}>{t(tKey)}</td>
+                          <td
+                            style={{
+                              ...tdStyle,
+                              borderBottom:
+                                index === arr.length - 1
+                                  ? "none"
+                                  : tdStyle.borderBottom,
+                            }}
+                          >
+                            {measure[key] === true
+                              ? t("common.yes", "Yes")
+                              : measure[key]}
+                          </td>
+                        </tr>
+                      ),
+                    )
+                  ) : (
+                    <tr>
+                      <td
+                        style={{ ...tdStyle, borderBottom: "none" }}
+                        colSpan={2}
+                      >
+                        -
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Penalty Detail Modal ───────────────────────────────────────────────────
+function PenaltyDetailModal({ penalty, language, t, onClose }) {
+  if (!penalty) return null;
+
+  const statusBadge = {
+    DAMAGE_ORDER: {
+      label: t("orders.damageOrderStatus", "Damage Order"),
+      bg: "#FEF2F2",
+      color: "#B91C1C",
+    },
+    COMPLETED: {
+      label: t("workerPanel.statusCompleted"),
+      bg: "var(--green-bg, #DCFCE7)",
+      color: "var(--green-fg, #15803D)",
+    },
+    IN_PROGRESS: {
+      label: t("workerPanel.statusInProgress"),
+      bg: "var(--blue-bg, #DBEAFE)",
+      color: "var(--blue-fg, #1D4ED8)",
+    },
+    PENDING: {
+      label: t("workerPanel.statusPending", "Pending"),
+      bg: "var(--surface2)",
+      color: "var(--text3)",
+    },
+  }[penalty.orderStatus] || {
+    label: penalty.orderStatus,
+    bg: "var(--surface2)",
+    color: "var(--text3)",
+  };
+
+  const thStyle = {
+    fontSize: 11,
+    color: "var(--text3)",
+    textTransform: "uppercase",
+    letterSpacing: ".04em",
+    textAlign: "start",
+    padding: "8px 10px",
+    background: "var(--surface2)",
+    borderBottom: "1px solid var(--border)",
+    fontWeight: 700,
+  };
+
+  const tdLabelStyle = {
+    fontSize: 12,
+    color: "var(--text3)",
+    padding: "8px 10px",
+    borderBottom: "1px solid var(--border)",
+    width: "45%",
+  };
+
+  const tdValueStyle = {
+    fontSize: 13,
+    color: "var(--text1)",
+    fontWeight: 600,
+    padding: "8px 10px",
+    borderBottom: "1px solid var(--border)",
+    textAlign: "end",
+  };
+
+  const tableWrapStyle = {
+    border: "1px solid var(--border)",
+    borderRadius: 10,
+    overflow: "hidden",
+    background: "var(--surface)",
+  };
+
+  const sectionLabelStyle = {
+    fontSize: 11,
+    fontWeight: 700,
+    color: "var(--text3)",
+    textTransform: "uppercase",
+    letterSpacing: ".04em",
+    margin: "14px 0 6px",
+  };
+
+  const CurrencyCell = ({ value, accent }) => (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 3,
+        color: accent || "var(--text1)",
+        fontWeight: 700,
+      }}
+    >
+      <AfCurrencyIcon size={12} />
+      {formatCurrency(value || 0, language)}
+    </span>
+  );
+
+  return (
+    <div
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-3 sm:p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="card w-full max-h-[90vh] max-w-[520px] overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-lg sm:p-5">
+        {/* Header */}
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+          <div>
+            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>
+              {t("workerPanel.penaltyDetailTitle", "Penalty Record Details")}
+            </h3>
+            <p
+              style={{ margin: "5px 0 0", fontSize: 13, color: "var(--text3)" }}
+            >
+              #{penalty.billNumber} · {penalty.customerName}
+            </p>
+          </div>
+          <button className="btn btn-outline btn-sm" onClick={onClose}>
+            {t("common.close", "Close")}
+          </button>
+        </div>
+
+        {/* Order Information */}
+        <p style={sectionLabelStyle}>
+          {t("workerPanel.orderInfoSection", "Order Information")}
+        </p>
+        <div style={tableWrapStyle}>
+          <div className="overflow-x-auto">
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <tbody>
+                {[
+                  [
+                    t("damagedClothes.details.billNumber"),
+                    `#${penalty.billNumber}`,
+                  ],
+                  [
+                    t("damagedClothes.details.customerName"),
+                    penalty.customerName || "—",
+                  ],
+                  [
+                    t("damagedClothes.details.phoneNumber"),
+                    penalty.phoneNumber || "—",
+                  ],
+                  [
+                    t("damagedClothes.details.orderType"),
+                    penalty.orderType || "—",
+                  ],
+                ].map(([label, value], i, arr) => (
+                  <tr key={label}>
+                    <td
+                      style={{
+                        ...tdLabelStyle,
+                        borderBottom:
+                          i === arr.length - 1
+                            ? "none"
+                            : tdLabelStyle.borderBottom,
+                      }}
+                    >
+                      {label}
+                    </td>
+                    <td
+                      style={{
+                        ...tdValueStyle,
+                        borderBottom:
+                          i === arr.length - 1
+                            ? "none"
+                            : tdValueStyle.borderBottom,
+                      }}
+                    >
+                      {value}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Status + date row */}
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <div
+            style={{
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              padding: "8px 10px",
+              background: "var(--surface)",
+            }}
+          >
+            <div
+              style={{ fontSize: 11, color: "var(--text3)", marginBottom: 4 }}
+            >
+              {t("workerPanel.orderStatus", "Order Status")}
+            </div>
+            <span
+              className="badge"
+              style={{
+                background: statusBadge.bg,
+                color: statusBadge.color,
+                fontWeight: 700,
+              }}
+            >
+              {statusBadge.label}
+            </span>
+          </div>
+          <div
+            style={{
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              padding: "8px 10px",
+              background: "var(--surface)",
+            }}
+          >
+            <div
+              style={{ fontSize: 11, color: "var(--text3)", marginBottom: 4 }}
+            >
+              {t("workerPanel.penaltyDate", "Penalty Applied")}
+            </div>
+            <strong style={{ fontSize: 12 }}>
+              {formatDateTimeLocale(penalty.createdAt, language)}
+            </strong>
+          </div>
+        </div>
+
+        {/* Billing Information */}
+        <p style={sectionLabelStyle}>
+          {t("workerPanel.billingInfoSection", "Billing Information")}
+        </p>
+        <div style={tableWrapStyle}>
+          <div className="overflow-x-auto">
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
                   <th style={thStyle}>{t("common.field", "Field")}</th>
-                  <th style={thStyle}>{t("common.value", "Value")}</th>
+                  <th style={{ ...thStyle, textAlign: "end" }}>
+                    {t("common.value", "Value")}
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {[...styleRows, ...booleanRows].length ? (
-                  [...styleRows, ...booleanRows].map(
-                    ([key, label], index, arr) => (
-                      <tr key={key}>
-                        <td style={tdStyle}>{label}</td>
-                        <td
-                          style={{
-                            ...tdStyle,
-                            borderBottom:
-                              index === arr.length - 1
-                                ? "none"
-                                : tdStyle.borderBottom,
-                          }}
-                        >
-                          {measure[key] === true
-                            ? t("common.yes", "Yes")
-                            : measure[key]}
-                        </td>
-                      </tr>
-                    ),
-                  )
-                ) : (
-                  <tr>
-                    <td
-                      style={{ ...tdStyle, borderBottom: "none" }}
-                      colSpan={2}
-                    >
-                      -
-                    </td>
-                  </tr>
-                )}
+                <tr>
+                  <td style={tdLabelStyle}>
+                    {t("workerPanel.totalOrderPrice", "Total Order Price")}
+                  </td>
+                  <td style={{ ...tdValueStyle }}>
+                    <CurrencyCell value={penalty.totalOrderPrice} />
+                  </td>
+                </tr>
+                <tr>
+                  <td style={tdLabelStyle}>
+                    {t("createOrder.discount", "Discount")}
+                  </td>
+                  <td style={{ ...tdValueStyle }}>
+                    <CurrencyCell
+                      value={penalty.discount}
+                      accent={penalty.discount > 0 ? "#15803D" : undefined}
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td style={tdLabelStyle}>
+                    {t("createOrder.paidAmount", "Paid Amount")}
+                  </td>
+                  <td style={{ ...tdValueStyle }}>
+                    <CurrencyCell value={penalty.paidAmount} accent="#1D4ED8" />
+                  </td>
+                </tr>
+                <tr>
+                  <td style={tdLabelStyle}>
+                    {t("common.remaining", "Remaining")}
+                  </td>
+                  <td style={{ ...tdValueStyle }}>
+                    <CurrencyCell
+                      value={penalty.remaining}
+                      accent={penalty.remaining > 0 ? "#DC2626" : "#15803D"}
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td
+                    style={{
+                      ...tdLabelStyle,
+                      borderBottom: "none",
+                      fontWeight: 700,
+                      color: "var(--text1)",
+                    }}
+                  >
+                    {t("workerPanel.finalPayable", "Final Payable")}
+                  </td>
+                  <td style={{ ...tdValueStyle, borderBottom: "none" }}>
+                    <CurrencyCell value={penalty.finalPayable} />
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
+        </div>
+
+        {/* Expense Information */}
+        <p style={sectionLabelStyle}>
+          {t("workerPanel.expenseInfoSection", "Expense Information")}
+        </p>
+        <div style={tableWrapStyle}>
+          <div className="overflow-x-auto">
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th style={thStyle}>{t("common.field", "Field")}</th>
+                  <th style={{ ...thStyle, textAlign: "end" }}>
+                    {t("common.value", "Value")}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  [
+                    t("damagedClothes.details.rakhtExpense"),
+                    penalty.rakhtExpense,
+                    undefined,
+                  ],
+                  [
+                    t("damagedClothes.details.dokhtExpense"),
+                    penalty.dokhtExpense,
+                    undefined,
+                  ],
+                  [
+                    t("damagedClothes.details.qichikarExpense"),
+                    penalty.qichikarExpense,
+                    undefined,
+                  ],
+                  [
+                    t("damagedClothes.details.dailyTaskExpense"),
+                    penalty.dailyTaskExpense,
+                    undefined,
+                  ],
+                  ...(penalty.extraExpense > 0
+                    ? [
+                        [
+                          t("workerPanel.extraExpenses", "Other Expenses"),
+                          penalty.extraExpense,
+                          undefined,
+                        ],
+                      ]
+                    : []),
+                ].map(([label, value, accent], i, arr) => (
+                  <tr key={label}>
+                    <td
+                      style={{
+                        ...tdLabelStyle,
+                        borderBottom: "1px solid var(--border)",
+                      }}
+                    >
+                      {label}
+                    </td>
+                    <td
+                      style={{
+                        ...tdValueStyle,
+                        borderBottom: "1px solid var(--border)",
+                      }}
+                    >
+                      <CurrencyCell value={value} accent={accent} />
+                    </td>
+                  </tr>
+                ))}
+                <tr>
+                  <td
+                    style={{
+                      ...tdLabelStyle,
+                      borderBottom: "none",
+                      fontWeight: 700,
+                      color: "#92400E",
+                    }}
+                  >
+                    {t("damagedClothes.details.totalPenalty")}
+                  </td>
+                  <td style={{ ...tdValueStyle, borderBottom: "none" }}>
+                    <CurrencyCell
+                      value={penalty.totalExpense}
+                      accent="#B45309"
+                    />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Applied by footer */}
+        <div className="mt-3 flex flex-col items-start justify-between gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface2)] px-2.5 py-2 text-xs sm:flex-row sm:items-center">
+          <span style={{ color: "var(--text3)" }}>
+            {t("workerPanel.appliedBy", "Applied By")}
+          </span>
+          <strong style={{ color: "var(--text1)" }}>
+            {penalty.createdBy?.name || "—"}
+          </strong>
         </div>
       </div>
     </div>
@@ -638,6 +990,9 @@ export default function WorkerPanel() {
   const qc = useQueryClient();
   const language = i18n.resolvedLanguage || i18n.language || "en";
   const cfg = ROLE_CONFIG[user?.accountType] || ROLE_CONFIG.QICHIKAR;
+  const roleLabel = t(cfg.labelKey, {
+    defaultValue: user?.accountType === "DOKHT" ? "Dokht" : "Qichikar",
+  });
   const workerScope = [user?.id, user?.accountType];
 
   const [activeTab, setActiveTab] = useState("all");
@@ -646,6 +1001,7 @@ export default function WorkerPanel() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [hasSearchAttempt, setHasSearchAttempt] = useState(false);
   const [detailOrder, setDetailOrder] = useState(null);
+  const [selectedPenalty, setSelectedPenalty] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
   const [optimisticInProgressIds, setOptimisticInProgressIds] = useState([]);
   const [optimisticCompletedIds, setOptimisticCompletedIds] = useState([]);
@@ -697,6 +1053,19 @@ export default function WorkerPanel() {
     refetchInterval: 15000,
     refetchOnWindowFocus: true,
   });
+
+  const { data: damagedPenaltyPayload, isLoading: damagedPenaltyLoading } =
+    useQuery({
+      queryKey: ["worker-panel-damaged-penalties", ...workerScope],
+      queryFn: () =>
+        api
+          .get("/damaged-clothes/my-penalties", {
+            params: { page: 1, limit: 100 },
+          })
+          .then((r) => r.data),
+      enabled: Boolean(user?.id),
+      refetchInterval: 30000,
+    });
 
   const unreadNotifs = allNotifs.filter((n) => !n.isRead);
 
@@ -864,10 +1233,18 @@ export default function WorkerPanel() {
   }, [orders, user?.accountType]);
 
   const totalLoanAmount = Number(workerMoneySummary?.loanTotal || 0);
+  const damagePenaltyTotalFromSummary = Number(
+    workerMoneySummary?.damagePenaltyTotal || 0,
+  );
   const totalCompletedPayments = Number(
     workerMoneySummary?.totalCompletedPayments || 0,
   );
-  const currentMoney = totalCompletedPayments - totalLoanAmount;
+  const currentMoney =
+    totalCompletedPayments - totalLoanAmount - damagePenaltyTotalFromSummary;
+  const damagedPenalties = Array.isArray(damagedPenaltyPayload?.data)
+    ? damagedPenaltyPayload.data
+    : [];
+  const totalDamagePenaltyAmount = damagePenaltyTotalFromSummary;
 
   const newAssignedOrders = useMemo(() => {
     const accountType = user?.accountType;
@@ -1005,6 +1382,11 @@ export default function WorkerPanel() {
       key: "completed",
       label: t("workerPanel.statusCompleted", "Completed"),
       count: stats.completed,
+    },
+    {
+      key: "penalties",
+      label: t("workerPanel.penaltyTab", "Penalty History"),
+      count: damagedPenaltyPayload?.total || 0,
     },
   ];
 
@@ -1161,12 +1543,6 @@ export default function WorkerPanel() {
             <b>{t("workerPanel.orderType", "Order Type")}:</b>{" "}
             {orderLabel.baseTypeLabel}
           </div>
-          {orderLabel.customName ? (
-            <div>
-              <b>{t("createOrder.nameNewSet", "Measurement Name")}:</b>{" "}
-              {orderLabel.customName}
-            </div>
-          ) : null}
           <div>
             <b>{t("common.customer", "Customer")}:</b>{" "}
             {getOrderPrimaryDisplayName(
@@ -1267,7 +1643,7 @@ export default function WorkerPanel() {
             </span>
             {order?.rakhtRequiredMeters != null && (
               <span className="order-rakht-chip order-rakht-chip--meters">
-                {Number(order.rakhtRequiredMeters).toFixed(2)}m
+                {formatTrimmedNumber(order.rakhtRequiredMeters, 2)}m
               </span>
             )}
           </div>
@@ -1298,9 +1674,9 @@ export default function WorkerPanel() {
             }}
           >
             {paidToWorker
-              ? formatCurrency(payment.amount || 0, "en")
+              ? formatCurrency(payment.amount || 0, language)
               : order.assignmentPrice != null
-                ? formatCurrency(order.assignmentPrice, "en")
+                ? formatCurrency(order.assignmentPrice, language)
                 : "-"}
           </span>
           {!paidToWorker && order.assignmentPrice != null && (
@@ -1442,7 +1818,7 @@ export default function WorkerPanel() {
               </span>
               {order?.rakhtRequiredMeters != null && (
                 <span className="order-rakht-chip order-rakht-chip--meters">
-                  {Number(order.rakhtRequiredMeters).toFixed(2)}m
+                  {formatTrimmedNumber(order.rakhtRequiredMeters, 2)}m
                 </span>
               )}
             </div>
@@ -1499,36 +1875,18 @@ export default function WorkerPanel() {
   };
 
   return (
-    <div style={{ display: "grid", gap: 18 }}>
-      <div className="card" style={{ padding: 18 }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 12,
-            flexWrap: "wrap",
-          }}
-        >
+    <div className="grid gap-4 sm:gap-5">
+      <div className="card p-4 sm:p-5">
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
           <div>
-            <h1
-              style={{
-                margin: 0,
-                fontSize: 22,
-                fontWeight: 800,
-                color: "var(--text1)",
-              }}
-            >
+            <h1 className="m-0 text-xl font-extrabold text-[var(--text1)] sm:text-2xl">
               {t("workerPanel.greeting", "Welcome")} {user?.name || ""}
             </h1>
-            <p
-              style={{ margin: "7px 0 0", color: "var(--text3)", fontSize: 13 }}
-            >
-              {cfg.label} - {t("workerPanel.allOrders", "All Orders")}:{" "}
+            <p className="mt-1.5 text-xs text-[var(--text3)] sm:text-sm">
+              {roleLabel} - {t("workerPanel.allOrders", "All Orders")}:{" "}
               {stats.all}
             </p>
-            <p
-              style={{ margin: "6px 0 0", color: "var(--text3)", fontSize: 12 }}
-            >
+            <p className="mt-1 text-xs text-[var(--text3)]">
               {t("common.viewingMonth", "Viewing data for")}:{" "}
               <b>{formatMonthYearLabel(viewMonth, viewYear, language)}</b>
             </p>
@@ -1536,24 +1894,16 @@ export default function WorkerPanel() {
           <span
             className="badge"
             style={{
-              alignSelf: "start",
               background: `${cfg.color}14`,
               color: cfg.color,
               border: `1px solid ${cfg.color}30`,
             }}
           >
-            {cfg.label}
+            {roleLabel}
           </span>
         </div>
 
-        <div
-          style={{
-            marginTop: 14,
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
-            gap: 10,
-          }}
-        >
+        <div className="mt-3.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
           <div
             style={{
               border: "1px solid var(--border)",
@@ -1583,7 +1933,7 @@ export default function WorkerPanel() {
               }}
             >
               <AfCurrencyIcon size={18} />
-              {totalCompletedPayments.toLocaleString()}
+              {formatCurrency(totalCompletedPayments, language)}
             </div>
           </div>
 
@@ -1613,7 +1963,7 @@ export default function WorkerPanel() {
               }}
             >
               <AfCurrencyIcon size={18} />
-              {totalLoanAmount.toLocaleString()}
+              {formatCurrency(totalLoanAmount, language)}
             </div>
           </div>
 
@@ -1643,16 +1993,48 @@ export default function WorkerPanel() {
               }}
             >
               <AfCurrencyIcon size={18} />
-              {currentMoney.toLocaleString()}
+              {formatCurrency(currentMoney, language)}
+            </div>
+          </div>
+
+          <div
+            style={{
+              border: "1px solid #FCD34D",
+              background: "#FFFBEB",
+              borderRadius: 10,
+              padding: "10px 12px",
+              display: "grid",
+              gap: 4,
+            }}
+          >
+            <div
+              style={{ fontSize: 12, color: "var(--text3)", fontWeight: 600 }}
+            >
+              {t("workerPanel.totalPenaltyAmount", "Total Damage Penalty")}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                color: "#B45309",
+                fontWeight: 800,
+                fontSize: 20,
+              }}
+            >
+              <AfCurrencyIcon size={18} />
+              {formatCurrency(totalDamagePenaltyAmount, language)}
+            </div>
+            <div style={{ fontSize: 11, color: "#92400E" }}>
+              {damagedPenaltyPayload?.total || 0}{" "}
+              {t("workerPanel.totalPenalties", "penalties")}
             </div>
           </div>
         </div>
       </div>
 
-      <div className="card" style={{ padding: 16 }}>
-        <div
-          style={{ display: "grid", gap: 10, gridTemplateColumns: "1fr auto" }}
-        >
+      <div className="card p-3.5 sm:p-4">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-[minmax(0,1fr)_auto]">
           <div>
             <label className="lbl">
               {t("orders.billNumber", "Bill Number")}
@@ -1670,6 +2052,7 @@ export default function WorkerPanel() {
               />
               <input
                 className="inp"
+                inputMode="numeric"
                 style={{ paddingInlineStart: 32 }}
                 value={billSearch}
                 onChange={(e) => setBillSearch(e.target.value)}
@@ -1685,7 +2068,7 @@ export default function WorkerPanel() {
           </div>
           <button
             className="btn btn-gold"
-            style={{ alignSelf: "end", minWidth: 110 }}
+            style={{ minWidth: 110 }}
             onClick={onSearch}
             disabled={searchLoading}
           >
@@ -1697,7 +2080,7 @@ export default function WorkerPanel() {
         </div>
 
         {searchResult?.orders?.length ? (
-          <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
+          <div className="mt-3.5 grid gap-2.5">
             {searchResult.orders.map((order) => renderSearchResultCard(order))}
           </div>
         ) : hasSearchAttempt ? (
@@ -1712,17 +2095,8 @@ export default function WorkerPanel() {
 
       {(newAssignedOrders.length > 0 || unreadNotifs.length > 0) && (
         <div className="card" style={{ padding: 0 }}>
-          <div
-            style={{
-              padding: "12px 14px",
-              borderBottom: "1px solid var(--border)",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div className="flex flex-col gap-2 border-b border-[var(--border)] px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-2">
               <LuBell size={15} style={{ color: cfg.color }} />
               <strong style={{ fontSize: 14 }}>
                 {t("workerPanel.newAssignments", "New Assignments")}
@@ -1744,7 +2118,7 @@ export default function WorkerPanel() {
             )}
           </div>
           {newAssignedOrders.length > 0 && (
-            <div style={{ padding: 12, display: "grid", gap: 8 }}>
+            <div className="grid gap-2 p-3">
               {newAssignedOrders.slice(0, 6).map((order) => {
                 const orderLabel = getOrderLabelParts(order, language);
                 const canReceive = canOrderBeReceived(order);
@@ -1752,17 +2126,7 @@ export default function WorkerPanel() {
                 return (
                   <div
                     key={`new-assigned-${order.id}`}
-                    style={{
-                      border: "1px solid var(--border)",
-                      borderRadius: 10,
-                      background: "var(--surface2)",
-                      padding: "10px 12px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 10,
-                      flexWrap: "wrap",
-                    }}
+                    className="flex flex-col gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface2)] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div style={{ minWidth: 0 }}>
                       <div
@@ -1870,7 +2234,7 @@ export default function WorkerPanel() {
         </div>
       )}
 
-      <div className="card" style={{ padding: 0 }}>
+      <div className="card overflow-hidden p-0">
         <div
           style={{
             display: "flex",
@@ -1917,48 +2281,294 @@ export default function WorkerPanel() {
           })}
         </div>
 
-        <div style={{ padding: 14 }}>
-          {isLoading ? (
-            <div
-              style={{
-                padding: "30px 0",
-                textAlign: "center",
-                color: "var(--text3)",
-              }}
-            >
-              {t("workerPanel.loadingOrders", "Loading orders...")}
-            </div>
-          ) : null}
-
-          {!isLoading && filteredOrders.length === 0 ? (
-            <div
-              style={{
-                padding: "40px 0",
-                textAlign: "center",
-                color: "var(--text3)",
-              }}
-            >
-              <LuClipboardList size={36} style={{ marginBottom: 8 }} />
-              <div>
-                {t(
-                  "workerPanel.noOrdersInCategory",
-                  "No orders in this category.",
-                )}
+        <div className="p-3.5 sm:p-4">
+          {activeTab === "penalties" ? (
+            damagedPenaltyLoading ? (
+              <div
+                style={{
+                  padding: "30px 0",
+                  textAlign: "center",
+                  color: "var(--text3)",
+                }}
+              >
+                {t("common.loading", "Loading...")}
               </div>
-            </div>
-          ) : null}
+            ) : damagedPenalties.length === 0 ? (
+              <div
+                style={{
+                  padding: "40px 0",
+                  textAlign: "center",
+                  color: "var(--text3)",
+                }}
+              >
+                <LuClipboardList size={36} style={{ marginBottom: 8 }} />
+                <div>{t("workerPanel.noDamagedPenaltyHistory")}</div>
+              </div>
+            ) : (
+              <div className="grid gap-2.5">
+                {damagedPenalties.map((penalty) => {
+                  const statusCfg = {
+                    DAMAGE_ORDER: {
+                      label: t("orders.damageOrderStatus", "Damage Order"),
+                      bg: "#FEE2E2",
+                      color: "#991B1B",
+                    },
+                    COMPLETED: {
+                      label: t("workerPanel.statusCompleted"),
+                      bg: "#DCFCE7",
+                      color: "#15803D",
+                    },
+                    IN_PROGRESS: {
+                      label: t("workerPanel.statusInProgress"),
+                      bg: "#DBEAFE",
+                      color: "#1D4ED8",
+                    },
+                    PENDING: {
+                      label: t("workerPanel.statusPending", "Pending"),
+                      bg: "#F3F4F6",
+                      color: "#4B5563",
+                    },
+                  }[penalty.orderStatus] || {
+                    label: penalty.orderStatus,
+                    bg: "#F3F4F6",
+                    color: "#4B5563",
+                  };
 
-          {!isLoading && filteredOrders.length > 0 ? (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))",
-                gap: 12,
-              }}
-            >
-              {filteredOrders.map((order) => renderOrderCard(order))}
-            </div>
-          ) : null}
+                  return (
+                    <div
+                      key={penalty.id}
+                      style={{
+                        border: "1px solid #FCD34D",
+                        background: "var(--surface1)",
+                        borderRadius: 12,
+                        overflow: "hidden",
+                      }}
+                    >
+                      {/* Card header */}
+                      <div
+                        style={{
+                          padding: "9px 14px",
+                          background: "#FEF3C7",
+                          borderBottom: "1px solid #FCD34D",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 15,
+                            fontWeight: 800,
+                            color: "#92400E",
+                          }}
+                        >
+                          #{penalty.billNumber}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: "var(--text1)",
+                            flex: 1,
+                            minWidth: 60,
+                          }}
+                        >
+                          {penalty.customerName}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            padding: "2px 8px",
+                            borderRadius: 20,
+                            background: "#FCD34D",
+                            color: "#92400E",
+                          }}
+                        >
+                          {penalty.orderType}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            padding: "2px 8px",
+                            borderRadius: 20,
+                            background: statusCfg.bg,
+                            color: statusCfg.color,
+                          }}
+                        >
+                          {statusCfg.label}
+                        </span>
+                      </div>
+
+                      {/* Card body: key info grid */}
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fit, minmax(130px, 1fr))",
+                        }}
+                      >
+                        {[
+                          {
+                            label: t("damagedClothes.details.phoneNumber"),
+                            value: penalty.phoneNumber || "—",
+                          },
+                          {
+                            label: t(
+                              "workerPanel.penaltyDate",
+                              "Penalty Applied",
+                            ),
+                            value: formatDateTimeLocale(
+                              penalty.createdAt,
+                              language,
+                            ),
+                          },
+                          {
+                            label: t("workerPanel.appliedBy", "Applied By"),
+                            value: penalty.createdBy?.name || "—",
+                          },
+                        ].map((item, i, arr) => (
+                          <div
+                            key={i}
+                            style={{
+                              padding: "8px 12px",
+                              borderBottom: "1px solid #FEF3C7",
+                              borderInlineEnd:
+                                i < arr.length - 1
+                                  ? "1px solid #FEF3C7"
+                                  : "none",
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: 11,
+                                color: "var(--text3)",
+                                marginBottom: 2,
+                              }}
+                            >
+                              {item.label}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 600,
+                                color: "var(--text1)",
+                              }}
+                            >
+                              {item.value}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Card footer: penalty amount + view details */}
+                      <div
+                        style={{
+                          padding: "8px 14px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 10,
+                          flexWrap: "wrap",
+                          background: "#FFFBEB",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 12,
+                              color: "#92400E",
+                              fontWeight: 600,
+                            }}
+                          >
+                            {t("damagedClothes.details.totalPenalty")}:
+                          </span>
+                          <strong
+                            style={{
+                              fontSize: 16,
+                              fontWeight: 800,
+                              color: "#B45309",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 4,
+                            }}
+                          >
+                            <AfCurrencyIcon size={14} />
+                            {formatCurrency(
+                              penalty.totalExpense || 0,
+                              language,
+                            )}
+                          </strong>
+                        </div>
+                        <button
+                          className="btn btn-sm"
+                          style={{
+                            background: "#FEF3C7",
+                            border: "1px solid #FCD34D",
+                            color: "#92400E",
+                            fontWeight: 600,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 5,
+                          }}
+                          onClick={() => setSelectedPenalty(penalty)}
+                        >
+                          <LuEye size={13} />
+                          {t("workerPanel.viewDetails", "View Details")}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          ) : (
+            <>
+              {isLoading ? (
+                <div
+                  style={{
+                    padding: "30px 0",
+                    textAlign: "center",
+                    color: "var(--text3)",
+                  }}
+                >
+                  {t("workerPanel.loadingOrders", "Loading orders...")}
+                </div>
+              ) : null}
+
+              {!isLoading && filteredOrders.length === 0 ? (
+                <div
+                  style={{
+                    padding: "40px 0",
+                    textAlign: "center",
+                    color: "var(--text3)",
+                  }}
+                >
+                  <LuClipboardList size={36} style={{ marginBottom: 8 }} />
+                  <div>
+                    {t(
+                      "workerPanel.noOrdersInCategory",
+                      "No orders in this category.",
+                    )}
+                  </div>
+                </div>
+              ) : null}
+
+              {!isLoading && filteredOrders.length > 0 ? (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
+                  {filteredOrders.map((order) => renderOrderCard(order))}
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
       </div>
 
@@ -1967,6 +2577,12 @@ export default function WorkerPanel() {
         language={language}
         t={t}
         onClose={() => setDetailOrder(null)}
+      />
+      <PenaltyDetailModal
+        penalty={selectedPenalty}
+        language={language}
+        t={t}
+        onClose={() => setSelectedPenalty(null)}
       />
       <ConfirmActionModal
         config={confirmConfig}

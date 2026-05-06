@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { formatSystemDate } from "../lib/locale.js";
+import { formatCurrency } from "../lib/currency.js";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import { PageHeader } from "../components/ui/index.jsx";
 import {
@@ -305,7 +306,7 @@ export default function CreateRakht() {
                       {t("rakht.tonTotalPrice", {
                         defaultValue: "Total price of this ton",
                       })}
-                      : {tonPrice > 0 ? tonPrice.toLocaleString() : "-"}
+                      : {tonPrice > 0 ? formatCurrency(tonPrice, language) : "-"}
                     </span>
                     <span>
                       {t("rakht.purchasePricePerMeter", {
@@ -313,12 +314,11 @@ export default function CreateRakht() {
                       })}
                       :{" "}
                       {tonPrice > 0 && Number(ton.totalMeters || 0) > 0
-                        ? (
-                            tonPrice / Number(ton.totalMeters || 0)
-                          ).toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })
+                        ? formatCurrency(
+                            tonPrice / Number(ton.totalMeters || 0),
+                            language,
+                            { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+                          )
                         : "-"}
                     </span>
                   </div>
@@ -389,7 +389,7 @@ export default function CreateRakht() {
                 <input
                   className="inp"
                   readOnly
-                  value={remainingMoney.toLocaleString()}
+                  value={formatCurrency(remainingMoney, language)}
                   style={{ cursor: "default" }}
                 />
               </div>

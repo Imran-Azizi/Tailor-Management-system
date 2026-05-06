@@ -1,4 +1,4 @@
-import { LuInbox, LuTriangleAlert, LuTrash2 } from "react-icons/lu";
+import { LuInbox, LuSearch, LuTriangleAlert, LuTrash2 } from "react-icons/lu";
 import { useTranslation } from "react-i18next";
 import { isRtlLanguage } from "../../lib/locale.js";
 
@@ -10,6 +10,53 @@ export const PageHeader = ({ title, subtitle, action }) => (
     </div>
     {action && <div className="page-hd-action">{action}</div>}
   </div>
+);
+
+export const Button = ({
+  children,
+  variant = "primary",
+  size = "md",
+  className = "",
+  ...props
+}) => {
+  const variantClass =
+    variant === "outline"
+      ? "btn btn-outline"
+      : variant === "ghost"
+        ? "btn btn-ghost"
+        : variant === "danger"
+          ? "btn btn-danger"
+          : "btn btn-gold";
+  const sizeClass = size === "sm" ? "btn-sm" : "";
+  return (
+    <button
+      {...props}
+      className={`${variantClass} ${sizeClass} ${className}`.trim()}
+    >
+      {children}
+    </button>
+  );
+};
+
+export const AppCard = ({
+  title,
+  subtitle,
+  action,
+  children,
+  className = "",
+}) => (
+  <section className={`card ${className}`.trim()}>
+    {(title || action) && (
+      <header className="card-hd">
+        <div>
+          {title ? <h3>{title}</h3> : null}
+          {subtitle ? <p className="small muted">{subtitle}</p> : null}
+        </div>
+        {action ? <div className="card-hd-actions">{action}</div> : null}
+      </header>
+    )}
+    <div className="card-body">{children}</div>
+  </section>
 );
 
 export const StatCard = ({
@@ -120,6 +167,37 @@ export const Spinner = () => (
     <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
   </div>
 );
+
+export const LoadingState = ({ message }) => {
+  const { t } = useTranslation();
+  return (
+    <div
+      className="vstack center"
+      style={{ padding: "48px 12px", color: "var(--text3)" }}
+    >
+      <Spinner />
+      <p className="small">{message || t("common.loading", "Loading...")}</p>
+    </div>
+  );
+};
+
+export const ErrorState = ({ message, action }) => {
+  const { t } = useTranslation();
+  return (
+    <div
+      className="vstack center"
+      style={{ padding: "40px 16px", textAlign: "center" }}
+    >
+      <LuTriangleAlert size={30} style={{ color: "var(--danger)" }} />
+      <p
+        style={{ color: "var(--danger-strong)", fontWeight: 600, marginTop: 6 }}
+      >
+        {message || t("common.error", "Something went wrong")}
+      </p>
+      {action ? <div style={{ marginTop: 10 }}>{action}</div> : null}
+    </div>
+  );
+};
 
 export const EmptyState = ({ message, Icon: I = LuInbox }) => {
   const { t } = useTranslation();
@@ -296,6 +374,91 @@ export const Card = ({ title, action, children, noPad, style }) => (
     <div className={noPad ? "" : "card-body"}>{children}</div>
   </div>
 );
+
+export const SearchInput = ({
+  value,
+  onChange,
+  placeholder,
+  onKeyDown,
+  className = "",
+  ...props
+}) => (
+  <div className={`iw ${className}`.trim()}>
+    <LuSearch size={15} className="ico" />
+    <input
+      className="inp"
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      onKeyDown={onKeyDown}
+      {...props}
+    />
+  </div>
+);
+
+export const SelectField = ({ className = "", children, ...props }) => (
+  <select className={`inp ${className}`.trim()} {...props}>
+    {children}
+  </select>
+);
+
+export const DataTable = ({
+  columns = [],
+  rows = [],
+  rowKey = "id",
+  emptyText,
+  renderCell,
+}) => {
+  const { t } = useTranslation();
+  if (!columns.length) return null;
+
+  return (
+    <div className="tbl-wrap">
+      <table className="tbl">
+        <thead>
+          <tr>
+            {columns.map((col) => (
+              <th key={col.key || col}>{col.label || col}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {!rows.length ? (
+            <tr>
+              <td
+                colSpan={columns.length}
+                className="center"
+                style={{ padding: 24 }}
+              >
+                <span className="muted">
+                  {emptyText || t("common.noData", "No data")}
+                </span>
+              </td>
+            </tr>
+          ) : (
+            rows.map((row, idx) => (
+              <tr
+                key={
+                  typeof rowKey === "function"
+                    ? rowKey(row, idx)
+                    : row?.[rowKey] || idx
+                }
+              >
+                {columns.map((col) => (
+                  <td key={`${col.key || col}-${idx}`}>
+                    {renderCell
+                      ? renderCell(row, col, idx)
+                      : row?.[col.key || col]}
+                  </td>
+                ))}
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+};
 
 export const Field = ({ label, error, children, required, hint }) => (
   <div>

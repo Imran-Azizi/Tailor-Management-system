@@ -42,12 +42,12 @@ const CompletedWorkerOrders = lazy(
 );
 const DailyTasks = lazy(() => import("./pages/DailyTasks.jsx"));
 const AllDailyTasks = lazy(() => import("./pages/AllDailyTasks.jsx"));
-const DailyTaskDetails = lazy(() => import("./pages/DailyTaskDetails.jsx"));
 const CreateRakht = lazy(() => import("./pages/CreateRakht.jsx"));
 const AllRakhts = lazy(() => import("./pages/AllRakhts.jsx"));
 const PaymentHistory = lazy(() => import("./pages/PaymentHistory.jsx"));
 const RakhtRevenue = lazy(() => import("./pages/RakhtRevenue.jsx"));
 const BackupManagement = lazy(() => import("./pages/BackupManagement.jsx"));
+const DamagedClothes = lazy(() => import("./pages/DamagedClothes.jsx"));
 
 function RoleBasedRedirect() {
   const { user } = useAuth();
@@ -134,7 +134,7 @@ export default function App() {
                   <Route
                     path="orders/assignments/report"
                     element={
-                      <RoleRoute roles={["ADMIN"]}>
+                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
                         <AssignOrdersReport />
                       </RoleRoute>
                     }
@@ -150,7 +150,7 @@ export default function App() {
                   <Route
                     path="delivery"
                     element={
-                      <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <RoleRoute roles={["ADMIN", "DOKAN", "FINANCE"]}>
                         <ClothesDeliveryToCustomer />
                       </RoleRoute>
                     }
@@ -207,7 +207,7 @@ export default function App() {
                   <Route
                     path="print-bills"
                     element={
-                      <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <RoleRoute roles={["ADMIN", "DOKAN", "FINANCE"]}>
                         <PrintBills />
                       </RoleRoute>
                     }
@@ -262,6 +262,14 @@ export default function App() {
                     }
                   />
                   <Route
+                    path="damaged-clothes"
+                    element={
+                      <RoleRoute roles={["ADMIN"]}>
+                        <DamagedClothes />
+                      </RoleRoute>
+                    }
+                  />
+                  <Route
                     path="backups"
                     element={
                       <RoleRoute roles={["ADMIN"]}>
@@ -300,14 +308,6 @@ export default function App() {
                     element={
                       <RoleRoute roles={["ADMIN", "DOKAN", "FINANCE"]}>
                         <AllDailyTasks />
-                      </RoleRoute>
-                    }
-                  />
-                  <Route
-                    path="daily-tasks/:id"
-                    element={
-                      <RoleRoute roles={["ADMIN", "DOKAN", "FINANCE"]}>
-                        <DailyTaskDetails />
                       </RoleRoute>
                     }
                   />

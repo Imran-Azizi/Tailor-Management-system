@@ -52,46 +52,46 @@ const TYPE_CLR = {
 };
 
 // Numeric measurement field → readable label
-const NUM_LABELS = {
-  height: "Height",
-  shoulder: "Shoulder",
-  sleeve: "Sleeve",
-  neck: "Neck",
-  chest: "Chest",
-  armpit: "Armpit",
-  waist: "Waist",
-  skirt: "Skirt",
-  tenban: "Tenban",
-  pantLeg: "Pant Leg",
-  arm: "Arm",
-  calf: "Calf",
-  sorain: "Sorain",
-  patlonHeight: "Patlon H.",
-  kamerPatlon: "Kamer",
-  doroBaghlePatlon: "Doro Baghle",
-  sorainPatlon: "Sorain P.",
-  patPatlon: "Pat Patlon",
-  pachaPatlon: "Pacha",
+const NUM_LABEL_KEYS = {
+  height: "createOrder.fields.height",
+  shoulder: "createOrder.fields.shoulder",
+  sleeve: "createOrder.fields.sleeve",
+  neck: "createOrder.fields.neck",
+  chest: "createOrder.fields.chest",
+  armpit: "createOrder.fields.armpit",
+  waist: "createOrder.fields.waist",
+  skirt: "createOrder.fields.skirt",
+  tenban: "createOrder.fields.tenban",
+  pantLeg: "createOrder.fields.pantLeg",
+  arm: "createOrder.fields.arm",
+  calf: "createOrder.fields.calf",
+  sorain: "createOrder.fields.sorain",
+  patlonHeight: "createOrder.fields.patlonHeight",
+  kamerPatlon: "createOrder.fields.kamerPatlon",
+  doroBaghlePatlon: "createOrder.fields.doroBaghlePatlon",
+  sorainPatlon: "createOrder.fields.sorainPatlon",
+  patPatlon: "createOrder.fields.patPatlon",
+  pachaPatlon: "createOrder.fields.pachaPatlon",
 };
-const STY_LABELS = {
-  neckStyle: "Neck Style",
-  sleeveStyle: "Sleeve Style",
-  sleeveSize: "Sleeve Size",
-  skirtStyle: "Skirt Style",
-  waskatStyle: "Style",
-  shoulderState: "Shoulder State",
-  outfitDesign: "Design",
-  outfitStyle: "Style",
-  buttonStyle: "Buttons",
-  pantStyle: "Pants",
-  style: "Style",
-  yakhanQaqDesign: "Design",
-  additionalStyleInfo: "Notes",
+const STY_LABEL_KEYS = {
+  neckStyle: "createOrder.fields.neckStyle",
+  sleeveStyle: "createOrder.fields.sleeveStyle",
+  sleeveSize: "createOrder.fields.sleeveSize",
+  skirtStyle: "createOrder.fields.skirtStyle",
+  waskatStyle: "createOrder.fields.waskatStyle",
+  shoulderState: "createOrder.fields.shoulderState",
+  outfitDesign: "createOrder.fields.outfitDesign",
+  outfitStyle: "createOrder.fields.outfitStyle",
+  buttonStyle: "createOrder.fields.buttonStyle",
+  pantStyle: "createOrder.fields.pantStyle",
+  style: "createOrder.fields.style",
+  yakhanQaqDesign: "createOrder.fields.yakhanQaqDesign",
+  additionalStyleInfo: "createOrder.fields.additionalStyleInfo",
 };
-const BOOL_LABELS = {
-  frontPocket: "Front Pocket",
-  sidePocket: "Side Pocket",
-  underPocket: "Under Pocket",
+const BOOL_LABEL_KEYS = {
+  frontPocket: "createOrder.fields.frontPocket",
+  sidePocket: "createOrder.fields.sidePocket",
+  underPocket: "createOrder.fields.underPocket",
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -107,8 +107,8 @@ function statusColor(s) {
   return "#D97706";
 }
 
-function fmt$(v) {
-  return formatCurrency(v, "en", {
+function fmt$(v, language = "en") {
+  return formatCurrency(v, language, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   });
@@ -120,23 +120,24 @@ function fmtDate(d, language) {
 
 // ── Measurements grid ──────────────────────────────────────────────────────────
 function MeasurementsGrid({ order }) {
+  const { t } = useTranslation();
   const m = order.outfit || order.waskat || order.korty || order.yakhanQaq;
   if (!m)
     return (
       <p style={{ fontSize: 13, color: "var(--text3)", padding: "8px 0" }}>
-        No measurements on record.
+        {t("myTasks.noMeasurements", "No measurements on record.")}
       </p>
     );
 
-  const nums = Object.entries(NUM_LABELS)
+  const nums = Object.entries(NUM_LABEL_KEYS)
     .filter(([k]) => m[k] != null)
-    .map(([k, lbl]) => ({ k, lbl, v: m[k] }));
-  const stys = Object.entries(STY_LABELS)
+    .map(([k, tKey]) => ({ k, lbl: t(tKey), v: m[k] }));
+  const stys = Object.entries(STY_LABEL_KEYS)
     .filter(([k]) => m[k])
-    .map(([k, lbl]) => ({ k, lbl, v: m[k] }));
-  const bools = Object.entries(BOOL_LABELS)
+    .map(([k, tKey]) => ({ k, lbl: t(tKey), v: m[k] }));
+  const bools = Object.entries(BOOL_LABEL_KEYS)
     .filter(([k]) => m[k] === true)
-    .map(([k, lbl]) => ({ k, lbl }));
+    .map(([k, tKey]) => ({ k, lbl: t(tKey) }));
 
   return (
     <div>
@@ -437,7 +438,7 @@ function OrderDetailModal({
                     {t("myTasks.totalShort")}
                   </span>
                   <span style={{ fontWeight: 700 }}>
-                    {fmt$(order.totalPrice)}
+                    {fmt$(order.totalPrice, language)}
                   </span>
                 </div>
                 {order.discount > 0 && (
@@ -452,7 +453,7 @@ function OrderDetailModal({
                       {t("myTasks.discountShort")}
                     </span>
                     <span style={{ color: "#16a34a" }}>
-                      − {fmt$(order.discount)}
+                      − {fmt$(order.discount, language)}
                     </span>
                   </div>
                 )}
@@ -467,7 +468,7 @@ function OrderDetailModal({
                     {t("myTasks.paidShort")}
                   </span>
                   <span style={{ color: "#16a34a", fontWeight: 600 }}>
-                    {fmt$(order.paidAmount)}
+                    {fmt$(order.paidAmount, language)}
                   </span>
                 </div>
                 <div
@@ -494,7 +495,7 @@ function OrderDetailModal({
                     }}
                   >
                     {order.remaining > 0
-                      ? fmt$(order.remaining)
+                      ? fmt$(order.remaining, language)
                       : `✓ ${t("myTasks.paidDone")}`}
                   </span>
                 </div>
@@ -615,7 +616,7 @@ function OrderDetailModal({
                 color: "var(--text2)",
               }}
             >
-              Close
+              {t("common.close", "Close")}
             </button>
             <button
               onClick={() => onProgress(order.id)}
@@ -690,7 +691,7 @@ function OrderDetailModal({
                 color: "var(--text2)",
               }}
             >
-              Close
+              {t("common.close", "Close")}
             </button>
           </div>
         )}
@@ -844,11 +845,11 @@ function OrderCard({
         {/* Price */}
         <div style={{ textAlign: "end", flexShrink: 0 }}>
           <p style={{ fontSize: 15, fontWeight: 800, color: "var(--text1)" }}>
-            {fmt$(order.totalPrice)}
+            {fmt$(order.totalPrice, language)}
           </p>
           {order.discount > 0 && (
             <p style={{ fontSize: 11, color: "#16a34a" }}>
-              − {fmt$(order.discount)}
+              − {fmt$(order.discount, language)}
             </p>
           )}
           <p
@@ -859,7 +860,7 @@ function OrderCard({
             }}
           >
             {order.remaining > 0
-              ? `${t("common.remaining", "Remaining")}: ${fmt$(order.remaining)}`
+              ? `${t("common.remaining", "Remaining")}: ${fmt$(order.remaining, language)}`
               : "✓ " + t("orders.paidInFull")}
           </p>
         </div>

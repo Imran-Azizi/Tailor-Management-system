@@ -50,7 +50,7 @@ const BADGE_V = {
 
 function formatMoney(v, language = "en") {
   return formatCurrency(v, language, {
-    minimumFractionDigits: 0,
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
 }

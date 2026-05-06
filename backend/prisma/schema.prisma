@@ -45,23 +45,25 @@ model User {
   isActive     Boolean     @default(true)
   refreshToken String?
 
-  assignedOrders         Order[]               @relation("AssignedOrders")
-  assignedByOrders       Order[]               @relation("AssignedByOrders")
-  receivedOrders         Order[]               @relation("ReceivedOrders")
-  qichikarAssignedOrders Order[]               @relation("QichikarAssignedOrders")
-  dokhtAssignedOrders    Order[]               @relation("DokhtAssignedOrders")
-  qichikarReceivedOrders Order[]               @relation("QichikarReceivedOrders")
-  dokhtReceivedOrders    Order[]               @relation("DokhtReceivedOrders")
-  workerPaidOrders       Order[]               @relation("WorkerPaidByOrders")
-  qichikarPaidOrders     Order[]               @relation("QichikarPaidByOrders")
-  dokhtPaidOrders        Order[]               @relation("DokhtPaidByOrders")
-  notifications          UserNotification[]
-  transactions           Transaction[]         @relation("UserTransactions")
-  createdTransactions    Transaction[]         @relation("CreatedTransactions")
-  createdDailyTasks      DailyTask[]           @relation("CreatedDailyTasks")
-  orderDrafts            OrderDraft[]
-  rakhtPaymentHistories  RakhtPaymentHistory[]
-  financeCreatedOrders   Order[]               @relation("FinanceCreatedOrders")
+  assignedOrders                 Order[]                 @relation("AssignedOrders")
+  assignedByOrders               Order[]                 @relation("AssignedByOrders")
+  receivedOrders                 Order[]                 @relation("ReceivedOrders")
+  qichikarAssignedOrders         Order[]                 @relation("QichikarAssignedOrders")
+  dokhtAssignedOrders            Order[]                 @relation("DokhtAssignedOrders")
+  qichikarReceivedOrders         Order[]                 @relation("QichikarReceivedOrders")
+  dokhtReceivedOrders            Order[]                 @relation("DokhtReceivedOrders")
+  workerPaidOrders               Order[]                 @relation("WorkerPaidByOrders")
+  qichikarPaidOrders             Order[]                 @relation("QichikarPaidByOrders")
+  dokhtPaidOrders                Order[]                 @relation("DokhtPaidByOrders")
+  notifications                  UserNotification[]
+  transactions                   Transaction[]           @relation("UserTransactions")
+  createdTransactions            Transaction[]           @relation("CreatedTransactions")
+  damagedClothesPenalties        DamagedClothesPenalty[] @relation("DamagedPenaltyUser")
+  createdDamagedClothesPenalties DamagedClothesPenalty[] @relation("DamagedPenaltyCreator")
+  createdDailyTasks              DailyTask[]             @relation("CreatedDailyTasks")
+  orderDrafts                    OrderDraft[]
+  rakhtPaymentHistories          RakhtPaymentHistory[]
+  financeCreatedOrders           Order[]                 @relation("FinanceCreatedOrders")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -111,6 +113,7 @@ model Order {
   rakhtBrandName             String?
   rakhtColor                 String?
   rakhtColorHex              String?
+  rakhtDate                  DateTime?
   rakhtRequiredMeters        Float?
   rakhtPiecePrice            Float?
   rakhtCustomerPricePerMeter Float?
@@ -163,9 +166,6 @@ model Order {
   // When Dokht completes, order becomes fully completed
   dokhtCompletedAt    DateTime?
 
-  // SMS notification tracking — set when customer completion SMS is sent (prevents duplicates)
-  smsSentAt DateTime?
-
   workerPaymentStatus WorkerPaymentStatus @default(UNPAID)
   workerPaymentAmount Float?
   workerPaidAt        DateTime?
@@ -194,22 +194,23 @@ model Order {
   dokhtPaidBy        User? @relation("DokhtPaidByOrders", fields: [dokhtPaidById], references: [id])
   createdByFinance   User? @relation("FinanceCreatedOrders", fields: [createdByFinanceId], references: [id])
 
-  customer      Customer       @relation(fields: [customerId], references: [id])
-  rakht         Rakht?         @relation(fields: [rakhtId], references: [id], onDelete: SetNull)
-  rakhtTon      RakhtTon?      @relation(fields: [rakhtTonId], references: [id], onDelete: SetNull)
-  boxId         Int?
-  box           Box?           @relation("OrderToBox", fields: [boxId], references: [id])
-  foreignBoxId  Int?
-  foreignBox    Box?           @relation("ForeignOrderToBox", fields: [foreignBoxId], references: [id])
-  outfit        Outfit?
-  waskat        Waskat?
-  korty         Korty?
-  yakhanQaq     YakhanQaq?
-  notifications Notification[]
-  transactions  Transaction[]
-  dailyTasks    DailyTask[]
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  customer                Customer                @relation(fields: [customerId], references: [id])
+  rakht                   Rakht?                  @relation(fields: [rakhtId], references: [id], onDelete: SetNull)
+  rakhtTon                RakhtTon?               @relation(fields: [rakhtTonId], references: [id], onDelete: SetNull)
+  boxId                   Int?
+  box                     Box?                    @relation("OrderToBox", fields: [boxId], references: [id])
+  foreignBoxId            Int?
+  foreignBox              Box?                    @relation("ForeignOrderToBox", fields: [foreignBoxId], references: [id])
+  outfit                  Outfit?
+  waskat                  Waskat?
+  korty                   Korty?
+  yakhanQaq               YakhanQaq?
+  notifications           Notification[]
+  transactions            Transaction[]
+  damagedClothesPenalties DamagedClothesPenalty[]
+  dailyTasks              DailyTask[]
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
 
   @@index([customerId])
   @@index([type])
@@ -527,6 +528,55 @@ model TenbanShip {
   updatedAt DateTime @updatedAt
 }
 
+model OutfitDesign {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model YakhanQaqNeck {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model YakhanQaqSleeve {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model YakhanQaqSkirt {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model YakhanQaqDesignOption {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model YakhanQaqButtonShip {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model YakhanQaqPantShip {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Contributor {
   id           String   @id @default(uuid())
   name         String
@@ -565,21 +615,22 @@ model DailyTask {
 // ─── Transactions ─────────────────────────────────────────────────────────────
 
 model Transaction {
-  id              String            @id @default(uuid())
-  accountType     AccountType
-  userId          String
-  user            User              @relation("UserTransactions", fields: [userId], references: [id])
-  orderId         String?
-  order           Order?            @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  kind            TransactionKind   @default(LOAN)
-  source          TransactionSource @default(MANUAL)
-  amount          Float
-  transactionDate DateTime
-  note            String?
-  createdById     String
-  createdBy       User              @relation("CreatedTransactions", fields: [createdById], references: [id])
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id                    String                 @id @default(uuid())
+  accountType           AccountType
+  userId                String
+  user                  User                   @relation("UserTransactions", fields: [userId], references: [id])
+  orderId               String?
+  order                 Order?                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  kind                  TransactionKind        @default(LOAN)
+  source                TransactionSource      @default(MANUAL)
+  amount                Float
+  transactionDate       DateTime
+  note                  String?
+  createdById           String
+  createdBy             User                   @relation("CreatedTransactions", fields: [createdById], references: [id])
+  damagedClothesPenalty DamagedClothesPenalty?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
 
   @@index([userId])
   @@index([orderId])
@@ -588,4 +639,39 @@ model Transaction {
   @@index([source])
   @@index([createdById])
   @@index([userId, source, kind])
+}
+
+model DamagedClothesPenalty {
+  id                 String      @id @default(uuid())
+  transactionId      String      @unique
+  transaction        Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  userId             String
+  user               User        @relation("DamagedPenaltyUser", fields: [userId], references: [id], onDelete: Restrict)
+  orderId            String
+  order              Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  roleType           AccountType
+  reason             String
+  confirmedDuplicate Boolean     @default(false)
+
+  billNumber   Int
+  customerName String
+  orderType    OrderType
+
+  totalOrderAmount Float
+  rakhtExpense     Float
+  dokhtExpense     Float
+  qichikarExpense  Float
+  dailyTaskExpense Float
+  totalExpense     Float
+
+  createdById String
+  createdBy   User     @relation("DamagedPenaltyCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([orderId])
+  @@index([createdById])
+  @@index([roleType])
+  @@index([createdAt])
 }

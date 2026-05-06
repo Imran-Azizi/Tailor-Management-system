@@ -18,19 +18,23 @@ import {
 import {
   LuShoppingBag,
   LuSquareCheck,
-  LuClock,
   LuTriangleAlert,
-  LuCalendar,
   LuTrendingUp,
   LuBanknote,
   LuCalendarCheck,
   LuUser,
   LuUsers,
+  LuWallet,
+  LuCoins,
 } from "react-icons/lu";
 import { useTranslation } from "react-i18next";
 import api from "../lib/api.js";
 import { formatCurrency } from "../lib/currency.js";
-import { formatDateLocale } from "../lib/locale.js";
+import {
+  formatAfghanistanReportDate,
+  formatDateLocale,
+  formatNumberLocale,
+} from "../lib/locale.js";
 import {
   getOrderLabelParts,
   getOrderPrimaryDisplayName,
@@ -39,24 +43,29 @@ import {
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
 import { formatMonthYearLabel } from "../lib/months.js";
-import {
-  StatCard,
-  Spinner,
-  PageHeader,
-  Card,
-} from "../components/ui/index.jsx";
-import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
+import { Spinner, Card } from "../components/ui/index.jsx";
+import StatCard from "../components/monthlyReport/StatCard.jsx";
+import ReportTable from "../components/monthlyReport/ReportTable.jsx";
 
-const TC = {
+const ORDER_TYPE_COLORS = {
   OUTFIT: "#2563EB",
   WASKAT: "#0891B2",
   KORTY: "#7C3AED",
   YAKHANQAQ: "#DC2626",
 };
-const TV = { OUTFIT: "gold", WASKAT: "teal", KORTY: "amber", YAKHANQAQ: "red" };
 
-const Tip = ({ active, payload, label, language, t }) => {
+const CURRENCY_FORMAT_OPTIONS = {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+};
+
+function formatMoney(value, language) {
+  return formatCurrency(value, language, CURRENCY_FORMAT_OPTIONS);
+}
+
+const TooltipCard = ({ active, payload, label, language, t }) => {
   if (!active || !payload?.length) return null;
+
   return (
     <div
       style={{
@@ -69,19 +78,19 @@ const Tip = ({ active, payload, label, language, t }) => {
       }}
     >
       <p style={{ fontWeight: 600, marginBottom: 4 }}>{label}</p>
-      {payload.map((p, i) => (
-        <p key={i} style={{ color: p.color }}>
-          {p.name}:{" "}
-          <strong>
-            {typeof p.value === "number"
-              ? formatCurrency(p.value, language, {
-                  minimumFractionDigits: 0,
-                  maximumFractionDigits: 0,
-                })
-              : p.value}
-          </strong>
-        </p>
-      ))}
+      {payload.map((item, index) => {
+        const isCount = item?.dataKey === "count";
+        return (
+          <p key={`${item.name}-${index}`} style={{ color: item.color }}>
+            {item.name}:{" "}
+            <strong>
+              {isCount
+                ? formatNumberLocale(item.value, language)
+                : formatMoney(item.value, language)}
+            </strong>
+          </p>
+        );
+      })}
       {payload[0]?.dataKey === "count" && (
         <p>{t("dashboardPage.tooltipOrders", { count: payload[0].value })}</p>
       )}
@@ -97,7 +106,7 @@ export default function Dashboard() {
   const { isAdmin, isFinance, user } = useAuth();
   const { viewMonth, viewYear } = useMonth();
 
-  const { data: d, isLoading } = useQuery({
+  const { data: dashboardData, isLoading } = useQuery({
     queryKey: ["analytics", viewMonth, viewYear, isFinance ? user?.id : null],
     queryFn: () =>
       api
@@ -107,185 +116,326 @@ export default function Dashboard() {
             year: viewYear,
           },
         })
-        .then((r) => r.data),
+        .then((response) => response.data),
     refetchInterval: 60_000,
   });
 
-  if (isLoading)
+  if (isLoading) {
     return (
       <div className="page">
         <Spinner />
       </div>
     );
+  }
 
-  const todayLabel = formatDateLocale(new Date(), language, {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-
-  const monthlyChartData = (d.monthlyRevenue || []).map((item) => ({
+  const data = dashboardData || {};
+  const monthlyChartData = (data.monthlyRevenue || []).map((item) => ({
     ...item,
     monthLabel:
       item.monthNumber && item.monthYear
         ? formatMonthYearLabel(item.monthNumber, item.monthYear, language)
         : item.month,
   }));
-  const totalRakhtRevenue = Number(d.totalRakhtRevenue ?? 0) || 0;
-  const totalOrderBenefit = Number(d.totalOrderBenefit ?? 0) || 0;
+
+  const totalRakhtRevenue = Number(data.totalRakhtRevenue ?? 0) || 0;
+  const totalOrderBenefit = Number(data.totalOrderBenefit ?? 0) || 0;
   const netBenefit = totalRakhtRevenue + totalOrderBenefit;
   const netBenefitIsPositive = netBenefit >= 0;
+  const monthLabel = formatMonthYearLabel(viewMonth, viewYear, language);
 
-  return (
-    <div className="page">
-      <PageHeader title={t("dashboardPage.title")} subtitle={todayLabel} />
+  const generatedAtLabel = formatAfghanistanReportDate(new Date(), language);
 
-      {(isAdmin || isFinance) && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "8px 14px",
-            marginBottom: 16,
-            borderRadius: "var(--r)",
-            background: "var(--success-soft, #F0FDF4)",
-            border: "1px solid var(--success-soft-border, #BBF7D0)",
-            fontSize: 13,
-            color: "var(--success, #16A34A)",
-            fontWeight: 500,
-          }}
+  const statCards = [
+    {
+      key: "totalOrders",
+      label: t("dashboardPage.totalOrders"),
+      value: formatNumberLocale(data.totalOrders || 0, language),
+      sub: `${t("dashboardPage.today")}: ${formatNumberLocale(data.todayOrders || 0, language)} | ${t("dashboardPage.month")}: ${formatNumberLocale(data.monthOrders || 0, language)}`,
+      Icon: LuShoppingBag,
+      accent: "#2563EB",
+    },
+    {
+      key: "totalAmount",
+      label: t("dashboardPage.totalAmount"),
+      value: formatMoney(data.totalRevenue, language),
+      sub: t("dashboardPage.yearOrders", {
+        count: formatNumberLocale(data.yearOrders || 0, language),
+      }),
+      Icon: LuWallet,
+      accent: "#16A34A",
+    },
+    {
+      key: "collected",
+      label: t("dashboardPage.collected"),
+      value: formatMoney(data.totalPaid, language),
+      sub: `${t("dashboardPage.discount")}: ${formatMoney(data.totalDiscount, language)}`,
+      Icon: LuBanknote,
+      accent: "#0891B2",
+    },
+    {
+      key: "outstanding",
+      label: t("dashboardPage.outstanding"),
+      value: formatMoney(data.totalRemaining, language),
+      sub: t("dashboardPage.remainingBalance"),
+      Icon: LuTrendingUp,
+      accent: "#DC2626",
+      onClick: () => navigate("/orders/remaining"),
+    },
+    {
+      key: "rakhtRevenue",
+      label: t("dashboardPage.totalRakhtRevenue", {
+        defaultValue: "Total Rakht Revenue",
+      }),
+      value: formatMoney(totalRakhtRevenue, language),
+      sub: t("dashboardPage.netBenefitSub", {
+        defaultValue: "Total Rakht Revenue + Total Order Benefit",
+      }),
+      Icon: LuCoins,
+      accent: "#0F766E",
+      adminOnly: true,
+    },
+    {
+      key: "orderBenefit",
+      label: t("dashboardPage.totalOrderBenefit", {
+        defaultValue: "Total Order Benefit",
+      }),
+      value: formatMoney(totalOrderBenefit, language),
+      sub: t("common.total", "Total"),
+      Icon: LuSquareCheck,
+      accent: "#7C3AED",
+      adminOnly: true,
+    },
+    {
+      key: "dailyExpenses",
+      label: t(
+        "dashboardPage.totalDailyExpenses",
+        "Total Amount of All Daily Expenses",
+      ),
+      value: formatMoney(data.totalDailyExpenses ?? 0, language),
+      sub: t("sidebar.dailyTasks", "Daily Expenses"),
+      Icon: LuCalendarCheck,
+      accent: "#2563EB",
+      hideWhenZero: true,
+    },
+    {
+      key: "totalLoan",
+      label: t("dashboardPage.totalLoan", "Total Loan"),
+      value: formatMoney(data.totalLoan ?? 0, language),
+      sub: t("transaction.loanOption", "Loan"),
+      Icon: LuUser,
+      accent: "#D97706",
+      hideWhenZero: true,
+    },
+    {
+      key: "qichikarMoney",
+      label: t(
+        "dashboardPage.totalQichikarUsersMoney",
+        "Total Money for Qichikar Users",
+      ),
+      value: formatMoney(data.totalQichikarUsersMoney ?? 0, language),
+      sub: t("assignment.qichikarLabel", "Qichikar"),
+      Icon: LuUsers,
+      accent: "#DB2777",
+      hideWhenZero: true,
+    },
+    {
+      key: "dokhtMoney",
+      label: t(
+        "dashboardPage.totalDokhtUsersMoney",
+        "Total Money for Dokht Users",
+      ),
+      value: formatMoney(data.totalDokhtUsersMoney ?? 0, language),
+      sub: t("assignment.dokhtLabel", "Dokht"),
+      Icon: LuUsers,
+      accent: "#7C3AED",
+      hideWhenZero: true,
+    },
+    {
+      key: "emergency",
+      label: t("dashboardPage.emergency"),
+      value: formatNumberLocale(data.emergencyOrders || 0, language),
+      sub: t("dashboardPage.active"),
+      Icon: LuTriangleAlert,
+      accent: "#DC2626",
+      hideWhenZero: true,
+    },
+  ];
+
+  const visibleStatCards = statCards.filter((card) => {
+    if (card.adminOnly && !isAdmin) return false;
+    if (!card.hideWhenZero) return true;
+    const numericValue = Number(String(card.value).replace(/[^0-9.-]/g, ""));
+    return Number.isFinite(numericValue) ? numericValue !== 0 : true;
+  });
+
+  const orderStatusClassName = (isCompleted) =>
+    isCompleted
+      ? "inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-900/30 dark:text-emerald-300"
+      : "inline-flex rounded-full border border-amber-200 bg-amber-50/70 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:border-amber-700/60 dark:bg-amber-900/25 dark:text-amber-300";
+
+  const tableColumns = [
+    {
+      key: "bill",
+      label: t("orders.billNumber", "Bill #"),
+      width: "9rem",
+      cellClassName:
+        "font-mono text-xs font-semibold text-slate-700 dark:text-amber-300 whitespace-nowrap",
+      render: (order) => `#${order?.customer?.billNumber || "-"}`,
+    },
+    {
+      key: "customer",
+      label: t("common.customer"),
+      width: "16rem",
+      render: (order) => (
+        <span className="block truncate font-medium text-gray-800 dark:text-slate-100">
+          {getOrderPrimaryDisplayName(
+            order,
+            order?.customer?.firstName || "-",
+            language,
+          )}
+        </span>
+      ),
+    },
+    {
+      key: "type",
+      label: t("common.type"),
+      width: "13rem",
+      render: (order) => (
+        <span
+          className="block max-w-[12rem] truncate rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+          title={getOrderLabelParts(order, language).baseTypeLabel}
         >
-          <LuCalendarCheck size={14} />
-          <span>
-            {t("common.viewingMonth", "Viewing data for")}:{" "}
-            <strong style={{ fontWeight: 700 }}>
-              {formatMonthYearLabel(viewMonth, viewYear, language)}
-            </strong>
+          {getOrderLabelParts(order, language).baseTypeLabel}
+        </span>
+      ),
+    },
+    {
+      key: "total",
+      label: t("common.total"),
+      width: "10rem",
+      isNumeric: true,
+      cellClassName: "whitespace-nowrap font-medium",
+      render: (order) => formatMoney(order.totalPrice, language),
+    },
+    {
+      key: "paid",
+      label: t("common.paid"),
+      width: "10rem",
+      isNumeric: true,
+      cellClassName:
+        "whitespace-nowrap font-medium text-emerald-700 dark:text-emerald-300",
+      render: (order) => formatMoney(order.paidAmount, language),
+    },
+    {
+      key: "remaining",
+      label: t("common.remaining", "Remaining"),
+      width: "10rem",
+      isNumeric: true,
+      cellClassName: "whitespace-nowrap font-medium",
+      render: (order) => {
+        const remainingValue = Number(order.remaining || 0);
+        const colorClass =
+          remainingValue > 0
+            ? "text-rose-700 dark:text-rose-300"
+            : "text-emerald-700 dark:text-emerald-300";
+        return (
+          <span className={colorClass}>
+            {remainingValue > 0
+              ? formatMoney(remainingValue, language)
+              : t("orders.paidInFull")}
+          </span>
+        );
+      },
+    },
+    {
+      key: "status",
+      label: t("common.status", "Status"),
+      width: "10rem",
+      render: (order) => (
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
+          {order.isEmergency ? (
+            <span className="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700 dark:border-rose-700/60 dark:bg-rose-900/30 dark:text-rose-300">
+              !
+            </span>
+          ) : null}
+          <span className={orderStatusClassName(order.isCompleted)}>
+            {order.isCompleted
+              ? t("dashboardPage.statusDone")
+              : t("dashboardPage.statusPending")}
           </span>
         </div>
-      )}
+      ),
+    },
+    {
+      key: "date",
+      label: t("common.date"),
+      width: "11rem",
+      cellClassName:
+        "text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap",
+      render: (order) =>
+        formatDateLocale(order.createdAt, language, {
+          year: "numeric",
+          month: "short",
+          day: "2-digit",
+        }),
+    },
+  ];
 
-      <section
-        className={`dashboard-net-card${netBenefitIsPositive ? "" : " dashboard-net-card--negative"}`}
-        dir={isRtl ? "rtl" : "ltr"}
-      >
-        <div className="dashboard-net-card__main">
-          <p
-            className={`dashboard-net-card__label${isRtl ? " dashboard-net-card__label--rtl" : ""}`}
-          >
-            {t("dashboardPage.netBenefit", "Net Benefit")}
-          </p>
-          <p className="dashboard-net-card__value">
-            {formatCurrency(netBenefit, language)}
-          </p>
-          <p className="dashboard-net-card__sub">
-            {t(
-              "dashboardPage.netBenefitSub",
-              "Total Rakht Revenue + Total Order Benefit",
-            )}
-          </p>
-        </div>
-
-        <div className="dashboard-net-card__icon" aria-hidden="true">
-          <AfCurrencyIcon size={34} />
+  return (
+    <div
+      className="page report-root leading-relaxed tracking-normal"
+      dir={isRtl ? "rtl" : "ltr"}
+    >
+      <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="text-start">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">
+              {t("dashboardPage.title")}
+            </h1>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              {t("common.viewingMonth", "Viewing data for")}:{" "}
+              <strong className={isRtl ? "rtl-number-inline" : ""}>
+                {monthLabel}
+              </strong>
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 text-start dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            {t("common.date", "Date")}:{" "}
+            <span className={isRtl ? "rtl-number-inline" : ""}>
+              {generatedAtLabel}
+            </span>
+          </div>
         </div>
       </section>
 
-      <div className="g-stats" style={{ marginBottom: 20 }}>
+      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         <StatCard
-          label={t("dashboardPage.totalOrders")}
-          value={d.totalOrders}
-          Icon={LuShoppingBag}
-          accent="#2563EB"
-          sub={`${t("dashboardPage.today")}: ${d.todayOrders} · ${t("dashboardPage.month")}: ${d.monthOrders}`}
-        />
-        <StatCard
-          label={t("dashboardPage.totalAmount")}
-          value={formatCurrency(d.totalRevenue, language)}
-          Icon={AfCurrencyIcon}
-          accent="#16A34A"
-          sub={t("dashboardPage.yearOrders", { count: d.yearOrders })}
-        />
-        <StatCard
-          label={t("dashboardPage.collected")}
-          value={formatCurrency(d.totalPaid, language)}
-          Icon={LuBanknote}
-          accent="#0891B2"
-          sub={`${t("dashboardPage.discount")}: ${formatCurrency(d.totalDiscount, language)}`}
-        />
-        <StatCard
-          label={t("dashboardPage.outstanding")}
-          value={formatCurrency(d.totalRemaining, language)}
+          className="md:col-span-2 xl:col-span-3 2xl:col-span-4"
+          label={t("dashboardPage.netBenefit", "Net Benefit")}
+          value={formatMoney(netBenefit, language)}
+          sub={t(
+            "dashboardPage.netBenefitSub",
+            "Total Rakht Revenue + Total Order Benefit",
+          )}
           Icon={LuTrendingUp}
-          accent="#DC2626"
-          sub={t("dashboardPage.remainingBalance")}
-          onClick={() => navigate("/orders/remaining")}
+          accent={netBenefitIsPositive ? "#16A34A" : "#DC2626"}
+          emphasize
         />
-        <StatCard
-          label={t(
-            "dashboardPage.totalDailyExpenses",
-            "Total Amount of All Daily Expenses",
-          )}
-          value={formatCurrency(d.totalDailyExpenses ?? 0, language)}
-          Icon={LuSquareCheck}
-          accent="#16A34A"
-          sub={t("sidebar.dailyTasks", "Daily Expenses")}
-        />
-        <StatCard
-          label={t(
-            "dashboardPage.totalRakhtPrice",
-            "Total Price of All Rakhts",
-          )}
-          value={formatCurrency(d.totalRakhtPrice ?? 0, language)}
-          Icon={LuClock}
-          accent="#2563EB"
-          sub={t("common.total", "Total")}
-        />
-        <StatCard
-          label={t("dashboardPage.totalLoan", "Total Loan")}
-          value={formatCurrency(d.totalLoan ?? 0, language)}
-          Icon={AfCurrencyIcon}
-          accent="#D97706"
-          sub={t("transaction.loanOption", "Loan")}
-        />
-        <StatCard
-          label={t(
-            "dashboardPage.totalQichikarUsersMoney",
-            "Total Money for Qichikar Users",
-          )}
-          value={formatCurrency(d.totalQichikarUsersMoney ?? 0, language)}
-          Icon={LuUser}
-          accent="#D97706"
-          sub={t("assignment.qichikarLabel", "Qichikar")}
-        />
-        <StatCard
-          label={t(
-            "dashboardPage.totalDokhtUsersMoney",
-            "Total Money for Dokht Users",
-          )}
-          value={formatCurrency(d.totalDokhtUsersMoney ?? 0, language)}
-          Icon={LuUsers}
-          accent="#DB2777"
-          sub={t("assignment.dokhtLabel", "Dokht")}
-        />
-        <StatCard
-          label={t("dashboardPage.emergency")}
-          value={d.emergencyOrders}
-          Icon={LuTriangleAlert}
-          accent="#DC2626"
-          sub={t("dashboardPage.active")}
-        />
-        <StatCard
-          label={t("dashboardPage.thisYear")}
-          value={d.yearOrders}
-          Icon={LuCalendar}
-          accent="#7C3AED"
-        />
+
+        {visibleStatCards.map((card) => (
+          <StatCard
+            key={card.key}
+            label={card.label}
+            value={card.value}
+            sub={card.sub}
+            Icon={card.Icon}
+            accent={card.accent}
+            onClick={card.onClick}
+          />
+        ))}
       </div>
 
-      <div className="g-charts" style={{ marginBottom: 20 }}>
+      <div className="g-charts mb-6">
         <Card title={t("dashboardPage.revenueTrend")}>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart
@@ -303,9 +453,9 @@ export default function Dashboard() {
                 tick={{ fontSize: 11, fill: "var(--text3)" }}
                 axisLine={false}
                 tickLine={false}
-                width={46}
+                width={54}
               />
-              <Tooltip content={<Tip language={language} t={t} />} />
+              <Tooltip content={<TooltipCard language={language} t={t} />} />
               <Legend wrapperStyle={{ fontSize: 12, color: "var(--text2)" }} />
               <Line
                 type="monotone"
@@ -332,9 +482,9 @@ export default function Dashboard() {
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
               <Pie
-                data={d.ordersByType.map((o) => ({
-                  name: getOrderTypeLabel(o.type, language),
-                  value: o.count,
+                data={(data.ordersByType || []).map((orderType) => ({
+                  name: getOrderTypeLabel(orderType.type, language),
+                  value: orderType.count,
                 }))}
                 cx="50%"
                 cy="50%"
@@ -343,14 +493,17 @@ export default function Dashboard() {
                 dataKey="value"
                 paddingAngle={3}
               >
-                {d.ordersByType.map((o, i) => (
-                  <Cell key={i} fill={TC[o.type] || "#2563EB"} />
+                {(data.ordersByType || []).map((orderType, index) => (
+                  <Cell
+                    key={`${orderType.type}-${index}`}
+                    fill={ORDER_TYPE_COLORS[orderType.type] || "#2563EB"}
+                  />
                 ))}
               </Pie>
               <Tooltip
-                formatter={(v, n) => [
-                  t("dashboardPage.tooltipOrders", { count: v }),
-                  n,
+                formatter={(value, name) => [
+                  t("dashboardPage.tooltipOrders", { count: value }),
+                  name,
                 ]}
               />
               <Legend wrapperStyle={{ fontSize: 11 }} />
@@ -361,7 +514,7 @@ export default function Dashboard() {
 
       <Card
         title={t("dashboardPage.monthlyOrderVolume")}
-        style={{ marginBottom: 20 }}
+        style={{ marginBottom: 24 }}
       >
         <ResponsiveContainer width="100%" height={140}>
           <BarChart
@@ -384,9 +537,9 @@ export default function Dashboard() {
               tick={{ fontSize: 11, fill: "var(--text3)" }}
               axisLine={false}
               tickLine={false}
-              width={30}
+              width={32}
             />
-            <Tooltip content={<Tip language={language} t={t} />} />
+            <Tooltip content={<TooltipCard language={language} t={t} />} />
             <Bar
               dataKey="count"
               fill="#2563EB"
@@ -397,80 +550,20 @@ export default function Dashboard() {
         </ResponsiveContainer>
       </Card>
 
-      <Card title={t("dashboardPage.recentOrders")} noPad>
-        <div className="tbl-wrap">
-          <table className="tbl">
-            <thead>
-              <tr>
-                {[
-                  "Bill #",
-                  t("common.customer"),
-                  t("common.type"),
-                  t("common.total"),
-                  t("common.paid"),
-                  t("common.status", "Status"),
-                  t("common.date"),
-                ].map((h) => (
-                  <th key={h}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {d.recentOrders.map((o) => (
-                <tr key={o.id}>
-                  <td>
-                    <span
-                      style={{
-                        fontFamily: "monospace",
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: "var(--primary)",
-                      }}
-                    >
-                      #{o.customer.billNumber}
-                    </span>
-                  </td>
-                  <td>
-                    <span style={{ fontWeight: 500 }}>
-                      {getOrderPrimaryDisplayName(
-                        o,
-                        o.customer.firstName,
-                        language,
-                      )}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`badge bg-${TV[o.type] || "gold"}`}>
-                      {getOrderLabelParts(o, language).baseTypeLabel}
-                    </span>
-                  </td>
-                  <td style={{ fontWeight: 500 }}>
-                    {formatCurrency(o.totalPrice, language)}
-                  </td>
-                  <td style={{ color: "#16A34A", fontWeight: 500 }}>
-                    {formatCurrency(o.paidAmount, language)}
-                  </td>
-                  <td>
-                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                      {o.isEmergency && <span className="badge bg-red">!</span>}
-                      <span
-                        className={`badge ${o.isCompleted ? "bg-green" : "bg-amber"}`}
-                      >
-                        {o.isCompleted
-                          ? t("dashboardPage.statusDone")
-                          : t("dashboardPage.statusPending")}
-                      </span>
-                    </div>
-                  </td>
-                  <td style={{ fontSize: 12, color: "var(--text3)" }}>
-                    {formatDateLocale(o.createdAt, language)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-700 sm:px-5">
+          <h3 className="text-base font-semibold text-gray-900 dark:text-slate-100">
+            {t("dashboardPage.recentOrders")}
+          </h3>
         </div>
-      </Card>
+
+        <ReportTable
+          isRtl={isRtl}
+          columns={tableColumns}
+          rows={data.recentOrders || []}
+          emptyText={t("common.noData", { defaultValue: "No data found" })}
+        />
+      </section>
     </div>
   );
 }

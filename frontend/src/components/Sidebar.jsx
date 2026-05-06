@@ -14,12 +14,60 @@ import SidebarGroup from "./sidebar/SidebarGroup.jsx";
 import { isRouteActive } from "./sidebar/routeMatch.js";
 import { getRoleAccent, getSidebarSections } from "./sidebar/sidebarConfig.js";
 
-function loadExpandedState(storageKey) {
+function getDropdownKeys(sections) {
+  return new Set(
+    sections.flatMap((section) =>
+      section.items
+        .filter((item) => item.children?.length)
+        .map((item) => item.key),
+    ),
+  );
+}
+
+function getDefaultOpenGroupKey(sections, pathname) {
+  for (const section of sections) {
+    for (const item of section.items) {
+      if (!item.children?.length) continue;
+      if (isChildActive(pathname, item.children)) {
+        return item.key;
+      }
+    }
+  }
+
+  return null;
+}
+
+function loadOpenGroupKey(storageKey, sections, pathname) {
   try {
     const raw = localStorage.getItem(storageKey);
-    return raw ? JSON.parse(raw) : {};
+    const validKeys = getDropdownKeys(sections);
+    const activeGroupKey = getDefaultOpenGroupKey(sections, pathname);
+
+    if (activeGroupKey) {
+      return activeGroupKey;
+    }
+
+    if (raw === null) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+
+    if (typeof parsed === "string") {
+      return validKeys.has(parsed) ? parsed : null;
+    }
+
+    if (parsed && typeof parsed === "object") {
+      for (const key of validKeys) {
+        if (parsed[key] === true) {
+          return key;
+        }
+      }
+    }
+
+    return null;
   } catch {
-    return {};
+    return getDefaultOpenGroupKey(sections, pathname);
   }
 }
 
@@ -44,20 +92,6 @@ function withLocalizedLabels(sections, t) {
   }));
 }
 
-function withActiveDefaults(stored, sections, pathname) {
-  const next = { ...stored };
-
-  sections.forEach((section) => {
-    section.items.forEach((item) => {
-      if (!item.children?.length) return;
-      if (next[item.key] != null) return;
-      next[item.key] = isChildActive(pathname, item.children);
-    });
-  });
-
-  return next;
-}
-
 export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
@@ -72,29 +106,34 @@ export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
     () => withLocalizedLabels(getSidebarSections(role), t),
     [role, t],
   );
+  const activeDropdownId = useMemo(
+    () => getDefaultOpenGroupKey(sections, location.pathname),
+    [sections, location.pathname],
+  );
 
-  const [expandedGroups, setExpandedGroups] = useState(() =>
-    withActiveDefaults(
-      loadExpandedState(expandedStorageKey),
-      sections,
-      location.pathname,
-    ),
+  const [openDropdownId, setOpenDropdownId] = useState(() =>
+    loadOpenGroupKey(expandedStorageKey, sections, location.pathname),
   );
 
   useEffect(() => {
-    setExpandedGroups(
-      (prev) =>
-        withActiveDefaults(
-          loadExpandedState(expandedStorageKey),
-          sections,
-          location.pathname,
-        ) || prev,
+    setOpenDropdownId(
+      loadOpenGroupKey(expandedStorageKey, sections, location.pathname),
     );
   }, [expandedStorageKey, sections, location.pathname]);
 
   useEffect(() => {
-    localStorage.setItem(expandedStorageKey, JSON.stringify(expandedGroups));
-  }, [expandedGroups, expandedStorageKey]);
+    if (!activeDropdownId) return;
+
+    setOpenDropdownId((currentDropdownId) =>
+      currentDropdownId === activeDropdownId
+        ? currentDropdownId
+        : activeDropdownId,
+    );
+  }, [activeDropdownId]);
+
+  useEffect(() => {
+    localStorage.setItem(expandedStorageKey, JSON.stringify(openDropdownId));
+  }, [expandedStorageKey, openDropdownId]);
 
   const { data: pendingOrdersData } = useQuery({
     queryKey: ["orders-sidebar-pending-count", role],
@@ -122,28 +161,31 @@ export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
     [pendingCount],
   );
 
-  const toggleGroup = (groupKey, currentlyOpen) => {
-    setExpandedGroups((prev) => ({
-      ...prev,
-      [groupKey]: !currentlyOpen,
-    }));
+  const handleNavigate = ({
+    openDropdownId: nextOpenDropdownId = null,
+  } = {}) => {
+    setOpenDropdownId(nextOpenDropdownId);
+    onNavigate?.();
+  };
+
+  const toggleGroup = (groupKey) => {
+    setOpenDropdownId((currentDropdownId) =>
+      currentDropdownId === groupKey ? null : groupKey,
+    );
   };
 
   return (
     <aside
       className={`sidebar ${collapsed ? "collapsed" : ""} ${open ? "open" : ""} no-print`}
-      style={{
-        background:
-          "radial-gradient(900px 420px at -20% -10%, rgba(59,130,246,0.22), transparent), radial-gradient(700px 300px at 120% 10%, rgba(16,185,129,0.12), transparent), linear-gradient(180deg, #081224 0%, #0C172B 34%, #0F172A 100%)",
-        borderInlineEnd: "1px solid rgba(148,163,184,.2)",
-      }}
     >
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(255,255,255,0.06),transparent_26%,transparent)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(255,255,255,0.08),transparent_30%,transparent)]" />
 
-      <header className="flex h-[var(--nav-h)] shrink-0 items-center gap-2 border-b border-white/10 px-3">
+      <header className="relative z-[1] flex h-[var(--nav-h)] shrink-0 items-center gap-2 border-b border-[var(--sb-bdr)] px-3">
         <div
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-md"
-          style={{ background: accent }}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/15 shadow-[0_12px_26px_-14px_rgba(0,0,0,.85)] ring-1 ring-white/10"
+          style={{
+            background: `linear-gradient(135deg, ${accent}, rgba(255,255,255,.16))`,
+          }}
           aria-hidden="true"
         >
           <LuScissors size={18} color="white" />
@@ -151,10 +193,10 @@ export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
 
         {!collapsed && (
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-sm font-semibold tracking-tight text-white">
+            <h1 className="truncate text-sm font-semibold tracking-tight text-[var(--sb-title)]">
               {t("appName")}
             </h1>
-            <p className="truncate text-[11px] text-slate-300/70">
+            <p className="truncate text-[11px] text-[var(--sb-subtitle)]">
               {t("appSubtitle")}
             </p>
           </div>
@@ -162,7 +204,7 @@ export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
 
         <button
           type="button"
-          className="hidden h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-300 transition hover:bg-white/10 hover:text-white md:inline-flex"
+          className="hidden h-8 w-8 items-center justify-center rounded-lg border border-[var(--sb-toggle-border)] bg-[var(--sb-toggle-bg)] text-[var(--sb-toggle-text)] transition hover:bg-[var(--sb-toggle-hover-bg)] hover:text-[var(--sb-toggle-hover-text)] md:inline-flex"
           onClick={onToggle}
           title={collapsed ? t("sidebar.expand") : t("sidebar.collapse")}
           aria-label={collapsed ? t("sidebar.expand") : t("sidebar.collapse")}
@@ -182,7 +224,7 @@ export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
 
         <button
           type="button"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-300 transition hover:bg-white/10 hover:text-white md:hidden"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--sb-toggle-border)] bg-[var(--sb-toggle-bg)] text-[var(--sb-toggle-text)] transition hover:bg-[var(--sb-toggle-hover-bg)] hover:text-[var(--sb-toggle-hover-text)] md:hidden"
           onClick={onNavigate}
           aria-label={t("common.close", "Close")}
           title={t("common.close", "Close")}
@@ -192,16 +234,18 @@ export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
       </header>
 
       {!collapsed && user && (
-        <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-2.5">
+        <div className="relative z-[1] mx-3 mt-3 flex shrink-0 items-center justify-between rounded-2xl border border-white/10 bg-white/[0.045] px-3 py-2.5 shadow-[0_14px_30px_-24px_rgba(0,0,0,.85)]">
           <div className="min-w-0">
-            <p className="truncate text-xs font-semibold uppercase tracking-[0.08em] text-slate-300/80">
+            <p className="truncate text-xs font-semibold uppercase tracking-[0.08em] text-[var(--sb-title)]">
               {user.accountType}
             </p>
-            <p className="truncate text-xs text-slate-400">{user.name}</p>
+            <p className="truncate text-xs text-[var(--sb-subtitle)]">
+              {user.name}
+            </p>
           </div>
           <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/25 bg-emerald-400/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.09em] text-emerald-200">
             <span
-              className="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-300"
+              className="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(110,231,183,.85)]"
               aria-hidden="true"
             />
             {t("common.active", "Active")}
@@ -222,17 +266,17 @@ export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
               collapsed={collapsed}
               accent={accent}
               isRtl={isRtl}
-              expanded={expandedGroups}
+              openDropdownId={openDropdownId}
               onToggle={toggleGroup}
               badges={badges}
-              onNavigate={onNavigate}
+              onNavigate={handleNavigate}
             />
           ))}
         </div>
       </nav>
 
       {!collapsed && (
-        <footer className="relative z-[1] shrink-0 border-t border-white/10 px-3 py-2 text-center text-[11px] text-slate-400">
+        <footer className="relative z-[1] shrink-0 border-t border-[var(--sb-bdr)] px-3 py-2 text-center text-[11px] text-[var(--sb-subtitle)]">
           {t("sidebar.copyright")}
         </footer>
       )}

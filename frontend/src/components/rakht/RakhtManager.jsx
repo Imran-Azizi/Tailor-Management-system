@@ -25,6 +25,7 @@ import {
   formatSystemDate,
   formatSystemDateTime,
 } from "../../lib/locale.js";
+import { formatCurrency } from "../../lib/currency.js";
 import { Modal, ConfirmDeleteModal, StatCard } from "../ui/index.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useMonth } from "../../context/MonthContext.jsx";
@@ -392,19 +393,19 @@ export default function RakhtManager() {
         />
         <StatCard
           label={t("rakht.totalPrice", { defaultValue: "Total Price" })}
-          value={Math.round(stats.totalPrice).toLocaleString()}
+          value={formatCurrency(Math.round(stats.totalPrice), language)}
           Icon={AfCurrencyIcon}
           accent="#7C3AED"
         />
         <StatCard
           label={t("rakht.givenMoney", { defaultValue: "Given Money" })}
-          value={Math.round(stats.totalPaid).toLocaleString()}
+          value={formatCurrency(Math.round(stats.totalPaid), language)}
           Icon={LuWallet}
           accent="#15803D"
         />
         <StatCard
           label={t("rakht.remainingMoney", { defaultValue: "Remaining" })}
-          value={Math.round(stats.totalRemaining).toLocaleString()}
+          value={formatCurrency(Math.round(stats.totalRemaining), language)}
           Icon={AfCurrencyIcon}
           accent="#B45309"
         />
@@ -553,19 +554,19 @@ export default function RakhtManager() {
                   <td>{item.brandName}</td>
                   <td>{item.tonQuantity}</td>
                   <td>
-                    {Math.round(Number(item.totalPrice || 0)).toLocaleString()}
+                    {formatCurrency(Math.round(Number(item.totalPrice || 0)), language)}
                   </td>
                   <td>
-                    {Math.round(Number(item.givenMoney || 0)).toLocaleString()}
+                    {formatCurrency(Math.round(Number(item.givenMoney || 0)), language)}
                   </td>
                   <td>
-                    {Math.round(
+                    {formatCurrency(Math.round(
                       item.remainingMoney ??
                         Math.max(
                           0,
                           (item.totalPrice || 0) - (item.givenMoney || 0),
                         ),
-                    ).toLocaleString()}
+                    ), language)}
                   </td>
                   <td>
                     {item.date ? formatSystemDate(item.date, language) : "-"}
@@ -962,9 +963,9 @@ export default function RakhtManager() {
             </label>
             <input
               className="inp"
-              value={Math.round(
+              value={formatCurrency(Math.round(
                 Number(selectedPaymentSummary?.totalPrice || 0),
-              ).toLocaleString()}
+              ), language)}
               readOnly
             />
           </div>
@@ -975,9 +976,9 @@ export default function RakhtManager() {
             </label>
             <input
               className="inp"
-              value={Math.round(
+              value={formatCurrency(Math.round(
                 Number(selectedPaymentSummary?.totalPaid || 0),
-              ).toLocaleString()}
+              ), language)}
               readOnly
             />
           </div>
@@ -988,9 +989,9 @@ export default function RakhtManager() {
             </label>
             <input
               className="inp"
-              value={Math.round(
+              value={formatCurrency(Math.round(
                 Number(selectedPaymentSummary?.remaining || 0),
-              ).toLocaleString()}
+              ), language)}
               readOnly
             />
           </div>

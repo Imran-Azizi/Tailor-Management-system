@@ -26,30 +26,33 @@ import { useAuth } from "../context/AuthContext.jsx";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 
 // ─── Zod schema ───────────────────────────────────────────────────────────────
-const schema = z
-  .object({
-    fromName: z
-      .object({ value: z.string(), label: z.string() })
-      .nullable()
-      .refine((value) => value !== null, { message: "Sender is required" }),
-    recipientName: z.string().min(1, "Recipient name is required"),
-    amount: z.string().optional(),
-    taskDate: z.string().min(1, "Date & time is required"),
-    forRakht: z.enum(["NO", "YES"]).default("NO"),
-    note: z.string().optional(),
-  })
-  .superRefine((value, ctx) => {
-    if (value.forRakht === "NO") {
-      const amount = Number(value.amount);
-      if (!Number.isFinite(amount) || amount <= 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["amount"],
-          message: "Amount must be a positive number",
-        });
+const createSchema = (t) =>
+  z
+    .object({
+      fromName: z
+        .object({ value: z.string(), label: z.string() })
+        .nullable()
+        .refine((value) => value !== null, {
+          message: t("dailyTasks.senderRequired"),
+        }),
+      recipientName: z.string().min(1, t("dailyTasks.recipientRequired")),
+      amount: z.string().optional(),
+      taskDate: z.string().min(1, t("dailyTasks.taskDateRequired")),
+      forRakht: z.enum(["NO", "YES"]).default("NO"),
+      note: z.string().optional(),
+    })
+    .superRefine((value, ctx) => {
+      if (value.forRakht === "NO") {
+        const amount = Number(value.amount);
+        if (!Number.isFinite(amount) || amount <= 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["amount"],
+            message: t("dailyTasks.amountPositive"),
+          });
+        }
       }
-    }
-  });
+    });
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function nowLocalInput() {
@@ -98,6 +101,7 @@ function DailyTaskForm({ onSuccess }) {
   const { user, isAdmin } = useAuth();
   const qc = useQueryClient();
   const language = i18n.resolvedLanguage || i18n.language || "en";
+  const schema = createSchema(t);
 
   const {
     control,
@@ -180,9 +184,7 @@ function DailyTaskForm({ onSuccess }) {
   const searchOrderByBill = async () => {
     const raw = String(orderBillSearch || "").trim();
     if (!raw) {
-      setOrderSearchError(
-        t("dailyTasks.billSearchRequired", "Please enter a bill number."),
-      );
+      setOrderSearchError(t("dailyTasks.billSearchRequired"));
       setLookupCustomer(null);
       setFoundOrders([]);
       setSelectedOrderIds([]);
@@ -206,7 +208,7 @@ function DailyTaskForm({ onSuccess }) {
       const orders = Array.isArray(lookup?.orders) ? lookup.orders : [];
 
       if (!orders.length) {
-        setOrderSearchError("Order not found with this billNumber");
+        setOrderSearchError(t("dailyTasks.orderNotFound"));
         return;
       }
 
@@ -216,7 +218,7 @@ function DailyTaskForm({ onSuccess }) {
       });
       setFoundOrders(orders);
     } catch {
-      setOrderSearchError("Order not found with this billNumber");
+      setOrderSearchError(t("dailyTasks.orderNotFound"));
     } finally {
       setSearchingOrder(false);
     }
@@ -244,21 +246,13 @@ function DailyTaskForm({ onSuccess }) {
   const onSubmit = (data) => {
     if (data.forRakht === "YES") {
       if (!foundOrders.length) {
-        setOrderSearchError("Order not found with this billNumber");
-        toast.error(
-          t(
-            "dailyTasks.selectOrderForRakht",
-            "Please select an order for Rakht expense.",
-          ),
-        );
+        setOrderSearchError(t("dailyTasks.orderNotFound"));
+        toast.error(t("dailyTasks.selectOrderForRakht"));
         return;
       }
 
       if (!selectedOrderIds.length) {
-        const message = t(
-          "dailyTasks.selectAtLeastOneOrderType",
-          "Please select at least one order type.",
-        );
+        const message = t("dailyTasks.selectAtLeastOneOrderType");
         setAllocationError(message);
         toast.error(message);
         return;
@@ -270,10 +264,7 @@ function DailyTaskForm({ onSuccess }) {
       });
 
       if (invalid) {
-        const message = t(
-          "dailyTasks.invalidOrderTypeAmount",
-          "Enter a valid amount for each selected order type.",
-        );
+        const message = t("dailyTasks.invalidOrderTypeAmount");
         setAllocationError(message);
         toast.error(message);
         return;
@@ -328,13 +319,8 @@ function DailyTaskForm({ onSuccess }) {
                 isSearchable
                 isClearable
                 isLoading={loadingDokanUsers}
-                placeholder={t(
-                  "dailyTasks.senderPlaceholder",
-                  "Select a Dokan sender",
-                )}
-                noOptionsMessage={() =>
-                  t("dailyTasks.noSenders", "No Dokan users found")
-                }
+                placeholder={t("dailyTasks.senderPlaceholder")}
+                noOptionsMessage={() => t("dailyTasks.noSenders")}
                 styles={buildSelectStyles(Boolean(errors.fromName))}
               />
             )}
@@ -355,7 +341,7 @@ function DailyTaskForm({ onSuccess }) {
 
       <div style={{ marginBottom: 20 }}>
         <Field
-          label={t("dailyTasks.forRakht", "For Rakht")}
+          label={t("dailyTasks.forRakht")}
           error={errors.forRakht?.message}
           required
         >
@@ -398,16 +384,14 @@ function DailyTaskForm({ onSuccess }) {
         {forRakhtValue === "YES" && (
           <div style={{ marginTop: 10 }}>
             <Field
-              label={t("dailyTasks.searchByBillNumber", "Search by billNumber")}
+              label={t("dailyTasks.searchByBillNumber")}
               error={orderSearchError || undefined}
             >
               <div style={{ display: "flex", gap: 8 }}>
                 <input
                   className="inp"
-                  placeholder={t(
-                    "dailyTasks.billNumberPlaceholder",
-                    "Enter bill number",
-                  )}
+                  inputMode="numeric"
+                  placeholder={t("dailyTasks.billNumberPlaceholder")}
                   value={orderBillSearch}
                   onChange={(event) => {
                     setOrderBillSearch(event.target.value);
@@ -444,8 +428,7 @@ function DailyTaskForm({ onSuccess }) {
                 }}
               >
                 <p style={{ margin: 0, fontSize: 12, color: "var(--text3)" }}>
-                  {t("dailyTasks.billNumber", "Bill")}: #
-                  {lookupCustomer.billNumber} |{" "}
+                  {t("dailyTasks.billNumber")}: #{lookupCustomer.billNumber} |{" "}
                   {t("common.customer", "Customer")}:{" "}
                   {lookupCustomer.customerName}
                 </p>
@@ -532,6 +515,7 @@ function DailyTaskForm({ onSuccess }) {
                           >
                             <input
                               type="number"
+                              inputMode="decimal"
                               min="0.01"
                               step="0.01"
                               className="inp"
@@ -580,6 +564,7 @@ function DailyTaskForm({ onSuccess }) {
           >
             <input
               type="number"
+              inputMode="decimal"
               min="0.01"
               step="0.01"
               className={`inp${errors.amount ? " inp-err" : ""}`}

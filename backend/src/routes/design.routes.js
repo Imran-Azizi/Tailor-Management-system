@@ -4,25 +4,25 @@ import { authenticate, authorize } from "../middleware/auth.middleware.js";
 const router = Router();
 router.use(authenticate);
 router.get("/", ctrl.getAllDesigns);
-router.get("/contributors", ctrl.listContributors);
+router.get("/contributors", authorize("ADMIN"), ctrl.listContributors);
 router.post(
   "/contributors",
-  authorize("ADMIN", "FINANCE"),
+  authorize("ADMIN"),
   ctrl.createContributor,
 );
 router.post(
   "/contributors/:id/verify-password",
-  authorize("ADMIN", "FINANCE"),
+  authorize("ADMIN"),
   ctrl.verifyContributorPassword,
 );
 router.put(
   "/contributors/:id",
-  authorize("ADMIN", "FINANCE"),
+  authorize("ADMIN"),
   ctrl.updateContributor,
 );
 router.delete(
   "/contributors/:id",
-  authorize("ADMIN", "FINANCE"),
+  authorize("ADMIN"),
   ctrl.deleteContributor,
 );
 router.get("/:model", ctrl.getAll);

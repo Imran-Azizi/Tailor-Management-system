@@ -15,6 +15,13 @@ export const MONTHS = [
 
 const AFGHANISTAN_TIMEZONE = "Asia/Kabul";
 
+function resolveMonthLocaleTag(language) {
+  const l = String(language || "en").toLowerCase();
+  if (l.startsWith("dari") || l.startsWith("fa")) return "fa-AF-u-ca-persian";
+  if (l.startsWith("pashto") || l.startsWith("ps")) return "ps-AF-u-ca-persian";
+  return "en-US";
+}
+
 const normalizeNumber = (value) => {
   if (typeof value !== "string") return String(value || "");
   const map = {
@@ -58,7 +65,7 @@ export function getMonthLabel(monthValue, language) {
 
 export function getCurrentAfghanMonthYear(date = new Date()) {
   try {
-    const formatter = new Intl.DateTimeFormat("fa-AF-u-ca-persian-nu-latn", {
+    const formatter = new Intl.DateTimeFormat("fa-AF-u-ca-persian", {
       timeZone: AFGHANISTAN_TIMEZONE,
       month: "numeric",
       year: "numeric",
@@ -109,7 +116,12 @@ export function formatMonthYearLabel(month, year, language) {
   const { month: displayMonth, year: displayYear } =
     getDisplayMonthYearForLanguage(month, year, language);
   const label = getMonthLabel(displayMonth, language) || String(displayMonth);
-  return `${label} ${displayYear}`;
+  const localeTag = resolveMonthLocaleTag(language);
+  const yearLabel = new Intl.NumberFormat(localeTag, {
+    useGrouping: false,
+    maximumFractionDigits: 0,
+  }).format(displayYear);
+  return `${label} ${yearLabel}`;
 }
 
 export function getDisplayYearForLanguage(year, month, language) {
@@ -177,7 +189,7 @@ export function gregorianToAfghanMonthYear(gregorianMonth, gregorianYear) {
   try {
     // Use mid-month date to avoid edge behavior at month boundaries.
     const date = new Date(gy, gm - 1, 15);
-    const formatter = new Intl.DateTimeFormat("fa-AF-u-ca-persian-nu-latn", {
+    const formatter = new Intl.DateTimeFormat("fa-AF-u-ca-persian", {
       month: "numeric",
       year: "numeric",
     });
@@ -224,7 +236,7 @@ export function afghanToGregorianMonthYear(afghanMonth, afghanYear) {
   }
 
   try {
-    const formatter = new Intl.DateTimeFormat("fa-AF-u-ca-persian-nu-latn", {
+    const formatter = new Intl.DateTimeFormat("fa-AF-u-ca-persian", {
       month: "numeric",
       year: "numeric",
     });

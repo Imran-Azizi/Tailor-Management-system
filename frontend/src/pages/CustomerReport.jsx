@@ -33,8 +33,8 @@ import { Spinner, Badge } from "../components/ui/index.jsx";
 
 function formatMoney(v, language = "en") {
   return formatCurrency(v, language, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
 }
 

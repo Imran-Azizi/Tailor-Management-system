@@ -1,6 +1,7 @@
 import { toAsciiDigits } from "./normalize.js";
 
 const AFGHANISTAN_TIMEZONE = "Asia/Kabul";
+const LRM = "\u200E";
 
 export function normalizeLanguage(language = "en") {
   const lang = String(language || "en").toLowerCase();
@@ -50,16 +51,48 @@ function withDateLocaleDefaults(language = "en", options = {}) {
   return next;
 }
 
+function stabilizeRtlMixedText(value, language = "en") {
+  if (!isRtlLanguage(language)) return String(value ?? "");
+  const text = String(value ?? "");
+  if (!text) return text;
+  // Keep latin-number tokens in logical order when mixed with RTL text.
+  return text.replace(
+    /[0-9]+(?:[./:-][0-9]+)*/g,
+    (token) => `${LRM}${token}${LRM}`,
+  );
+}
+
 export function formatDateLocale(value, language = "en", options = {}) {
   if (!value) return "-";
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
-  return toAsciiDigits(
+  const rendered = toAsciiDigits(
     new Intl.DateTimeFormat(
       getLocaleTag(language),
       withDateLocaleDefaults(language, options),
     ).format(date),
   );
+  return stabilizeRtlMixedText(rendered, language);
+}
+
+export function formatAfghanistanReportDate(value, language = "en") {
+  const normalized = normalizeLanguage(language);
+  const defaultOptions =
+    normalized === "en"
+      ? {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "2-digit",
+        }
+      : {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        };
+
+  return formatDateLocale(value, language, defaultOptions);
 }
 
 export function formatSystemDate(value, language = "en", options = {}) {

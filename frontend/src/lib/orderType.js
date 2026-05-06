@@ -110,6 +110,16 @@ function isDefaultGeneratedName(rawName, typeLabel, sequencedLabel) {
     return true;
   }
 
+  const seqMatch = String(sequencedLabel || "").match(/^(.*)\s+(\d+)$/);
+  if (seqMatch) {
+    const typePart = normalizeNameForCompare(seqMatch[1]);
+    const seqPart = String(seqMatch[2] || "").trim();
+    const compactReversed = `${seqPart}${typePart.replace(/\s+/g, "")}`;
+    if (compactRaw === compactReversed) {
+      return true;
+    }
+  }
+
   return false;
 }
 

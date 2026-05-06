@@ -115,31 +115,50 @@ export const getTransactionSummaryForUser = async (
         ? "qichikarPaymentAmount"
         : "workerPaymentAmount";
 
-  const [loanAggregate, completedPayments] = await Promise.all([
-    prisma.transaction.aggregate({
-      where: {
-        userId,
-        kind: "LOAN",
-        source: "MANUAL",
-        ...(paidDateFilter
-          ? {
-              transactionDate: paidDateFilter,
-            }
-          : {}),
-      },
-      _sum: { amount: true },
-    }),
-    prisma.order.aggregate({
-      where: completedPaymentWhere,
-      _sum: { [paymentSumField]: true },
-    }),
-  ]);
+  const [loanAggregate, penaltyAggregate, completedPaymentsAggregate] =
+    await Promise.all([
+      prisma.transaction.aggregate({
+        where: {
+          userId,
+          kind: "LOAN",
+          source: "MANUAL",
+          damagedClothesPenalty: null,
+          ...(paidDateFilter
+            ? {
+                transactionDate: paidDateFilter,
+              }
+            : {}),
+        },
+        _sum: { amount: true },
+      }),
+      prisma.damagedClothesPenalty.aggregate({
+        where: {
+          userId,
+          ...(paidDateFilter
+            ? {
+                createdAt: paidDateFilter,
+              }
+            : {}),
+        },
+        _sum: { totalExpense: true },
+      }),
+      prisma.order.aggregate({
+        where: completedPaymentWhere,
+        _sum: { [paymentSumField]: true },
+      }),
+    ]);
+
+  const loanTotal = Number(loanAggregate._sum.amount || 0);
+  const damagePenaltyTotal = Number(penaltyAggregate?._sum?.totalExpense || 0);
+  const totalCompletedPayments = Number(
+    completedPaymentsAggregate._sum?.[paymentSumField] || 0,
+  );
 
   return {
-    loanTotal: Number(loanAggregate._sum.amount || 0),
-    totalCompletedPayments: Number(
-      completedPayments._sum?.[paymentSumField] || 0,
-    ),
+    loanTotal,
+    damagePenaltyTotal,
+    totalCompletedPayments,
+    currentBalance: totalCompletedPayments - loanTotal - damagePenaltyTotal,
   };
 };
 
@@ -153,7 +172,7 @@ export const getTransactions = async ({
 }) => {
   const skip = (page - 1) * limit;
 
-  const where = { source: "MANUAL" };
+  const where = { source: "MANUAL", damagedClothesPenalty: null };
   if (accountType) where.accountType = accountType;
   if (search) {
     where.user = { name: { contains: search, mode: "insensitive" } };

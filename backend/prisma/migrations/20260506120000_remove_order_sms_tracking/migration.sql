@@ -1,0 +1,2 @@
+ALTER TABLE "Order"
+DROP COLUMN IF EXISTS "smsSentAt";

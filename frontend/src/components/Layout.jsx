@@ -30,6 +30,7 @@ const TITLES = {
   "/print-bills": "orders.printBills",
   "/notifications": "common.notifications",
   "/users": "users.title",
+  "/damaged-clothes": "damagedClothes.title",
   "/backups": "backup.title",
   "/my-tasks": "myTasks.title",
   "/customers/create": "sidebar.createNewAccount",

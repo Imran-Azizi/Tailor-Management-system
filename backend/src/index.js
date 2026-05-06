@@ -16,15 +16,81 @@ import transactionRoutes from "./routes/transaction.routes.js";
 import dailyTaskRoutes from "./routes/dailyTask.routes.js";
 import rakhtRoutes from "./routes/rakht.routes.js";
 import backupRoutes from "./routes/backup.routes.js";
+import damagedClothesRoutes from "./routes/damagedClothes.routes.js";
 import { startCronJobs } from "./cron/notifications.cron.js";
 import { startBackupCron } from "./cron/backup.cron.js";
 
 const app = express();
 const PORT = process.env.PORT || 8000;
 
+const normalizeOrigin = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  if (raw === "*") return "*";
+  if (/^https?:\/\//i.test(raw)) return raw.replace(/\/$/, "");
+  if (/^localhost(:\d+)?$/i.test(raw) || /^127\.0\.0\.1(:\d+)?$/i.test(raw)) {
+    return `http://${raw.replace(/\/$/, "")}`;
+  }
+  return `https://${raw.replace(/\/$/, "")}`;
+};
+
+const parseConfiguredOrigins = () => {
+  const rawValues = [
+    process.env.FRONTEND_URL,
+    process.env.FRONTEND_URLS,
+    process.env.CORS_ORIGINS,
+  ]
+    .filter(Boolean)
+    .join(",")
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+
+  const normalized = rawValues
+    .map(normalizeOrigin)
+    .filter(Boolean)
+    .filter((value, index, list) => list.indexOf(value) === index);
+
+  if (!normalized.length) {
+    return ["http://localhost:5173"];
+  }
+  return normalized;
+};
+
+const configuredOrigins = parseConfiguredOrigins();
+const isTrustedVercelDeployment = (origin) =>
+  /^https:\/\/tailor-management-system(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(
+    origin,
+  );
+
+const corsOrigin = (origin, callback) => {
+  // Allow server-to-server and CLI requests that don't send Origin.
+  if (!origin) {
+    callback(null, true);
+    return;
+  }
+
+  const normalizedRequestOrigin = normalizeOrigin(origin);
+  if (!normalizedRequestOrigin) {
+    callback(new Error("Invalid request origin."));
+    return;
+  }
+
+  if (
+    configuredOrigins.includes("*") ||
+    configuredOrigins.includes(normalizedRequestOrigin) ||
+    isTrustedVercelDeployment(normalizedRequestOrigin)
+  ) {
+    callback(null, true);
+    return;
+  }
+
+  callback(new Error(`CORS blocked for origin: ${normalizedRequestOrigin}`));
+};
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: corsOrigin,
     credentials: true,
   }),
 );
@@ -52,6 +118,7 @@ app.use("/api/transactions", transactionRoutes);
 app.use("/api/daily-tasks", dailyTaskRoutes);
 app.use("/api/rakhts", rakhtRoutes);
 app.use("/api/backups", backupRoutes);
+app.use("/api/damaged-clothes", damagedClothesRoutes);
 
 // Health check
 app.get("/api/health", (req, res) =>

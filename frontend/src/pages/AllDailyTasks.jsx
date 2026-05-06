@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import Select from "react-select";
+import { useNavigate } from "react-router-dom";
 import {
   LuBadgeCheck,
   LuCalendarCheck,
@@ -11,7 +11,6 @@ import {
   LuChevronDown,
   LuClipboardList,
   LuEllipsisVertical,
-  LuEye,
   LuFileText,
   LuHash,
   LuInbox,
@@ -26,6 +25,7 @@ import {
   LuArrowUpRight,
   LuChevronRight,
   LuTrash2,
+  LuEye,
 } from "react-icons/lu";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -182,7 +182,6 @@ function StatBanner({ label, value, Icon, accent, sub }) {
 function ActionMenu({
   open,
   setOpen,
-  onView,
   onEdit,
   onDelete,
   t,
@@ -202,7 +201,7 @@ function ActionMenu({
     const rect = triggerRef.current.getBoundingClientRect();
     const menuWidth = 164;
     const menuItemHeight = 36;
-    const itemsCount = canManage ? 3 : 1;
+    const itemsCount = canManage ? 2 : 0;
     const menuHeight =
       itemsCount * menuItemHeight + (!isEditable && canManage ? 42 : 8);
 
@@ -276,34 +275,17 @@ function ActionMenu({
 
       {open && (
         <div
+          className="dt-action-dropdown"
           style={{
             position: "fixed",
             top: menuPos.top,
             left: menuPos.left,
-            minWidth: 148,
-            borderRadius: "var(--r)",
-            border: "1px solid var(--border)",
-            background: "var(--surface)",
-            boxShadow: "var(--sh-lg)",
             zIndex: 999,
-            overflow: "hidden",
             animation: "fadeUp .12s ease",
             direction: isRtl ? "rtl" : "ltr",
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          <button
-            type="button"
-            className="dt-action-item"
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpen(false);
-              onView();
-            }}
-          >
-            <LuEye size={13} />
-            {t("common.view")}
-          </button>
           {canManage && (
             <>
               <button
@@ -433,9 +415,143 @@ function EmptyTasksState({ t }) {
   );
 }
 
+function DailyTaskDetailsModal({ open, task, isLoading, onClose, t, language }) {
+  const infoCardStyle = {
+    border: "1px solid var(--border)",
+    borderRadius: 12,
+    background: "var(--surface)",
+    padding: "12px 14px",
+    display: "grid",
+    gap: 4,
+  };
+
+  const labelStyle = {
+    fontSize: 11,
+    fontWeight: 700,
+    color: "var(--text3)",
+    textTransform: "uppercase",
+    letterSpacing: ".05em",
+  };
+
+  const valueStyle = {
+    fontSize: 14,
+    fontWeight: 600,
+    color: "var(--text1)",
+    lineHeight: 1.5,
+    wordBreak: "break-word",
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={t("dailyTasks.detailTitle", "Expense Details")}
+      maxW={720}
+    >
+      {isLoading ? (
+        <div style={{ padding: "28px 0", display: "flex", justifyContent: "center" }}>
+          <Spinner />
+        </div>
+      ) : !task ? (
+        <div
+          style={{
+            padding: "22px 4px",
+            textAlign: "center",
+            color: "var(--text3)",
+            fontSize: 14,
+          }}
+        >
+          {t("dailyTasks.notFound", "Expense not found.")}
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: 16 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 12,
+            }}
+          >
+            <div style={infoCardStyle}>
+              <span style={labelStyle}>{t("dailyTasks.fromName")}</span>
+              <span style={valueStyle}>{task.fromName || "-"}</span>
+            </div>
+            <div style={infoCardStyle}>
+              <span style={labelStyle}>{t("dailyTasks.recipientName")}</span>
+              <span style={valueStyle}>{task.recipientName || "-"}</span>
+            </div>
+            <div style={infoCardStyle}>
+              <span style={labelStyle}>{t("dailyTasks.amount")}</span>
+              <span style={{ ...valueStyle, color: "#166534" }}>
+                {formatMoney(task.amount, language)}
+              </span>
+            </div>
+            <div style={infoCardStyle}>
+              <span style={labelStyle}>{t("dailyTasks.taskDate")}</span>
+              <span style={valueStyle}>{formatDateTime(task.taskDate, language)}</span>
+            </div>
+          </div>
+
+          <div style={infoCardStyle}>
+            <span style={labelStyle}>{t("dailyTasks.note")}</span>
+            <span
+              style={{
+                ...valueStyle,
+                fontWeight: 500,
+                color: task.note ? "var(--text1)" : "var(--text3)",
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              {task.note || t("dailyTasks.noNote", "No note added.")}
+            </span>
+          </div>
+
+          <div style={infoCardStyle}>
+            <span style={labelStyle}>{t("dailyTasks.orderInfo", "Linked Order")}</span>
+            {task.order ? (
+              <div style={{ display: "grid", gap: 6 }}>
+                <span style={valueStyle}>
+                  {t("orders.billNumber", "Bill Number")}: #{task.order.customer?.billNumber || "-"}
+                </span>
+                <span style={valueStyle}>
+                  {t("common.customer", "Customer")}: {task.order.customer?.firstName || "-"}
+                </span>
+                <span style={valueStyle}>
+                  {t("common.type", "Type")}: {task.order.type || "-"}
+                </span>
+              </div>
+            ) : (
+              <span style={{ ...valueStyle, fontWeight: 500, color: "var(--text3)" }}>
+                {t("dailyTasks.noLinkedOrder", "No linked order.")}
+              </span>
+            )}
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 12,
+            }}
+          >
+            <div style={infoCardStyle}>
+              <span style={labelStyle}>{t("dailyTasks.createdBy")}</span>
+              <span style={valueStyle}>{task.createdBy?.name || "-"}</span>
+            </div>
+            <div style={infoCardStyle}>
+              <span style={labelStyle}>{t("dailyTasks.createdAt")}</span>
+              <span style={valueStyle}>{formatDateTime(task.createdAt, language)}</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 function TaskRow({
   task,
-  onClick,
+  onView,
   onEdit,
   onDelete,
   index,
@@ -451,11 +567,7 @@ function TaskRow({
   const isEditable = isMonthEditable && isDailyTaskEditable(task);
 
   return (
-    <tr
-      className="tr-hover dt-row"
-      style={{ cursor: "pointer", transition: "all .16s ease" }}
-      onClick={() => onClick(task.id)}
-    >
+    <tr className="tr-hover dt-row" style={{ transition: "all .16s ease" }}>
       <td style={{ width: 44, color: "var(--text3)", fontSize: 12 }}>
         {index + 1}
       </td>
@@ -519,20 +631,39 @@ function TaskRow({
         {task.note || <span style={{ opacity: 0.35 }}>—</span>}
       </td>
       <td
-        style={{ textAlign: "end", width: 72 }}
+        style={{ textAlign: "end", width: 148 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <ActionMenu
-          open={openMenu === task.id}
-          setOpen={(value) => setOpenMenu(value ? task.id : null)}
-          onView={() => onClick(task.id)}
-          onEdit={() => onEdit(task)}
-          onDelete={() => onDelete(task)}
-          canManage={canManage}
-          isEditable={isEditable}
-          disabledReason={disabledReason}
-          t={t}
-        />
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            gap: 8,
+          }}
+        >
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            style={{ gap: 5, minWidth: 84, height: 34 }}
+            onClick={() => onView(task)}
+          >
+            <LuEye size={13} />
+            {t("common.view", "View")}
+          </button>
+          {canManage ? (
+            <ActionMenu
+              open={openMenu === task.id}
+              setOpen={(value) => setOpenMenu(value ? task.id : null)}
+              onEdit={() => onEdit(task)}
+              onDelete={() => onDelete(task)}
+              canManage={canManage}
+              isEditable={isEditable}
+              disabledReason={disabledReason}
+              t={t}
+            />
+          ) : null}
+        </div>
       </td>
     </tr>
   );
@@ -540,7 +671,7 @@ function TaskRow({
 
 function TaskCard({
   task,
-  onClick,
+  onView,
   onEdit,
   onDelete,
   openMenu,
@@ -561,13 +692,11 @@ function TaskCard({
         border: "1px solid var(--border)",
         borderRadius: "var(--r-lg)",
         padding: "14px 16px",
-        cursor: "pointer",
         transition: "all .15s",
         display: "flex",
         flexDirection: "column",
         gap: 10,
       }}
-      onClick={() => onClick(task.id)}
     >
       <div
         style={{
@@ -647,12 +776,9 @@ function TaskCard({
           }}
         >
           <LuCalendarDays size={12} />
-          {formatDateTime(task.taskDate)}
+          {formatDateTime(task.taskDate, language)}
         </span>
-        <LuChevronRight
-          size={14}
-          style={{ color: "var(--text3)", flexShrink: 0 }}
-        />
+        <span style={{ width: 14, height: 14, display: "inline-block" }} />
       </div>
 
       {task.note && (
@@ -674,6 +800,7 @@ function TaskCard({
       <div
         style={{
           display: "flex",
+          flexWrap: "wrap",
           gap: 8,
           marginTop: 2,
           justifyContent: "space-between",
@@ -684,21 +811,17 @@ function TaskCard({
         <button
           type="button"
           className="btn btn-outline btn-sm"
-          style={{ gap: 4, justifyContent: "center" }}
-          onClick={(e) => {
-            e.stopPropagation();
-            onClick(task.id);
-          }}
+          style={{ gap: 5, minWidth: 92, height: 34 }}
+          onClick={() => onView(task)}
         >
-          <LuEye size={12} />
-          {t("common.view")}
+          <LuEye size={13} />
+          {t("common.view", "View")}
         </button>
-        {canManage && (
+        {canManage ? (
           <ActionMenu
             compact
             open={openMenu === task.id}
             setOpen={(value) => setOpenMenu(value ? task.id : null)}
-            onView={() => onClick(task.id)}
             onEdit={() => onEdit(task)}
             onDelete={() => onDelete(task)}
             canManage={canManage}
@@ -706,7 +829,7 @@ function TaskCard({
             disabledReason={disabledReason}
             t={t}
           />
-        )}
+        ) : null}
       </div>
     </div>
   );
@@ -714,11 +837,11 @@ function TaskCard({
 
 export default function AllDailyTasks() {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const language = i18n.resolvedLanguage || i18n.language;
   const isRtl = (i18n.dir?.() || "ltr") === "rtl";
   const { isAdmin } = useAuth();
   const { viewMonth, viewYear, getMonthAccessMode } = useMonth();
-  const navigate = useNavigate();
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -727,6 +850,7 @@ export default function AllDailyTasks() {
   const [reportMenuOpen, setReportMenuOpen] = useState(false);
   const [editTask, setEditTask] = useState(null);
   const [deleteTask, setDeleteTask] = useState(null);
+  const [viewTaskId, setViewTaskId] = useState(null);
   const reportMenuRef = useRef(null);
   const reportMenuButtonRef = useRef(null);
   const [reportMenuPos, setReportMenuPos] = useState({
@@ -839,6 +963,17 @@ export default function AllDailyTasks() {
     onError: (err) =>
       toast.error(getApiErrorMessage(err, t("dailyTasks.deleteFailed"))),
   });
+
+  const { data: viewTask, isLoading: viewTaskLoading } = useQuery({
+    queryKey: ["daily-task", viewTaskId],
+    queryFn: () => api.get(`/daily-tasks/${viewTaskId}`).then((r) => r.data),
+    enabled: Boolean(viewTaskId),
+  });
+
+  const openView = (task) => {
+    setViewTaskId(task.id);
+    setOpenMenu(null);
+  };
 
   const submitEdit = (e) => {
     e.preventDefault();
@@ -958,7 +1093,8 @@ export default function AllDailyTasks() {
     if (!reportMenuButtonRef.current || typeof window === "undefined") return;
 
     const rect = reportMenuButtonRef.current.getBoundingClientRect();
-    const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+    const viewportWidth =
+      window.innerWidth || document.documentElement.clientWidth;
     const gutter = 8;
     const width = Math.min(292, Math.max(220, viewportWidth - gutter * 2));
     const desiredLeft = isRtl ? rect.right - width : rect.left;
@@ -1336,6 +1472,7 @@ export default function AllDailyTasks() {
                     <TaskRow
                       key={task.id}
                       task={task}
+                      onView={openView}
                       index={(page - 1) * 20 + i}
                       isRtlNote={isRtlNote}
                       openMenu={openMenu}
@@ -1345,7 +1482,6 @@ export default function AllDailyTasks() {
                       disabledReason={effectiveDisabledReason}
                       onEdit={openEdit}
                       onDelete={requestDelete}
-                      onClick={(id) => navigate(`/daily-tasks/${id}`)}
                     />
                   ))}
                 </tbody>
@@ -1365,6 +1501,7 @@ export default function AllDailyTasks() {
                 <TaskCard
                   key={task.id}
                   task={task}
+                  onView={openView}
                   openMenu={openMenu}
                   setOpenMenu={setOpenMenu}
                   canManage={isAdmin}
@@ -1372,7 +1509,6 @@ export default function AllDailyTasks() {
                   disabledReason={effectiveDisabledReason}
                   onEdit={openEdit}
                   onDelete={requestDelete}
-                  onClick={(id) => navigate(`/daily-tasks/${id}`)}
                 />
               ))}
             </div>
@@ -1516,6 +1652,15 @@ export default function AllDailyTasks() {
             ? `${deleteTask.fromName} → ${deleteTask.recipientName}`
             : ""
         }
+      />
+
+      <DailyTaskDetailsModal
+        open={Boolean(viewTaskId)}
+        task={viewTask}
+        isLoading={viewTaskLoading}
+        onClose={() => setViewTaskId(null)}
+        t={t}
+        language={language}
       />
 
       <style>{`

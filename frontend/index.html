@@ -6,6 +6,27 @@
     <title>Hoshmand Safi</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script>
+      (() => {
+        const storageKey = "theme";
+        const root = document.documentElement;
+        let storedTheme = null;
+        try {
+          storedTheme = localStorage.getItem(storageKey);
+        } catch {
+          storedTheme = null;
+        }
+        const prefersDark =
+          window.matchMedia &&
+          window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const isDark = storedTheme
+          ? storedTheme === "dark"
+          : Boolean(prefersDark);
+        root.classList.toggle("dark", isDark);
+        root.dataset.theme = isDark ? "dark" : "light";
+        root.style.colorScheme = isDark ? "dark" : "light";
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { LuPlus, LuPencil, LuTrash2, LuPercent } from "react-icons/lu";
@@ -7,6 +7,7 @@ import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { formatCurrency } from "../lib/currency.js";
 import { useMonth } from "../context/MonthContext.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 import {
   PageHeader,
   Modal,
@@ -14,26 +15,49 @@ import {
 } from "../components/ui/index.jsx";
 
 const MODELS = [
-  { key: "yakhan", label: "یخن", color: "#2563EB" },
-  { key: "neckoutfit", label: "یخن (پیراهن تنبان)", color: "#0EA5A4" },
+  { key: "yakhan", label: "شیپ یخن", color: "#2563EB" },
+  { key: "neckoutfit", label: "شیپ یخن (پیراهن تنبان)", color: "#0EA5A4" },
   { key: "astin", label: "آستین", color: "#0891B2" },
-  { key: "daman", label: "دامن", color: "#7C3AED" },
+  { key: "daman", label: "شیپ دامن", color: "#7C3AED" },
   { key: "shoulderstate", label: "وضعیت شانه", color: "#F97316" },
-  { key: "neckwaskat", label: "یخن (واسکت)", color: "#F59E0B" },
+  { key: "neckwaskat", label: "شیپ یخن (واسکت)", color: "#F59E0B" },
   { key: "jibrow", label: "جیب رو", color: "#2563EB" },
   { key: "jibbaghle", label: "جیب بغل", color: "#DC2626" },
   { key: "jibtenban", label: "جیب تنبان", color: "#16A34A" },
   { key: "patyship", label: "شیپ پتی", color: "#0E7490" },
   { key: "buttonship", label: "شیپ دکمه", color: "#7C3AED" },
   { key: "tenbanship", label: "شیپ تنبان", color: "#DB2777" },
+  { key: "outfitdesign", label: "دیزاین", color: "#7C3AED" },
+  { key: "yakhanqaqneck", label: "شیپ یخن", color: "#2563EB" },
+  { key: "yakhanqaqsleeve", label: "آستین", color: "#0891B2" },
+  { key: "yakhanqaqskirt", label: "شیپ دامن", color: "#DB2777" },
+  { key: "yakhanqaqdesign", label: "دیزاین", color: "#7C3AED" },
+  { key: "yakhanqaqbutton", label: "شیپ دکمه", color: "#F97316" },
+  { key: "yakhanqaqpant", label: "شیپ پتی", color: "#0E7490" },
 ];
 
 const TAB_GROUPS = {
-  OUTFIT: ["neckoutfit", "astin", "daman", "buttonship", "tenbanship"],
+  OUTFIT: [
+    "neckoutfit",
+    "astin",
+    "daman",
+    "outfitdesign",
+    "buttonship",
+    "patyship",
+    "tenbanship",
+  ],
   WASKAT: ["neckwaskat", "shoulderstate"],
+  YAKHANQAQ: [
+    "yakhanqaqneck",
+    "yakhanqaqsleeve",
+    "yakhanqaqskirt",
+    "yakhanqaqdesign",
+    "yakhanqaqbutton",
+    "yakhanqaqpant",
+  ],
 };
 
-const PAGE_TABS = ["OUTFIT", "WASKAT", "CONTRIBUTOR"];
+const PAGE_TABS = ["OUTFIT", "WASKAT", "YAKHANQAQ", "CONTRIBUTOR"];
 
 function ContributorSection() {
   const { t, i18n } = useTranslation();
@@ -1031,7 +1055,10 @@ function DesignCard({ model }) {
             {t("designs.noStyles", { defaultValue: "No styles yet" })}
           </p>
         ) : (
-          <div className="designs-chip-wrap" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          <div
+            className="designs-chip-wrap"
+            style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
+          >
             {data.map((item) => (
               <div
                 key={item.id}
@@ -1168,13 +1195,25 @@ function DesignCard({ model }) {
 
 export default function Designs() {
   const { t } = useTranslation();
+  const { isAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState("OUTFIT");
+  const availableTabs = useMemo(
+    () =>
+      isAdmin ? PAGE_TABS : PAGE_TABS.filter((tab) => tab !== "CONTRIBUTOR"),
+    [isAdmin],
+  );
+
+  useEffect(() => {
+    if (!availableTabs.includes(activeTab)) {
+      setActiveTab(availableTabs[0] || "OUTFIT");
+    }
+  }, [activeTab, availableTabs]);
 
   const tabLabels = {
     OUTFIT: t("designs.tabs.outfit", { defaultValue: "Outfit" }),
     WASKAT: t("designs.tabs.waskat", { defaultValue: "Waskat" }),
     CONTRIBUTOR: t("designs.tabs.contributor", { defaultValue: "Contributor" }),
-    YAKHANQAQ: t("designs.tabs.yakhanaqq", { defaultValue: "YakhanQaq" }),
+    YAKHANQAQ: t("designs.tabs.yakhanaqq", { defaultValue: "یخن قاق" }),
   };
 
   const modelsToShow = (TAB_GROUPS[activeTab] || [])
@@ -1194,7 +1233,7 @@ export default function Designs() {
         className="design-tabs"
         style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}
       >
-        {PAGE_TABS.map((tab) => (
+        {availableTabs.map((tab) => (
           <button
             key={tab}
             type="button"

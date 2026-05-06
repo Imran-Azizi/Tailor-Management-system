@@ -18,6 +18,7 @@ import {
   LuWalletCards,
   LuFileText,
   LuDatabaseBackup,
+  LuShieldAlert,
 } from "react-icons/lu";
 import AfCurrencyIcon from "../ui/AfCurrencyIcon.jsx";
 
@@ -224,6 +225,13 @@ const ADMIN_SECTIONS = [
         fallback: "User Management",
         path: "/users",
         icon: LuShieldCheck,
+      },
+      {
+        key: "damagedClothes",
+        label: "sidebar.damagedClothes",
+        fallback: "Damaged Clothes",
+        path: "/damaged-clothes",
+        icon: LuShieldAlert,
       },
       {
         key: "backupManagement",
@@ -552,6 +560,28 @@ const FINANCE_SECTIONS = [
             fallback: "Completed Orders",
             path: "/orders/completed",
             icon: LuListChecks,
+          },
+          {
+            key: "clothesStatus",
+            label: "sidebar.clothesStatus",
+            fallback: "Clothes Status",
+            path: "/orders/assignments/report",
+            icon: LuFileText,
+          },
+          {
+            key: "printBills",
+            label: "orders.printBills",
+            fallback: "Print Bills",
+            path: "/print-bills",
+            icon: LuPrinter,
+          },
+          {
+            key: "delivery",
+            label: "sidebar.clothesDelivery",
+            fallback: "Delivery",
+            path: "/delivery",
+            icon: LuTruck,
+            end: true,
           },
         ],
       },

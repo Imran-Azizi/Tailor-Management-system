@@ -21,8 +21,8 @@ import {
   Badge,
 } from "../components/ui/index.jsx";
 
-function formatMoney(v) {
-  return formatCurrency(v, "en", {
+function formatMoney(v, language) {
+  return formatCurrency(v, language || "en", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   });
@@ -100,7 +100,7 @@ function CustomerRow({ customer, expanded, onToggle }) {
           {orders.length}
         </td>
         <td style={{ padding: "13px 16px", fontSize: 13, fontWeight: 700 }}>
-          {formatMoney(totalBilled)}
+          {formatMoney(totalBilled, language)}
         </td>
         <td
           style={{
@@ -110,12 +110,12 @@ function CustomerRow({ customer, expanded, onToggle }) {
             fontWeight: 600,
           }}
         >
-          {formatMoney(totalPaid)}
+          {formatMoney(totalPaid, language)}
         </td>
         <td
           style={{ padding: "13px 16px", fontSize: 13, color: "var(--text3)" }}
         >
-          {formatMoney(totalDiscount)}
+          {formatMoney(totalDiscount, language)}
         </td>
         <td style={{ padding: "13px 16px" }}>
           <span
@@ -126,7 +126,7 @@ function CustomerRow({ customer, expanded, onToggle }) {
             }}
           >
             {totalRemaining > 0
-              ? formatMoney(totalRemaining)
+              ? formatMoney(totalRemaining, language)
               : t("orders.paidInFull")}
           </span>
         </td>
@@ -222,15 +222,15 @@ function CustomerRow({ customer, expanded, onToggle }) {
                         ) : null}
                       </td>
                       <td style={{ padding: "8px 10px", fontWeight: 600 }}>
-                        {formatMoney(o.totalPrice)}
+                        {formatMoney(o.totalPrice, language)}
                       </td>
                       <td style={{ padding: "8px 10px", color: "#16a34a" }}>
-                        {formatMoney(o.paidAmount)}
+                        {formatMoney(o.paidAmount, language)}
                       </td>
                       <td
                         style={{ padding: "8px 10px", color: "var(--text3)" }}
                       >
-                        {formatMoney(o.discount)}
+                        {formatMoney(o.discount, language)}
                       </td>
                       <td
                         style={{
@@ -239,7 +239,7 @@ function CustomerRow({ customer, expanded, onToggle }) {
                           fontWeight: o.remaining > 0 ? 700 : 400,
                         }}
                       >
-                        {formatMoney(o.remaining)}
+                        {formatMoney(o.remaining, language)}
                       </td>
                       <td style={{ padding: "8px 10px" }}>
                         <Badge v={o.isCompleted ? "green" : "amber"}>
@@ -394,7 +394,7 @@ export default function CustomerTransactions() {
           },
           {
             label: t("dadAndStud.totalOutstanding"),
-            value: formatMoney(totalRemaining),
+            value: formatMoney(totalRemaining, language),
             Icon: LuTrendingDown,
             color: "#DC2626",
             isText: true,

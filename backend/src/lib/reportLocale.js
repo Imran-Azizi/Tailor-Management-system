@@ -6,6 +6,7 @@ export function normalizeReportLanguage(language = "en") {
 }
 
 const AFGHANISTAN_TIMEZONE = "Asia/Kabul";
+const LRM = "\u200E";
 
 const WEEKDAY_MAP_DARI = {
   Sun: "یکشنبه",
@@ -96,10 +97,35 @@ function withReportDateDefaults(language = "en", options = {}) {
   return next;
 }
 
+function stabilizeRtlMixedText(value) {
+  const text = String(value ?? "");
+  if (!text) return text;
+
+  // Keep latin-number tokens in logical order when mixed with RTL text.
+  return text.replace(
+    /[0-9]+(?:[./:-][0-9]+)*/g,
+    (token) => `${LRM}${token}${LRM}`,
+  );
+}
+
+export function formatReportLabelValue(
+  label,
+  value,
+  language = "en",
+  separator,
+) {
+  const safeLabel = String(label || "").trim();
+  const safeValue = String(value ?? "-").trim();
+  const isRtl = isRtlReportLanguage(language);
+  const sep = separator || (isRtl ? "،" : ":");
+  const line = `${safeLabel}${sep} ${safeValue}`;
+  return isRtl ? stabilizeRtlMixedText(line) : line;
+}
+
 export function formatReportDateTime(value, language = "en", options = {}) {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
-  return new Intl.DateTimeFormat(getReportLocaleTag(language), {
+  const rendered = new Intl.DateTimeFormat(getReportLocaleTag(language), {
     year: "numeric",
     month: "long",
     day: "2-digit",
@@ -107,6 +133,9 @@ export function formatReportDateTime(value, language = "en", options = {}) {
     minute: "2-digit",
     ...withReportDateDefaults(language, options),
   }).format(date);
+  return isRtlReportLanguage(language)
+    ? stabilizeRtlMixedText(rendered)
+    : rendered;
 }
 
 export function formatMonthlyReportHeaderDateTime(value, language = "en") {
@@ -157,7 +186,8 @@ export function formatMonthlyReportHeaderDateTime(value, language = "en") {
       return formatReportDateTime(date, language);
     }
 
-    return `${weekdayName}، ${day} ${monthName} ${year} — ${timePart}`;
+    const line = `${weekdayName}، ${day} ${monthName} ${year} — ${timePart}`;
+    return stabilizeRtlMixedText(line);
   } catch {
     return formatReportDateTime(date, language);
   }
@@ -166,9 +196,41 @@ export function formatMonthlyReportHeaderDateTime(value, language = "en") {
 export function formatReportNumber(value, language = "en", options = {}) {
   const num = Number(value || 0);
   const safeNum = Number.isFinite(num) ? num : 0;
-  return new Intl.NumberFormat(getReportLocaleTag(language), options).format(
-    safeNum,
-  );
+  const {
+    minimumFractionDigits,
+    maximumFractionDigits,
+    trimTrailingZeros = true,
+    ...restOptions
+  } = options || {};
+
+  const formatterOptions = { ...restOptions };
+  if (
+    minimumFractionDigits !== undefined ||
+    maximumFractionDigits !== undefined
+  ) {
+    const minDigits = Number.isFinite(minimumFractionDigits)
+      ? Math.max(0, Number(minimumFractionDigits))
+      : 0;
+    const maxDigitsCandidate = Number.isFinite(maximumFractionDigits)
+      ? Math.max(0, Number(maximumFractionDigits))
+      : minDigits;
+    const maxDigits = Math.max(maxDigitsCandidate, minDigits);
+
+    formatterOptions.minimumFractionDigits = trimTrailingZeros ? 0 : minDigits;
+    formatterOptions.maximumFractionDigits = maxDigits;
+  }
+
+  const formatted = new Intl.NumberFormat(
+    getReportLocaleTag(language),
+    formatterOptions,
+  ).format(safeNum);
+
+  // For RTL languages (Dari/Pashto), ensure negative numbers display correctly
+  // with minus sign on the left by adding LTR mark (U+200E)
+  const normalized = normalizeReportLanguage(language);
+  const isRtl = normalized === "dari" || normalized === "pashto";
+
+  return isRtl ? `\u200E${formatted}` : formatted;
 }
 
 export const REPORT_TEXT = {
@@ -203,6 +265,7 @@ export const REPORT_TEXT = {
       statusDone: "Done",
       statusPending: "Pending",
       statusEmergency: "Emergency",
+      statusDamageOrder: "Damage Order",
       dashboardStatsTitle: "Dashboard Snapshot",
       statGroups: {
         revenue: "Revenue & Profit",
@@ -288,6 +351,7 @@ export const REPORT_TEXT = {
       statusDone: "تکمیل",
       statusPending: "در انتظار",
       statusEmergency: "عاجل",
+      statusDamageOrder: "سفارش خساره",
       dashboardStatsTitle: "نمای کلی داشبورد",
       statGroups: {
         revenue: "عواید و فایده",
@@ -373,6 +437,7 @@ export const REPORT_TEXT = {
       statusDone: "بشپړ",
       statusPending: "په تمه",
       statusEmergency: "بیړنی",
+      statusDamageOrder: "د زيان فرمایش",
       dashboardStatsTitle: "د ډشبورډ لنډه کتنه",
       statGroups: {
         revenue: "عاید او ګټه",

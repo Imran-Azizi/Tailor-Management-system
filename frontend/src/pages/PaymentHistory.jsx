@@ -35,7 +35,7 @@ const PAGE_SIZE = 20;
 
 function formatMoney(value, language = "en") {
   return formatCurrency(value, language, {
-    minimumFractionDigits: 0,
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
 }

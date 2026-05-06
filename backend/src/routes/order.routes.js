@@ -22,7 +22,7 @@ router.get("/", ctrl.getAll);
 router.get("/report/monthly", authorize("ADMIN"), ctrl.getMonthlyReport);
 router.get(
   "/lookup",
-  authorize("ADMIN", "DOKAN", "QICHIKAR", "DOKHT"),
+  authorize("ADMIN", "DOKAN", "QICHIKAR", "DOKHT", "FINANCE"),
   ctrl.lookup,
 );
 router.get(
@@ -33,11 +33,11 @@ router.get(
 router.get("/:id", ctrl.getOne);
 router.get("/:id/bill", authorize("ADMIN", "DOKAN"), ctrl.getBill);
 router.post("/", authorize("ADMIN", "DOKAN", "FINANCE"), ctrl.create);
-router.put("/:id", authorize("ADMIN", "DOKAN"), ctrl.update);
+router.put("/:id", authorize("ADMIN", "DOKAN", "FINANCE"), ctrl.update);
 router.put("/:id/bill", authorize("ADMIN", "DOKAN"), ctrl.updateBill);
 router.patch(
   "/:id/complete",
-  authorize("ADMIN", "DOKAN", "QICHIKAR", "DOKHT"),
+  authorize("ADMIN", "DOKAN", "QICHIKAR", "DOKHT", "FINANCE"),
   ctrl.markComplete,
 );
 router.patch(

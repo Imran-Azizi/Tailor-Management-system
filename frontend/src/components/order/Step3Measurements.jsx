@@ -15,6 +15,10 @@ import {
 } from "react-icons/lu";
 import api from "../../lib/api.js";
 import { getOrderTypeLabel } from "../../lib/orderType.js";
+import {
+  getMeasurementFieldLabel,
+  getStyleFieldLabel,
+} from "./measurementLabels.js";
 
 const FIELDS = {
   OUTFIT: [
@@ -71,10 +75,10 @@ const STYLES = {
     ["sleeveStyle", "sleeve", "astin"],
     ["sleeveSize", "sleeveSize", null],
     ["skirtStyle", "skirt", "daman"],
-    ["outfitDesign", "design", "daman"],
-    ["outfitStyle", "style", "daman"],
+    ["outfitDesign", "design", "tenbanship"],
+    ["outfitStyle", "style", "outfitdesign"],
     ["buttonStyle", "button", "buttonship"],
-    ["pantStyle", "pant", "tenbanship"],
+    ["pantStyle", "pant", "patyship"],
   ],
   WASKAT: [
     ["neckStyle", "neck", "neckwaskat"],
@@ -83,13 +87,13 @@ const STYLES = {
   ],
   KORTY: [["style", "style", "__textarea"]],
   YAKHANQAQ: [
-    ["neckStyle", "neck", "neckoutfit"],
-    ["sleeveStyle", "sleeve", "astin"],
+    ["neckStyle", "neck", "yakhanqaqneck"],
+    ["sleeveStyle", "sleeve", "yakhanqaqsleeve"],
     ["sleeveSize", "sleeveSize", null],
-    ["skirtStyle", "skirt", "daman"],
-    ["yakhanQaqDesign", "design", "daman"],
-    ["buttonStyle", "button", "buttonship"],
-    ["pantStyle", "pant", "tenbanship"],
+    ["skirtStyle", "skirt", "yakhanqaqskirt"],
+    ["yakhanQaqDesign", "yakhanQaqDesign", "yakhanqaqdesign"],
+    ["buttonStyle", "button", "yakhanqaqbutton"],
+    ["pantStyle", "pant", "yakhanqaqpant"],
   ],
 };
 
@@ -192,7 +196,15 @@ function MeasureBlock({
   const { data: daman } = useDesign("daman");
   const { data: shoulderstate } = useDesign("shoulderstate");
   const { data: buttonship } = useDesign("buttonship");
+  const { data: patyship } = useDesign("patyship");
   const { data: tenbanship } = useDesign("tenbanship");
+  const { data: outfitdesign } = useDesign("outfitdesign");
+  const { data: yakhanqaqneck } = useDesign("yakhanqaqneck");
+  const { data: yakhanqaqsleeve } = useDesign("yakhanqaqsleeve");
+  const { data: yakhanqaqskirt } = useDesign("yakhanqaqskirt");
+  const { data: yakhanqaqdesign } = useDesign("yakhanqaqdesign");
+  const { data: yakhanqaqbutton } = useDesign("yakhanqaqbutton");
+  const { data: yakhanqaqpant } = useDesign("yakhanqaqpant");
   const designMaps = {
     yakhan,
     neckoutfit,
@@ -201,7 +213,15 @@ function MeasureBlock({
     daman,
     shoulderstate,
     buttonship,
+    patyship,
     tenbanship,
+    outfitdesign,
+    yakhanqaqneck,
+    yakhanqaqsleeve,
+    yakhanqaqskirt,
+    yakhanqaqdesign,
+    yakhanqaqbutton,
+    yakhanqaqpant,
   };
 
   const setField = (key, nextValue) => {
@@ -297,7 +317,7 @@ function MeasureBlock({
             {fields.map(([key, label]) => (
               <div key={key} className="measure-field">
                 <label className="lbl" style={{ fontSize: 11 }}>
-                  {t(`createOrder.fields.${label}`)}
+                  {getMeasurementFieldLabel(t, label)}
                 </label>
                 <input
                   type="text"
@@ -306,7 +326,7 @@ function MeasureBlock({
                   style={{ height: 38, fontSize: 13 }}
                   value={value?.[key] || ""}
                   onChange={(e) => setField(key, e.target.value)}
-                  placeholder={t(`createOrder.fields.${label}`)}
+                  placeholder={getMeasurementFieldLabel(t, label)}
                 />
                 {errors[key] && <p className="err-msg">{errors[key]}</p>}
               </div>
@@ -332,7 +352,7 @@ function MeasureBlock({
                 {styles.map(([key, label, model]) => (
                   <div key={key} className="measure-field">
                     <label className="lbl" style={{ fontSize: 11 }}>
-                      {t(`createOrder.fields.${label}`)}
+                      {getStyleFieldLabel(t, label)}
                     </label>
                     {model === "__textarea" ? (
                       <textarea
@@ -340,7 +360,7 @@ function MeasureBlock({
                         style={{ height: 80, fontSize: 13 }}
                         value={value?.[key] || ""}
                         onChange={(e) => setField(key, e.target.value)}
-                        placeholder={t(`createOrder.fields.${label}`)}
+                        placeholder={getStyleFieldLabel(t, label)}
                       />
                     ) : model === null ? (
                       <input
@@ -349,7 +369,7 @@ function MeasureBlock({
                         style={{ height: 38, fontSize: 13 }}
                         value={value?.[key] || ""}
                         onChange={(e) => setField(key, e.target.value)}
-                        placeholder={t(`createOrder.fields.${label}`)}
+                        placeholder={getStyleFieldLabel(t, label)}
                       />
                     ) : (
                       <Select

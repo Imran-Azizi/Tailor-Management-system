@@ -6,14 +6,16 @@ import {
 } from "../validators/order.validator.js";
 import { prisma } from "../lib/prisma.js";
 import { parseNumberLocale } from "../lib/normalize.js";
-import { sendCustomerCompletionSMS } from "../services/sms.service.js";
 import { buildMonthlyReportPdf } from "../lib/monthlyReportPdf.js";
 import { getDashboardStats } from "../services/analytics.service.js";
 import {
   getReportLocaleTag,
   normalizeReportLanguage,
 } from "../lib/reportLocale.js";
-import { assertNotFutureAfghanMonth } from "../lib/afghanistanDate.js";
+import {
+  assertNotFutureAfghanMonth,
+  getAfghanMonthDateRange,
+} from "../lib/afghanistanDate.js";
 
 const WORKER_ACCOUNT_TYPES = ["QICHIKAR", "DOKHT"];
 const SAME_ROLE_CLAIM_CONFLICT_MESSAGE =
@@ -302,9 +304,13 @@ export const markComplete = async (req, res, next) => {
     const isQichikar = user.accountType === "QICHIKAR";
     const roleValues = getRoleOrderValues(order, user.accountType);
 
-    if (!isWorker && user.accountType !== "ADMIN") {
+    const isAdminOrFinance =
+      user.accountType === "ADMIN" || user.accountType === "FINANCE";
+
+    if (!isWorker && !isAdminOrFinance) {
       return res.status(403).json({
-        error: "Only admin can mark delivery completion for customer handover.",
+        error:
+          "Only admin or finance can mark delivery completion for customer handover.",
       });
     }
 
@@ -337,7 +343,6 @@ export const markComplete = async (req, res, next) => {
     }
 
     let result;
-    let smsSent = false;
     const admins = await prisma.user.findMany({
       where: { accountType: "ADMIN" },
       select: { id: true },
@@ -413,7 +418,7 @@ export const markComplete = async (req, res, next) => {
           ),
         );
 
-        return res.json({ ...result, smsSent: false });
+        return res.json(result);
       }
 
       if (order.dokhtCompletedAt) {
@@ -472,41 +477,11 @@ export const markComplete = async (req, res, next) => {
         ),
       );
 
-      // ── Customer SMS notification ──────────────────────────────────────────
-      // Send only once per order and stamp smsSentAt after a confirmed send.
-      if (!order.smsSentAt && order.customer?.phoneNumber) {
-        try {
-          await sendCustomerCompletionSMS(order.customer, order);
-          await prisma.order.update({
-            where: { id: req.params.id },
-            data: { smsSentAt: new Date() },
-          });
-          smsSent = true;
-        } catch (smsErr) {
-          console.error(
-            `[SMS] Failed to send completion SMS for order ${req.params.id}:`,
-            smsErr.message,
-          );
-        }
-      }
-
-      return res.json({ ...result, smsSent });
+      return res.json(result);
     }
 
     try {
       result = await service.markComplete(req.params.id);
-      if (!order.smsSentAt && order.customer?.phoneNumber) {
-        try {
-          await sendCustomerCompletionSMS(order.customer, order);
-          await prisma.order.update({
-            where: { id: req.params.id },
-            data: { smsSentAt: new Date() },
-          });
-          smsSent = true;
-        } catch (smsError) {
-          console.error("Failed to send completion SMS:", smsError);
-        }
-      }
     } catch (error) {
       if (
         error?.code === "BOX_CAPACITY_FULL" ||
@@ -553,7 +528,7 @@ export const markComplete = async (req, res, next) => {
       ),
     );
 
-    res.json({ ...result, smsSent });
+    res.json(result);
   } catch (error) {
     next(error);
   }
@@ -1006,9 +981,16 @@ export const getMonthlyReport = async (req, res, next) => {
       language,
     });
 
-    const monthLabel = new Intl.DateTimeFormat(getReportLocaleTag(language), {
-      month: "long",
-    }).format(new Date(year, month - 1, 1));
+    let monthLabel = `${month}`;
+    try {
+      const { start } = getAfghanMonthDateRange({ month, year });
+      monthLabel = new Intl.DateTimeFormat(getReportLocaleTag(language), {
+        month: "long",
+        timeZone: "Asia/Kabul",
+      }).format(start);
+    } catch {
+      monthLabel = `${month}`;
+    }
     const asciiFallback = `Monthly_Report_${month}_${year}.pdf`;
     const encodedFilename = encodeURIComponent(
       `Monthly_Report_${monthLabel}_${year}.pdf`,

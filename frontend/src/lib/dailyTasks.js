@@ -11,30 +11,51 @@ export function isDailyTaskEditable(task) {
   return Date.now() - createdAt <= DAILY_TASK_EDIT_WINDOW_MS;
 }
 
-export function buildSelectStyles(hasError = false) {
+export function buildSelectStyles(optionsOrHasError = false) {
+  const hasError =
+    typeof optionsOrHasError === "object"
+      ? Boolean(optionsOrHasError?.hasError)
+      : Boolean(optionsOrHasError);
+  const isRtl =
+    typeof optionsOrHasError === "object"
+      ? Boolean(optionsOrHasError?.isRtl)
+      : typeof document !== "undefined"
+        ? document.dir === "rtl"
+        : false;
+  const fontFamily = isRtl
+    ? "'Vazirmatn', 'Noto Naskh Arabic', 'Noto Sans Arabic', 'Segoe UI', Tahoma, sans-serif"
+    : "'Inter', 'Segoe UI', Arial, sans-serif";
+
   return {
     control: (base, state) => ({
       ...base,
-      background: "var(--surface2)",
+      background: "var(--surface)",
       borderColor: hasError
         ? "#DC2626"
         : state.isFocused
           ? "var(--primary)"
           : "var(--border)",
-      borderRadius: 8,
-      minHeight: 40,
+      borderRadius: 12,
+      minHeight: 42,
       fontSize: 14,
       color: "var(--text1)",
-      boxShadow: state.isFocused ? "0 0 0 2px var(--primary-100)" : "none",
+      fontFamily,
+      direction: isRtl ? "rtl" : "ltr",
+      textAlign: isRtl ? "right" : "left",
+      boxShadow: state.isFocused ? "0 0 0 3px var(--focus-ring)" : "none",
+      transition: "border-color .15s ease, box-shadow .15s ease, background-color .15s ease",
       "&:hover": { borderColor: "var(--border2)" },
     }),
     menu: (base) => ({
       ...base,
       background: "var(--surface)",
       border: "1px solid var(--border)",
-      borderRadius: 8,
+      borderRadius: 12,
       boxShadow: "var(--sh-md)",
       zIndex: 9999,
+      overflow: "hidden",
+      fontFamily,
+      direction: isRtl ? "rtl" : "ltr",
     }),
     option: (base, state) => ({
       ...base,
@@ -45,11 +66,29 @@ export function buildSelectStyles(hasError = false) {
           : "transparent",
       color: state.isSelected ? "#fff" : "var(--text1)",
       fontSize: 14,
+      direction: isRtl ? "rtl" : "ltr",
+      textAlign: isRtl ? "right" : "left",
       cursor: "pointer",
     }),
-    singleValue: (base) => ({ ...base, color: "var(--text1)" }),
-    placeholder: (base) => ({ ...base, color: "var(--text3)", fontSize: 14 }),
-    input: (base) => ({ ...base, color: "var(--text1)" }),
+    singleValue: (base) => ({
+      ...base,
+      color: "var(--text1)",
+      fontFamily,
+      textAlign: isRtl ? "right" : "left",
+    }),
+    placeholder: (base) => ({
+      ...base,
+      color: "var(--text3)",
+      fontSize: 14,
+      fontFamily,
+      textAlign: isRtl ? "right" : "left",
+    }),
+    input: (base) => ({
+      ...base,
+      color: "var(--text1)",
+      fontFamily,
+      textAlign: isRtl ? "right" : "left",
+    }),
     indicatorSeparator: () => ({ display: "none" }),
   };
 }

@@ -18,6 +18,7 @@ import {
 } from "react-icons/lu";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
+import { formatSystemDateTime } from "../lib/locale.js";
 import {
   PageHeader,
   Spinner,
@@ -38,14 +39,8 @@ function formatBytes(bytes) {
 
 function formatDate(iso, language = "en") {
   if (!iso) return "—";
-  const locale =
-    language === "fa" ? "fa-AF" : language === "ps" ? "ps-AF" : "en-GB";
-  return new Date(iso).toLocaleString(locale, {
-    year: "numeric",
+  return formatSystemDateTime(iso, language, {
     month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
   });
 }
 

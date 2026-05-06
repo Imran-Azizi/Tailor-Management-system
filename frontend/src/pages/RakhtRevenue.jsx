@@ -17,7 +17,7 @@ import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
 
 function formatMeters(value) {
-  return Number(value || 0).toLocaleString(undefined, {
+  return Number(value || 0).toLocaleString("en-US", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   });
@@ -36,6 +36,7 @@ const DEFAULT_FILTERS = {
 export default function RakhtRevenue() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language || "en";
+  const meterUnit = t("rakht.meterUnitShort", { defaultValue: "m" });
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const { viewMonth, viewYear } = useMonth();
 
@@ -117,7 +118,7 @@ export default function RakhtRevenue() {
           label={t("rakht.totalSoldMeters", {
             defaultValue: "Total Sold Meters",
           })}
-          value={`${formatMeters(summary.totalMetersSold)} m`}
+          value={`${formatMeters(summary.totalMetersSold)} ${meterUnit}`}
           Icon={LuRuler}
           accent="#2563EB"
         />
@@ -262,7 +263,14 @@ export default function RakhtRevenue() {
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
           <button
             type="button"
             className="btn btn-outline"
@@ -349,14 +357,18 @@ export default function RakhtRevenue() {
             alignItems: "center",
             justifyContent: "space-between",
             gap: 10,
+            flexWrap: "wrap",
             padding: 12,
             borderTop: "1px solid var(--border)",
           }}
         >
           <p style={{ fontSize: 12, color: "var(--text3)" }}>
-            {t("common.page", "Page")} {summary.pagination.page} /{" "}
-            {summary.pagination.totalPages} · {t("common.total", "Total")}:{" "}
-            {summary.pagination.total}
+            {t("ui.pageSummary", {
+              defaultValue: "Page {{page}} of {{pages}} · {{total}} total",
+              page: summary.pagination.page,
+              pages: summary.pagination.totalPages,
+              total: summary.pagination.total,
+            })}
           </p>
           <div style={{ display: "flex", gap: 8 }}>
             <button
@@ -370,7 +382,7 @@ export default function RakhtRevenue() {
                 }))
               }
             >
-              {t("common.previous", "Previous")}
+              {t("ui.prev", "Previous")}
             </button>
             <button
               type="button"
@@ -388,7 +400,7 @@ export default function RakhtRevenue() {
                 }))
               }
             >
-              {t("common.next", "Next")}
+              {t("ui.next", "Next")}
             </button>
           </div>
         </div>

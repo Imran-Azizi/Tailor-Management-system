@@ -131,8 +131,20 @@ const ALLOWED_MEASUREMENT_FIELDS = {
 export const enrichOrderAssignment = (order) => {
   if (!order || typeof order !== "object") return order;
 
+  const isDamageOrder = Array.isArray(order.damagedClothesPenalties)
+    ? order.damagedClothesPenalties.length > 0
+    : Boolean(order.isDamageOrder);
+
   return {
     ...order,
+    isDamageOrder,
+    orderStatus: isDamageOrder
+      ? "DAMAGE_ORDER"
+      : order.isCompleted
+        ? "COMPLETED"
+        : order.inProgress
+          ? "IN_PROGRESS"
+          : "PENDING",
     assignmentNote:
       typeof order.assignmentNote === "string"
         ? normalizeText(order.assignmentNote) || null
@@ -166,6 +178,27 @@ const stripRepeatedBasePrefix = (customName, baseLabel) => {
   return match?.[1]?.trim() || "";
 };
 
+const isRedundantOrderLabel = (name, typeLabel, sequence) => {
+  const normalizeCompact = (value) =>
+    String(value || "")
+      .toLowerCase()
+      .replace(/[\s\-_]+/g, "")
+      .trim();
+
+  const n = normalizeCompact(name);
+  if (!n) return true;
+
+  const seq =
+    Number.isFinite(Number(sequence)) && Number(sequence) > 0
+      ? String(Number(sequence))
+      : "1";
+  const typeN = normalizeCompact(typeLabel);
+  const canonicalA = normalizeCompact(`${typeLabel} ${seq}`);
+  const canonicalB = normalizeCompact(`${seq} ${typeLabel}`);
+
+  return n === typeN || n === canonicalA || n === canonicalB;
+};
+
 const buildOrderDisplayName = ({
   type,
   orderName,
@@ -186,6 +219,9 @@ const buildOrderDisplayName = ({
     typeof orderName === "string" ? normalizeText(orderName) || "" : "";
 
   if (!customName) return baseLabel;
+  if (isRedundantOrderLabel(customName, typeLabel, normalizedSequence)) {
+    return baseLabel;
+  }
 
   const normalizedBase = normalizeNameForCompare(baseLabel);
   const normalizedCustom = normalizeNameForCompare(customName);
@@ -195,6 +231,9 @@ const buildOrderDisplayName = ({
 
   const strippedCustom = stripRepeatedBasePrefix(customName, baseLabel);
   if (strippedCustom) {
+    if (isRedundantOrderLabel(strippedCustom, typeLabel, normalizedSequence)) {
+      return baseLabel;
+    }
     const normalizedStripped = normalizeNameForCompare(strippedCustom);
     if (normalizedStripped && normalizedStripped !== normalizedBase) {
       return `${baseLabel} - ${strippedCustom}`;
@@ -397,6 +436,7 @@ const ORDER_LIST_INCLUDE_BASE = {
   waskat: true,
   korty: true,
   yakhanQaq: true,
+  damagedClothesPenalties: { select: { id: true }, take: 1 },
   notifications: { orderBy: { createdAt: "desc" }, take: 1 },
   assignedTo: { select: { id: true, name: true, accountType: true } },
   qichikarAssignedTo: { select: { id: true, name: true, accountType: true } },
@@ -415,6 +455,7 @@ const ORDER_DETAIL_INCLUDE_BASE = {
   waskat: true,
   korty: true,
   yakhanQaq: true,
+  damagedClothesPenalties: { select: { id: true }, take: 1 },
   notifications: true,
   assignedTo: { select: { id: true, name: true, accountType: true } },
   qichikarAssignedTo: { select: { id: true, name: true, accountType: true } },
@@ -426,6 +467,7 @@ const ORDER_DETAIL_INCLUDE_BASE = {
 };
 
 const ORDER_BENEFIT_INCLUDE_BASE = {
+  rakht: { select: { date: true } },
   assignedTo: { select: { id: true, name: true, accountType: true } },
   qichikarAssignedTo: { select: { id: true, name: true, accountType: true } },
   dokhtAssignedTo: { select: { id: true, name: true, accountType: true } },
@@ -497,6 +539,7 @@ const buildEmergencyAlertMessage = ({
 const buildExpenseRow = ({
   key,
   label,
+  labelKey = null,
   amount,
   userId = null,
   userName = "-",
@@ -504,9 +547,11 @@ const buildExpenseRow = ({
   orderType = null,
   source = "Order",
   paidAt = null,
+  date = null,
 }) => ({
   key,
   label,
+  labelKey,
   amount: toPositiveMoney(amount),
   userId,
   userName,
@@ -514,6 +559,7 @@ const buildExpenseRow = ({
   orderType,
   source,
   paidAt,
+  date,
 });
 
 const buildOrderBenefitDetails = ({ order, linkedDailyExpenses = [] }) => {
@@ -533,11 +579,13 @@ const buildOrderBenefitDetails = ({ order, linkedDailyExpenses = [] }) => {
       buildExpenseRow({
         key: "purchase-total",
         label: "Total Price (Purchase)",
+        labelKey: "orders.expenses.rakhtPurchase",
         amount: purchaseTotal,
         userName: order?.rakhtBrandName || order?.rakhtCompanyName || "Rakht",
         userRole: "RAKHT",
         orderType: order?.type || null,
         source: "Order",
+        date: order?.rakhtDate || order?.rakht?.date || null,
       }),
     );
   }
@@ -547,6 +595,7 @@ const buildOrderBenefitDetails = ({ order, linkedDailyExpenses = [] }) => {
       buildExpenseRow({
         key: "qichikar",
         label: "Rakht users payment",
+        labelKey: "orders.expenses.qichikarPayment",
         amount: qichikarAmount,
         userId: order?.qichikarAssignedTo?.id || null,
         userName: order?.qichikarAssignedTo?.name || "-",
@@ -554,6 +603,7 @@ const buildOrderBenefitDetails = ({ order, linkedDailyExpenses = [] }) => {
         orderType: order?.type || null,
         source: "Order",
         paidAt: order?.qichikarPaidAt || order?.qichikarAssignedAt || null,
+        date: order?.qichikarPaidAt || order?.qichikarAssignedAt || null,
       }),
     );
   }
@@ -563,6 +613,7 @@ const buildOrderBenefitDetails = ({ order, linkedDailyExpenses = [] }) => {
       buildExpenseRow({
         key: "dokht",
         label: "Dokht users payment",
+        labelKey: "orders.expenses.dokhtPayment",
         amount: dokhtAmount,
         userId: order?.dokhtAssignedTo?.id || null,
         userName: order?.dokhtAssignedTo?.name || "-",
@@ -570,6 +621,7 @@ const buildOrderBenefitDetails = ({ order, linkedDailyExpenses = [] }) => {
         orderType: order?.type || null,
         source: "Order",
         paidAt: order?.dokhtPaidAt || order?.dokhtAssignedAt || null,
+        date: order?.dokhtPaidAt || order?.dokhtAssignedAt || null,
       }),
     );
   }
@@ -580,6 +632,7 @@ const buildOrderBenefitDetails = ({ order, linkedDailyExpenses = [] }) => {
       buildExpenseRow({
         key: "worker",
         label: "Worker payment",
+        labelKey: "orders.expenses.workerPayment",
         amount: workerAmount,
         userId: order?.assignedTo?.id || null,
         userName: order?.assignedTo?.name || "-",
@@ -587,6 +640,7 @@ const buildOrderBenefitDetails = ({ order, linkedDailyExpenses = [] }) => {
         orderType: order?.type || null,
         source: "Order",
         paidAt: order?.workerPaidAt || null,
+        date: order?.workerPaidAt || null,
       }),
     );
   }
@@ -600,12 +654,14 @@ const buildOrderBenefitDetails = ({ order, linkedDailyExpenses = [] }) => {
       buildExpenseRow({
         key: `daily-expense:${expense.id}`,
         label: "Daily Expense (For Rakht)",
+        labelKey: "orders.expenses.dailyTaskRakht",
         amount,
         userName: expense?.recipientName || "-",
         userRole: expense?.createdBy?.accountType || "DAILY_EXPENSE",
         orderType: order?.type || null,
         source: "DailyTask",
         paidAt: expense?.taskDate || null,
+        date: expense?.taskDate || null,
       }),
     );
   }
@@ -838,6 +894,9 @@ export const getAllOrders = async ({
   if (status === "pending") {
     where.isCompleted = false;
   }
+  if (status === "damaged") {
+    where.damagedClothesPenalties = { some: {} };
+  }
   if (type) where.type = type;
   if (String(hasRemaining).toLowerCase() === "true") {
     where.remaining = { gt: 0 };
@@ -1028,11 +1087,12 @@ export const getMonthlyReportOrders = async ({ month, year }) => {
     },
     include: {
       customer: { select: { id: true, firstName: true, billNumber: true } },
+      damagedClothesPenalties: { select: { id: true }, take: 1 },
     },
     orderBy: [{ customer: { billNumber: "asc" } }, { createdAt: "asc" }],
   });
 
-  return enrichOrdersWithDisplayMeta(orders);
+  return enrichOrdersWithDisplayMeta(enrichOrderListAssignment(orders));
 };
 
 export const lookupOrdersByBillOrPhone = async ({
@@ -1101,6 +1161,7 @@ export const lookupOrdersByBillOrPhone = async ({
     {
       customer: true,
       box: { select: { id: true, boxName: true } },
+      damagedClothesPenalties: { select: { id: true }, take: 1 },
       assignedTo: { select: { id: true, name: true, accountType: true } },
       assignedBy: { select: { id: true, name: true } },
     },
@@ -1592,6 +1653,7 @@ const reserveRakhtStock = async (tx, selection) => {
     rakhtBrandName: rakht.brandName,
     rakhtColor: ton.name,
     rakhtColorHex: ton.colorHex,
+    rakhtDate: rakht.date,
     rakhtRequiredMeters: requiredMeters,
     rakhtPiecePrice: piecePrice,
     rakhtCustomerPricePerMeter: priceForCustomer,
@@ -2282,6 +2344,7 @@ export const updateOrderBill = async (
         rakhtBrandName: rakht.brandName,
         rakhtColor: ton.name,
         rakhtColorHex: ton.colorHex,
+        rakhtDate: rakht.date,
         rakhtRequiredMeters: requiredMeters,
         rakhtPiecePrice: piecePrice,
         rakhtCustomerPricePerMeter:
@@ -2429,6 +2492,7 @@ export const updateOrderBill = async (
           rakhtColor: rakhtSnapshot?.rakhtColor ?? seed.rakhtColor ?? null,
           rakhtColorHex:
             rakhtSnapshot?.rakhtColorHex ?? seed.rakhtColorHex ?? null,
+          rakhtDate: rakhtSnapshot?.rakhtDate ?? seed.rakhtDate ?? null,
           rakhtRequiredMeters:
             rakhtSnapshot?.rakhtRequiredMeters ??
             seed.rakhtRequiredMeters ??

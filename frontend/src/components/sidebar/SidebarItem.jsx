@@ -30,8 +30,8 @@ export default function SidebarItem({
     : "group relative flex h-10 items-center gap-2.5 overflow-visible rounded-xl border border-transparent text-sm font-medium transition-all duration-200";
 
   const interactiveClass = isChild
-    ? "text-slate-400 hover:border-white/8 hover:bg-white/5 hover:text-slate-100"
-    : "text-slate-300 hover:-translate-y-[1px] hover:border-white/12 hover:bg-white/7 hover:text-white";
+    ? "text-[var(--sb-txt)] hover:border-white/10 hover:bg-[var(--sb-hover)] hover:text-[var(--sb-hover-t)]"
+    : "text-[var(--sb-txt)] hover:-translate-y-[1px] hover:border-white/10 hover:bg-[var(--sb-hover)] hover:text-[var(--sb-hover-t)] hover:shadow-[0_12px_24px_-20px_rgba(0,0,0,.9)]";
 
   return (
     <NavLink
@@ -40,33 +40,35 @@ export default function SidebarItem({
       role="menuitem"
       aria-label={item.text}
       title={collapsed ? item.text : undefined}
-      onClick={onNavigate}
+      onClick={() => onNavigate?.()}
       className={() =>
         [
           groupClass,
           baseClass,
           interactiveClass,
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--sb-bg)]",
           collapsed ? "justify-center px-0" : paddingClass,
           active
             ? isChild
-              ? "text-sky-100"
-              : "text-white shadow-[0_10px_22px_-14px_rgba(59,130,246,.7)]"
+              ? "text-[var(--sb-hover-t)]"
+              : "text-[var(--sb-act-t)] shadow-[0_16px_32px_-24px_rgba(0,0,0,.9)]"
             : "",
         ].join(" ")
       }
       style={() =>
         active
           ? {
-              background: isChild ? "rgba(30,41,59,.78)" : `${accent}33`,
-              borderColor: isChild ? "rgba(148,163,184,.18)" : `${accent}66`,
-              boxShadow: isChild ? "none" : `inset 3px 0 0 ${accent}`,
+              background: isChild ? "rgba(255,255,255,.07)" : "var(--sb-act)",
+              borderColor: isChild ? "rgba(255,255,255,.10)" : `${accent}66`,
+              boxShadow: isChild
+                ? "none"
+                : `${isRtl ? "inset -3px 0 0" : "inset 3px 0 0"} ${accent}, 0 16px 30px -24px rgba(0,0,0,.95)`,
             }
           : undefined
       }
     >
       <span
-        className={`relative flex shrink-0 items-center justify-center ${isChild ? "h-4.5 w-4.5 text-[15px]" : "h-5 w-5 text-[18px]"}`}
+        className={`relative flex shrink-0 items-center justify-center transition-transform duration-200 group-hover:scale-105 ${isChild ? "h-4.5 w-4.5 text-[15px]" : "h-5 w-5 text-[18px]"}`}
       >
         <Icon />
       </span>
@@ -81,7 +83,7 @@ export default function SidebarItem({
               className="inline-flex min-w-[1.3rem] items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-semibold"
               style={{
                 background: `${accent}30`,
-                color: "#DBEAFE",
+                color: "var(--sb-act-t)",
               }}
               aria-label={`${item.text} ${badge}`}
             >
@@ -104,7 +106,7 @@ export default function SidebarItem({
       {collapsed && (
         <span
           role="tooltip"
-          className={`pointer-events-none absolute top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 shadow-lg opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"}`}
+          className={`pointer-events-none absolute top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs font-medium text-[var(--text1)] shadow-lg opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity ${isRtl ? "right-[calc(100%+10px)]" : "left-[calc(100%+10px)]"}`}
         >
           {item.text}
         </span>
