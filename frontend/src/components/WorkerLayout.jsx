@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
@@ -406,6 +406,7 @@ export default function WorkerLayout() {
   const { user } = useAuth();
   const { dark, toggle } = useTheme();
   const { i18n, t } = useTranslation();
+  const location = useLocation();
   const language = i18n.resolvedLanguage || i18n.language || "en";
   const workerScope = [user?.id, user?.accountType];
 
@@ -459,7 +460,10 @@ export default function WorkerLayout() {
     >
       <header
         className="worker-navbar sticky top-0 z-[100] flex min-h-[60px] flex-wrap items-center gap-2 px-3 py-2 sm:px-4 lg:flex-nowrap lg:px-6"
-        style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)" }}
+        style={{
+          background: "var(--surface)",
+          borderBottom: "1px solid var(--border)",
+        }}
       >
         <div
           className="worker-brand flex min-w-0 flex-1 items-center gap-2.5"
@@ -497,7 +501,10 @@ export default function WorkerLayout() {
 
         <div
           className="worker-month-wrap order-3 flex w-full items-center gap-2 overflow-x-auto rounded-xl px-2 py-1.5 lg:order-none lg:w-auto"
-          style={{ border: "1px solid var(--border)", background: "var(--surface2)" }}
+          style={{
+            border: "1px solid var(--border)",
+            background: "var(--surface2)",
+          }}
           title={t("navbar.viewDataByMonth", "View Data by Month")}
         >
           <LuCalendarCheck size={14} style={{ color: "var(--text2)" }} />
@@ -649,7 +656,7 @@ export default function WorkerLayout() {
         className="worker-main mx-auto w-full max-w-[1140px] min-w-0 flex-1 px-3 py-4 sm:px-4 sm:py-5 lg:px-5 lg:py-7"
         style={{ textAlign: isRtl ? "right" : "left" }}
       >
-        <Outlet />
+        <Outlet key={location.pathname} />
       </main>
 
       <WorkerNotifDrawer

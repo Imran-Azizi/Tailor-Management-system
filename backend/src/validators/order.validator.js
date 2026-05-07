@@ -29,6 +29,7 @@ const orderBillItemSchema = orderItemSchema.extend({
 });
 
 const rakhtSelectionSchema = z.object({
+  orderId: optionalText,
   orderItemKey: optionalText,
   type: z.enum(["OUTFIT", "WASKAT", "KORTY", "YAKHANQAQ"]).optional(),
   rakhtId: optionalText,

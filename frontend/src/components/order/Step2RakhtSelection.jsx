@@ -52,6 +52,7 @@ export default function Step2RakhtSelection({
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
   const isRtlLanguage = detectRtlLanguage(language);
+  const [validationError, setValidationError] = useState("");
 
   const { data: rakhtRows = [], isLoading } = useQuery({
     queryKey: ["rakht-list"],
@@ -67,7 +68,7 @@ export default function Step2RakhtSelection({
         const type = item?.type;
         const fallbackLabel = `${getOrderTypeLabel(type, language)} ${index + 1}`;
         const label = item?.displayName?.trim() || fallbackLabel;
-        return { key, type, label };
+        return { key, type, label, orderId: item?.orderId || "" };
       });
     }
 
@@ -75,7 +76,7 @@ export default function Step2RakhtSelection({
       const type = entry?.type;
       const key = `${type || "ITEM"}-${index}`;
       const label = `${getOrderTypeLabel(type, language)} ${index + 1}`;
-      return { key, type, label };
+      return { key, type, label, orderId: entry?.orderId || "" };
     });
   }, [orderItems, orderTypes, language]);
 
@@ -87,6 +88,12 @@ export default function Step2RakhtSelection({
       const next = {};
       selectionItems.forEach((item) => {
         const existing =
+          incoming.find(
+            (entry) =>
+              item.orderId &&
+              entry?.orderId &&
+              String(entry.orderId) === String(item.orderId),
+          ) ||
           incoming.find((entry) => entry?.orderItemKey === item.key) ||
           incoming.find((entry) => entry?.type === item.type);
         const fallback = prev[item.key] || emptySelection;
@@ -126,16 +133,34 @@ export default function Step2RakhtSelection({
   }, [rakhtRows]);
 
   const updateSelection = (itemKey, patch) => {
+    setValidationError("");
     setSelections((prev) => ({
       ...prev,
       [itemKey]: { ...(prev[itemKey] || emptySelection), ...patch },
     }));
   };
 
+  // Track meters committed per ton across ALL form items: tonId -> { itemKey -> meters }
+  const formTonMeters = useMemo(() => {
+    const map = {};
+    for (const [itemKey, sel] of Object.entries(selections)) {
+      const tonId = sel.rakhtTonId;
+      if (!tonId) continue;
+      const m = toScaledNumber(sel.requiredMeters || 0, METER_SCALE);
+      if (!(m > 0)) continue;
+      if (!map[tonId]) map[tonId] = {};
+      map[tonId][itemKey] = m;
+    }
+    return map;
+  }, [selections]);
+
   const handleSubmit = (event) => {
     event.preventDefault();
+    setValidationError("");
 
     const rakhtSelections = [];
+    // Cumulative per-ton allocation to prevent combined over-selection
+    const tonAllocated = {};
 
     for (const item of selectionItems) {
       const current = selections[item.key] || emptySelection;
@@ -169,22 +194,61 @@ export default function Step2RakhtSelection({
           item.companyName === companyName && item.brandName === brandName,
       );
 
-      if (!selectedRakht) continue;
+      if (!selectedRakht) {
+        setValidationError(
+          t("createOrder.rakhtSelectionRequired", {
+            defaultValue: "Please select a valid Rakht company and brand.",
+          }),
+        );
+        return;
+      }
 
       const ton = (selectedRakht.tons || []).find(
         (entry) => entry.id === rakhtTonId,
       );
-      if (!ton) continue;
+      if (!ton) {
+        setValidationError(
+          t("createOrder.rakhtTonSelectionRequired", {
+            defaultValue: "Please select a Rakht ton/color.",
+          }),
+        );
+        return;
+      }
 
       const tonAvailable = getTonRemainingMeters(ton);
       const safeRequiredMeters = maxScaled(requiredMeters, 0, METER_SCALE);
       const safePiecePrice = maxScaled(piecePrice, 0, MONEY_SCALE);
       const safePriceForCustomer = maxScaled(priceForCustomer, 0, MONEY_SCALE);
 
-      if (safeRequiredMeters <= 0) continue;
-      if (safeRequiredMeters > tonAvailable) continue;
+      if (safeRequiredMeters <= 0) {
+        setValidationError(
+          t("createOrder.requiredMetersPositive", {
+            defaultValue: "Required meters must be greater than zero.",
+          }),
+        );
+        return;
+      }
+
+      // Validate against effective available (DB remaining minus already allocated in this form)
+      const alreadyAllocated = tonAllocated[ton.id] || 0;
+      const tonAvailableNet = maxScaled(
+        subScaled(tonAvailable, alreadyAllocated, METER_SCALE),
+        0,
+        METER_SCALE,
+      );
+      if (safeRequiredMeters > tonAvailableNet) {
+        setValidationError(
+          t("createOrder.insufficientRakhtMeters", {
+            available: formatScaled(tonAvailableNet, { scale: 2 }),
+            defaultValue: `Insufficient meters. Available: ${formatScaled(tonAvailableNet, { scale: 2 })}`,
+          }),
+        );
+        return;
+      }
+      tonAllocated[ton.id] = alreadyAllocated + safeRequiredMeters;
 
       rakhtSelections.push({
+        orderId: item.orderId || undefined,
         type: item.type,
         orderItemKey: item.key,
         rakhtId: selectedRakht.id,
@@ -285,9 +349,22 @@ export default function Step2RakhtSelection({
               (entry) => entry.id === rakhtTonId,
             );
 
-            const availableMeters = selectedTon
+            const dbAvailableMeters = selectedTon
               ? getTonRemainingMeters(selectedTon)
               : 0;
+
+            // Subtract meters committed by OTHER items in this form for the same ton
+            const otherItemsCommitted = rakhtTonId
+              ? Object.entries(formTonMeters[rakhtTonId] || {})
+                  .filter(([key]) => key !== item.key)
+                  .reduce((sum, [, m]) => sum + m, 0)
+              : 0;
+
+            const availableMeters = maxScaled(
+              subScaled(dbAvailableMeters, otherItemsCommitted, METER_SCALE),
+              0,
+              METER_SCALE,
+            );
 
             const safeRequiredMeters = maxScaled(
               requiredMeters,
@@ -436,38 +513,59 @@ export default function Step2RakhtSelection({
                             ),
                         });
                       }}
-                      formatOptionLabel={(opt) => (
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 8,
-                          }}
-                        >
+                      formatOptionLabel={(opt) => {
+                        const tonDbAvail = opt.ton
+                          ? getTonRemainingMeters(opt.ton)
+                          : 0;
+                        const otherCommittedForOpt = opt.ton
+                          ? Object.entries(formTonMeters[opt.ton.id] || {})
+                              .filter(([key]) => key !== item.key)
+                              .reduce((sum, [, m]) => sum + m, 0)
+                          : 0;
+                        const tonEffectiveAvail = maxScaled(
+                          subScaled(
+                            tonDbAvail,
+                            otherCommittedForOpt,
+                            METER_SCALE,
+                          ),
+                          0,
+                          METER_SCALE,
+                        );
+                        return (
                           <span
                             style={{
-                              width: 12,
-                              height: 12,
-                              borderRadius: "50%",
-                              background: opt.ton?.colorHex || "#94A3B8",
-                              border: "1px solid rgba(15,23,42,0.15)",
-                              flexShrink: 0,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 8,
                             }}
-                          />
-                          {opt.label}
-                          {opt.ton && (
+                          >
                             <span
-                              style={{ fontSize: 11, color: "var(--text3)" }}
-                            >
-                              &nbsp;-&nbsp;
-                              {getTonRemainingMeters(opt.ton)}m{" "}
-                              {t("rakht.remaining", {
-                                defaultValue: "remaining",
-                              })}
-                            </span>
-                          )}
-                        </span>
-                      )}
+                              style={{
+                                width: 12,
+                                height: 12,
+                                borderRadius: "50%",
+                                background: opt.ton?.colorHex || "#94A3B8",
+                                border: "1px solid rgba(15,23,42,0.15)",
+                                flexShrink: 0,
+                              }}
+                            />
+                            {opt.label}
+                            {opt.ton && (
+                              <span
+                                style={{ fontSize: 11, color: "var(--text3)" }}
+                              >
+                                &nbsp;-&nbsp;
+                                {formatScaled(tonEffectiveAvail, {
+                                  scale: 2,
+                                })}m{" "}
+                                {t("rakht.remaining", {
+                                  defaultValue: "remaining",
+                                })}
+                              </span>
+                            )}
+                          </span>
+                        );
+                      }}
                       styles={{
                         control: (base, state) => ({
                           ...base,
@@ -495,13 +593,34 @@ export default function Step2RakhtSelection({
                         inputMode="decimal"
                         className="inp"
                         value={current.requiredMeters || ""}
-                        onChange={(event) =>
+                        onChange={(event) => {
+                          const sanitized = sanitizeDecimalInput(
+                            event.target.value,
+                          );
+                          if (sanitized === "") {
+                            updateSelection(item.key, { requiredMeters: "" });
+                            return;
+                          }
+
+                          const parsedMeters = toScaledNumber(
+                            sanitized,
+                            METER_SCALE,
+                          );
+                          if (!Number.isFinite(parsedMeters)) {
+                            updateSelection(item.key, { requiredMeters: "" });
+                            return;
+                          }
+
+                          const clampedMeters = selectedTon
+                            ? Math.min(parsedMeters, availableMeters)
+                            : parsedMeters;
+
                           updateSelection(item.key, {
-                            requiredMeters: sanitizeDecimalInput(
-                              event.target.value,
-                            ),
-                          })
-                        }
+                            requiredMeters: formatScaled(clampedMeters, {
+                              scale: METER_SCALE,
+                            }),
+                          });
+                        }}
                       />
                     </div>
                   </Field>
@@ -760,6 +879,12 @@ export default function Step2RakhtSelection({
           })}
         </div>
       )}
+
+      {validationError ? (
+        <div className="info-box ib-red" style={{ marginTop: 12 }}>
+          {validationError}
+        </div>
+      ) : null}
 
       <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
         <button

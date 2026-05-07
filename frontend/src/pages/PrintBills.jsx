@@ -166,10 +166,7 @@ export default function PrintBills() {
         return;
       }
 
-      toast(
-        t("orders.searchCustomers") ||
-          "Enter Bill Number, Phone Number, or Name to search",
-      );
+      toast(t("orders.searchCustomers"));
     } catch (error) {
       console.error("Search failed", error);
       if (error?.response?.status === 404) {
@@ -528,14 +525,14 @@ export default function PrintBills() {
                                   alignItems: "center",
                                 }}
                               >
-                                  <span
-                                    style={{
-                                      fontSize: 10,
-                                      fontWeight: 800,
-                                      color: "var(--warning-strong)",
-                                      textTransform: "uppercase",
-                                      letterSpacing: ".08em",
-                                    }}
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    fontWeight: 800,
+                                    color: "var(--warning-strong)",
+                                    textTransform: "uppercase",
+                                    letterSpacing: ".08em",
+                                  }}
                                 >
                                   {t("createOrder.rakhtSelection", {
                                     defaultValue: "Rakht",
@@ -546,7 +543,8 @@ export default function PrintBills() {
                                   style={{
                                     background: "var(--warning-soft)",
                                     color: "var(--warning-strong)",
-                                    border: "1px solid var(--warning-soft-border)",
+                                    border:
+                                      "1px solid var(--warning-soft-border)",
                                   }}
                                 >
                                   {order.rakhtBrandName || "-"}

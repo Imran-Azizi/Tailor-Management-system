@@ -203,8 +203,34 @@ input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
 .sb-item .sl{transition:opacity .15s;overflow:hidden;white-space:nowrap}
 .sidebar.collapsed .sb-item .sl{opacity:0;width:0}
 .sidebar.collapsed .sb-item{justify-content:center}
-.sb-overlay{display:none;position:fixed;inset:0;background:linear-gradient(180deg,rgba(2,6,23,.5),rgba(2,6,23,.58));backdrop-filter:blur(1.5px);z-index:45}
-@media(max-width:768px){.sb-overlay.on{display:block}}
+/* Overlay: hidden on desktop, fades in on mobile when sidebar opens */
+.sb-overlay{
+  position:fixed;inset:0;
+  background:linear-gradient(180deg,rgba(2,6,23,.5),rgba(2,6,23,.58));
+  backdrop-filter:blur(1.5px);
+  z-index:45;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .3s cubic-bezier(.4,0,.2,1);
+  display:none;
+}
+@media(max-width:768px){
+  .sb-overlay{display:block}
+  .sb-overlay.on{opacity:1;pointer-events:auto}
+}
+
+/* Mobile sidebar: hidden off-screen by default, slides in when .open */
+@media(max-width:768px){
+  .sidebar{
+    transform:translateX(100%); /* RTL default: slide off to the right */
+  }
+  [dir="ltr"] .sidebar{
+    transform:translateX(-100%); /* LTR default: slide off to the left */
+  }
+  .sidebar.open{
+    transform:translateX(0)!important;
+  }
+}
 
 /* APP SHELL */
 .app-shell{
@@ -769,6 +795,9 @@ input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
   background:var(--surface);border:1px solid var(--border2);
   border-radius:var(--r-sm);color:var(--text1);font-family:inherit;
   font-size:14px;outline:none;transition:border-color .15s,box-shadow .15s;
+  direction:inherit;
+  text-align:start;
+  unicode-bidi:plaintext;
 }
 .inp[type="number"],
 .inp[type="tel"],
@@ -784,19 +813,6 @@ input[inputmode="decimal"]{
   font-variant-numeric:tabular-nums lining-nums;
   font-feature-settings:"tnum" 1,"lnum" 1;
 }
-html:is([lang|="fa"], [lang|="ps"]) .inp[type="number"],
-html:is([lang|="fa"], [lang|="ps"]) .inp[type="tel"],
-html:is([lang|="fa"], [lang|="ps"]) .inp[inputmode="numeric"],
-html:is([lang|="fa"], [lang|="ps"]) .inp[inputmode="decimal"],
-html:is([lang|="fa"], [lang|="ps"]) input[type="number"],
-html:is([lang|="fa"], [lang|="ps"]) input[type="tel"],
-html:is([lang|="fa"], [lang|="ps"]) input[inputmode="numeric"],
-html:is([lang|="fa"], [lang|="ps"]) input[inputmode="decimal"]{
-  direction:ltr;
-  text-align:left;
-  unicode-bidi:isolate;
-  text-rendering:optimizeLegibility;
-}
 .inp[type="number"]::placeholder,
 .inp[type="tel"]::placeholder,
 .inp[inputmode="numeric"]::placeholder,
@@ -807,17 +823,6 @@ input[inputmode="numeric"]::placeholder,
 input[inputmode="decimal"]::placeholder{
   letter-spacing:0;
   font-variant-numeric:tabular-nums lining-nums;
-}
-html:is([lang|="fa"], [lang|="ps"]) .inp[type="number"]::placeholder,
-html:is([lang|="fa"], [lang|="ps"]) .inp[type="tel"]::placeholder,
-html:is([lang|="fa"], [lang|="ps"]) .inp[inputmode="numeric"]::placeholder,
-html:is([lang|="fa"], [lang|="ps"]) .inp[inputmode="decimal"]::placeholder,
-html:is([lang|="fa"], [lang|="ps"]) input[type="number"]::placeholder,
-html:is([lang|="fa"], [lang|="ps"]) input[type="tel"]::placeholder,
-html:is([lang|="fa"], [lang|="ps"]) input[inputmode="numeric"]::placeholder,
-html:is([lang|="fa"], [lang|="ps"]) input[inputmode="decimal"]::placeholder{
-  direction:ltr;
-  text-align:left;
 }
 .inp::placeholder{color:var(--text3)}
 .inp:hover{border-color:var(--primary-200)}
@@ -833,26 +838,43 @@ select.inp{
 .iw{position:relative}
 .iw .inp{padding-inline-start:36px}
 .iw .ico{position:absolute;inset-inline-start:11px;top:50%;transform:translateY(-50%);color:var(--text3);pointer-events:none}
+[dir="rtl"] .iw .ico{inset-inline-start:auto;inset-inline-end:11px}
+.iw .ico-end,
+.iw .end-action{position:absolute;inset-inline-end:11px;top:50%;transform:translateY(-50%)}
+[dir="rtl"] .iw .ico-end,
+[dir="rtl"] .iw .end-action{inset-inline-end:auto;inset-inline-start:11px}
+.inp.with-leading-icon{padding-inline-start:36px}
+.inp.with-trailing-icon{padding-inline-end:36px}
 [dir="rtl"] .inp{
+  direction:rtl;
   text-align:right;
 }
 [dir="rtl"] .inp::placeholder,
 [dir="rtl"] textarea.inp::placeholder{
+  direction:rtl;
   text-align:right;
 }
 [dir="rtl"] .iw .inp{
   padding-inline-start:12px;
   padding-inline-end:36px;
 }
-[dir="rtl"] .iw .ico{
-  inset-inline-start:auto;
-  inset-inline-end:11px;
-}
 [dir="rtl"] .iw textarea.inp{
   padding-inline-end:36px;
 }
 [dir="rtl"] .iw textarea.inp:not([data-field-direction="ltr"]) {
   text-align:right;
+}
+[dir="rtl"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+[dir="rtl"] textarea,
+[dir="rtl"] select{
+  direction:rtl;
+  text-align:right;
+}
+[dir="ltr"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+[dir="ltr"] textarea,
+[dir="ltr"] select{
+  direction:ltr;
+  text-align:left;
 }
 .lbl{display:block;font-size:12px;font-weight:500;color:var(--text2);margin-bottom:5px}
 .lbl-r::after{content:' *';color:var(--danger)}
@@ -1928,14 +1950,7 @@ select.inp{
 [dir="ltr"] .notif-panel-item,[dir="ltr"] .order-dropdown-item,[dir="ltr"] .dd-item{direction:ltr}
 [dir="rtl"] .delete-confirm-item{text-align:start}
 [dir="rtl"] .order-mobile-bill,[dir="rtl"] .order-bill-chip{direction:ltr;unicode-bidi:embed}
-/* Number fields always stay LTR */
-[dir="rtl"] input[type="number"],
-[dir="rtl"] input[type="tel"],
-[dir="rtl"] input[type="date"],
-[dir="rtl"] input[type="datetime-local"],
-[dir="rtl"] input[type="time"],
-[dir="rtl"] input[inputmode="numeric"],
-[dir="rtl"] input[inputmode="decimal"],
+/* Explicit LTR fields inside RTL layouts */
 [dir="rtl"] .field-ltr,
 [dir="rtl"] [data-field-direction="ltr"]{
   direction:ltr;
@@ -1943,13 +1958,6 @@ select.inp{
   unicode-bidi:isolate;
   caret-color:currentColor;
 }
-[dir="rtl"] input[type="number"]::placeholder,
-[dir="rtl"] input[type="tel"]::placeholder,
-[dir="rtl"] input[type="date"]::placeholder,
-[dir="rtl"] input[type="datetime-local"]::placeholder,
-[dir="rtl"] input[type="time"]::placeholder,
-[dir="rtl"] input[inputmode="numeric"]::placeholder,
-[dir="rtl"] input[inputmode="decimal"]::placeholder,
 [dir="rtl"] .field-ltr::placeholder,
 [dir="rtl"] [data-field-direction="ltr"]::placeholder{
   direction:ltr;
@@ -1966,6 +1974,16 @@ select.inp{
   [dir="rtl"] .app-shell {
     margin-inline-end: 0 !important;
   }
+}
+
+/* A6 bill sheets: flip column-separator borders for RTL */
+.print-a6-sheet[dir="rtl"] .border-r {
+  border-right-width: 0;
+  border-inline-end-width: 1px;
+}
+.print-a6-sheet[dir="rtl"] .border-r-2 {
+  border-right-width: 0;
+  border-inline-end-width: 2px;
 }
 
 /* Alignment helpers */
@@ -2000,6 +2018,11 @@ select.inp{
 .rs__option--is-focused{background:var(--surface2) !important;color:var(--text1) !important}
 [dir="rtl"] .rs__control,[dir="rtl"] .rs__menu,[dir="rtl"] .rs__option{text-align:right;direction:rtl}
 [dir="rtl"] .rs__single-value,[dir="rtl"] .rs__placeholder{text-align:right}
+[dir="rtl"] .rs__value-container{padding-right:8px;padding-left:6px}
+[dir="rtl"] .rs__indicators{flex-direction:row-reverse}
+[dir="rtl"] .rs__indicator{padding:0 8px}
+[dir="rtl"] .rs__clear-indicator{padding-right:8px;padding-left:4px}
+[dir="rtl"] .rs__dropdown-indicator{padding-left:8px;padding-right:4px}
 [dir="ltr"] .rs__control,[dir="ltr"] .rs__menu,[dir="ltr"] .rs__option{text-align:left;direction:ltr}
 
 /* ─── NAVBAR RESPONSIVE ─────────────────────────────────────────────────── */

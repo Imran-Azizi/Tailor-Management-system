@@ -241,7 +241,7 @@ export default function Login() {
             >
               {t("common.phone", "Phone")}
             </label>
-            <div style={{ position: "relative", direction: "ltr" }}>
+            <div className="iw" style={{ position: "relative" }}>
               <LuPhone
                 size={15}
                 style={{
@@ -254,22 +254,15 @@ export default function Login() {
               />
               <input
                 type="tel"
+                className="inp with-leading-icon"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="0700000000"
-                dir="ltr"
                 style={{
-                  width: "100%",
                   padding: "10px 12px",
-                  paddingInlineStart: 36,
-                  border: "1px solid var(--border)",
                   borderRadius: 8,
                   background: "var(--surface2)",
-                  color: "var(--text1)",
-                  fontSize: 14,
-                  outline: "none",
                   boxSizing: "border-box",
-                  textAlign: "left",
                 }}
                 autoComplete="username"
                 disabled={loading}
@@ -290,7 +283,7 @@ export default function Login() {
             >
               {t("auth.password")}
             </label>
-            <div style={{ position: "relative", direction: "ltr" }}>
+            <div className="iw" style={{ position: "relative" }}>
               <LuLock
                 size={15}
                 style={{
@@ -303,23 +296,15 @@ export default function Login() {
               />
               <input
                 type={showPw ? "text" : "password"}
+                className="inp with-leading-icon with-trailing-icon"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="********"
-                dir="ltr"
                 style={{
-                  width: "100%",
                   padding: "10px 12px",
-                  paddingInlineStart: 36,
-                  paddingInlineEnd: 40,
-                  border: "1px solid var(--border)",
                   borderRadius: 8,
                   background: "var(--surface2)",
-                  color: "var(--text1)",
-                  fontSize: 14,
-                  outline: "none",
                   boxSizing: "border-box",
-                  textAlign: "left",
                 }}
                 autoComplete="current-password"
                 disabled={loading}
@@ -329,7 +314,7 @@ export default function Login() {
                 onClick={() => setShowPw((s) => !s)}
                 style={{
                   position: "absolute",
-                  insetInlineEnd: 10,
+                  insetInlineEnd: 12,
                   top: "50%",
                   transform: "translateY(-50%)",
                   background: "none",

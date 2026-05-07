@@ -28,8 +28,6 @@ const WORKER_TYPES = [
     fallback: "Qichikar",
   },
 ];
-const COMPLETED_REASSIGN_BLOCK_MESSAGE =
-  "This order completed, you can not assign it again";
 
 function isCompletedForWorkerType(order, type) {
   if (!order || !type) return false;
@@ -199,7 +197,12 @@ export default function AssignOrders() {
       }
 
       if (isCompletedForWorkerType(selectedOrder, workerType)) {
-        throw new Error(COMPLETED_REASSIGN_BLOCK_MESSAGE);
+        throw new Error(
+          t("assignment.completedReassignBlocked", {
+            defaultValue:
+              "This order is completed. You cannot assign it again.",
+          }),
+        );
       }
 
       const parsedPrice = parseNumberLocale(assignmentPrice);

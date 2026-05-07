@@ -415,7 +415,14 @@ function EmptyTasksState({ t }) {
   );
 }
 
-function DailyTaskDetailsModal({ open, task, isLoading, onClose, t, language }) {
+function DailyTaskDetailsModal({
+  open,
+  task,
+  isLoading,
+  onClose,
+  t,
+  language,
+}) {
   const infoCardStyle = {
     border: "1px solid var(--border)",
     borderRadius: 12,
@@ -449,7 +456,13 @@ function DailyTaskDetailsModal({ open, task, isLoading, onClose, t, language }) 
       maxW={720}
     >
       {isLoading ? (
-        <div style={{ padding: "28px 0", display: "flex", justifyContent: "center" }}>
+        <div
+          style={{
+            padding: "28px 0",
+            display: "flex",
+            justifyContent: "center",
+          }}
+        >
           <Spinner />
         </div>
       ) : !task ? (
@@ -488,7 +501,9 @@ function DailyTaskDetailsModal({ open, task, isLoading, onClose, t, language }) 
             </div>
             <div style={infoCardStyle}>
               <span style={labelStyle}>{t("dailyTasks.taskDate")}</span>
-              <span style={valueStyle}>{formatDateTime(task.taskDate, language)}</span>
+              <span style={valueStyle}>
+                {formatDateTime(task.taskDate, language)}
+              </span>
             </div>
           </div>
 
@@ -507,21 +522,31 @@ function DailyTaskDetailsModal({ open, task, isLoading, onClose, t, language }) 
           </div>
 
           <div style={infoCardStyle}>
-            <span style={labelStyle}>{t("dailyTasks.orderInfo", "Linked Order")}</span>
+            <span style={labelStyle}>
+              {t("dailyTasks.orderInfo", "Linked Order")}
+            </span>
             {task.order ? (
               <div style={{ display: "grid", gap: 6 }}>
                 <span style={valueStyle}>
-                  {t("orders.billNumber", "Bill Number")}: #{task.order.customer?.billNumber || "-"}
+                  {t("orders.billNumber", "Bill Number")}: #
+                  {task.order.customer?.billNumber || "-"}
                 </span>
                 <span style={valueStyle}>
-                  {t("common.customer", "Customer")}: {task.order.customer?.firstName || "-"}
+                  {t("common.customer", "Customer")}:{" "}
+                  {task.order.customer?.firstName || "-"}
                 </span>
                 <span style={valueStyle}>
                   {t("common.type", "Type")}: {task.order.type || "-"}
                 </span>
               </div>
             ) : (
-              <span style={{ ...valueStyle, fontWeight: 500, color: "var(--text3)" }}>
+              <span
+                style={{
+                  ...valueStyle,
+                  fontWeight: 500,
+                  color: "var(--text3)",
+                }}
+              >
                 {t("dailyTasks.noLinkedOrder", "No linked order.")}
               </span>
             )}
@@ -540,7 +565,9 @@ function DailyTaskDetailsModal({ open, task, isLoading, onClose, t, language }) 
             </div>
             <div style={infoCardStyle}>
               <span style={labelStyle}>{t("dailyTasks.createdAt")}</span>
-              <span style={valueStyle}>{formatDateTime(task.createdAt, language)}</span>
+              <span style={valueStyle}>
+                {formatDateTime(task.createdAt, language)}
+              </span>
             </div>
           </div>
         </div>
@@ -1540,6 +1567,8 @@ export default function AllDailyTasks() {
           >
             <Field label={t("dailyTasks.fromName")} required>
               <Select
+                classNamePrefix="rs"
+                isRtl={isRtlTextLanguage(language)}
                 value={
                   senderOptions.find(
                     (option) => option.value === editForm.fromName,

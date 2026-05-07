@@ -184,6 +184,7 @@ function MeasureBlock({
 }) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
+  const isRtl = i18n.dir?.(language) === "rtl";
   const [open, setOpen] = useState(true);
   const fields = FIELDS[entry.type] || [];
   const styles = STYLES[entry.type] || [];
@@ -373,6 +374,8 @@ function MeasureBlock({
                       />
                     ) : (
                       <Select
+                        classNamePrefix="rs"
+                        isRtl={isRtl}
                         options={options(designMaps[model])}
                         value={
                           value?.[key]

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
@@ -1054,6 +1054,7 @@ export default function Navbar({ onHamburger, pageTitle }) {
   const userRef = useRef();
   useOutside(langRef, () => setLangOpen(false));
   useOutside(userRef, () => setUserOpen(false));
+  const location = useLocation();
   const navigate = useNavigate();
 
   // Emergency order alerts for Admin/Dokan
@@ -1126,6 +1127,10 @@ export default function Navbar({ onHamburger, pageTitle }) {
       playEmergencyAlertSound();
     }
   }, [canViewAdminNotifications, emergencyAlarmMuted, unreadSystem]);
+
+  useEffect(() => {
+    setSearch("");
+  }, [location.pathname]);
 
   const toggleEmergencyAlarmMuted = () => {
     setEmergencyAlarmMuted((prev) => {

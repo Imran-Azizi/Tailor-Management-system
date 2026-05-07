@@ -17,6 +17,37 @@ const SEARCH_EMPTY_STATE_CODES = {
   WORKER_NOT_ON_ORDER: "WORKER_NOT_ON_ORDER",
 };
 
+const resolveWorkerAssignedAmountForOrder = ({ order, userId, roleType }) => {
+  if (!order || !userId || !WORKER_ROLES.includes(roleType)) return 0;
+
+  if (roleType === "QICHIKAR") {
+    const isRoleLinked =
+      order.qichikarAssignedToId === userId ||
+      order.qichikarReceivedById === userId;
+    if (isRoleLinked) return Number(order.qichikarPaymentAmount || 0);
+  }
+
+  if (roleType === "DOKHT") {
+    const isRoleLinked =
+      order.dokhtAssignedToId === userId || order.dokhtReceivedById === userId;
+    if (isRoleLinked) return Number(order.dokhtPaymentAmount || 0);
+  }
+
+  const isLegacyLinked =
+    order.assignedToId === userId || order.receivedById === userId;
+  return isLegacyLinked ? Number(order.workerPaymentAmount || 0) : 0;
+};
+
+const applyWorkerAssignedDeduction = ({ totalExpense, assignedAmount }) => {
+  const safeTotal = Number(totalExpense || 0);
+  const safeAssigned = Math.max(0, Number(assignedAmount || 0));
+
+  return {
+    assignedAmount: safeAssigned,
+    adjustedTotalExpense: Math.max(0, safeTotal - safeAssigned),
+  };
+};
+
 const normalizeReason = (value) =>
   String(value || "")
     .trim()
@@ -114,6 +145,15 @@ export const searchOrdersForPenalty = async ({
       orders.map(async (order) => {
         const benefitDetails = await getOrderBenefitDetails(order.id);
         const breakdown = getExpenseBreakdown(benefitDetails);
+        const assignedAmount = resolveWorkerAssignedAmountForOrder({
+          order,
+          userId,
+          roleType,
+        });
+        const { adjustedTotalExpense } = applyWorkerAssignedDeduction({
+          totalExpense: breakdown.totalExpense,
+          assignedAmount,
+        });
 
         return {
           id: order.id,
@@ -139,7 +179,7 @@ export const searchOrdersForPenalty = async ({
           dokhtExpense: breakdown.dokhtExpense,
           qichikarExpense: breakdown.qichikarExpense,
           dailyTaskExpense: breakdown.dailyTaskExpense,
-          totalExpense: breakdown.totalExpense,
+          totalExpense: adjustedTotalExpense,
           expenseRows: breakdown.expenses,
           createdAt: order.createdAt,
         };
@@ -280,6 +320,17 @@ export const getOrderExpenseDetails = async (orderId, workerContext = null) => {
 
   const benefitDetails = await getOrderBenefitDetails(orderId);
   const breakdown = getExpenseBreakdown(benefitDetails);
+  const assignedAmount = workerContext?.userId
+    ? resolveWorkerAssignedAmountForOrder({
+        order,
+        userId: workerContext.userId,
+        roleType: workerContext.roleType,
+      })
+    : 0;
+  const { adjustedTotalExpense } = applyWorkerAssignedDeduction({
+    totalExpense: breakdown.totalExpense,
+    assignedAmount,
+  });
 
   return {
     id: order.id,
@@ -305,7 +356,7 @@ export const getOrderExpenseDetails = async (orderId, workerContext = null) => {
     dokhtExpense: breakdown.dokhtExpense,
     qichikarExpense: breakdown.qichikarExpense,
     dailyTaskExpense: breakdown.dailyTaskExpense,
-    totalExpense: breakdown.totalExpense,
+    totalExpense: adjustedTotalExpense,
     expenseRows: breakdown.expenses,
   };
 };

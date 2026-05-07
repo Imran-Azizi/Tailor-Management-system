@@ -230,13 +230,13 @@ export default function PaymentHistory() {
       setExporting("csv");
       const allRows = await exportRows();
       const header = [
-        "Company Name",
-        "Total Price",
-        "Paid Amount",
-        "Remaining Amount",
-        "Payment Date & Time",
-        "Status",
-        "User",
+        t("rakht.companyName", { defaultValue: "Company Name" }),
+        t("rakht.totalPrice", { defaultValue: "Total Price" }),
+        t("rakht.givenMoney", { defaultValue: "Paid Amount" }),
+        t("rakht.remainingMoney", { defaultValue: "Remaining Amount" }),
+        t("rakht.dateTime", { defaultValue: "Payment Date & Time" }),
+        t("common.status", { defaultValue: "Status" }),
+        t("users.name", { defaultValue: "User" }),
       ];
       const csvLines = [header.map(toCsvValue).join(",")];
 

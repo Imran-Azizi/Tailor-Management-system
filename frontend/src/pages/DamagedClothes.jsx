@@ -327,6 +327,8 @@ export default function DamagedClothes() {
                 <span style={{ color: "var(--danger)" }}>*</span>
               </label>
               <Select
+                classNamePrefix="rs"
+                isRtl={isRtl}
                 options={roleOptions}
                 value={selectedRole}
                 onChange={(value) => {
@@ -359,6 +361,8 @@ export default function DamagedClothes() {
                 <span style={{ color: "var(--danger)" }}>*</span>
               </label>
               <Select
+                classNamePrefix="rs"
+                isRtl={isRtl}
                 options={workerOptions}
                 value={selectedWorker}
                 onChange={(value) => {
@@ -566,6 +570,7 @@ export default function DamagedClothes() {
                     language={language}
                     isRtl={isRtl}
                     t={t}
+                    selectedRole={selectedRole}
                     selectedWorker={selectedWorker}
                     onApply={() => openConfirm(order)}
                   />
@@ -643,8 +648,20 @@ export default function DamagedClothes() {
 }
 
 /* ── Order Card sub-component ─────────────────────────────────────────── */
-function OrderCard({ order, language, t, selectedWorker, onApply }) {
+function OrderCard({
+  order,
+  language,
+  t,
+  selectedRole,
+  selectedWorker,
+  onApply,
+}) {
   const isDamageOrder = Boolean(order?.isDamageOrder);
+  const selectedRoleValue = selectedRole?.value;
+  const dokhtExpenseValue =
+    selectedRoleValue === "DOKHT" ? 0 : Number(order.dokhtExpense || 0);
+  const qichikarExpenseValue =
+    selectedRoleValue === "QICHIKAR" ? 0 : Number(order.qichikarExpense || 0);
 
   return (
     <div
@@ -747,12 +764,12 @@ function OrderCard({ order, language, t, selectedWorker, onApply }) {
           />
           <StatPill
             label={t("damagedClothes.details.dokhtExpense")}
-            value={formatCurrency(order.dokhtExpense || 0, language)}
+            value={formatCurrency(dokhtExpenseValue, language)}
             color="neutral"
           />
           <StatPill
             label={t("damagedClothes.details.qichikarExpense")}
-            value={formatCurrency(order.qichikarExpense || 0, language)}
+            value={formatCurrency(qichikarExpenseValue, language)}
             color="neutral"
           />
         </div>

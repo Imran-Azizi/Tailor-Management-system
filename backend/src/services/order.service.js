@@ -15,6 +15,7 @@ import {
   MONEY_SCALE,
   METER_SCALE,
   toNumberScaled,
+  addScaled,
   mulScaled,
   subScaled,
   maxScaled,
@@ -2191,6 +2192,25 @@ export const updateOrderBill = async (
   orderId,
   { customerInfo, rakhtSelections, orders: items },
 ) => {
+  const EMPTY_RAKHT_FIELDS = {
+    rakhtId: null,
+    rakhtTonId: null,
+    rakhtCompanyName: null,
+    rakhtBrandName: null,
+    rakhtColor: null,
+    rakhtColorHex: null,
+    rakhtDate: null,
+    rakhtRequiredMeters: null,
+    rakhtPiecePrice: null,
+    rakhtCustomerPricePerMeter: null,
+    rakhtTotalCustomerPrice: null,
+  };
+
+  const toOrderRakhtData = (snapshot) => ({
+    ...EMPTY_RAKHT_FIELDS,
+    ...(snapshot || {}),
+  });
+
   const seed = await prisma.order.findUnique({
     where: { id: orderId },
     include: { customer: true },
@@ -2274,93 +2294,76 @@ export const updateOrderBill = async (
 
     const existingOrders = await tx.order.findMany({
       where: { customerId: seed.customerId },
-      select: { id: true, type: true, customerId: true },
+      select: {
+        id: true,
+        type: true,
+        customerId: true,
+        rakhtTonId: true,
+        rakhtRequiredMeters: true,
+      },
     });
     const existingById = new Map(existingOrders.map((o) => [o.id, o]));
 
-    const resolveRakhtSnapshot = async (selection) => {
-      const requiredMeters = toNumberScaled(
-        selection?.requiredMeters || 0,
+    // Roll back reserved Rakht meters for existing bill items being updated.
+    // New snapshots are reserved again below in the same transaction.
+    const releaseByTon = new Map();
+    for (const item of items || []) {
+      if (!item?.id) continue;
+      const existing = existingById.get(item.id);
+      if (!existing) continue;
+      const tonId = existing.rakhtTonId || null;
+      const meters = toNumberScaled(
+        existing.rakhtRequiredMeters || 0,
         METER_SCALE,
       );
-      const piecePrice = toNumberScaled(
-        selection?.piecePrice || 0,
-        MONEY_SCALE,
+      if (!tonId || !Number.isFinite(meters) || meters <= 0) continue;
+      releaseByTon.set(
+        tonId,
+        addScaled(releaseByTon.get(tonId) || 0, meters, METER_SCALE),
       );
-      const priceForCustomer = toNumberScaled(
-        selection?.priceForCustomer || 0,
-        MONEY_SCALE,
-      );
+    }
 
-      if (!selection?.rakhtId) {
-        throw Object.assign(new Error("Rakht selection is required"), {
-          status: 400,
-        });
-      }
+    for (const [tonId, metersToRelease] of releaseByTon.entries()) {
+      const releaseResult = await tx.rakhtTon.updateMany({
+        where: {
+          id: tonId,
+          usedMeters: { gte: metersToRelease },
+        },
+        data: {
+          usedMeters: { decrement: metersToRelease },
+        },
+      });
 
-      if (!selection?.rakhtTonId) {
-        throw Object.assign(new Error("Rakht ton selection is required"), {
-          status: 400,
-        });
-      }
-
-      if (!Number.isFinite(requiredMeters) || requiredMeters <= 0) {
+      if (releaseResult.count !== 1) {
         throw Object.assign(
-          new Error("Required meters must be a positive number"),
-          {
-            status: 400,
-          },
+          new Error("Rakht inventory changed. Please retry with fresh data."),
+          { status: 409 },
         );
       }
+    }
 
-      if (!Number.isFinite(piecePrice) || piecePrice < 0) {
-        throw Object.assign(new Error("Piece price must be a valid number"), {
-          status: 400,
-        });
-      }
-
-      const rakht = await tx.rakht.findUnique({
-        where: { id: selection.rakhtId },
-      });
-      if (!rakht) {
-        throw Object.assign(new Error("Selected Rakht not found"), {
-          status: 404,
-        });
-      }
-
-      const ton = await tx.rakhtTon.findUnique({
-        where: { id: selection.rakhtTonId },
-      });
-      if (!ton || ton.rakhtId !== rakht.id) {
-        throw Object.assign(new Error("Selected Rakht ton not found"), {
-          status: 404,
-        });
-      }
-
-      return {
-        rakhtId: rakht.id,
-        rakhtTonId: ton.id,
-        rakhtCompanyName: rakht.companyName,
-        rakhtBrandName: rakht.brandName,
-        rakhtColor: ton.name,
-        rakhtColorHex: ton.colorHex,
-        rakhtDate: rakht.date,
-        rakhtRequiredMeters: requiredMeters,
-        rakhtPiecePrice: piecePrice,
-        rakhtCustomerPricePerMeter:
-          priceForCustomer > 0 ? priceForCustomer : null,
-        rakhtTotalCustomerPrice:
-          priceForCustomer > 0
-            ? mulScaled(priceForCustomer, requiredMeters, MONEY_SCALE)
-            : null,
-      };
+    const resolveRakhtSnapshot = async (selection) => {
+      return reserveRakhtStock(tx, selection);
     };
 
+    const rakhtSnapshotByOrderId = new Map();
     const rakhtSnapshotByOrderItemKey = new Map();
     const rakhtSnapshotQueueByType = new Map();
     for (const selection of rakhtSelections || []) {
       if (!selection?.type) continue;
       const snapshot = await resolveRakhtSnapshot(selection);
+
+      if (selection?.orderId) {
+        const orderIdKey = String(selection.orderId);
+        if (rakhtSnapshotByOrderId.has(orderIdKey)) {
+          throw Object.assign(
+            new Error(`Duplicate Rakht selection for order ${orderIdKey}.`),
+            { status: 400 },
+          );
+        }
+        rakhtSnapshotByOrderId.set(orderIdKey, snapshot);
+        continue;
+      }
 
       if (selection?.orderItemKey) {
         const key = String(selection.orderItemKey);
@@ -2404,11 +2407,18 @@ export const updateOrderBill = async (
         orderItemKey !== undefined && orderItemKey !== null
           ? String(orderItemKey)
           : "";
+      const rakhtSnapshotFromOrderId = id
+        ? rakhtSnapshotByOrderId.get(String(id))
+        : null;
       const rakhtSnapshotFromItem = itemKey
         ? rakhtSnapshotByOrderItemKey.get(itemKey)
         : null;
       const typeQueue = rakhtSnapshotQueueByType.get(type) || [];
-      const rakhtSnapshot = rakhtSnapshotFromItem || typeQueue.shift() || null;
+      const rakhtSnapshot =
+        rakhtSnapshotFromOrderId ||
+        rakhtSnapshotFromItem ||
+        typeQueue.shift() ||
+        null;
       if (typeQueue.length >= 0) {
         rakhtSnapshotQueueByType.set(type, typeQueue);
       }
@@ -2461,7 +2471,7 @@ export const updateOrderBill = async (
             remaining,
             quantity,
             ...(boxId !== undefined ? { boxId: boxId ?? null } : {}),
-            ...(rakhtSnapshot || {}),
+            ...toOrderRakhtData(rakhtSnapshot),
           },
         });
 
@@ -2483,30 +2493,7 @@ export const updateOrderBill = async (
           customerId: seed.customerId,
           type,
           orderName: orderName || null,
-          rakhtId: rakhtSnapshot?.rakhtId ?? seed.rakhtId ?? null,
-          rakhtTonId: rakhtSnapshot?.rakhtTonId ?? seed.rakhtTonId ?? null,
-          rakhtCompanyName:
-            rakhtSnapshot?.rakhtCompanyName ?? seed.rakhtCompanyName ?? null,
-          rakhtBrandName:
-            rakhtSnapshot?.rakhtBrandName ?? seed.rakhtBrandName ?? null,
-          rakhtColor: rakhtSnapshot?.rakhtColor ?? seed.rakhtColor ?? null,
-          rakhtColorHex:
-            rakhtSnapshot?.rakhtColorHex ?? seed.rakhtColorHex ?? null,
-          rakhtDate: rakhtSnapshot?.rakhtDate ?? seed.rakhtDate ?? null,
-          rakhtRequiredMeters:
-            rakhtSnapshot?.rakhtRequiredMeters ??
-            seed.rakhtRequiredMeters ??
-            null,
-          rakhtPiecePrice:
-            rakhtSnapshot?.rakhtPiecePrice ?? seed.rakhtPiecePrice ?? null,
-          rakhtCustomerPricePerMeter:
-            rakhtSnapshot?.rakhtCustomerPricePerMeter ??
-            seed.rakhtCustomerPricePerMeter ??
-            null,
-          rakhtTotalCustomerPrice:
-            rakhtSnapshot?.rakhtTotalCustomerPrice ??
-            seed.rakhtTotalCustomerPrice ??
-            null,
+          ...toOrderRakhtData(rakhtSnapshot),
           totalPrice,
           discount,
           paidAmount,

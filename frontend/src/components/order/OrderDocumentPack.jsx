@@ -373,7 +373,7 @@ function PrintBillHeader({ settings, title, date, time }) {
           <p className="text-[10px] font-bold uppercase tracking-[0.06em] text-slate-600">
             {title}
           </p>
-          <p className="text-[10px] font-semibold text-slate-700">
+          <p className="text-[10px] font-semibold text-slate-700 [direction:ltr] [unicode-bidi:embed]">
             {date} | {time}
           </p>
         </div>
@@ -589,7 +589,8 @@ export function CustomerBill({ customer, order }) {
         className={`grid grid-cols-2 bg-slate-100 text-[9px] text-slate-800`}
       >
         <div className={`border-r border-slate-800 px-2 py-1.5 ${alignClass}`}>
-          <span className="font-extrabold">{txt.date}</span>: {date} | {time}
+          <span className="font-extrabold">{txt.date}</span>:{" "}
+          <span className="[direction:ltr] [unicode-bidi:embed]">{date} | {time}</span>
         </div>
         <div
           className={`px-2 py-1.5 ${rowDirClass === "flex-row-reverse" ? "text-left" : "text-right"}`}
@@ -1274,6 +1275,7 @@ export function printElement(id, options = {}) {
     .map((sheet) => {
       try {
         return Array.from(sheet.cssRules || [])
+          .filter((rule) => !rule.cssText?.trimStart().startsWith("@page"))
           .map((rule) => rule.cssText)
           .join("\n");
       } catch {
@@ -1331,8 +1333,10 @@ export function printElement(id, options = {}) {
             -webkit-print-color-adjust:exact;
             print-color-adjust:exact;
           }
-          .print-a6-sheet{max-width:100%;margin:0 auto}
-          @media print{body{padding:4mm}}
+          .print-a6-sheet{width:100%;max-width:100%;margin:0;box-sizing:border-box}
+          .print-a6-sheet[dir="rtl"] .border-r{border-right-width:0;border-inline-end-width:1px}
+          .print-a6-sheet[dir="rtl"] .border-r-2{border-right-width:0;border-inline-end-width:2px}
+          @media print{*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}body{padding:4mm;margin:0}}
         </style>
       </head>
       <body dir="${dir}">

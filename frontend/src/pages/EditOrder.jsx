@@ -201,6 +201,7 @@ export default function EditOrder() {
           null;
         if (!source) return null;
         return {
+          orderId: source.id,
           type: item.type,
           orderItemKey: item.billingKey,
           rakhtId: source.rakhtId || "",
@@ -276,12 +277,17 @@ export default function EditOrder() {
         phoneNumber: merged.phoneNumber,
       },
       rakhtSelections: (merged?.rakhtSelections || []).map((selection) => ({
+        orderId: selection.orderId,
         type: selection.type,
         orderItemKey: selection.orderItemKey,
         rakhtId: selection.rakhtId,
         rakhtTonId: selection.rakhtTonId,
         requiredMeters: parseNumberLocale(selection.requiredMeters || 0),
-        piecePrice: 0,
+        piecePrice: parseNumberLocale(selection.piecePrice || 0),
+        priceForCustomer: parseNumberLocale(selection.priceForCustomer || 0),
+        totalPriceForCustomer: parseNumberLocale(
+          selection.totalPriceForCustomer || 0,
+        ),
       })),
       orders: orderItems.map((item) => {
         const b = merged.billing?.[item.billingKey] || {};

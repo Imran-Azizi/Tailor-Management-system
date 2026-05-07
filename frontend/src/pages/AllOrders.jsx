@@ -52,8 +52,6 @@ import {
 } from "../lib/locale.js";
 
 const ROLE_COLORS = { QICHIKAR: "#D97706", DOKHT: "#DB2777" };
-const COMPLETED_REASSIGN_BLOCK_MESSAGE =
-  "This order completed, you can not assign it again";
 
 function isCompletedForWorkerType(order, workerType) {
   if (!order || !workerType) return false;
@@ -94,7 +92,12 @@ function AssignModal({ order, onClose, onAssigned }) {
         selectedUserId &&
         isCompletedForWorkerType(order, selectedWorker?.accountType)
       ) {
-        toast.error(COMPLETED_REASSIGN_BLOCK_MESSAGE);
+        toast.error(
+          t("assignment.completedReassignBlocked", {
+            defaultValue:
+              "This order is completed. You cannot assign it again.",
+          }),
+        );
         setSaving(false);
         return;
       }
@@ -328,11 +331,20 @@ function getBenefitEntryDate(entry) {
 function OrderViewModal({ orderId, open, onClose }) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ["order-detail", orderId],
     queryFn: () => api.get(`/orders/${orderId}`).then((r) => r.data),
     enabled: open && !!orderId,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
+    refetchOnReconnect: "always",
   });
+
+  useEffect(() => {
+    if (!open || !orderId) return;
+    refetch();
+  }, [open, orderId, refetch]);
   const benefitDetails = data?.benefitDetails;
   const detailOrderLabel = getOrderLabelParts(data, language);
   const detailCustomerName = String(data?.customer?.firstName || "").trim();
@@ -346,6 +358,23 @@ function OrderViewModal({ orderId, open, onClose }) {
   const detailCreatedAt = data?.createdAt
     ? formatSystemDateTime(data.createdAt, language)
     : "-";
+  const hasRakhtDetails = Boolean(
+    data?.rakhtId ||
+    data?.rakhtCompanyName ||
+    data?.rakhtBrandName ||
+    data?.rakhtTonId ||
+    data?.rakhtColor ||
+    data?.rakhtRequiredMeters != null ||
+    data?.rakhtPiecePrice != null ||
+    data?.rakhtCustomerPricePerMeter != null ||
+    data?.rakhtTotalCustomerPrice != null,
+  );
+  const rakhtMeters = Number(data?.rakhtRequiredMeters || 0);
+  const rakhtPurchasePerMeter = Number(data?.rakhtPiecePrice || 0);
+  const rakhtPurchaseTotal =
+    rakhtMeters > 0 ? rakhtPurchasePerMeter * rakhtMeters : 0;
+  const rakhtCustomerTotal = Number(data?.rakhtTotalCustomerPrice || 0);
+  const rakhtBenefit = rakhtCustomerTotal - rakhtPurchaseTotal;
 
   return (
     <Modal
@@ -504,6 +533,129 @@ function OrderViewModal({ orderId, open, onClose }) {
               </div>
             </div>
           </div>
+
+          {hasRakhtDetails && (
+            <div
+              className="card order-details-rakht-card"
+              style={{
+                border: "1px solid var(--border)",
+                borderRadius: 12,
+                padding: 14,
+                background: "var(--surface2)",
+                marginBottom: 12,
+              }}
+            >
+              <h4 style={{ fontSize: 15, fontWeight: 800, marginBottom: 10 }}>
+                {t("createOrder.rakhtSelection", "Rakht (Fabric)")}
+              </h4>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                  gap: 10,
+                }}
+              >
+                {data.rakhtCompanyName && (
+                  <div className="order-details-info-card">
+                    <span>{t("rakht.companyName", "Company")}</span>
+                    <strong>{data.rakhtCompanyName}</strong>
+                  </div>
+                )}
+                {data.rakhtBrandName && (
+                  <div className="order-details-info-card">
+                    <span>{t("rakht.brandName", "Brand")}</span>
+                    <strong>{data.rakhtBrandName}</strong>
+                  </div>
+                )}
+                {data.rakhtColor && (
+                  <div className="order-details-info-card">
+                    <span>{t("rakht.color", "Color")}</span>
+                    <strong
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      {data.rakhtColorHex && (
+                        <span
+                          style={{
+                            width: 12,
+                            height: 12,
+                            borderRadius: "50%",
+                            background: data.rakhtColorHex,
+                            border: "1px solid rgba(15,23,42,0.15)",
+                            display: "inline-block",
+                            flexShrink: 0,
+                          }}
+                        />
+                      )}
+                      {data.rakhtColor}
+                    </strong>
+                  </div>
+                )}
+                {data.rakhtRequiredMeters != null && (
+                  <div className="order-details-info-card">
+                    <span>{t("rakht.requiredMeters", "Meters Used")}</span>
+                    <strong>
+                      {Number(data.rakhtRequiredMeters).toFixed(2)}m
+                    </strong>
+                  </div>
+                )}
+                {data.rakhtCustomerPricePerMeter != null && (
+                  <div className="order-details-info-card">
+                    <span>
+                      {t("rakht.priceForCustomer", "Price / m (Customer)")}
+                    </span>
+                    <strong>
+                      {formatMoney(data.rakhtCustomerPricePerMeter, language)}
+                    </strong>
+                  </div>
+                )}
+                {data.rakhtPiecePrice != null && (
+                  <div className="order-details-info-card">
+                    <span>
+                      {t("rakht.purchasePricePerMeter", "Price / m (Purchase)")}
+                    </span>
+                    <strong>
+                      {formatMoney(data.rakhtPiecePrice, language)}
+                    </strong>
+                  </div>
+                )}
+                {rakhtPurchaseTotal > 0 && (
+                  <div className="order-details-info-card">
+                    <span>
+                      {t("rakht.totalPurchasePrice", "Total Price (Purchase)")}
+                    </span>
+                    <strong>{formatMoney(rakhtPurchaseTotal, language)}</strong>
+                  </div>
+                )}
+                {data.rakhtTotalCustomerPrice != null &&
+                  Number(data.rakhtTotalCustomerPrice) > 0 && (
+                    <div className="order-details-info-card">
+                      <span>
+                        {t("rakht.totalPriceForCustomer", "Total Rakht Price")}
+                      </span>
+                      <strong>
+                        {formatMoney(data.rakhtTotalCustomerPrice, language)}
+                      </strong>
+                    </div>
+                  )}
+                {(rakhtPurchaseTotal > 0 || rakhtCustomerTotal > 0) && (
+                  <div className="order-details-info-card">
+                    <span>{t("rakht.benefit", "Rakht Benefit")}</span>
+                    <strong
+                      style={{
+                        color: rakhtBenefit >= 0 ? "#15803D" : "#DC2626",
+                      }}
+                    >
+                      {formatMoney(rakhtBenefit, language)}
+                    </strong>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div
             className="card order-details-benefit-card"

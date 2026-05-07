@@ -90,7 +90,7 @@ export default function Layout() {
           pageTitle={t(titleKey)}
         />
         <main className="min-w-0" style={{ flex: 1 }}>
-          <Outlet />
+          <Outlet key={loc.pathname} />
         </main>
       </div>
     </>

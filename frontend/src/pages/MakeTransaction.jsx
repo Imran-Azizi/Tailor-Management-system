@@ -30,7 +30,7 @@ const schema = z.object({
   note: z.string().optional(),
 });
 
-function buildSelectStyles(hasError) {
+function buildSelectStyles(hasError, isRtl = false) {
   return {
     control: (base, state) => ({
       ...base,
@@ -44,6 +44,8 @@ function buildSelectStyles(hasError) {
       minHeight: 40,
       fontSize: 14,
       color: "var(--text1)",
+      direction: isRtl ? "rtl" : "ltr",
+      textAlign: isRtl ? "right" : "left",
       boxShadow: state.isFocused ? "0 0 0 2px var(--primary-100)" : "none",
       "&:hover": { borderColor: "var(--border2)" },
     }),
@@ -54,6 +56,7 @@ function buildSelectStyles(hasError) {
       borderRadius: 8,
       boxShadow: "var(--sh-md)",
       zIndex: 9999,
+      direction: isRtl ? "rtl" : "ltr",
     }),
     option: (base, state) => ({
       ...base,
@@ -66,9 +69,22 @@ function buildSelectStyles(hasError) {
       fontSize: 14,
       cursor: "pointer",
     }),
-    singleValue: (base) => ({ ...base, color: "var(--text1)" }),
-    placeholder: (base) => ({ ...base, color: "var(--text3)", fontSize: 14 }),
-    input: (base) => ({ ...base, color: "var(--text1)" }),
+    singleValue: (base) => ({
+      ...base,
+      color: "var(--text1)",
+      textAlign: isRtl ? "right" : "left",
+    }),
+    placeholder: (base) => ({
+      ...base,
+      color: "var(--text3)",
+      fontSize: 14,
+      textAlign: isRtl ? "right" : "left",
+    }),
+    input: (base) => ({
+      ...base,
+      color: "var(--text1)",
+      textAlign: isRtl ? "right" : "left",
+    }),
     indicatorSeparator: () => ({ display: "none" }),
   };
 }
@@ -76,9 +92,11 @@ function buildSelectStyles(hasError) {
 const today = () => new Date().toISOString().split("T")[0];
 
 export default function MakeTransaction() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const qc = useQueryClient();
   const [selectedAccountType, setSelectedAccountType] = useState(null);
+  const language = i18n.resolvedLanguage || i18n.language || "en";
+  const isRtl = i18n.dir?.(language) === "rtl";
 
   const {
     register,
@@ -218,10 +236,12 @@ export default function MakeTransaction() {
                 render={({ field }) => (
                   <Select
                     {...field}
+                    classNamePrefix="rs"
+                    isRtl={isRtl}
                     options={accountTypeOptions}
                     isLoading={loadingTypes}
                     placeholder={t("transaction.selectAccountType")}
-                    styles={buildSelectStyles(!!errors.accountType)}
+                    styles={buildSelectStyles(!!errors.accountType, isRtl)}
                   />
                 )}
               />
@@ -238,6 +258,8 @@ export default function MakeTransaction() {
                 render={({ field }) => (
                   <Select
                     {...field}
+                    classNamePrefix="rs"
+                    isRtl={isRtl}
                     options={userOptions}
                     isLoading={loadingUsers}
                     isDisabled={!selectedAccountType}
@@ -249,7 +271,7 @@ export default function MakeTransaction() {
                     noOptionsMessage={() =>
                       loadingUsers ? t("common.loading") : t("common.noData")
                     }
-                    styles={buildSelectStyles(!!errors.user)}
+                    styles={buildSelectStyles(!!errors.user, isRtl)}
                   />
                 )}
               />

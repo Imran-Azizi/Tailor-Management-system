@@ -101,6 +101,7 @@ function DailyTaskForm({ onSuccess }) {
   const { user, isAdmin } = useAuth();
   const qc = useQueryClient();
   const language = i18n.resolvedLanguage || i18n.language || "en";
+  const isRtl = i18n.dir?.(language) === "rtl";
   const schema = createSchema(t);
 
   const {
@@ -315,13 +316,18 @@ function DailyTaskForm({ onSuccess }) {
             render={({ field }) => (
               <Select
                 {...field}
+                classNamePrefix="rs"
+                isRtl={isRtl}
                 options={senderOptions}
                 isSearchable
                 isClearable
                 isLoading={loadingDokanUsers}
                 placeholder={t("dailyTasks.senderPlaceholder")}
                 noOptionsMessage={() => t("dailyTasks.noSenders")}
-                styles={buildSelectStyles(Boolean(errors.fromName))}
+                styles={buildSelectStyles({
+                  hasError: Boolean(errors.fromName),
+                  isRtl,
+                })}
               />
             )}
           />
@@ -351,6 +357,7 @@ function DailyTaskForm({ onSuccess }) {
             render={({ field }) => (
               <Select
                 classNamePrefix="rs"
+                isRtl={isRtl}
                 isSearchable={false}
                 options={[
                   { value: "NO", label: t("common.no", "No") },

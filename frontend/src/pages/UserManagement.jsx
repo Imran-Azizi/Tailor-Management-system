@@ -32,7 +32,13 @@ const ROLE_COLORS = {
 
 const ROLES = ["ADMIN", "DOKAN", "DOKHT", "QICHIKAR", "FINANCE"];
 
-function RoleBadge({ role }) {
+function getRoleLabel(role, t) {
+  return t(`users.roles.${String(role || "").toLowerCase()}`, {
+    defaultValue: role,
+  });
+}
+
+function RoleBadge({ role, label }) {
   return (
     <span
       style={{
@@ -45,7 +51,7 @@ function RoleBadge({ role }) {
         border: `1px solid ${ROLE_COLORS[role] || "#888"}30`,
       }}
     >
-      {role}
+      {label || role}
     </span>
   );
 }
@@ -107,10 +113,18 @@ function UserModal({ user, onClose, onSaved }) {
     fontSize: 14,
     boxSizing: "border-box",
     outline: "none",
+    direction: "inherit",
+    textAlign: "start",
   };
+
+  const docDir =
+    typeof document !== "undefined"
+      ? document.documentElement.getAttribute("dir") || "ltr"
+      : "ltr";
 
   return (
     <div
+      dir={docDir}
       style={{
         position: "fixed",
         inset: 0,
@@ -196,7 +210,7 @@ function UserModal({ user, onClose, onSaved }) {
             >
               {t("common.phone", "Phone")}
             </label>
-            <div style={{ position: "relative" }}>
+            <div className="iw" style={{ position: "relative" }}>
               <LuPhone
                 size={14}
                 style={{
@@ -208,7 +222,8 @@ function UserModal({ user, onClose, onSaved }) {
                 }}
               />
               <input
-                style={{ ...inputStyle, paddingInlineStart: 32 }}
+                className="inp with-leading-icon"
+                style={inputStyle}
                 value={form.phoneNumber}
                 onChange={(e) => set("phoneNumber", e.target.value)}
                 placeholder="0700000000"
@@ -243,7 +258,7 @@ function UserModal({ user, onClose, onSaved }) {
             >
               {ROLES.map((r) => (
                 <option key={r} value={r}>
-                  {r}
+                  {getRoleLabel(r, t)}
                 </option>
               ))}
             </select>
@@ -269,7 +284,7 @@ function UserModal({ user, onClose, onSaved }) {
                   )
                 </span>
               </label>
-              <div style={{ position: "relative" }}>
+              <div className="iw" style={{ position: "relative" }}>
                 <LuLock
                   size={14}
                   style={{
@@ -281,10 +296,9 @@ function UserModal({ user, onClose, onSaved }) {
                   }}
                 />
                 <input
+                  className="inp with-leading-icon with-trailing-icon"
                   style={{
                     ...inputStyle,
-                    paddingInlineStart: 32,
-                    paddingInlineEnd: 36,
                   }}
                   type={showPw ? "text" : "password"}
                   value={form.password}
@@ -296,7 +310,7 @@ function UserModal({ user, onClose, onSaved }) {
                   onClick={() => setShowPw((s) => !s)}
                   style={{
                     position: "absolute",
-                    insetInlineEnd: 8,
+                    insetInlineEnd: 10,
                     top: "50%",
                     transform: "translateY(-50%)",
                     background: "none",
@@ -573,7 +587,10 @@ export default function UserManagement() {
                       {u.phoneNumber}
                     </td>
                     <td>
-                      <RoleBadge role={u.accountType} />
+                      <RoleBadge
+                        role={u.accountType}
+                        label={getRoleLabel(u.accountType, t)}
+                      />
                     </td>
                     <td style={{ fontSize: 13, color: "var(--text2)" }}>
                       {u._count?.assignedOrders ?? 0}
