@@ -381,15 +381,6 @@ export default function DamagedClothes() {
                 }
                 styles={buildSelectStyles({ isRtl })}
               />
-              {selectedRole?.value ? (
-                <p style={{ margin: 0, fontSize: 11, color: "var(--text3)" }}>
-                  {t("damagedClothes.workerHint")}
-                </p>
-              ) : (
-                <p style={{ margin: 0, fontSize: 11, color: "var(--text3)" }}>
-                  {t("damagedClothes.workerHintSelectRole")}
-                </p>
-              )}
             </div>
           </div>
 

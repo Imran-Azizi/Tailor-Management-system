@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { MonthProvider } from "./context/MonthContext.jsx";
-import { useAuth } from "./context/AuthContext.jsx";
 import {
   ProtectedRoute,
   RoleRoute,
@@ -40,6 +39,9 @@ const AssignOrdersReport = lazy(() => import("./pages/AssignOrdersReport.jsx"));
 const CompletedWorkerOrders = lazy(
   () => import("./pages/CompletedWorkerOrders.jsx"),
 );
+const WorkerPaymentReceipts = lazy(
+  () => import("./pages/WorkerPaymentReceipts.jsx"),
+);
 const DailyTasks = lazy(() => import("./pages/DailyTasks.jsx"));
 const AllDailyTasks = lazy(() => import("./pages/AllDailyTasks.jsx"));
 const CreateRakht = lazy(() => import("./pages/CreateRakht.jsx"));
@@ -50,9 +52,6 @@ const BackupManagement = lazy(() => import("./pages/BackupManagement.jsx"));
 const DamagedClothes = lazy(() => import("./pages/DamagedClothes.jsx"));
 
 function RoleBasedRedirect() {
-  const { user } = useAuth();
-  if (user?.accountType === "FINANCE")
-    return <Navigate to="/dashboard" replace />;
   return <Navigate to="/dashboard" replace />;
 }
 
@@ -144,6 +143,14 @@ export default function App() {
                     element={
                       <RoleRoute roles={["ADMIN"]}>
                         <CompletedWorkerOrders />
+                      </RoleRoute>
+                    }
+                  />
+                  <Route
+                    path="orders/completed-workers/receipts"
+                    element={
+                      <RoleRoute roles={["ADMIN"]}>
+                        <WorkerPaymentReceipts />
                       </RoleRoute>
                     }
                   />

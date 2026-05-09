@@ -18,14 +18,11 @@ import {
 import {
   LuShoppingBag,
   LuSquareCheck,
+  LuCircleCheck,
+  LuClock,
   LuTriangleAlert,
-  LuTrendingUp,
-  LuBanknote,
   LuCalendarCheck,
-  LuUser,
   LuUsers,
-  LuWallet,
-  LuCoins,
 } from "react-icons/lu";
 import { useTranslation } from "react-i18next";
 import api from "../lib/api.js";
@@ -44,6 +41,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
 import { formatMonthYearLabel } from "../lib/months.js";
 import { Spinner, Card } from "../components/ui/index.jsx";
+import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import StatCard from "../components/monthlyReport/StatCard.jsx";
 import ReportTable from "../components/monthlyReport/ReportTable.jsx";
 
@@ -63,7 +61,7 @@ function formatMoney(value, language) {
   return formatCurrency(value, language, CURRENCY_FORMAT_OPTIONS);
 }
 
-const TooltipCard = ({ active, payload, label, language, t }) => {
+const TooltipCard = ({ active, payload, label, language, t, isRtl }) => {
   if (!active || !payload?.length) return null;
 
   return (
@@ -75,6 +73,8 @@ const TooltipCard = ({ active, payload, label, language, t }) => {
         padding: "10px 14px",
         boxShadow: "var(--sh-lg)",
         fontSize: 12,
+        direction: isRtl ? "rtl" : "ltr",
+        textAlign: isRtl ? "right" : "left",
       }}
     >
       <p style={{ fontWeight: 600, marginBottom: 4 }}>{label}</p>
@@ -142,9 +142,11 @@ export default function Dashboard() {
   const netBenefit = totalRakhtRevenue + totalOrderBenefit;
   const netBenefitIsPositive = netBenefit >= 0;
   const monthLabel = formatMonthYearLabel(viewMonth, viewYear, language);
-
   const generatedAtLabel = formatAfghanistanReportDate(new Date(), language);
 
+  // ltrOrder = position when reading left→right (English)
+  // rtlOrder = position when reading right→left (Dari/Pashto)
+  // In RTL grid (dir="rtl"), the item with rtlOrder:1 lands in the rightmost slot.
   const statCards = [
     {
       key: "totalOrders",
@@ -153,6 +155,28 @@ export default function Dashboard() {
       sub: `${t("dashboardPage.today")}: ${formatNumberLocale(data.todayOrders || 0, language)} | ${t("dashboardPage.month")}: ${formatNumberLocale(data.monthOrders || 0, language)}`,
       Icon: LuShoppingBag,
       accent: "#2563EB",
+      ltrOrder: 1,
+      rtlOrder: 1,
+    },
+    {
+      key: "completedOrders",
+      label: t("common.completedOrders", "Completed Orders"),
+      value: formatNumberLocale(data.completedOrders || 0, language),
+      sub: t("sidebar.completed", "Completed"),
+      Icon: LuCircleCheck,
+      accent: "#16A34A",
+      ltrOrder: 14,
+      rtlOrder: 14,
+    },
+    {
+      key: "pendingOrders",
+      label: t("common.pendingOrders", "Pending Orders"),
+      value: formatNumberLocale(data.allPendingOrders || 0, language),
+      sub: `${t("dashboardPage.month")}: ${formatNumberLocale(data.pendingOrders || 0, language)}`,
+      Icon: LuClock,
+      accent: "#D97706",
+      ltrOrder: 15,
+      rtlOrder: 15,
     },
     {
       key: "totalAmount",
@@ -161,25 +185,31 @@ export default function Dashboard() {
       sub: t("dashboardPage.yearOrders", {
         count: formatNumberLocale(data.yearOrders || 0, language),
       }),
-      Icon: LuWallet,
-      accent: "#16A34A",
+      Icon: AfCurrencyIcon,
+      accent: "#0891B2",
+      ltrOrder: 4,
+      rtlOrder: 4,
     },
     {
       key: "collected",
       label: t("dashboardPage.collected"),
       value: formatMoney(data.totalPaid, language),
       sub: `${t("dashboardPage.discount")}: ${formatMoney(data.totalDiscount, language)}`,
-      Icon: LuBanknote,
+      Icon: AfCurrencyIcon,
       accent: "#0891B2",
+      ltrOrder: 5,
+      rtlOrder: 5,
     },
     {
       key: "outstanding",
       label: t("dashboardPage.outstanding"),
       value: formatMoney(data.totalRemaining, language),
       sub: t("dashboardPage.remainingBalance"),
-      Icon: LuTrendingUp,
+      Icon: AfCurrencyIcon,
       accent: "#DC2626",
       onClick: () => navigate("/orders/remaining"),
+      ltrOrder: 6,
+      rtlOrder: 6,
     },
     {
       key: "rakhtRevenue",
@@ -190,9 +220,11 @@ export default function Dashboard() {
       sub: t("dashboardPage.netBenefitSub", {
         defaultValue: "Total Rakht Revenue + Total Order Benefit",
       }),
-      Icon: LuCoins,
+      Icon: AfCurrencyIcon,
       accent: "#0F766E",
       adminOnly: true,
+      ltrOrder: 7,
+      rtlOrder: 7,
     },
     {
       key: "orderBenefit",
@@ -201,9 +233,11 @@ export default function Dashboard() {
       }),
       value: formatMoney(totalOrderBenefit, language),
       sub: t("common.total", "Total"),
-      Icon: LuSquareCheck,
+      Icon: AfCurrencyIcon,
       accent: "#7C3AED",
       adminOnly: true,
+      ltrOrder: 8,
+      rtlOrder: 8,
     },
     {
       key: "dailyExpenses",
@@ -213,18 +247,22 @@ export default function Dashboard() {
       ),
       value: formatMoney(data.totalDailyExpenses ?? 0, language),
       sub: t("sidebar.dailyTasks", "Daily Expenses"),
-      Icon: LuCalendarCheck,
+      Icon: AfCurrencyIcon,
       accent: "#2563EB",
       hideWhenZero: true,
+      ltrOrder: 9,
+      rtlOrder: 9,
     },
     {
       key: "totalLoan",
       label: t("dashboardPage.totalLoan", "Total Loan"),
       value: formatMoney(data.totalLoan ?? 0, language),
       sub: t("transaction.loanOption", "Loan"),
-      Icon: LuUser,
+      Icon: AfCurrencyIcon,
       accent: "#D97706",
       hideWhenZero: true,
+      ltrOrder: 10,
+      rtlOrder: 10,
     },
     {
       key: "qichikarMoney",
@@ -234,9 +272,11 @@ export default function Dashboard() {
       ),
       value: formatMoney(data.totalQichikarUsersMoney ?? 0, language),
       sub: t("assignment.qichikarLabel", "Qichikar"),
-      Icon: LuUsers,
+      Icon: AfCurrencyIcon,
       accent: "#DB2777",
       hideWhenZero: true,
+      ltrOrder: 11,
+      rtlOrder: 11,
     },
     {
       key: "dokhtMoney",
@@ -246,9 +286,11 @@ export default function Dashboard() {
       ),
       value: formatMoney(data.totalDokhtUsersMoney ?? 0, language),
       sub: t("assignment.dokhtLabel", "Dokht"),
-      Icon: LuUsers,
+      Icon: AfCurrencyIcon,
       accent: "#7C3AED",
       hideWhenZero: true,
+      ltrOrder: 12,
+      rtlOrder: 12,
     },
     {
       key: "emergency",
@@ -258,15 +300,23 @@ export default function Dashboard() {
       Icon: LuTriangleAlert,
       accent: "#DC2626",
       hideWhenZero: true,
+      ltrOrder: 13,
+      rtlOrder: 13,
     },
   ];
 
-  const visibleStatCards = statCards.filter((card) => {
-    if (card.adminOnly && !isAdmin) return false;
-    if (!card.hideWhenZero) return true;
-    const numericValue = Number(String(card.value).replace(/[^0-9.-]/g, ""));
-    return Number.isFinite(numericValue) ? numericValue !== 0 : true;
-  });
+  const visibleStatCards = statCards
+    .filter((card) => {
+      if (card.adminOnly && !isAdmin) return false;
+      if (!card.hideWhenZero) return true;
+      const numericValue = Number(String(card.value).replace(/[^0-9.-]/g, ""));
+      return Number.isFinite(numericValue) ? numericValue !== 0 : true;
+    })
+    .sort((a, b) =>
+      isRtl
+        ? (a.rtlOrder ?? 99) - (b.rtlOrder ?? 99)
+        : (a.ltrOrder ?? 99) - (b.ltrOrder ?? 99),
+    );
 
   const orderStatusClassName = (isCompleted) =>
     isCompleted
@@ -352,7 +402,11 @@ export default function Dashboard() {
       label: t("common.status", "Status"),
       width: "10rem",
       render: (order) => (
-        <div className="flex flex-wrap items-center justify-end gap-1.5">
+        <div
+          className={`flex flex-wrap items-center gap-1.5 ${
+            isRtl ? "justify-start" : "justify-end"
+          }`}
+        >
           {order.isEmergency ? (
             <span className="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700 dark:border-rose-700/60 dark:bg-rose-900/30 dark:text-rose-300">
               !
@@ -383,23 +437,25 @@ export default function Dashboard() {
 
   return (
     <div
-      className="page report-root leading-relaxed tracking-normal"
+      className={`page report-root dashboard-shell leading-relaxed tracking-normal ${
+        isRtl ? "dashboard-shell--rtl" : "dashboard-shell--ltr"
+      }`}
       dir={isRtl ? "rtl" : "ltr"}
     >
-      <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="text-start">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">
+      <section className="dashboard-hero mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
+        <div className="dashboard-hero-row flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="dashboard-hero-title text-start">
+            <h1 className="dashboard-hero-heading text-2xl font-bold text-gray-900 dark:text-slate-100">
               {t("dashboardPage.title")}
             </h1>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            <p className="dashboard-hero-sub mt-1 text-sm text-slate-500 dark:text-slate-400">
               {t("common.viewingMonth", "Viewing data for")}:{" "}
               <strong className={isRtl ? "rtl-number-inline" : ""}>
                 {monthLabel}
               </strong>
             </p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 text-start dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+          <div className="dashboard-date-chip rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 text-start dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
             {t("common.date", "Date")}:{" "}
             <span className={isRtl ? "rtl-number-inline" : ""}>
               {generatedAtLabel}
@@ -408,7 +464,10 @@ export default function Dashboard() {
         </div>
       </section>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+      <div
+        className="dashboard-stats-grid mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
+        dir={isRtl ? "rtl" : "ltr"}
+      >
         <StatCard
           className="md:col-span-2 xl:col-span-3 2xl:col-span-4"
           label={t("dashboardPage.netBenefit", "Net Benefit")}
@@ -417,7 +476,7 @@ export default function Dashboard() {
             "dashboardPage.netBenefitSub",
             "Total Rakht Revenue + Total Order Benefit",
           )}
-          Icon={LuTrendingUp}
+          Icon={AfCurrencyIcon}
           accent={netBenefitIsPositive ? "#16A34A" : "#DC2626"}
           emphasize
         />
@@ -435,12 +494,17 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="g-charts mb-6">
+      <div className="g-charts dashboard-charts-grid mb-6">
         <Card title={t("dashboardPage.revenueTrend")}>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart
               data={monthlyChartData}
-              margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
+              margin={{
+                top: 4,
+                right: isRtl ? 2 : 4,
+                bottom: 0,
+                left: isRtl ? 6 : 0,
+              }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis
@@ -450,13 +514,26 @@ export default function Dashboard() {
                 tickLine={false}
               />
               <YAxis
+                orientation={isRtl ? "right" : "left"}
                 tick={{ fontSize: 11, fill: "var(--text3)" }}
                 axisLine={false}
                 tickLine={false}
                 width={54}
               />
-              <Tooltip content={<TooltipCard language={language} t={t} />} />
-              <Legend wrapperStyle={{ fontSize: 12, color: "var(--text2)" }} />
+              <Tooltip
+                content={
+                  <TooltipCard language={language} t={t} isRtl={isRtl} />
+                }
+              />
+              <Legend
+                align={isRtl ? "right" : "center"}
+                wrapperStyle={{
+                  fontSize: 12,
+                  color: "var(--text2)",
+                  direction: isRtl ? "rtl" : "ltr",
+                  textAlign: isRtl ? "right" : "center",
+                }}
+              />
               <Line
                 type="monotone"
                 dataKey="revenue"
@@ -505,8 +582,19 @@ export default function Dashboard() {
                   t("dashboardPage.tooltipOrders", { count: value }),
                   name,
                 ]}
+                contentStyle={{
+                  direction: isRtl ? "rtl" : "ltr",
+                  textAlign: isRtl ? "right" : "left",
+                }}
               />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Legend
+                align={isRtl ? "right" : "center"}
+                wrapperStyle={{
+                  fontSize: 11,
+                  direction: isRtl ? "rtl" : "ltr",
+                  textAlign: isRtl ? "right" : "center",
+                }}
+              />
             </PieChart>
           </ResponsiveContainer>
         </Card>
@@ -520,7 +608,12 @@ export default function Dashboard() {
           <BarChart
             data={monthlyChartData}
             barSize={20}
-            margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
+            margin={{
+              top: 4,
+              right: isRtl ? 2 : 4,
+              bottom: 0,
+              left: isRtl ? 4 : 0,
+            }}
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -534,12 +627,15 @@ export default function Dashboard() {
               tickLine={false}
             />
             <YAxis
+              orientation={isRtl ? "right" : "left"}
               tick={{ fontSize: 11, fill: "var(--text3)" }}
               axisLine={false}
               tickLine={false}
               width={32}
             />
-            <Tooltip content={<TooltipCard language={language} t={t} />} />
+            <Tooltip
+              content={<TooltipCard language={language} t={t} isRtl={isRtl} />}
+            />
             <Bar
               dataKey="count"
               fill="#2563EB"
@@ -550,8 +646,8 @@ export default function Dashboard() {
         </ResponsiveContainer>
       </Card>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-700 sm:px-5">
+      <section className="dashboard-recent-orders overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="dashboard-recent-orders__head border-b border-slate-200 px-4 py-3 dark:border-slate-700 sm:px-5">
           <h3 className="text-base font-semibold text-gray-900 dark:text-slate-100">
             {t("dashboardPage.recentOrders")}
           </h3>

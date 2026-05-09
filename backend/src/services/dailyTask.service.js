@@ -3,6 +3,11 @@ import {
   getAfghanMonthDateRange,
   getCurrentAfghanMonthYear,
 } from "../lib/afghanistanDate.js";
+import {
+  normalizeText,
+  parseNumberLocale,
+  toAsciiDigits,
+} from "../lib/normalize.js";
 import { recalculateOrderBenefit } from "./order.service.js";
 
 const CREATOR_SELECT = { id: true, name: true, accountType: true };
@@ -286,12 +291,21 @@ export const getDailyTasks = async ({
   year = null,
 }) => {
   const where = {};
+  const normalizedSearch = String(normalizeText(search || "") || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const parsedSearchBill = Math.trunc(
+    parseNumberLocale(toAsciiDigits(normalizedSearch)),
+  );
 
-  if (search) {
+  if (normalizedSearch) {
     where.OR = [
-      { fromName: { contains: search, mode: "insensitive" } },
-      { recipientName: { contains: search, mode: "insensitive" } },
-      { note: { contains: search, mode: "insensitive" } },
+      { fromName: { contains: normalizedSearch, mode: "insensitive" } },
+      { recipientName: { contains: normalizedSearch, mode: "insensitive" } },
+      { note: { contains: normalizedSearch, mode: "insensitive" } },
+      ...(Number.isFinite(parsedSearchBill)
+        ? [{ order: { customer: { billNumber: parsedSearchBill } } }]
+        : []),
     ];
   }
 

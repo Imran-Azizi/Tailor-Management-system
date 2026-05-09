@@ -39,6 +39,9 @@ const TITLES = {
   "/transactions/create": "transaction.title",
   "/transactions": "transaction.allTitle",
 };
+const SORTED_TITLE_ENTRIES = Object.entries(TITLES).sort(
+  (a, b) => b[0].length - a[0].length,
+);
 
 export default function Layout() {
   const { t } = useTranslation();
@@ -66,11 +69,9 @@ export default function Layout() {
   }, [mobileOpen]);
 
   const titleKey =
-    Object.entries(TITLES)
-      .sort((a, b) => b[0].length - a[0].length)
-      .find(
-        ([p]) => loc.pathname === p || loc.pathname.startsWith(`${p}/`),
-      )?.[1] || "appName";
+    SORTED_TITLE_ENTRIES.find(
+      ([p]) => loc.pathname === p || loc.pathname.startsWith(`${p}/`),
+    )?.[1] || "appName";
 
   return (
     <>

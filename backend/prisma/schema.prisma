@@ -25,11 +25,18 @@ enum TransactionSource {
   MANUAL
   SYSTEM_ORDER_ASSIGNMENT
   SYSTEM_WORKER_COMPLETION
+  DAMAGE_PENALTY
 }
 
 enum WorkerPaymentStatus {
   UNPAID
   PAID_TO_WORKER
+}
+
+enum WorkerRoleType {
+  QICHIKAR
+  DOKHT
+  WORKER
 }
 
 enum DraftStatus {
@@ -55,6 +62,8 @@ model User {
   workerPaidOrders               Order[]                 @relation("WorkerPaidByOrders")
   qichikarPaidOrders             Order[]                 @relation("QichikarPaidByOrders")
   dokhtPaidOrders                Order[]                 @relation("DokhtPaidByOrders")
+  workerPaymentReceipts          WorkerPaymentReceipt[]  @relation("WorkerPaymentReceiptWorker")
+  createdWorkerPaymentReceipts   WorkerPaymentReceipt[]  @relation("WorkerPaymentReceiptAdmin")
   notifications                  UserNotification[]
   transactions                   Transaction[]           @relation("UserTransactions")
   createdTransactions            Transaction[]           @relation("CreatedTransactions")
@@ -207,6 +216,7 @@ model Order {
   yakhanQaq               YakhanQaq?
   notifications           Notification[]
   transactions            Transaction[]
+  workerPaymentReceipts   WorkerPaymentReceipt[]
   damagedClothesPenalties DamagedClothesPenalty[]
   dailyTasks              DailyTask[]
   createdAt               DateTime                @default(now())
@@ -236,6 +246,30 @@ model Order {
   @@index([entryMonth])
   @@index([entryYear])
   @@index([createdByFinanceId])
+}
+
+model WorkerPaymentReceipt {
+  id                String         @id @default(uuid())
+  orderId           String
+  workerId          String
+  workerRole        WorkerRoleType
+  paidAmount        Float
+  receiptDate       DateTime       @default(now())
+  receivedByAdminId String
+  status            String         @default("RECEIVED")
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  order           Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  worker          User  @relation("WorkerPaymentReceiptWorker", fields: [workerId], references: [id], onDelete: Restrict)
+  receivedByAdmin User  @relation("WorkerPaymentReceiptAdmin", fields: [receivedByAdminId], references: [id], onDelete: Restrict)
+
+  @@unique([orderId, workerRole])
+  @@index([orderId])
+  @@index([workerId])
+  @@index([workerRole])
+  @@index([receiptDate])
+  @@index([receivedByAdminId])
 }
 
 model OrderDraft {

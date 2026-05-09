@@ -116,6 +116,52 @@ export const getDashboardStats = async ({
     monthWhere = { ...financeWhere };
   }
 
+  const carryForwardPendingWhere = hasMonthFilter
+    ? {
+        ...financeWhere,
+        isCompleted: false,
+        OR: [
+          { entryYear: { lt: parsedYear } },
+          { entryYear: parsedYear, entryMonth: { lte: parsedMonth } },
+          { entryMonth: null, createdAt: { lte: monthEnd } },
+        ],
+      }
+    : { ...monthWhere, isCompleted: false };
+
+  const carryForwardRemainingWhere = hasMonthFilter
+    ? {
+        ...financeWhere,
+        isCompleted: false,
+        OR: [
+          { entryYear: { lt: parsedYear } },
+          { entryYear: parsedYear, entryMonth: { lte: parsedMonth } },
+          { entryMonth: null, createdAt: { lte: monthEnd } },
+        ],
+      }
+    : { ...monthWhere, isCompleted: false };
+
+  const recentOrdersWhere = hasMonthFilter
+    ? {
+        ...financeWhere,
+        OR: [
+          { entryMonth: parsedMonth, entryYear: parsedYear },
+          { entryMonth: null, createdAt: { gte: monthStart, lte: monthEnd } },
+          {
+            AND: [
+              { isCompleted: false },
+              {
+                OR: [
+                  { entryYear: { lt: parsedYear } },
+                  { entryYear: parsedYear, entryMonth: { lt: parsedMonth } },
+                  { entryMonth: null, createdAt: { lt: monthStart } },
+                ],
+              },
+            ],
+          },
+        ],
+      }
+    : monthWhere;
+
   const now = new Date();
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
@@ -123,16 +169,20 @@ export const getDashboardStats = async ({
     totalOrders,
     completedOrders,
     pendingOrders,
+    allPendingOrders,
     emergencyOrders,
     todayOrders,
     revenueData,
     paidData,
+    remainingData,
     recentOrders,
     ordersByType,
   ] = await Promise.all([
     prisma.order.count({ where: monthWhere }),
     prisma.order.count({ where: { ...monthWhere, isCompleted: true } }),
-    prisma.order.count({ where: { ...monthWhere, isCompleted: false } }),
+    prisma.order.count({ where: carryForwardPendingWhere }),
+    // Global pending: all incomplete orders regardless of month (carry-over support)
+    prisma.order.count({ where: { ...financeWhere, isCompleted: false } }),
     prisma.order.count({
       where: { ...monthWhere, isEmergency: true, isCompleted: false },
     }),
@@ -151,8 +201,12 @@ export const getDashboardStats = async ({
       where: monthWhere,
       _sum: { paidAmount: true, remaining: true },
     }),
+    prisma.order.aggregate({
+      where: carryForwardRemainingWhere,
+      _sum: { remaining: true },
+    }),
     prisma.order.findMany({
-      where: monthWhere,
+      where: recentOrdersWhere,
       take: 10,
       orderBy: { createdAt: "desc" },
       include: { customer: true },
@@ -283,6 +337,7 @@ export const getDashboardStats = async ({
     totalOrders,
     completedOrders,
     pendingOrders,
+    allPendingOrders,
     emergencyOrders,
     todayOrders,
     // Legacy fields kept for non-filtered views
@@ -291,7 +346,7 @@ export const getDashboardStats = async ({
     totalRevenue: revenueData._sum.totalPrice || 0,
     totalDiscount: revenueData._sum.discount || 0,
     totalPaid: paidData._sum.paidAmount || 0,
-    totalRemaining: paidData._sum.remaining || 0,
+    totalRemaining: remainingData._sum.remaining || 0,
     recentOrders,
     monthlyRevenue,
     ordersByType: ordersByType.map((o) => ({
@@ -368,32 +423,39 @@ const getMonthlyRevenue = async (
     ];
   }
 
-  const months = [];
-  for (let i = 5; i >= 0; i--) {
+  const monthContexts = Array.from({ length: 6 }, (_, index) => {
+    const i = 5 - index;
     const d = new Date();
     d.setMonth(d.getMonth() - i);
     const start = new Date(d.getFullYear(), d.getMonth(), 1);
     const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+    return { start, end };
+  });
 
-    const result = await prisma.order.aggregate({
-      where: { ...financeWhere, createdAt: { gte: start, lte: end } },
-      _sum: { totalPrice: true, paidAmount: true },
-      _count: true,
-    });
+  const results = await Promise.all(
+    monthContexts.map(({ start, end }) =>
+      prisma.order.aggregate({
+        where: { ...financeWhere, createdAt: { gte: start, lte: end } },
+        _sum: { totalPrice: true, paidAmount: true },
+        _count: true,
+      }),
+    ),
+  );
 
+  return monthContexts.map(({ start }, index) => {
+    const result = results[index];
     const afghan = getCurrentAfghanMonthYear(start);
     const afghanLabel =
       AFGHAN_MONTH_LABELS_EN[(Number(afghan.month) || 1) - 1] ||
       String(afghan.month);
 
-    months.push({
+    return {
       month: `${afghanLabel} ${afghan.year}`,
       monthNumber: afghan.month,
       monthYear: afghan.year,
       revenue: result._sum.totalPrice || 0,
       paid: result._sum.paidAmount || 0,
       count: result._count,
-    });
-  }
-  return months;
+    };
+  });
 };

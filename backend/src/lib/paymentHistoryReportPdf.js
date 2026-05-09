@@ -1,34 +1,41 @@
 import PDFDocument from "pdfkit";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
 import {
   formatReportLabelValue,
   formatReportDateTime,
   formatReportNumber,
   isRtlReportLanguage,
+  normalizeReportPdfText,
   normalizeReportLanguage,
 } from "./reportLocale.js";
-import { loadArabicFont, drawArabicTextSync } from "./arabicRenderer.js";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ARABIC_SCRIPT_REGEX =
-  /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+import {
+  loadArabicFont,
+  resolveArabicReportFontPath,
+} from "./arabicRenderer.js";
+import {
+  wt,
+  tokenWidth,
+  truncateTextToWidth,
+  rtlAwareAlign,
+  mirrorColumns,
+  drawRtlMixedValue,
+} from "./reportPdfUtils.js";
 
 const TABLE_X = 40;
 const TABLE_W = 760;
-const ROW_H = 24;
-const FOOTER_MARGIN = 56;
+const ROW_H = 34;
+const FOOTER_THRESHOLD_MARGIN = 56;
+const CELL_PAD_X = 8;
+const CURRENCY_GAP = "  ";
 
 const COL = {
-  num: { x: 40, w: 24 },
-  company: { x: 64, w: 150 },
-  total: { x: 214, w: 92, align: "right" },
-  paid: { x: 306, w: 92, align: "right" },
-  remaining: { x: 398, w: 95, align: "right" },
-  status: { x: 493, w: 84 },
-  paidAt: { x: 577, w: 128 },
-  user: { x: 705, w: 95 },
+  num: { x: 40, w: 28 },
+  company: { x: 68, w: 180 },
+  total: { x: 248, w: 90, align: "right" },
+  paid: { x: 338, w: 90, align: "right" },
+  remaining: { x: 428, w: 96, align: "right" },
+  status: { x: 524, w: 92 },
+  paidAt: { x: 616, w: 116 },
+  user: { x: 732, w: 68 },
 };
 
 const TEXT = {
@@ -50,7 +57,7 @@ const TEXT = {
       paid: "Paid",
       remaining: "Remaining",
       status: "Status",
-      paidAt: "Date & Time",
+      paidAt: "Date",
       user: "User",
     },
     statuses: {
@@ -77,7 +84,7 @@ const TEXT = {
       paid: "پرداخت",
       remaining: "باقی‌مانده",
       status: "وضعیت",
-      paidAt: "تاریخ و زمان",
+      paidAt: "تاریخ",
       user: "کاربر",
     },
     statuses: {
@@ -104,7 +111,7 @@ const TEXT = {
       paid: "ورکړه",
       remaining: "پاتې",
       status: "حالت",
-      paidAt: "نېټه او وخت",
+      paidAt: "نېټه",
       user: "کارن",
     },
     statuses: {
@@ -115,123 +122,64 @@ const TEXT = {
   },
 };
 
-function hasArabicScript(value) {
-  return ARABIC_SCRIPT_REGEX.test(String(value || ""));
-}
-
-function rtlAwareAlign(isRtl, fallback = "left") {
-  return isRtl ? "right" : fallback;
-}
-
-function resolveArabicFontPath() {
-  const candidates = [
-    process.env.PDF_REPORT_FONT_PATH,
-    process.env.PDF_DARI_PASHTO_FONT_PATH,
-    process.env.PDF_BAHIJ_FONT_PATH,
-    process.env.PDF_VAZIRMATN_FONT_PATH,
-    process.env.PDF_ARABIC_FONT_PATH,
-    path.join(__dirname, "../fonts/Vazirmatn-Regular.ttf"),
-    path.join(__dirname, "../fonts/NotoNaskhArabic-Regular.ttf"),
-    path.join(__dirname, "../fonts/NotoSansArabic-Regular.ttf"),
-    path.join(__dirname, "../fonts/NotoNastaliqUrdu-Regular.ttf"),
-    "C:/Windows/Fonts/bahij.ttf",
-    "C:/Windows/Fonts/bahij-zar.ttf",
-    "C:/Windows/Fonts/Bahij_Zar.ttf",
-    "C:/Windows/Fonts/Bahij Zar.ttf",
-    path.join(__dirname, "../fonts/Bahij_Zar.ttf"),
-    path.join(__dirname, "../fonts/Bahij-Zar.ttf"),
-    path.join(__dirname, "../fonts/BahijZar.ttf"),
-    "C:/Windows/Fonts/segoeui.ttf",
-    "C:/Windows/Fonts/tahoma.ttf",
-    "C:/Windows/Fonts/arial.ttf",
-    "C:/Windows/Fonts/aldhabi.ttf",
-    "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf",
-    "/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf",
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-  ].filter(Boolean);
-  return candidates.find((p) => fs.existsSync(p)) ?? null;
-}
-
-function mirrorColumns(columns, tableX, tableWidth) {
-  return Object.fromEntries(
-    Object.entries(columns).map(([key, col]) => [
-      key,
-      { ...col, x: tableX + tableWidth - (col.x - tableX) - col.w },
-    ]),
-  );
-}
-
-function tokenWidth(doc, token, fkFont, fontSize = 10) {
-  const text = String(token ?? "");
-  if (!text) return 0;
-
-  if (fkFont && hasArabicScript(text)) {
-    const scale = fontSize / fkFont.unitsPerEm;
-    const run = fkFont.layout(text, [], "arab", "dflt", "rtl");
-    return run.positions.reduce((sum, pos) => sum + pos.xAdvance * scale, 0);
-  }
-
-  return doc.font("Helvetica").fontSize(fontSize).widthOfString(text);
-}
-
-function drawRtlMixedValue(doc, value, x, y, width, fkFont, fontSize = 10) {
-  const text = String(value ?? "");
-  if (!text) return;
-
-  const tokens = text.match(/(\d[\d,./:-]*|\s+|[^\d\s]+)/g) || [text];
-  let cursor = x + width;
-
-  tokens.forEach((token) => {
-    const segment = String(token ?? "");
-    if (!segment) return;
-    const w = tokenWidth(doc, segment, fkFont, fontSize);
-    const startX = cursor - w;
-
-    if (!segment.trim()) {
-      cursor = startX;
-      return;
-    }
-
-    if (/^\d[\d,./:-]*$/.test(segment)) {
-      doc
-        .font("Helvetica")
-        .fontSize(fontSize)
-        .fillColor("#0F172A")
-        .text(segment, startX, y + 1.2, {
-          width: Math.max(w + 1, 1),
-          align: "left",
-          lineBreak: false,
-        });
-    } else {
-      wt(
-        doc,
-        segment,
-        startX,
-        y,
-        { width: Math.max(w + 1, 1), align: "left", lineBreak: false },
-        fkFont,
-        "#0F172A",
-        false,
-        fontSize,
-      );
-    }
-
-    cursor = startX;
+function formatMoney(value, language) {
+  const formatted = formatReportNumber(value, language, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
+  const normalized = normalizeReportLanguage(language);
+  const isRtl = normalized === "dari" || normalized === "pashto";
+  return isRtl
+    ? `\u200E${formatted}${CURRENCY_GAP}AF\u200E`
+    : `${formatted}${CURRENCY_GAP}AF`;
+}
+
+function formatHeaderMoney(value, language) {
+  const formatted = String(
+    formatReportNumber(value, language, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }),
+  ).replace(/\u200E/g, "");
+  const normalized = normalizeReportLanguage(language);
+  const isRtl = normalized === "dari" || normalized === "pashto";
+
+  // In RTL meta-line rendering, first token appears on the visual right.
+  return isRtl
+    ? `AF${CURRENCY_GAP}${formatted}`
+    : `${formatted}${CURRENCY_GAP}AF`;
+}
+
+function formatDateOnly(value, language) {
+  return formatReportDateTime(value, language, {
+    year: "numeric",
+    month: "long",
+    day: "2-digit",
+    hour: undefined,
+    minute: undefined,
+  });
+}
+
+function resolveStatus(row, labels) {
+  const remaining = Number(row?.remainingAfter || 0);
+  const paid = Number(row?.totalPaidAfter || 0);
+  if (remaining <= 0) return { key: "PAID", color: "#15803D" };
+  if (paid > 0) return { key: "PARTIAL", color: "#B45309" };
+  return { key: "REMAINING", color: "#DC2626" };
 }
 
 function drawHeaderMetaLine(
   doc,
-  { label, value, x, y, width, isRtl, fkFont, fontSize = 10 },
+  { label, value, x, y, width, isRtl, fkFont, language, fontSize = 10 },
 ) {
-  const safeLabel = String(label || "");
-  const safeValue = String(value ?? "-");
+  const safeLabel = normalizeReportPdfText(label, language);
+  const safeValue = normalizeReportPdfText(value, language);
 
   if (isRtl) {
-    const sep = "،";
+    const sep = ":";
     const labelW = Math.min(
       Math.max(tokenWidth(doc, safeLabel, fkFont, fontSize) + 12, 86),
-      Math.min(230, width * 0.45),
+      Math.min(220, width * 0.45),
     );
     const sepW = Math.max(tokenWidth(doc, sep, fkFont, fontSize) + 6, 10);
     const valueW = Math.max(width - labelW - sepW - 6, 40);
@@ -261,7 +209,58 @@ function drawHeaderMetaLine(
       false,
       fontSize,
     );
-    drawRtlMixedValue(doc, safeValue, x, y, valueW, fkFont, fontSize);
+
+    // Render currency values with a fixed visual gap between AF and amount.
+    const currencyMatch = safeValue.match(/^AF\s+(.+)$/i);
+    if (currencyMatch) {
+      const numberPart = String(currencyMatch[1] || "").trim() || "0";
+      const afLabel = "AF";
+      const afW = Math.max(tokenWidth(doc, afLabel, fkFont, fontSize), 12);
+      const moneyGap = 7;
+      const rightEdge = x + valueW;
+      const afX = rightEdge - afW;
+      const numberBoxW = Math.max(valueW - afW - moneyGap, 72);
+
+      wt(
+        doc,
+        afLabel,
+        afX,
+        y,
+        { width: afW + 1, align: "left", lineBreak: false },
+        fkFont,
+        "#475569",
+        false,
+        fontSize,
+        language,
+      );
+
+      drawRtlMixedValue(
+        doc,
+        numberPart,
+        x,
+        y,
+        numberBoxW,
+        fkFont,
+        fontSize,
+        "#475569",
+        false,
+        language,
+      );
+      return;
+    }
+
+    drawRtlMixedValue(
+      doc,
+      safeValue,
+      x,
+      y,
+      valueW,
+      fkFont,
+      fontSize,
+      "#475569",
+      false,
+      language,
+    );
     return;
   }
 
@@ -278,60 +277,33 @@ function drawHeaderMetaLine(
   );
 }
 
-function wt(
-  doc,
-  text,
-  x,
-  y,
-  opts,
-  fkFont,
-  fillColor,
-  bold = false,
-  fontSize = 10,
-) {
-  const safe = String(text ?? "");
-  if (fkFont && hasArabicScript(safe)) {
-    drawArabicTextSync(
-      doc,
-      safe,
-      x,
-      y,
-      { ...opts, fontSize },
-      fkFont,
-      fillColor || "#000000",
-    );
-    return;
-  }
-  doc
-    .font(bold ? "Helvetica-Bold" : "Helvetica")
-    .fontSize(fontSize)
-    .fillColor(fillColor || "#0F172A")
-    .text(safe, x, y, opts);
-}
-
-function formatMoney(value, language) {
-  const formatted = formatReportNumber(value, language, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-  const normalized = normalizeReportLanguage(language);
-  const isRtl = normalized === "dari" || normalized === "pashto";
-
-  // Wrap entire currency string in LTR marks for RTL languages to keep minus sign on left
-  return isRtl ? `\u200E${formatted} AF` : `${formatted} AF`;
-}
-
-function resolveStatus(row, labels) {
-  const remaining = Number(row?.remainingAfter || 0);
-  const paid = Number(row?.totalPaidAfter || 0);
-  if (remaining <= 0) return { key: "PAID", color: "#15803D" };
-  if (paid > 0) return { key: "PARTIAL", color: "#B45309" };
-  return { key: "REMAINING", color: "#DC2626" };
-}
-
-function drawHeaderRow(doc, y, labels, fkFont, isRtl, colMap) {
+function drawHeaderRow(doc, y, labels, fkFont, isRtl, colMap, language) {
   doc.save();
-  doc.roundedRect(TABLE_X, y, TABLE_W, ROW_H, 3).fill("#1E293B");
+  doc.rect(TABLE_X, y, TABLE_W, ROW_H).fill("#FFFFFF");
+  doc
+    .rect(TABLE_X, y, TABLE_W, ROW_H)
+    .lineWidth(1)
+    .strokeColor("#111111")
+    .stroke();
+
+  const boundaryXs = Array.from(
+    new Set(
+      Object.values(colMap)
+        .map((col) => Number(col.x))
+        .filter(Boolean),
+    ),
+  )
+    .sort((a, b) => a - b)
+    .filter((x) => x > TABLE_X && x < TABLE_X + TABLE_W);
+
+  boundaryXs.forEach((x) => {
+    doc
+      .moveTo(x, y)
+      .lineTo(x, y + ROW_H)
+      .lineWidth(0.7)
+      .strokeColor("#111111")
+      .stroke();
+  });
   doc.restore();
 
   const headerMap = {
@@ -350,15 +322,179 @@ function drawHeaderRow(doc, y, labels, fkFont, isRtl, colMap) {
     wt(
       doc,
       label,
-      c.x,
-      y + 7,
-      { width: c.w, align: rtlAwareAlign(isRtl, c.align || "left") },
+      c.x + 3,
+      y + 10,
+      {
+        width: Math.max(c.w - 6, 8),
+        align:
+          key === "num" ? "center" : rtlAwareAlign(isRtl, c.align || "left"),
+      },
       fkFont,
-      "#FFFFFF",
+      "#000000",
       true,
       9.5,
+      language,
     );
   });
+
+  return y + ROW_H;
+}
+
+function drawRow(doc, y, index, row, labels, fkFont, isRtl, colMap, language) {
+  const rowBackground = index % 2 === 0 ? "#FFFFFF" : "#FAFAFA";
+  const status = resolveStatus(row, labels);
+  const statusLabel = labels.statuses[status.key] || status.key;
+
+  doc.save();
+  doc.rect(TABLE_X, y, TABLE_W, ROW_H).fill(rowBackground);
+  doc
+    .rect(TABLE_X, y, TABLE_W, ROW_H)
+    .lineWidth(0.6)
+    .strokeColor("#DDDDDD")
+    .stroke();
+
+  const boundaryXs = Array.from(
+    new Set(
+      Object.values(colMap)
+        .map((col) => Number(col.x))
+        .filter(Boolean),
+    ),
+  )
+    .sort((a, b) => a - b)
+    .filter((x) => x > TABLE_X && x < TABLE_X + TABLE_W);
+
+  boundaryXs.forEach((x) => {
+    doc
+      .moveTo(x, y)
+      .lineTo(x, y + ROW_H)
+      .lineWidth(0.5)
+      .strokeColor("#DDDDDD")
+      .stroke();
+  });
+  doc.restore();
+
+  doc.font("Helvetica").fontSize(9).fillColor("#000000");
+  doc.text(String(index + 1), colMap.num.x, y + 12, {
+    width: colMap.num.w,
+    align: "center",
+  });
+  doc.text(formatMoney(row.totalPriceAfter, language), colMap.total.x, y + 12, {
+    width: colMap.total.w - 4,
+    align: "right",
+  });
+  doc.text(formatMoney(row.paidAmount, language), colMap.paid.x, y + 12, {
+    width: colMap.paid.w - 4,
+    align: "right",
+  });
+  doc.fillColor(
+    status.key === "PAID"
+      ? "#15803D"
+      : status.key === "PARTIAL"
+        ? "#B45309"
+        : "#DC2626",
+  );
+  doc.text(
+    formatMoney(row.remainingAfter, language),
+    colMap.remaining.x,
+    y + 12,
+    {
+      width: colMap.remaining.w - 4,
+      align: "right",
+    },
+  );
+
+  wt(
+    doc,
+    truncateTextToWidth(
+      doc,
+      row.companyName || "-",
+      colMap.company.w - CELL_PAD_X * 2,
+      fkFont,
+      9,
+    ),
+    colMap.company.x + CELL_PAD_X,
+    y + 12,
+    {
+      width: colMap.company.w - CELL_PAD_X * 2,
+      align: rtlAwareAlign(isRtl, "left"),
+    },
+    fkFont,
+    "#000000",
+    false,
+    9,
+    language,
+  );
+  wt(
+    doc,
+    truncateTextToWidth(
+      doc,
+      statusLabel,
+      colMap.status.w - CELL_PAD_X * 2,
+      fkFont,
+      9,
+    ),
+    colMap.status.x + CELL_PAD_X,
+    y + 12,
+    {
+      width: colMap.status.w - CELL_PAD_X * 2,
+      align: rtlAwareAlign(isRtl, "left"),
+    },
+    fkFont,
+    status.color,
+    true,
+    9,
+    language,
+  );
+
+  if (isRtl) {
+    drawRtlMixedValue(
+      doc,
+      formatDateOnly(row.paidAt, language),
+      colMap.paidAt.x + CELL_PAD_X,
+      y + 12,
+      colMap.paidAt.w - CELL_PAD_X * 2,
+      fkFont,
+      9,
+      "#000000",
+      false,
+      language,
+    );
+  } else {
+    wt(
+      doc,
+      formatDateOnly(row.paidAt, language),
+      colMap.paidAt.x + CELL_PAD_X,
+      y + 12,
+      { width: colMap.paidAt.w - CELL_PAD_X * 2, align: "left" },
+      fkFont,
+      "#000000",
+      false,
+      9,
+      language,
+    );
+  }
+
+  wt(
+    doc,
+    truncateTextToWidth(
+      doc,
+      row.paidBy?.name || "-",
+      colMap.user.w - CELL_PAD_X * 2,
+      fkFont,
+      9,
+    ),
+    colMap.user.x + CELL_PAD_X,
+    y + 12,
+    {
+      width: colMap.user.w - CELL_PAD_X * 2,
+      align: rtlAwareAlign(isRtl, "left"),
+    },
+    fkFont,
+    "#000000",
+    false,
+    9,
+    language,
+  );
 
   return y + ROW_H;
 }
@@ -376,7 +512,7 @@ export async function buildPaymentHistoryReportPdf({
 
   let fkFont = null;
   if (isRtl) {
-    const fontPath = resolveArabicFontPath();
+    const fontPath = resolveArabicReportFontPath();
     if (fontPath) {
       try {
         fkFont = await loadArabicFont(fontPath);
@@ -406,89 +542,105 @@ export async function buildPaymentHistoryReportPdf({
     const safeRows = Array.isArray(rows) ? rows : [];
     const activeFilters = Number(filters.activeFilterCount || 0);
 
+    const headerX = TABLE_X;
+    const headerY = 22;
+    const headerH = 116;
+
+    doc.save();
+    doc.rect(headerX, headerY, TABLE_W, headerH).fill("#FFFFFF");
+    doc
+      .rect(headerX, headerY, TABLE_W, headerH)
+      .lineWidth(1)
+      .strokeColor("#DDDDDD")
+      .stroke();
+    doc.restore();
+
     wt(
       doc,
       labels.title,
-      40,
-      36,
-      { width: pageW - 80, align: rtlAwareAlign(isRtl, "left") },
+      headerX + 14,
+      headerY + 12,
+      { width: TABLE_W - 28, align: rtlAwareAlign(isRtl, "left") },
       fkFont,
-      "#0F172A",
+      "#000000",
       true,
-      19,
-    );
-    const activeFiltersLine = [
-      formatReportLabelValue(
-        labels.activeFilters,
-        formatReportNumber(activeFilters, normalizedLanguage),
-        normalizedLanguage,
-      ),
-      formatReportLabelValue(
-        labels.records,
-        formatReportNumber(safeRows.length, normalizedLanguage),
-        normalizedLanguage,
-      ),
-    ].join(" | ");
-    const totalPaidLine = [
-      formatReportLabelValue(
-        labels.totalPaid,
-        formatMoney(summary.totalPaid || 0, normalizedLanguage),
-        normalizedLanguage,
-      ),
-      formatReportLabelValue(
-        labels.totalRemaining,
-        formatMoney(summary.totalRemaining || 0, normalizedLanguage),
-        normalizedLanguage,
-      ),
-    ].join(" | ");
-    drawHeaderMetaLine(doc, {
-      label: labels.generatedAt,
-      value: formatReportDateTime(new Date(), normalizedLanguage),
-      x: 40,
-      y: 60,
-      width: pageW - 80,
-      isRtl,
-      fkFont,
-      fontSize: 10,
-    });
-    wt(
-      doc,
-      activeFiltersLine,
-      40,
-      76,
-      { width: pageW - 80, align: rtlAwareAlign(isRtl, "left") },
-      fkFont,
-      "#334155",
-      false,
-      10,
-    );
-    wt(
-      doc,
-      totalPaidLine,
-      40,
-      92,
-      { width: pageW - 80, align: rtlAwareAlign(isRtl, "left") },
-      fkFont,
-      "#0F172A",
-      true,
-      10,
+      17,
+      normalizedLanguage,
     );
 
-    let y = 118;
-    y = drawHeaderRow(doc, y, labels, fkFont, isRtl, colMap);
-    const footerThreshold = doc.page.height - FOOTER_MARGIN;
+    void activeFilters;
+
+    drawHeaderMetaLine(doc, {
+      label: labels.generatedAt,
+      value: formatDateOnly(new Date(), normalizedLanguage),
+      x: headerX + 14,
+      y: headerY + 44,
+      width: TABLE_W - 28,
+      isRtl,
+      fkFont,
+      language: normalizedLanguage,
+      fontSize: 10,
+    });
+    drawHeaderMetaLine(doc, {
+      label: labels.totalPaid,
+      value: formatHeaderMoney(summary.totalPaid || 0, normalizedLanguage),
+      x: headerX + 14,
+      y: headerY + 68,
+      width: TABLE_W - 28,
+      isRtl,
+      fkFont,
+      language: normalizedLanguage,
+      fontSize: 10,
+    });
+    drawHeaderMetaLine(doc, {
+      label: labels.totalRemaining,
+      value: formatHeaderMoney(summary.totalRemaining || 0, normalizedLanguage),
+      x: headerX + 14,
+      y: headerY + 88,
+      width: TABLE_W - 28,
+      isRtl,
+      fkFont,
+      language: normalizedLanguage,
+      fontSize: 10,
+    });
+
+    let y = headerY + headerH + 16;
+    wt(
+      doc,
+      labels.records,
+      TABLE_X,
+      y,
+      { width: TABLE_W, align: rtlAwareAlign(isRtl, "left") },
+      fkFont,
+      "#000000",
+      true,
+      12,
+      normalizedLanguage,
+    );
+    y += 18;
+    y = drawHeaderRow(
+      doc,
+      y,
+      labels,
+      fkFont,
+      isRtl,
+      colMap,
+      normalizedLanguage,
+    );
+    const footerThreshold = doc.page.height - FOOTER_THRESHOLD_MARGIN;
 
     if (safeRows.length === 0) {
       wt(
         doc,
         labels.noRecords,
         44,
-        y + 8,
+        y + 10,
         { width: TABLE_W - 8, align: rtlAwareAlign(isRtl, "left") },
         fkFont,
         "#64748B",
         false,
         10,
+        normalizedLanguage,
       );
     } else {
       safeRows.forEach((row, index) => {
@@ -505,111 +657,30 @@ export async function buildPaymentHistoryReportPdf({
             "#0F172A",
             true,
             11,
+            normalizedLanguage,
           );
-          y = drawHeaderRow(doc, y + 16, labels, fkFont, isRtl, colMap);
-        }
-
-        if (index % 2 === 0) {
-          doc.save();
-          doc.rect(TABLE_X, y, TABLE_W, ROW_H).fill("#F8FAFC");
-          doc.restore();
-        }
-
-        const status = resolveStatus(row, labels);
-        const statusLabel = labels.statuses[status.key] || status.key;
-
-        doc.font("Helvetica").fontSize(9.5).fillColor("#0F172A");
-        doc.text(String(index + 1), colMap.num.x, y + 6, {
-          width: colMap.num.w,
-          align: rtlAwareAlign(isRtl, "left"),
-        });
-        doc.text(
-          formatMoney(row.totalPriceAfter, normalizedLanguage),
-          colMap.total.x,
-          y + 6,
-          {
-            width: colMap.total.w,
-            align: "right",
-          },
-        );
-        doc.text(
-          formatMoney(row.paidAmount, normalizedLanguage),
-          colMap.paid.x,
-          y + 6,
-          {
-            width: colMap.paid.w,
-            align: "right",
-          },
-        );
-        doc.fillColor(status.key === "PAID" ? "#15803D" : "#DC2626");
-        doc.text(
-          formatMoney(row.remainingAfter, normalizedLanguage),
-          colMap.remaining.x,
-          y + 6,
-          {
-            width: colMap.remaining.w,
-            align: "right",
-          },
-        );
-
-        wt(
-          doc,
-          row.companyName || "-",
-          colMap.company.x,
-          y + 6,
-          { width: colMap.company.w, align: rtlAwareAlign(isRtl, "left") },
-          fkFont,
-          "#0F172A",
-          false,
-          9.5,
-        );
-        wt(
-          doc,
-          statusLabel,
-          colMap.status.x,
-          y + 6,
-          { width: colMap.status.w, align: rtlAwareAlign(isRtl, "left") },
-          fkFont,
-          status.color,
-          true,
-          9.5,
-        );
-        if (isRtl) {
-          drawRtlMixedValue(
+          y = drawHeaderRow(
             doc,
-            formatReportDateTime(row.paidAt, normalizedLanguage),
-            colMap.paidAt.x,
-            y + 6,
-            colMap.paidAt.w,
+            y + 16,
+            labels,
             fkFont,
-            9.5,
-          );
-        } else {
-          wt(
-            doc,
-            formatReportDateTime(row.paidAt, normalizedLanguage),
-            colMap.paidAt.x,
-            y + 6,
-            { width: colMap.paidAt.w, align: "left" },
-            fkFont,
-            "#0F172A",
-            false,
-            9.5,
+            isRtl,
+            colMap,
+            normalizedLanguage,
           );
         }
-        wt(
-          doc,
-          row.paidBy?.name || "-",
-          colMap.user.x,
-          y + 6,
-          { width: colMap.user.w, align: rtlAwareAlign(isRtl, "left") },
-          fkFont,
-          "#0F172A",
-          false,
-          9.5,
-        );
 
-        y += ROW_H;
+        y = drawRow(
+          doc,
+          y,
+          index,
+          row,
+          labels,
+          fkFont,
+          isRtl,
+          colMap,
+          normalizedLanguage,
+        );
       });
     }
 
@@ -623,6 +694,7 @@ export async function buildPaymentHistoryReportPdf({
       "#94A3B8",
       false,
       8,
+      normalizedLanguage,
     );
 
     doc.end();

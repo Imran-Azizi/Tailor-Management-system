@@ -1,6 +1,5 @@
-import { useMemo } from "react";
 import { LuChevronDown } from "react-icons/lu";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import SidebarItem from "./SidebarItem.jsx";
 import { isRouteActive } from "./routeMatch.js";
 
@@ -12,6 +11,7 @@ function hasChildActive(children, pathname) {
 
 export default function SidebarGroup({
   group,
+  pathname,
   collapsed,
   accent,
   isRtl,
@@ -20,21 +20,7 @@ export default function SidebarGroup({
   badges,
   onNavigate,
 }) {
-  const location = useLocation();
   const navigate = useNavigate();
-
-  const normalizedItems = useMemo(
-    () =>
-      group.items.map((item) => ({
-        ...item,
-        text: item.text,
-        children: item.children?.map((child) => ({
-          ...child,
-          text: child.text,
-        })),
-      })),
-    [group.items],
-  );
 
   const parentButtonBase =
     "group flex h-10 w-full items-center gap-2.5 rounded-xl border border-transparent px-3 text-sm font-medium transition-all duration-200";
@@ -48,22 +34,23 @@ export default function SidebarGroup({
       </div>
 
       <div className="space-y-0.5 px-2">
-        {normalizedItems.map((item) => {
+        {group.items.map((item) => {
           if (!item.children?.length) {
             return (
               <SidebarItem
                 key={item.key}
                 item={item}
+                pathname={pathname}
                 collapsed={collapsed}
                 accent={accent}
                 isRtl={isRtl}
                 badgeValue={item.badge ? badges?.[item.badge] : null}
-                onNavigate={() => onNavigate?.()}
+                onNavigate={onNavigate}
               />
             );
           }
 
-          const childActive = hasChildActive(item.children, location.pathname);
+          const childActive = hasChildActive(item.children, pathname);
           const itemOpen = openDropdownId === item.key || childActive;
 
           if (collapsed) {
@@ -142,6 +129,7 @@ export default function SidebarGroup({
                       <SidebarItem
                         key={child.key}
                         item={child}
+                        pathname={pathname}
                         collapsed={false}
                         accent={accent}
                         isRtl={isRtl}

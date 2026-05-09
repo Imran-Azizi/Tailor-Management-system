@@ -12,7 +12,6 @@ import {
   LuHistory,
   LuRefreshCcw,
   LuSearch,
-  LuWallet,
   LuX,
 } from "react-icons/lu";
 import api from "../lib/api.js";
@@ -86,11 +85,6 @@ function downloadBlob(blob, fileName) {
   anchor.click();
   document.body.removeChild(anchor);
   URL.revokeObjectURL(url);
-}
-
-function toCsvValue(value) {
-  const safe = String(value ?? "");
-  return `"${safe.replaceAll('"', '""')}"`;
 }
 
 export default function PaymentHistory() {
@@ -213,66 +207,6 @@ export default function PaymentHistory() {
     setSortOrder(field === "companyName" ? "asc" : "desc");
   };
 
-  const exportRows = async () => {
-    const exportLimit = Math.min(Math.max(total || PAGE_SIZE, PAGE_SIZE), 5000);
-    const response = await api.get("/rakhts/payment-history", {
-      params: {
-        ...queryParams,
-        page: 1,
-        limit: exportLimit,
-      },
-    });
-    return Array.isArray(response.data?.data) ? response.data.data : [];
-  };
-
-  const handleExportCsv = async () => {
-    try {
-      setExporting("csv");
-      const allRows = await exportRows();
-      const header = [
-        t("rakht.companyName", { defaultValue: "Company Name" }),
-        t("rakht.totalPrice", { defaultValue: "Total Price" }),
-        t("rakht.givenMoney", { defaultValue: "Paid Amount" }),
-        t("rakht.remainingMoney", { defaultValue: "Remaining Amount" }),
-        t("rakht.dateTime", { defaultValue: "Payment Date & Time" }),
-        t("common.status", { defaultValue: "Status" }),
-        t("users.name", { defaultValue: "User" }),
-      ];
-      const csvLines = [header.map(toCsvValue).join(",")];
-
-      allRows.forEach((row) => {
-        const status = getPaymentStatus(row, t).label;
-        csvLines.push(
-          [
-            row.companyName,
-            formatMoney(row.totalPriceAfter, language),
-            formatMoney(row.paidAmount, language),
-            formatMoney(row.remainingAfter, language),
-            formatDateTime(row.paidAt, language),
-            status,
-            row.paidBy?.name || "-",
-          ]
-            .map(toCsvValue)
-            .join(","),
-        );
-      });
-
-      downloadBlob(
-        new Blob([csvLines.join("\n")], { type: "text/csv;charset=utf-8;" }),
-        `payment-history-${formatDateValue(new Date()) || "export"}.csv`,
-      );
-    } catch (error) {
-      toast.error(
-        getApiErrorMessage(
-          error,
-          t("rakht.exportCsvFailed", { defaultValue: "Failed to export CSV." }),
-        ),
-      );
-    } finally {
-      setExporting("");
-    }
-  };
-
   const handleExportPdf = async () => {
     try {
       setExporting("pdf");
@@ -328,17 +262,6 @@ export default function PaymentHistory() {
               {isFetching
                 ? t("common.loading", { defaultValue: "Loading..." })
                 : t("common.refresh", { defaultValue: "Refresh" })}
-            </button>
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              onClick={handleExportCsv}
-              disabled={exporting === "csv" || total === 0}
-            >
-              <LuDownload size={14} />
-              {exporting === "csv"
-                ? t("common.loading", { defaultValue: "Loading..." })
-                : t("rakht.exportCsv", { defaultValue: "Export CSV" })}
             </button>
             <button
               type="button"

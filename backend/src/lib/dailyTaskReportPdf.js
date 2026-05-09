@@ -1,84 +1,26 @@
 import PDFDocument from "pdfkit";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
 import {
   formatReportLabelValue,
   formatReportDateTime,
   formatReportNumber,
   isRtlReportLanguage,
+  normalizeReportPdfText,
   normalizeReportLanguage,
   resolveReportText,
 } from "./reportLocale.js";
-import { loadArabicFont, drawArabicTextSync } from "./arabicRenderer.js";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-const ARABIC_SCRIPT_REGEX =
-  /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
-
-function hasArabicScript(value) {
-  return ARABIC_SCRIPT_REGEX.test(String(value || ""));
-}
-
-function resolveArabicFontPath() {
-  const candidates = [
-    process.env.PDF_REPORT_FONT_PATH,
-    process.env.PDF_DARI_PASHTO_FONT_PATH,
-    process.env.PDF_BAHIJ_FONT_PATH,
-    process.env.PDF_VAZIRMATN_FONT_PATH,
-    process.env.PDF_ARABIC_FONT_PATH,
-    // Preferred bundled fonts first for predictable production output
-    path.join(__dirname, "../fonts/Vazirmatn-Regular.ttf"),
-    path.join(__dirname, "../fonts/NotoNaskhArabic-Regular.ttf"),
-    path.join(__dirname, "../fonts/NotoSansArabic-Regular.ttf"),
-    path.join(__dirname, "../fonts/NotoNastaliqUrdu-Regular.ttf"),
-    "C:/Windows/Fonts/bahij.ttf",
-    "C:/Windows/Fonts/bahij-zar.ttf",
-    "C:/Windows/Fonts/Bahij_Zar.ttf",
-    "C:/Windows/Fonts/Bahij Zar.ttf",
-    // Additional bundled compatibility names
-    path.join(__dirname, "../fonts/Bahij_Zar.ttf"),
-    path.join(__dirname, "../fonts/Bahij-Zar.ttf"),
-    path.join(__dirname, "../fonts/BahijZar.ttf"),
-    "C:/Windows/Fonts/segoeui.ttf",
-    "C:/Windows/Fonts/tahoma.ttf",
-    "C:/Windows/Fonts/arial.ttf",
-    "C:/Windows/Fonts/aldhabi.ttf",
-    "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf",
-    "/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf",
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-  ].filter(Boolean);
-  return candidates.find((p) => fs.existsSync(p)) ?? null;
-}
-
-// Write text: uses Arabic glyph-path renderer for Arabic script, Helvetica for Latin
-function wt(
-  doc,
-  rawText,
-  x,
-  y,
-  opts,
-  fkFont,
-  fillColor,
-  bold = false,
-  fontSize = 10,
-) {
-  const text = String(rawText ?? "");
-  if (fkFont && hasArabicScript(text)) {
-    drawArabicTextSync(
-      doc,
-      text,
-      x,
-      y,
-      { ...opts, fontSize },
-      fkFont,
-      fillColor || "#000000",
-    );
-  } else {
-    doc.font(bold ? "Helvetica-Bold" : "Helvetica").text(text, x, y, opts);
-  }
-}
+import {
+  loadArabicFont,
+  resolveArabicReportFontPath,
+} from "./arabicRenderer.js";
+import {
+  wt,
+  tokenWidth,
+  truncateTextToWidth,
+  getWrappedLineCount,
+  rtlAwareAlign,
+  mirrorColumns,
+  drawRtlMixedValue,
+} from "./reportPdfUtils.js";
 
 // --- Stat Card Grid for Dashboard Section (like monthly report) ---
 function drawDashboardStatsCards(
@@ -216,53 +158,23 @@ function formatMoney(value, language) {
   const normalized = normalizeReportLanguage(language);
   const isRtl = normalized === "dari" || normalized === "pashto";
 
-  // Wrap entire currency string in LTR marks for RTL languages to keep minus sign on left
-  return isRtl ? `\u200E${formatted} AF` : `${formatted} AF`;
+  // Keep the full currency token LTR so AF remains visually on the right side.
+  return isRtl ? `\u200E${formatted} AF\u200E` : `${formatted} AF`;
 }
 
-function truncateTextToWidth(doc, value, width, fkFont, fontSize = 10) {
-  const text = String(value ?? "").trim();
-  if (!text || width <= 10) return text;
-  if (tokenWidth(doc, text, fkFont, fontSize) <= width) return text;
+function formatSummaryMoney(value, language) {
+  const formatted = String(
+    formatReportNumber(value, language, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }),
+  ).replace(/\u200E/g, "");
+  const normalized = normalizeReportLanguage(language);
+  const isRtl = normalized === "dari" || normalized === "pashto";
 
-  const ellipsis = "…";
-  const ellipsisWidth = tokenWidth(doc, ellipsis, fkFont, fontSize);
-  const chars = Array.from(text);
-  let result = "";
-
-  for (const char of chars) {
-    const candidate = `${result}${char}`;
-    if (tokenWidth(doc, candidate, fkFont, fontSize) + ellipsisWidth > width) {
-      break;
-    }
-    result = candidate;
-  }
-
-  return result ? `${result}${ellipsis}` : ellipsis;
-}
-
-function getWrappedLineCount(doc, value, width, fkFont, fontSize = 10) {
-  const text = String(value ?? "").trim();
-  if (!text || width <= 12) return 1;
-  if (tokenWidth(doc, text, fkFont, fontSize) <= width) return 1;
-
-  const words = text.split(/\s+/).filter(Boolean);
-  if (words.length <= 1) return 2;
-
-  let lines = 1;
-  let currentLine = "";
-
-  for (const word of words) {
-    const candidate = currentLine ? `${currentLine} ${word}` : word;
-    if (tokenWidth(doc, candidate, fkFont, fontSize) <= width) {
-      currentLine = candidate;
-      continue;
-    }
-    lines += 1;
-    currentLine = word;
-  }
-
-  return Math.max(1, lines);
+  // drawRtlMixedValue places the first token on the visual right in RTL mode.
+  // Put AF first so it is rendered on the right side in summary rows.
+  return isRtl ? `AF ${formatted}` : `${formatted} AF`;
 }
 
 function wrapTextToLines(
@@ -270,12 +182,14 @@ function wrapTextToLines(
   value,
   width,
   fkFont,
+  language,
   fontSize = 10,
   maxLines = Infinity,
 ) {
-  const text = String(value ?? "").trim();
+  const text = normalizeReportPdfText(value, language).trim();
   if (!text) return [""];
-  if (width <= 12) return [truncateTextToWidth(doc, text, width, fkFont, fontSize)];
+  if (width <= 12)
+    return [truncateTextToWidth(doc, text, width, fkFont, fontSize)];
   if (tokenWidth(doc, text, fkFont, fontSize) <= width) return [text];
 
   const words = text.split(/\s+/).filter(Boolean);
@@ -303,9 +217,7 @@ function wrapTextToLines(
       const remaining = [currentLine, ...words.slice(words.indexOf(word) + 1)]
         .filter(Boolean)
         .join(" ");
-      lines.push(
-        truncateTextToWidth(doc, remaining, width, fkFont, fontSize),
-      );
+      lines.push(truncateTextToWidth(doc, remaining, width, fkFont, fontSize));
       return lines;
     }
   }
@@ -337,6 +249,7 @@ function drawWrappedCellText(
   width,
   fkFont,
   isRtl,
+  language,
   {
     fontSize = 10,
     fillColor = "#0F172A",
@@ -350,6 +263,7 @@ function drawWrappedCellText(
     value,
     width,
     fkFont,
+    language,
     fontSize,
     maxLines,
   );
@@ -374,7 +288,7 @@ function drawWrappedCellText(
 function formatTaskRowDateParts(value, language) {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return { dateText: "-", timeText: "-" };
+    return { dateText: "-" };
   }
 
   return {
@@ -385,23 +299,26 @@ function formatTaskRowDateParts(value, language) {
       hour: undefined,
       minute: undefined,
     }),
-    timeText: formatReportDateTime(date, language, {
-      year: undefined,
-      month: undefined,
-      day: undefined,
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
   };
 }
 
 function drawTaskRowDateCell(doc, value, x, y, width, fkFont, language, isRtl) {
-  const { dateText, timeText } = formatTaskRowDateParts(value, language);
+  const { dateText } = formatTaskRowDateParts(value, language);
 
   if (isRtl) {
-    drawRtlMixedValue(doc, dateText, x, y, width, fkFont, 10);
-    drawRtlMixedValue(doc, timeText, x, y + 12, width, fkFont, 10, "#475569");
-    return 2;
+    drawRtlMixedValue(
+      doc,
+      dateText,
+      x,
+      y,
+      width,
+      fkFont,
+      10,
+      "#0F172A",
+      false,
+      language,
+    );
+    return 1;
   }
 
   wt(
@@ -414,100 +331,17 @@ function drawTaskRowDateCell(doc, value, x, y, width, fkFont, language, isRtl) {
     "#0F172A",
     false,
     10,
+    language,
   );
-  wt(
-    doc,
-    timeText,
-    x,
-    y + 12,
-    { width, align: "left" },
-    fkFont,
-    "#475569",
-    false,
-    10,
-  );
-  return 2;
-}
-
-function rtlAwareAlign(isRtl, fallback = "left") {
-  return isRtl ? "right" : fallback;
-}
-
-function tokenWidth(doc, token, fkFont, fontSize = 10) {
-  const text = String(token ?? "");
-  if (!text) return 0;
-
-  if (fkFont && hasArabicScript(text)) {
-    const scale = fontSize / fkFont.unitsPerEm;
-    const run = fkFont.layout(text, [], "arab", "dflt", "rtl");
-    return run.positions.reduce((sum, pos) => sum + pos.xAdvance * scale, 0);
-  }
-
-  return doc.font("Helvetica").fontSize(fontSize).widthOfString(text);
-}
-
-function drawRtlMixedValue(
-  doc,
-  value,
-  x,
-  y,
-  width,
-  fkFont,
-  fontSize = 10,
-  fillColor = "#0F172A",
-  bold = false,
-) {
-  const text = String(value ?? "");
-  if (!text) return;
-
-  const tokens = text.match(/(\d[\d,./:-]*|\s+|[^\d\s]+)/g) || [text];
-  let cursor = x + width;
-
-  tokens.forEach((token) => {
-    const segment = String(token ?? "");
-    if (!segment) return;
-    const w = tokenWidth(doc, segment, fkFont, fontSize);
-    const startX = cursor - w;
-
-    if (!segment.trim()) {
-      cursor = startX;
-      return;
-    }
-
-    if (/^\d[\d,./:-]*$/.test(segment)) {
-      doc
-        .font(bold ? "Helvetica-Bold" : "Helvetica")
-        .fontSize(fontSize)
-        .fillColor(fillColor)
-        .text(segment, startX, y + 1.2, {
-          width: Math.max(w + 1, 1),
-          align: "left",
-          lineBreak: false,
-        });
-    } else {
-      wt(
-        doc,
-        segment,
-        startX,
-        y,
-        { width: Math.max(w + 1, 1), align: "left", lineBreak: false },
-        fkFont,
-        fillColor,
-        bold,
-        fontSize,
-      );
-    }
-
-    cursor = startX;
-  });
+  return 1;
 }
 
 function drawHeaderMetaLine(
   doc,
-  { label, value, x, y, width, isRtl, fkFont, fontSize = 10 },
+  { label, value, x, y, width, isRtl, fkFont, language, fontSize = 10 },
 ) {
-  const safeLabel = String(label || "");
-  const safeValue = String(value ?? "-");
+  const safeLabel = normalizeReportPdfText(label, language);
+  const safeValue = normalizeReportPdfText(value, language);
 
   if (isRtl) {
     const sep = ":";
@@ -543,7 +377,18 @@ function drawHeaderMetaLine(
       false,
       fontSize,
     );
-    drawRtlMixedValue(doc, safeValue, x, y, valueW, fkFont, fontSize);
+    drawRtlMixedValue(
+      doc,
+      safeValue,
+      x,
+      y,
+      valueW,
+      fkFont,
+      fontSize,
+      "#0F172A",
+      false,
+      language,
+    );
     return;
   }
 
@@ -564,6 +409,7 @@ function drawHeaderMetaLine(
 const TABLE_X = 40;
 const TABLE_W = 515;
 const TABLE_ROW_H = 24;
+const CELL_PAD_X = 8;
 const DAILY_COL = {
   num: { x: 48, w: 24 },
   date: { x: 76, w: 94 },
@@ -573,25 +419,109 @@ const DAILY_COL = {
   note: { x: 452, w: 98 },
 };
 
-function mirrorColumns(columns, tableX, tableWidth) {
-  return Object.fromEntries(
-    Object.entries(columns).map(([key, col]) => [
-      key,
-      {
-        ...col,
-        x: tableX + tableWidth - (col.x - tableX) - col.w,
-      },
-    ]),
-  );
-}
-
 const DAILY_COL_RTL = mirrorColumns(DAILY_COL, TABLE_X, TABLE_W);
 
-function drawSummaryRow(doc, label, value, y, fkFont, isRtl) {
+function drawSummaryRow(doc, label, value, y, fkFont, isRtl, language) {
+  const rowX = 44;
+  const rowW = TABLE_W - 8;
+
+  if (isRtl) {
+    const safeLabel = normalizeReportPdfText(label, language);
+    const safeValue = normalizeReportPdfText(String(value), language);
+    const sep = ":";
+
+    const labelW = Math.min(
+      Math.max(tokenWidth(doc, safeLabel, fkFont, 11.5) + 14, 120),
+      210,
+    );
+    const sepW = Math.max(tokenWidth(doc, sep, fkFont, 11.5) + 8, 12);
+    const valueW = Math.max(rowW - labelW - sepW - 8, 120);
+
+    const rightX = rowX + rowW;
+    const labelX = rightX - labelW;
+    const sepX = labelX - sepW;
+
+    wt(
+      doc,
+      safeLabel,
+      labelX,
+      y,
+      { width: labelW, align: "right", lineBreak: false },
+      fkFont,
+      "#334155",
+      false,
+      11.5,
+      language,
+    );
+    wt(
+      doc,
+      sep,
+      sepX,
+      y,
+      { width: sepW, align: "center", lineBreak: false },
+      fkFont,
+      "#475569",
+      false,
+      11.5,
+      language,
+    );
+    const currencyMatch = safeValue.match(/^AF\s+(.+)$/i);
+    if (currencyMatch) {
+      const numberPart = String(currencyMatch[1] || "").trim() || "0";
+      const afLabel = "AF";
+      const afW = Math.max(tokenWidth(doc, afLabel, fkFont, 11.5), 12);
+      const moneyGap = 7;
+      const rightEdge = rowX + valueW;
+      const afX = rightEdge - afW;
+      const numberBoxW = Math.max(valueW - afW - moneyGap, 72);
+
+      wt(
+        doc,
+        afLabel,
+        afX,
+        y,
+        { width: afW + 1, align: "left", lineBreak: false },
+        fkFont,
+        "#0F172A",
+        true,
+        11.5,
+        language,
+      );
+
+      drawRtlMixedValue(
+        doc,
+        numberPart,
+        rowX,
+        y,
+        numberBoxW,
+        fkFont,
+        11.5,
+        "#0F172A",
+        true,
+        language,
+      );
+      return;
+    }
+
+    drawRtlMixedValue(
+      doc,
+      safeValue,
+      rowX,
+      y,
+      valueW,
+      fkFont,
+      11.5,
+      "#0F172A",
+      true,
+      language,
+    );
+    return;
+  }
+
   wt(
     doc,
     label,
-    44,
+    rowX,
     y,
     { width: 180, align: rtlAwareAlign(isRtl, "left") },
     fkFont,
@@ -599,109 +529,165 @@ function drawSummaryRow(doc, label, value, y, fkFont, isRtl) {
     false,
     11.5,
   );
-  // value is always formatted numbers/dates — no shaping needed
-  if (isRtl) {
-    drawRtlMixedValue(doc, String(value), 230, y, 320, fkFont, 11.5);
-  } else {
-    wt(
-      doc,
-      String(value),
-      230,
-      y,
-      { width: 320, align: "left" },
-      fkFont,
-      "#0F172A",
-      true,
-      11.5,
-    );
-  }
+  wt(
+    doc,
+    String(value),
+    230,
+    y,
+    { width: 320, align: "left" },
+    fkFont,
+    "#0F172A",
+    true,
+    11.5,
+  );
 }
 
-function drawTableHeader(doc, y, labels, fkFont, isRtl, colMap) {
+function drawTableHeader(
+  doc,
+  y,
+  labels,
+  fkFont,
+  isRtl,
+  colMap,
+  language = "dari",
+) {
   const rowHeight = TABLE_ROW_H;
   doc.save();
-  doc.roundedRect(TABLE_X, y, TABLE_W, rowHeight, 4).fill("#E2E8F0");
+  doc.rect(TABLE_X, y, TABLE_W, rowHeight).fill("#FFFFFF");
+  doc
+    .rect(TABLE_X, y, TABLE_W, rowHeight)
+    .lineWidth(1)
+    .strokeColor("#111111")
+    .stroke();
+
+  const boundaryXs = Array.from(
+    new Set(
+      Object.values(colMap)
+        .map((col) => Number(col.x))
+        .filter(Boolean),
+    ),
+  )
+    .sort((a, b) => a - b)
+    .filter((x) => x > TABLE_X && x < TABLE_X + TABLE_W);
+
+  boundaryXs.forEach((x) => {
+    doc
+      .moveTo(x, y)
+      .lineTo(x, y + rowHeight)
+      .lineWidth(0.7)
+      .strokeColor("#111111")
+      .stroke();
+  });
   doc.restore();
 
   wt(
     doc,
     labels.columns.num,
-    colMap.num.x,
-    y + 7,
-    { width: colMap.num.w, align: rtlAwareAlign(isRtl, "left") },
+    colMap.num.x + 3,
+    y + 10,
+    { width: Math.max(colMap.num.w - 6, 8), align: "center" },
     fkFont,
-    "#0F172A",
+    "#000000",
     true,
-    10,
+    9.5,
+    language,
   );
   wt(
     doc,
     labels.columns.date,
-    colMap.date.x,
-    y + 7,
-    { width: colMap.date.w, align: rtlAwareAlign(isRtl, "left") },
+    colMap.date.x + 3,
+    y + 10,
+    {
+      width: Math.max(colMap.date.w - 6, 8),
+      align: rtlAwareAlign(isRtl, "left"),
+    },
     fkFont,
-    "#0F172A",
+    "#000000",
     true,
-    10,
+    9.5,
+    language,
   );
   wt(
     doc,
     labels.columns.from,
-    colMap.from.x,
-    y + 7,
-    { width: colMap.from.w, align: rtlAwareAlign(isRtl, "left") },
+    colMap.from.x + 3,
+    y + 10,
+    {
+      width: Math.max(colMap.from.w - 6, 8),
+      align: rtlAwareAlign(isRtl, "left"),
+    },
     fkFont,
-    "#0F172A",
+    "#000000",
     true,
-    10,
+    9.5,
+    language,
   );
   wt(
     doc,
     labels.columns.recipient,
-    colMap.recipient.x,
-    y + 7,
-    { width: colMap.recipient.w, align: rtlAwareAlign(isRtl, "left") },
+    colMap.recipient.x + 3,
+    y + 10,
+    {
+      width: Math.max(colMap.recipient.w - 6, 8),
+      align: rtlAwareAlign(isRtl, "left"),
+    },
     fkFont,
-    "#0F172A",
+    "#000000",
     true,
-    10,
+    9.5,
+    language,
   );
   wt(
     doc,
     labels.columns.amount,
-    colMap.amount.x,
-    y + 7,
-    { width: colMap.amount.w, align: "right" },
+    colMap.amount.x + 3,
+    y + 10,
+    { width: Math.max(colMap.amount.w - 6, 8), align: "right" },
     fkFont,
-    "#0F172A",
+    "#000000",
     true,
-    10,
+    9.5,
+    language,
   );
   wt(
     doc,
     labels.columns.note,
-    colMap.note.x,
-    y + 7,
-    { width: colMap.note.w, align: rtlAwareAlign(isRtl, "left") },
+    colMap.note.x + 3,
+    y + 10,
+    {
+      width: Math.max(colMap.note.w - 6, 8),
+      align: rtlAwareAlign(isRtl, "left"),
+    },
     fkFont,
-    "#0F172A",
+    "#000000",
     true,
-    10,
+    9.5,
+    language,
   );
 
   return y + rowHeight;
 }
 
+function formatDateOnly(value, language) {
+  return formatReportDateTime(value, language, {
+    year: "numeric",
+    month: "long",
+    day: "2-digit",
+    hour: undefined,
+    minute: undefined,
+  });
+}
+
 export async function buildDailyTaskReportPdf(report, language = "en") {
+  const normalizedLanguage = normalizeReportLanguage(language);
   const text = resolveReportText(language).daily;
-  const isRtl = isRtlReportLanguage(language);
+  const isRtl = isRtlReportLanguage(normalizedLanguage);
 
   // Pre-load the Arabic fontkit font for glyph-path rendering
   let fkFont = null;
   if (isRtl) {
     try {
-      const fontPath = resolveArabicFontPath();
+      const fontPath = resolveArabicReportFontPath();
       if (!fontPath) throw new Error("No Arabic font found");
       fkFont = await loadArabicFont(fontPath);
       console.info(`[PDF] Daily RTL font: ${fontPath}`);
@@ -733,80 +719,127 @@ export async function buildDailyTaskReportPdf(report, language = "en") {
     const tasks = Array.isArray(report?.tasks) ? report.tasks : [];
     const colMap = isRtl ? DAILY_COL_RTL : DAILY_COL;
 
+    const headerX = TABLE_X;
+    const headerY = 22;
+    const headerH = 116;
+
+    doc.save();
+    doc.rect(headerX, headerY, TABLE_W, headerH).fill("#FFFFFF");
+    doc
+      .rect(headerX, headerY, TABLE_W, headerH)
+      .lineWidth(1)
+      .strokeColor("#DDDDDD")
+      .stroke();
+    doc.restore();
+
     wt(
       doc,
       text.title,
-      40,
-      36,
-      { width: 515, align: rtlAwareAlign(isRtl, "left") },
+      headerX + 14,
+      headerY + 12,
+      { width: TABLE_W - 28, align: rtlAwareAlign(isRtl, "left") },
       fkFont,
-      "#0F172A",
+      "#000000",
       true,
-      19,
+      17,
+      normalizedLanguage,
     );
+
+    const dateRangeSep = isRtl ? "  تا  " : "  -  ";
+    const dateRangeValue = normalizeReportPdfText(
+      `${formatDateOnly(from, language)}${dateRangeSep}${formatDateOnly(to, language)}`,
+      normalizedLanguage,
+    );
+
     drawHeaderMetaLine(doc, {
       label: text.generatedAt,
-      value: formatReportDateTime(new Date(), language),
-      x: 40,
-      y: 62,
-      width: 515,
+      value: formatDateOnly(new Date(), language),
+      x: headerX + 14,
+      y: headerY + 44,
+      width: TABLE_W - 28,
       isRtl,
       fkFont,
+      language: normalizedLanguage,
+      fontSize: 10,
+    });
+    drawHeaderMetaLine(doc, {
+      label: text.reportType,
+      value: formatReportType(type, text),
+      x: headerX + 14,
+      y: headerY + 64,
+      width: TABLE_W - 28,
+      isRtl,
+      fkFont,
+      language: normalizedLanguage,
+      fontSize: 10,
+    });
+    drawHeaderMetaLine(doc, {
+      label: text.dateRange,
+      value: dateRangeValue,
+      x: headerX + 14,
+      y: headerY + 84,
+      width: TABLE_W - 28,
+      isRtl,
+      fkFont,
+      language: normalizedLanguage,
       fontSize: 10,
     });
 
-    doc
-      .moveTo(40, 78)
-      .lineTo(TABLE_X + TABLE_W, 78)
-      .lineWidth(1)
-      .strokeColor("#CBD5E1")
-      .stroke();
-
-    drawSummaryRow(
+    let y = headerY + headerH + 16;
+    wt(
       doc,
-      text.reportType,
-      formatReportType(type, text),
-      92,
+      text.summary || "Summary",
+      40,
+      y,
+      { width: TABLE_W, align: rtlAwareAlign(isRtl, "left") },
       fkFont,
-      isRtl,
+      "#000000",
+      true,
+      12,
+      normalizedLanguage,
     );
-    const dateRangeSep = isRtl ? " تا " : " - ";
-    const dateRangeValue = `${formatReportDateTime(from, language)}${dateRangeSep}${formatReportDateTime(to, language)}`;
-    drawSummaryRow(doc, text.dateRange, dateRangeValue, 108, fkFont, isRtl);
+    y += 16;
     drawSummaryRow(
       doc,
       text.totalTasks,
       formatReportNumber(summary.totalTasks || 0, language),
-      124,
+      y,
       fkFont,
       isRtl,
+      normalizedLanguage,
     );
+    y += 16;
     drawSummaryRow(
       doc,
       text.totalAmount,
-      formatMoney(summary.totalAmount, language),
-      140,
+      formatSummaryMoney(summary.totalAmount, language),
+      y,
       fkFont,
       isRtl,
+      normalizedLanguage,
     );
+    y += 16;
     drawSummaryRow(
       doc,
       text.highestExpense,
-      formatMoney(summary.highestExpense, language),
-      156,
+      formatSummaryMoney(summary.highestExpense, language),
+      y,
       fkFont,
       isRtl,
+      normalizedLanguage,
     );
+    y += 16;
     drawSummaryRow(
       doc,
       text.averageExpense,
-      formatMoney(summary.averageAmount, language),
-      172,
+      formatSummaryMoney(summary.averageAmount, language),
+      y,
       fkFont,
       isRtl,
+      normalizedLanguage,
     );
 
-    let y = 196;
+    y += 24;
     wt(
       doc,
       text.records,
@@ -817,10 +850,19 @@ export async function buildDailyTaskReportPdf(report, language = "en") {
       "#0F172A",
       true,
       11,
+      normalizedLanguage,
     );
 
     y += 10;
-    y = drawTableHeader(doc, y + 6, text, fkFont, isRtl, colMap);
+    y = drawTableHeader(
+      doc,
+      y + 6,
+      text,
+      fkFont,
+      isRtl,
+      colMap,
+      normalizedLanguage,
+    );
 
     const baseRowHeight = 34;
     const noteColumnWidth = colMap.note.w;
@@ -838,20 +880,25 @@ export async function buildDailyTaskReportPdf(report, language = "en") {
         "#64748B",
         false,
         10,
+        normalizedLanguage,
       );
     } else {
       tasks.forEach((task, index) => {
-        const noteRaw = String(task.note || "-");
+        const noteRaw = normalizeReportPdfText(
+          task.note || "-",
+          normalizedLanguage,
+        );
         const noteLines = wrapTextToLines(
           doc,
           noteRaw,
           noteColumnWidth,
           fkFont,
+          normalizedLanguage,
           10,
           3,
         );
         const noteLineCount = Math.max(1, noteLines.length);
-        const dateLineCount = 2;
+        const dateLineCount = 1;
         const rowHeight = Math.max(
           baseRowHeight,
           dateLineCount * 12 + noteVerticalPadding,
@@ -871,83 +918,129 @@ export async function buildDailyTaskReportPdf(report, language = "en") {
             "#0F172A",
             true,
             11,
+            normalizedLanguage,
           );
-          y = drawTableHeader(doc, y + 16, text, fkFont, isRtl, colMap);
+          y = drawTableHeader(
+            doc,
+            y + 16,
+            text,
+            fkFont,
+            isRtl,
+            colMap,
+            normalizedLanguage,
+          );
         }
 
-        if (index % 2 === 0) {
-          doc.save();
-          doc.rect(TABLE_X, y, TABLE_W, rowHeight).fill("#F8FAFC");
-          doc.restore();
-        }
+        const rowBackground = index % 2 === 0 ? "#FFFFFF" : "#FAFAFA";
+        doc.save();
+        doc.rect(TABLE_X, y, TABLE_W, rowHeight).fill(rowBackground);
+        doc
+          .rect(TABLE_X, y, TABLE_W, rowHeight)
+          .lineWidth(0.6)
+          .strokeColor("#DDDDDD")
+          .stroke();
+
+        const boundaryXs = Array.from(
+          new Set(
+            Object.values(colMap)
+              .map((col) => Number(col.x))
+              .filter(Boolean),
+          ),
+        )
+          .sort((a, b) => a - b)
+          .filter((x) => x > TABLE_X && x < TABLE_X + TABLE_W);
+
+        boundaryXs.forEach((x) => {
+          doc
+            .moveTo(x, y)
+            .lineTo(x, y + rowHeight)
+            .lineWidth(0.5)
+            .strokeColor("#DDDDDD")
+            .stroke();
+        });
+        doc.restore();
 
         // Numeric / date columns — always ASCII
-        doc.fillColor("#0F172A").font("Helvetica").fontSize(10);
-        doc.text(String(index + 1), colMap.num.x, y + 6, {
+        doc.fillColor("#000000").font("Helvetica").fontSize(9);
+        doc.text(String(index + 1), colMap.num.x, y + 12, {
           width: colMap.num.w,
-          align: rtlAwareAlign(isRtl, "left"),
+          align: "center",
         });
         drawTaskRowDateCell(
           doc,
           task.taskDate,
-          colMap.date.x,
-          y + 6,
-          colMap.date.w,
+          colMap.date.x + CELL_PAD_X,
+          y + 8,
+          colMap.date.w - CELL_PAD_X * 2,
           fkFont,
           language,
           isRtl,
         );
         wt(
           doc,
-          truncateTextToWidth(doc, task.fromName, colMap.from.w, fkFont, 10),
-          colMap.from.x,
-          y + 6,
+          truncateTextToWidth(
+            doc,
+            task.fromName,
+            colMap.from.w - CELL_PAD_X * 2,
+            fkFont,
+            9,
+          ),
+          colMap.from.x + CELL_PAD_X,
+          y + 12,
           {
-            width: colMap.from.w,
+            width: colMap.from.w - CELL_PAD_X * 2,
             align: rtlAwareAlign(isRtl, "left"),
           },
           fkFont,
-          "#0F172A",
+          "#000000",
           false,
-          10,
+          9,
+          normalizedLanguage,
         );
         wt(
           doc,
           truncateTextToWidth(
             doc,
             task.recipientName,
-            colMap.recipient.w,
+            colMap.recipient.w - CELL_PAD_X * 2,
             fkFont,
-            10,
+            9,
           ),
-          colMap.recipient.x,
-          y + 6,
+          colMap.recipient.x + CELL_PAD_X,
+          y + 12,
           {
-            width: colMap.recipient.w,
+            width: colMap.recipient.w - CELL_PAD_X * 2,
             align: rtlAwareAlign(isRtl, "left"),
           },
           fkFont,
-          "#0F172A",
+          "#000000",
           false,
-          10,
+          9,
+          normalizedLanguage,
         );
-        doc.text(formatMoney(task.amount, language), colMap.amount.x, y + 6, {
-          width: colMap.amount.w,
-          align: "right",
-        });
+        doc.text(
+          formatMoney(task.amount, language),
+          colMap.amount.x + 4,
+          y + 12,
+          {
+            width: colMap.amount.w - 8,
+            align: "right",
+          },
+        );
 
         // Note column — may be Arabic
         drawWrappedCellText(
           doc,
           noteRaw,
-          colMap.note.x,
-          y + 6,
-          noteColumnWidth,
+          colMap.note.x + CELL_PAD_X,
+          y + 8,
+          noteColumnWidth - CELL_PAD_X * 2,
           fkFont,
           isRtl,
+          normalizedLanguage,
           {
-            fontSize: 10,
-            fillColor: "#0F172A",
+            fontSize: 9,
+            fillColor: "#000000",
             maxLines: 3,
             lineHeight: 12,
           },
@@ -967,6 +1060,7 @@ export async function buildDailyTaskReportPdf(report, language = "en") {
       "#94A3B8",
       false,
       8,
+      normalizedLanguage,
     );
 
     doc.end();

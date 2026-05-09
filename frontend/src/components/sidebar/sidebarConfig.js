@@ -2,20 +2,20 @@ import {
   LuArchive,
   LuArrowRightLeft,
   LuBell,
+  LuClipboardCheck,
   LuClipboardList,
   LuFactory,
   LuLayoutDashboard,
-  LuList,
   LuListChecks,
   LuListTodo,
   LuPackagePlus,
   LuPalette,
   LuPrinter,
+  LuReceiptText,
   LuScissors,
   LuShieldCheck,
   LuTruck,
   LuUserCheck,
-  LuWalletCards,
   LuFileText,
   LuDatabaseBackup,
   LuShieldAlert,
@@ -55,7 +55,7 @@ const ADMIN_SECTIONS = [
         key: "manageOrders",
         label: "sidebar.orders",
         fallback: "Orders",
-        icon: LuList,
+        icon: LuReceiptText,
         children: [
           {
             key: "createOrder",
@@ -69,7 +69,7 @@ const ADMIN_SECTIONS = [
             label: "common.allOrders",
             fallback: "All Orders",
             path: "/orders",
-            icon: LuList,
+            icon: LuReceiptText,
           },
           {
             key: "pendingOrders",
@@ -91,7 +91,7 @@ const ADMIN_SECTIONS = [
             label: "sidebar.clothesStatus",
             fallback: "Clothes Status",
             path: "/orders/assignments/report",
-            icon: LuFileText,
+            icon: LuClipboardCheck,
           },
           {
             key: "printBills",
@@ -128,7 +128,7 @@ const ADMIN_SECTIONS = [
             label: "dailyTasks.allTitle",
             fallback: "All Expenses",
             path: "/daily-tasks/all",
-            icon: LuList,
+            icon: LuClipboardList,
           },
         ],
       },
@@ -152,6 +152,13 @@ const ADMIN_SECTIONS = [
             path: "/orders/completed-workers",
             icon: LuListChecks,
           },
+          {
+            key: "workerPaymentReceipts",
+            label: "sidebar.workerPaymentReceipts",
+            fallback: "Worker Payment Receipts",
+            path: "/orders/completed-workers/receipts",
+            icon: LuReceiptText,
+          },
         ],
       },
       {
@@ -172,7 +179,7 @@ const ADMIN_SECTIONS = [
             label: "rakht.allTitle",
             fallback: "All Rakhts",
             path: "/rakhts",
-            icon: LuList,
+            icon: LuFactory,
           },
           {
             key: "rakhtPaymentHistory",
@@ -201,7 +208,7 @@ const ADMIN_SECTIONS = [
         key: "transactions",
         label: "sidebar.transactions",
         fallback: "Loan",
-        icon: LuWalletCards,
+        icon: AfCurrencyIcon,
         children: [
           {
             key: "makeTransaction",
@@ -215,7 +222,7 @@ const ADMIN_SECTIONS = [
             label: "sidebar.allTransactions",
             fallback: "All Loans",
             path: "/transactions",
-            icon: LuList,
+            icon: LuFileText,
           },
         ],
       },
@@ -290,7 +297,7 @@ const DOKAN_SECTIONS = [
         key: "manageOrders",
         label: "sidebar.orders",
         fallback: "Orders",
-        icon: LuList,
+        icon: LuReceiptText,
         children: [
           {
             key: "createOrder",
@@ -304,7 +311,7 @@ const DOKAN_SECTIONS = [
             label: "common.allOrders",
             fallback: "All Orders",
             path: "/orders",
-            icon: LuList,
+            icon: LuReceiptText,
           },
           {
             key: "pendingOrders",
@@ -326,7 +333,7 @@ const DOKAN_SECTIONS = [
             label: "sidebar.clothesStatus",
             fallback: "Clothes Status",
             path: "/orders/assignments/report",
-            icon: LuFileText,
+            icon: LuClipboardCheck,
           },
           {
             key: "printBills",
@@ -363,7 +370,7 @@ const DOKAN_SECTIONS = [
             label: "dailyTasks.allTitle",
             fallback: "All Expenses",
             path: "/daily-tasks/all",
-            icon: LuList,
+            icon: LuClipboardList,
           },
         ],
       },
@@ -385,7 +392,7 @@ const DOKAN_SECTIONS = [
             label: "rakht.allTitle",
             fallback: "All Rakhts",
             path: "/rakhts",
-            icon: LuList,
+            icon: LuFactory,
           },
           {
             key: "rakhtPaymentHistory",
@@ -414,7 +421,7 @@ const DOKAN_SECTIONS = [
         key: "transactions",
         label: "sidebar.transactions",
         fallback: "Loan",
-        icon: LuWalletCards,
+        icon: AfCurrencyIcon,
         children: [
           {
             key: "makeTransaction",
@@ -428,7 +435,7 @@ const DOKAN_SECTIONS = [
             label: "sidebar.allTransactions",
             fallback: "All Loans",
             path: "/transactions",
-            icon: LuList,
+            icon: LuFileText,
           },
         ],
       },
@@ -475,14 +482,14 @@ const WORKER_SECTIONS = [
         key: "manageOrders",
         label: "sidebar.orders",
         fallback: "Orders",
-        icon: LuList,
+        icon: LuReceiptText,
         children: [
           {
             key: "allOrders",
             label: "common.allOrders",
             fallback: "All Orders",
             path: "/orders",
-            icon: LuList,
+            icon: LuReceiptText,
           },
           {
             key: "pendingOrders",
@@ -530,7 +537,7 @@ const FINANCE_SECTIONS = [
         key: "manageOrders",
         label: "sidebar.orders",
         fallback: "Orders",
-        icon: LuList,
+        icon: LuReceiptText,
         children: [
           {
             key: "createOrder",
@@ -544,7 +551,7 @@ const FINANCE_SECTIONS = [
             label: "common.allOrders",
             fallback: "All Orders",
             path: "/orders",
-            icon: LuList,
+            icon: LuReceiptText,
           },
           {
             key: "pendingOrders",
@@ -566,7 +573,7 @@ const FINANCE_SECTIONS = [
             label: "sidebar.clothesStatus",
             fallback: "Clothes Status",
             path: "/orders/assignments/report",
-            icon: LuFileText,
+            icon: LuClipboardCheck,
           },
           {
             key: "printBills",
@@ -603,7 +610,7 @@ const FINANCE_SECTIONS = [
             label: "dailyTasks.allTitle",
             fallback: "All Expenses",
             path: "/daily-tasks/all",
-            icon: LuList,
+            icon: LuClipboardList,
           },
         ],
       },

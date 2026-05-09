@@ -20,7 +20,7 @@ import {
 import toast from "react-hot-toast";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
-import { parseNumberLocale } from "../lib/normalize.js";
+import { parseNumberLocale, toAsciiDigits } from "../lib/normalize.js";
 import { formatCurrency } from "../lib/currency.js";
 import { MONEY_SCALE } from "../lib/decimal.js";
 import {
@@ -331,7 +331,7 @@ function getBenefitEntryDate(entry) {
 function OrderViewModal({ orderId, open, onClose }) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["order-detail", orderId],
     queryFn: () => api.get(`/orders/${orderId}`).then((r) => r.data),
     enabled: open && !!orderId,
@@ -340,11 +340,6 @@ function OrderViewModal({ orderId, open, onClose }) {
     refetchOnWindowFocus: "always",
     refetchOnReconnect: "always",
   });
-
-  useEffect(() => {
-    if (!open || !orderId) return;
-    refetch();
-  }, [open, orderId, refetch]);
   const benefitDetails = data?.benefitDetails;
   const detailOrderLabel = getOrderLabelParts(data, language);
   const detailCustomerName = String(data?.customer?.firstName || "").trim();
@@ -1067,9 +1062,6 @@ export default function AllOrders({ filter, mode = "orders" }) {
     qc.invalidateQueries({ queryKey: ["rakht-revenue-summary"] });
     qc.invalidateQueries({ queryKey: ["analytics"] });
     qc.invalidateQueries({ queryKey: ["analytics-dashboard"] });
-    setTimeout(() => {
-      qc.refetchQueries({ queryKey: ["orders"] });
-    }, 100);
   };
 
   const deleteMut = useMutation({
@@ -1249,7 +1241,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
           </div>
 
           <div className="all-orders-search">
-            <LuReceipt size={14} className="all-orders-search-icon" />
+            <LuSearch size={14} className="all-orders-search-icon" />
             <input
               className="inp all-orders-search-input"
               aria-label={t("orders.billNumber", "Bill Number")}
@@ -1258,7 +1250,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
               onChange={(e) => {
                 const { value } = e.target;
                 setSearchBill(value);
-                setSearchBillFilter(value);
+                setSearchBillFilter(toAsciiDigits(value).replace(/\D/g, ""));
                 setPage(1);
               }}
               inputMode="numeric"

@@ -13,6 +13,7 @@ import {
 import toast from "react-hot-toast";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
+import { toAsciiDigits } from "../lib/normalize.js";
 import {
   getOrderLabelParts,
   getOrderPrimaryDisplayName,
@@ -55,10 +56,12 @@ function normalizeText(value) {
 
 function filterBoxOrders(orders, query) {
   const q = normalizeText(query);
+  const qDigits = toAsciiDigits(q).replace(/\D/g, "");
   if (!q) return orders;
 
   return orders.filter((order) => {
     const billNumber = String(order?.customer?.billNumber ?? "");
+    const billDigits = toAsciiDigits(billNumber).replace(/\D/g, "");
     const customerName = normalizeText(order?.customer?.firstName);
     const customerPhone = normalizeText(order?.customer?.phoneNumber);
     const orderName = normalizeText(order?.orderName);
@@ -66,6 +69,7 @@ function filterBoxOrders(orders, query) {
 
     return (
       billNumber.includes(q) ||
+      (qDigits && billDigits.includes(qDigits)) ||
       customerName.includes(q) ||
       customerPhone.includes(q) ||
       orderName.includes(q) ||

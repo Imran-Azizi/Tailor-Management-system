@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import {
   LuCalendarCheck,
   LuRefreshCcw,
+  LuReceiptText,
   LuSearch,
   LuSquareCheckBig,
   LuUser,
@@ -47,6 +48,39 @@ function paymentBadge(status, t) {
     );
   }
   return <Badge v="amber">{t("completedWorkerOrders.unpaid", "Unpaid")}</Badge>;
+}
+
+function paymentStatusLabel(status, t) {
+  if (status === "PAID_TO_WORKER") {
+    return t("completedWorkerOrders.paid", "Paid to worker");
+  }
+  if (status === "UNPAID") {
+    return t("completedWorkerOrders.unpaid", "Unpaid");
+  }
+  return status || "-";
+}
+
+function receiptBadge(status, t) {
+  if (status === "RECEIVED") {
+    return (
+      <Badge v="green">{t("completedWorkerOrders.received", "Received")}</Badge>
+    );
+  }
+  return (
+    <Badge v="amber">
+      {t("completedWorkerOrders.pendingReceipt", "Pending receipt")}
+    </Badge>
+  );
+}
+
+function workerRoleLabel(role, t) {
+  if (role === "QICHIKAR") {
+    return t("completedWorkerOrders.qichikarRole", "Qichikar");
+  }
+  if (role === "DOKHT") {
+    return t("completedWorkerOrders.dokhtRole", "Dokht");
+  }
+  return role || "-";
 }
 
 function getPaymentRowKey(order) {
@@ -124,6 +158,8 @@ export default function CompletedWorkerOrders() {
   const [page, setPage] = useState(1);
   const [pendingPayments, setPendingPayments] = useState({});
   const [confirmPayment, setConfirmPayment] = useState(null);
+  const [selectedRowKeys, setSelectedRowKeys] = useState({});
+  const [confirmReceipt, setConfirmReceipt] = useState(false);
 
   // When a specific order is linked from a notification, reset page to 1
   useEffect(() => {
@@ -134,6 +170,10 @@ export default function CompletedWorkerOrders() {
   useEffect(() => {
     setPage(1);
   }, [viewMonth, viewYear]);
+
+  useEffect(() => {
+    setSelectedRowKeys({});
+  }, [page, paymentStatus, qichikarUserId, dokhtUserId, search]);
 
   // Refs for auto-scrolling to the highlighted row
   const rowRefs = useRef({});
@@ -218,6 +258,35 @@ export default function CompletedWorkerOrders() {
     },
   });
 
+  const receiptMut = useMutation({
+    mutationFn: ({ items }) =>
+      api
+        .patch("/orders/completed/from-workers/receipts", { items })
+        .then((r) => r.data),
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ["completed-worker-orders"] });
+      qc.invalidateQueries({ queryKey: ["worker-payment-receipts"] });
+      qc.invalidateQueries({ queryKey: ["worker-panel-transaction-summary"] });
+      setSelectedRowKeys({});
+      setConfirmReceipt(false);
+      toast.success(
+        t(
+          "completedWorkerOrders.receiptSaved",
+          "Receipt saved for {{count}} order(s).",
+          { count: result?.totalCount || 0 },
+        ),
+      );
+    },
+    onError: (error) => {
+      toast.error(
+        getApiErrorMessage(
+          error,
+          t("completedWorkerOrders.receiptFailed", "Unable to save receipt."),
+        ),
+      );
+    },
+  });
+
   const rows = data?.data || [];
   const total = Number(data?.total || 0);
   const stats = data?.stats || {
@@ -225,6 +294,64 @@ export default function CompletedWorkerOrders() {
     paidOrders: 0,
     unpaidOrders: 0,
     totalPaidAmount: 0,
+    totalReceiptAmount: 0,
+    totalPendingReceiptAmount: 0,
+  };
+
+  const eligibleRows = useMemo(
+    () =>
+      rows.filter(
+        (row) =>
+          row.workerPaymentStatus === "PAID_TO_WORKER" &&
+          row.moneyReceiptStatus !== "RECEIVED",
+      ),
+    [rows],
+  );
+
+  const selectedItems = useMemo(
+    () =>
+      eligibleRows
+        .filter((row) => selectedRowKeys[getPaymentRowKey(row)])
+        .map((row) => ({
+          rowKey: getPaymentRowKey(row),
+          orderId: row.id,
+          workerRole: row.workerRole,
+          paidAmount: Number(row.workerPaymentAmount || 0),
+        })),
+    [eligibleRows, selectedRowKeys],
+  );
+
+  const selectedTotalAmount = useMemo(
+    () => selectedItems.reduce((sum, item) => sum + item.paidAmount, 0),
+    [selectedItems],
+  );
+
+  const allEligibleSelected =
+    eligibleRows.length > 0 && selectedItems.length === eligibleRows.length;
+  const hasSelectedRows = selectedItems.length > 0;
+
+  const toggleSelectAll = (checked) => {
+    if (!checked) {
+      setSelectedRowKeys({});
+      return;
+    }
+    const next = {};
+    eligibleRows.forEach((row) => {
+      next[getPaymentRowKey(row)] = true;
+    });
+    setSelectedRowKeys(next);
+  };
+
+  const toggleSelectRow = (row, checked) => {
+    const rowKey = getPaymentRowKey(row);
+    setSelectedRowKeys((prev) => {
+      if (!checked) {
+        const clone = { ...prev };
+        delete clone[rowKey];
+        return clone;
+      }
+      return { ...prev, [rowKey]: true };
+    });
   };
 
   const qichikarUsers = useMemo(
@@ -267,6 +394,7 @@ export default function CompletedWorkerOrders() {
     setQichikarUserId("");
     setDokhtUserId("");
     setPage(1);
+    setSelectedRowKeys({});
     if (highlightOrderId) {
       setSearchParams({}, { replace: true });
     }
@@ -311,6 +439,16 @@ export default function CompletedWorkerOrders() {
       id: confirmPayment.order.id,
       paymentAmount: confirmPayment.amount,
       workerRole: confirmPayment.order.workerRole,
+    });
+  };
+
+  const submitReceipt = () => {
+    if (!selectedItems.length) return;
+    receiptMut.mutate({
+      items: selectedItems.map((item) => ({
+        orderId: item.orderId,
+        workerRole: item.workerRole,
+      })),
     });
   };
 
@@ -450,6 +588,27 @@ export default function CompletedWorkerOrders() {
           })}
           Icon={AfCurrencyIcon}
           accent="#7C3AED"
+        />
+        <StatCard
+          label={t("completedWorkerOrders.totalReceipt", "Total Receipt")}
+          value={formatCurrency(stats.totalReceiptAmount || 0, "en", {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+          })}
+          Icon={LuReceiptText}
+          accent="#0F766E"
+        />
+        <StatCard
+          label={t(
+            "completedWorkerOrders.pendingReceiptTotal",
+            "Pending Receipt",
+          )}
+          value={formatCurrency(stats.totalPendingReceiptAmount || 0, "en", {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+          })}
+          Icon={LuSquareCheckBig}
+          accent="#B45309"
         />
       </div>
 
@@ -604,15 +763,21 @@ export default function CompletedWorkerOrders() {
             <span className="badge bg-gray">{search.trim()}</span>
           ) : null}
           {paymentStatus !== "ALL" ? (
-            <span className="badge bg-gray">{paymentStatus}</span>
+            <span className="badge bg-gray">
+              {paymentStatusLabel(paymentStatus, t)}
+            </span>
           ) : null}
           {selectedQichikar ? (
             <span className="badge bg-amber">
-              Qichikar: {selectedQichikar.name}
+              {t("completedWorkerOrders.qichikarRole", "Qichikar")}:{" "}
+              {selectedQichikar.name}
             </span>
           ) : null}
           {selectedDokht ? (
-            <span className="badge bg-red">Dokht: {selectedDokht.name}</span>
+            <span className="badge bg-red">
+              {t("completedWorkerOrders.dokhtRole", "Dokht")}:{" "}
+              {selectedDokht.name}
+            </span>
           ) : null}
         </div>
       </Card>
@@ -638,163 +803,277 @@ export default function CompletedWorkerOrders() {
             )}
           />
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>
-                    {t("completedWorkerOrders.workerName", "Worker Name")}
-                  </th>
-                  <th>
-                    {t("completedWorkerOrders.workerRole", "Worker Role")}
-                  </th>
-                  <th>{t("orders.billNumber", "Bill Number")}</th>
-                  <th>{t("common.customer", "Customer")}</th>
-                  <th>{t("workerPanel.orderType", "Order Type")}</th>
-                  <th>
-                    {t(
-                      "completedWorkerOrders.completionDate",
-                      "Completion Date",
-                    )}
-                  </th>
-                  <th>{t("common.status", "Status")}</th>
-                  <th>
-                    {t("completedWorkerOrders.paymentStatus", "Payment Status")}
-                  </th>
-                  <th>
-                    {t("completedWorkerOrders.paymentAmount", "Payment Amount")}
-                  </th>
-                  <th>{t("common.actions", "Actions")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((order) => {
-                  const orderLabel = getOrderLabelParts(order, language);
-                  const rowKey = getPaymentRowKey(order);
-                  const editUiState = getPaymentEditUiState(order);
-                  const isAlreadyPaid = editUiState.isAlreadyPaid;
-                  const paymentInputValue =
-                    pendingPayments[rowKey] ??
-                    (order.workerPaymentAmount != null
-                      ? String(order.workerPaymentAmount)
-                      : "");
-                  const isHighlighted =
-                    highlightOrderId && order.id === highlightOrderId;
-                  return (
-                    <tr
-                      key={rowKey}
-                      ref={
-                        isHighlighted
-                          ? (node) => {
-                              rowRefs.current[highlightOrderId] = node;
-                            }
-                          : undefined
-                      }
-                      className={isHighlighted ? "row-highlight" : undefined}
-                    >
-                      <td>{order.assignedTo?.name || "-"}</td>
-                      <td>
-                        {order.workerRole ||
-                          order.assignedTo?.accountType ||
-                          "-"}
-                      </td>
-                      <td>#{order.customer?.billNumber || "-"}</td>
-                      <td>
-                        <div style={{ display: "grid", gap: 3 }}>
-                          <strong style={{ color: "var(--text1)" }}>
-                            {getOrderPrimaryDisplayName(
-                              order,
-                              order.customer?.firstName,
-                              language,
-                            )}
-                          </strong>
-                          <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                            {order.customer?.phoneNumber || "-"}
-                          </span>
-                        </div>
-                      </td>
-                      <td>{orderLabel.baseTypeLabel}</td>
-                      <td>
-                        {formatDateLocale(
-                          order.completedAt || order.updatedAt,
-                          language,
-                        )}
-                      </td>
-                      <td>
-                        <Badge v="green">
-                          {t("common.completed", "Completed")}
-                        </Badge>
-                      </td>
-                      <td>{paymentBadge(order.workerPaymentStatus, t)}</td>
-                      <td>
-                        <div style={{ minWidth: 160 }}>
-                          <input
-                            className="inp"
-                            value={paymentInputValue}
-                            onChange={(e) =>
-                              setPendingPayments((prev) => ({
-                                ...prev,
-                                [rowKey]: e.target.value,
-                              }))
-                            }
-                            placeholder={t(
-                              "completedWorkerOrders.amountPlaceholder",
-                              "Enter amount",
-                            )}
-                            inputMode="decimal"
-                            disabled={!editUiState.canEditAmount}
-                            style={{ minWidth: 140 }}
-                          />
-                          {isAlreadyPaid && editUiState.canEditWithinWindow ? (
-                            <div
-                              style={{
-                                marginTop: 4,
-                                fontSize: 11,
-                                color: "var(--text3)",
-                              }}
-                            >
-                              {t(
-                                "completedWorkerOrders.editWindowUntil",
-                                "Editable until {{time}}",
-                                {
-                                  time: editUiState.effectiveExpiresAt
-                                    ? formatDateLocale(
-                                        editUiState.effectiveExpiresAt,
-                                        language,
-                                      )
-                                    : "-",
-                                },
+          <>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 10,
+                marginBottom: 10,
+                padding: "14px 16px",
+                borderRadius: 14,
+                border: "1px solid #D6DCE8",
+                background:
+                  "linear-gradient(135deg, #F8FAFF 0%, #F2F6FE 55%, #EEF4FF 100%)",
+                boxShadow: "0 8px 20px rgba(15, 23, 42, 0.06)",
+              }}
+            >
+              <label
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 10,
+                  fontWeight: 600,
+                  fontSize: 14,
+                  color: "#0F172A",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={allEligibleSelected}
+                  onChange={(e) => toggleSelectAll(e.target.checked)}
+                  disabled={!eligibleRows.length || receiptMut.isPending}
+                />
+                {t("completedWorkerOrders.selectAll", "Select All")}
+              </label>
+
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 12,
+                }}
+              >
+                <span style={{ fontSize: 13, color: "var(--text2)" }}>
+                  {t("completedWorkerOrders.selectedOrders", "Selected")}:{" "}
+                  <b>{selectedItems.length}</b>
+                </span>
+                <span
+                  style={{
+                    fontSize: 13,
+                    color: "#1E293B",
+                    background: "rgba(37, 99, 235, 0.1)",
+                    border: "1px solid rgba(37, 99, 235, 0.25)",
+                    borderRadius: 999,
+                    padding: "6px 10px",
+                    fontWeight: 600,
+                  }}
+                >
+                  {t("completedWorkerOrders.selectedTotal", "Total")}:{" "}
+                  <b>{formatCurrency(selectedTotalAmount, "en")}</b>
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-gold btn-sm"
+                  onClick={() => setConfirmReceipt(true)}
+                  disabled={!hasSelectedRows || receiptMut.isPending}
+                >
+                  <LuReceiptText size={14} />
+                  {receiptMut.isPending
+                    ? t("common.loading", "Loading...")
+                    : t("completedWorkerOrders.receipt", "Receipt")}
+                </button>
+              </div>
+            </div>
+
+            <div style={{ overflowX: "auto" }}>
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>
+                      {t("completedWorkerOrders.workerName", "Worker Name")}
+                    </th>
+                    <th>
+                      {t("completedWorkerOrders.workerRole", "Worker Role")}
+                    </th>
+                    <th>{t("orders.billNumber", "Bill Number")}</th>
+                    <th>{t("common.customer", "Customer")}</th>
+                    <th>{t("workerPanel.orderType", "Order Type")}</th>
+                    <th>
+                      {t(
+                        "completedWorkerOrders.completionDate",
+                        "Completion Date",
+                      )}
+                    </th>
+                    <th>{t("common.status", "Status")}</th>
+                    <th>
+                      {t(
+                        "completedWorkerOrders.paymentStatus",
+                        "Payment Status",
+                      )}
+                    </th>
+                    <th>
+                      {t(
+                        "completedWorkerOrders.receiptStatus",
+                        "Receipt Status",
+                      )}
+                    </th>
+                    <th>
+                      {t(
+                        "completedWorkerOrders.paymentAmount",
+                        "Payment Amount",
+                      )}
+                    </th>
+                    <th>{t("common.actions", "Actions")}</th>
+                    <th>{t("common.select", "Select")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((order) => {
+                    const orderLabel = getOrderLabelParts(order, language);
+                    const rowKey = getPaymentRowKey(order);
+                    const editUiState = getPaymentEditUiState(order);
+                    const isAlreadyPaid = editUiState.isAlreadyPaid;
+                    const paymentInputValue =
+                      pendingPayments[rowKey] ??
+                      (order.workerPaymentAmount != null
+                        ? String(order.workerPaymentAmount)
+                        : "");
+                    const isHighlighted =
+                      highlightOrderId && order.id === highlightOrderId;
+                    const canSelectForReceipt =
+                      order.workerPaymentStatus === "PAID_TO_WORKER" &&
+                      order.moneyReceiptStatus !== "RECEIVED";
+                    const isSelected = Boolean(selectedRowKeys[rowKey]);
+                    return (
+                      <tr
+                        key={rowKey}
+                        ref={
+                          isHighlighted
+                            ? (node) => {
+                                rowRefs.current[highlightOrderId] = node;
+                              }
+                            : undefined
+                        }
+                        className={isHighlighted ? "row-highlight" : undefined}
+                      >
+                        <td>{order.assignedTo?.name || "-"}</td>
+                        <td>
+                          {workerRoleLabel(
+                            order.workerRole || order.assignedTo?.accountType,
+                            t,
+                          )}
+                        </td>
+                        <td>#{order.customer?.billNumber || "-"}</td>
+                        <td>
+                          <div style={{ display: "grid", gap: 3 }}>
+                            <strong style={{ color: "var(--text1)" }}>
+                              {getOrderPrimaryDisplayName(
+                                order,
+                                order.customer?.firstName,
+                                language,
                               )}
-                            </div>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className={`btn btn-primary btn-sm payment-btn ${isAlreadyPaid ? "is-paid" : ""}`}
-                          onClick={() => handleSavePayment(order)}
-                          disabled={
-                            payWorkerMut.isPending || !editUiState.canSubmit
-                          }
-                        >
-                          <AfCurrencyIcon size={14} />
-                          {!isAlreadyPaid
-                            ? t(
-                                "completedWorkerOrders.savePayment",
-                                "Save Payment",
-                              )
-                            : editUiState.canEditWithinWindow
-                              ? t("common.edit", "Edit")
-                              : t("completedWorkerOrders.expired", "Expired")}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                            </strong>
+                            <span
+                              style={{ fontSize: 12, color: "var(--text3)" }}
+                            >
+                              {order.customer?.phoneNumber || "-"}
+                            </span>
+                          </div>
+                        </td>
+                        <td>{orderLabel.baseTypeLabel}</td>
+                        <td>
+                          {formatDateLocale(
+                            order.completedAt || order.updatedAt,
+                            language,
+                          )}
+                        </td>
+                        <td>
+                          <Badge v="green">
+                            {t("common.completed", "Completed")}
+                          </Badge>
+                        </td>
+                        <td>{paymentBadge(order.workerPaymentStatus, t)}</td>
+                        <td>{receiptBadge(order.moneyReceiptStatus, t)}</td>
+                        <td>
+                          <div style={{ minWidth: 160 }}>
+                            <input
+                              className="inp"
+                              value={paymentInputValue}
+                              onChange={(e) =>
+                                setPendingPayments((prev) => ({
+                                  ...prev,
+                                  [rowKey]: e.target.value,
+                                }))
+                              }
+                              placeholder={t(
+                                "completedWorkerOrders.amountPlaceholder",
+                                "Enter amount",
+                              )}
+                              inputMode="decimal"
+                              disabled={!editUiState.canEditAmount}
+                              style={{ minWidth: 140 }}
+                            />
+                            {isAlreadyPaid &&
+                            editUiState.canEditWithinWindow ? (
+                              <div
+                                style={{
+                                  marginTop: 4,
+                                  fontSize: 11,
+                                  color: "var(--text3)",
+                                }}
+                              >
+                                {t(
+                                  "completedWorkerOrders.editWindowUntil",
+                                  "Editable until {{time}}",
+                                  {
+                                    time: editUiState.effectiveExpiresAt
+                                      ? formatDateLocale(
+                                          editUiState.effectiveExpiresAt,
+                                          language,
+                                        )
+                                      : "-",
+                                  },
+                                )}
+                              </div>
+                            ) : null}
+                          </div>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-gold btn-sm"
+                            onClick={() => handleSavePayment(order)}
+                            disabled={
+                              payWorkerMut.isPending || !editUiState.canSubmit
+                            }
+                          >
+                            <AfCurrencyIcon size={14} />
+                            {!isAlreadyPaid
+                              ? t(
+                                  "completedWorkerOrders.savePayment",
+                                  "Save Payment",
+                                )
+                              : editUiState.canEditWithinWindow
+                                ? t("common.edit", "Edit")
+                                : t("completedWorkerOrders.expired", "Expired")}
+                          </button>
+                        </td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            disabled={
+                              !canSelectForReceipt || receiptMut.isPending
+                            }
+                            onChange={(e) =>
+                              toggleSelectRow(order, e.target.checked)
+                            }
+                            aria-label={t(
+                              "completedWorkerOrders.selectOrder",
+                              "Select order",
+                            )}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         <Pagination
@@ -804,6 +1083,75 @@ export default function CompletedWorkerOrders() {
           onChange={(nextPage) => setPage(nextPage)}
         />
       </Card>
+
+      <Modal
+        open={confirmReceipt}
+        onClose={() => {
+          if (receiptMut.isPending) return;
+          setConfirmReceipt(false);
+        }}
+        title={t(
+          "completedWorkerOrders.confirmReceiptTitle",
+          "Confirm Receipt",
+        )}
+        maxW={500}
+      >
+        <div style={{ display: "grid", gap: 12 }}>
+          <p style={{ margin: 0, color: "var(--text2)", fontSize: 13 }}>
+            {t(
+              "completedWorkerOrders.confirmReceiptMessage",
+              "Mark selected orders as received and move them to receipt history?",
+            )}
+          </p>
+          <div
+            style={{
+              border: "1px solid var(--border)",
+              borderRadius: 10,
+              background: "var(--surface2)",
+              padding: 12,
+              display: "grid",
+              gap: 6,
+              fontSize: 13,
+            }}
+          >
+            <div>
+              <b>{t("completedWorkerOrders.selectedOrders", "Selected")}:</b>{" "}
+              {selectedItems.length}
+            </div>
+            <div>
+              <b>{t("completedWorkerOrders.selectedTotal", "Total")}:</b>{" "}
+              {formatCurrency(selectedTotalAmount, "en")}
+            </div>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: isRtl ? "flex-start" : "flex-end",
+              gap: 8,
+            }}
+          >
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => setConfirmReceipt(false)}
+              disabled={receiptMut.isPending}
+            >
+              {t("common.cancel", "Cancel")}
+            </button>
+            <button
+              type="button"
+              className="btn btn-gold"
+              onClick={submitReceipt}
+              disabled={receiptMut.isPending || !hasSelectedRows}
+            >
+              <LuReceiptText size={14} />
+              {receiptMut.isPending
+                ? t("common.loading", "Loading...")
+                : t("completedWorkerOrders.receipt", "Receipt")}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         open={!!confirmPayment}
@@ -851,7 +1199,7 @@ export default function CompletedWorkerOrders() {
               </div>
               <div>
                 <b>{t("completedWorkerOrders.workerRole", "Worker Role")}:</b>{" "}
-                {confirmPayment.order.workerRole || "-"}
+                {workerRoleLabel(confirmPayment.order.workerRole, t)}
               </div>
               <div>
                 <b>{t("orders.billNumber", "Bill Number")}:</b> #
@@ -897,7 +1245,7 @@ export default function CompletedWorkerOrders() {
               </button>
               <button
                 type="button"
-                className="btn btn-primary payment-btn-confirm"
+                className="btn btn-gold"
                 onClick={submitConfirmedPayment}
                 disabled={payWorkerMut.isPending}
               >

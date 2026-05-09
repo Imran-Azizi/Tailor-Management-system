@@ -478,11 +478,12 @@ export const getAllRakht = async ({ month = null, year = null } = {}) => {
     Number.isFinite(parsedMonth) &&
     Number.isFinite(parsedYear)
   ) {
-    const { start, end } = getAfghanMonthDateRange({
+    const { end } = getAfghanMonthDateRange({
       month: parsedMonth,
       year: parsedYear,
     });
-    where.date = { gte: start, lte: end };
+    // Cumulative visibility: include fabrics created in previous months as well.
+    where.date = { lte: end };
   }
 
   const rows = await prisma.rakht.findMany({

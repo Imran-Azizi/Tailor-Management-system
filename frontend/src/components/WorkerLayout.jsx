@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
   LuScissors,
+  LuRuler,
   LuBell,
   LuLogOut,
   LuUser,
@@ -22,6 +23,10 @@ import api from "../lib/api.js";
 import { formatUserNotificationMessage } from "../lib/notifications.js";
 import { formatDateTimeLocale } from "../lib/locale.js";
 import {
+  getLatestNotificationTimestamp,
+  playNotificationChime,
+} from "../lib/notificationSound.js";
+import {
   MONTHS,
   getDisplayMonthLabelForLanguage,
   getDisplayYearForLanguage,
@@ -30,8 +35,16 @@ import AfCurrencyIcon from "./ui/AfCurrencyIcon.jsx";
 import { NotificationText } from "./ui/index.jsx";
 
 const ROLE_CONFIG = {
-  DOKHT: { color: "#DB2777", labelKey: "workerLayout.dokhtPanel" },
-  QICHIKAR: { color: "#D97706", labelKey: "workerLayout.qichikarPanel" },
+  DOKHT: {
+    color: "#DB2777",
+    labelKey: "workerLayout.dokhtPanel",
+    Icon: LuScissors,
+  },
+  QICHIKAR: {
+    color: "#D97706",
+    labelKey: "workerLayout.qichikarPanel",
+    Icon: LuRuler,
+  },
 };
 
 function useOutside(ref, fn) {
@@ -421,7 +434,7 @@ export default function WorkerLayout() {
   useOutside(userRef, () => setUserOpen(false));
 
   const cfg = ROLE_CONFIG[user?.accountType] || ROLE_CONFIG.QICHIKAR;
-  const { color: roleColor, labelKey } = cfg;
+  const { color: roleColor, labelKey, Icon: RoleIcon } = cfg;
   const roleLabel = t(labelKey);
   const {
     viewMonth,
@@ -449,9 +462,25 @@ export default function WorkerLayout() {
   });
 
   const unreadNotifs = Array.isArray(unreadNotifsRaw) ? unreadNotifsRaw : [];
+  const lastWorkerSoundTs = useRef(0);
 
   const currentLang = (i18n.resolvedLanguage || "en").slice(0, 2).toUpperCase();
   const isRtl = (i18n.dir?.() || "ltr") === "rtl";
+
+  useEffect(() => {
+    const latestTimestamp = getLatestNotificationTimestamp(unreadNotifs);
+    if (!latestTimestamp) return;
+
+    if (!lastWorkerSoundTs.current) {
+      lastWorkerSoundTs.current = latestTimestamp;
+      return;
+    }
+
+    if (latestTimestamp > lastWorkerSoundTs.current) {
+      playNotificationChime();
+      lastWorkerSoundTs.current = latestTimestamp;
+    }
+  }, [unreadNotifs]);
 
   return (
     <div
@@ -480,7 +509,7 @@ export default function WorkerLayout() {
               justifyContent: "center",
             }}
           >
-            <LuScissors size={18} color="#fff" />
+            <RoleIcon size={18} color="#fff" />
           </div>
           <div>
             <p

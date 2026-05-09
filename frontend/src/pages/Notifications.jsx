@@ -15,6 +15,11 @@ import { getApiErrorMessage } from "../lib/feedback.js";
 import { formatSystemNotificationMessage } from "../lib/notifications.js";
 import { formatDateTimeLocale, formatDateLocale } from "../lib/locale.js";
 import {
+  getNotificationSummary,
+  groupNotificationsByDay,
+} from "../lib/notificationGrouping.js";
+import { useMonth } from "../context/MonthContext.jsx";
+import {
   EMERGENCY_SOUND_MUTED_KEY,
   playEmergencyAlertSound,
   shouldPlayEmergencyAlertCycle,
@@ -31,12 +36,18 @@ export default function Notifications() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const language = i18n.resolvedLanguage || i18n.language;
+  const { viewMonth, viewYear } = useMonth();
   const qc = useQueryClient();
   const [deleteNotifTarget, setDeleteNotifTarget] = useState(null);
 
   const { data: notifs = [], isLoading } = useQuery({
-    queryKey: ["notifications"],
-    queryFn: () => api.get("/notifications").then((r) => r.data),
+    queryKey: ["notifications", viewMonth, viewYear],
+    queryFn: () =>
+      api
+        .get("/notifications", {
+          params: { unread: false, month: viewMonth, year: viewYear },
+        })
+        .then((r) => r.data),
     refetchInterval: 30_000,
   });
 
@@ -78,6 +89,11 @@ export default function Notifications() {
   });
 
   const unread = notifs.filter((n) => !n.isRead).length;
+  const groupedNotifs = groupNotificationsByDay(notifs, {
+    language,
+    t,
+    getDate: (item) => item?.createdAt,
+  });
 
   useEffect(() => {
     if (!Array.isArray(notifs) || notifs.length === 0) return;
@@ -122,151 +138,125 @@ export default function Notifications() {
           <EmptyState message={t("notificationsPage.empty")} Icon={LuBell} />
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {notifs.map((n) => (
-            <div
-              key={n.id}
-              className="card"
-              style={{
-                padding: "14px 18px",
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 14,
-                borderInlineStart: !n.isRead
-                  ? "3px solid var(--primary)"
-                  : "3px solid transparent",
-                cursor: n?.orderId ? "pointer" : "default",
-              }}
-              onClick={() => {
-                if (!n?.orderId) return;
-                if (!n.isRead) readMut.mutate(n.id);
-                navigate(`/orders/${n.orderId}/edit`);
-              }}
-            >
-              <div
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: "50%",
-                  background: n.isRead
-                    ? "var(--surface2)"
-                    : "var(--primary-100)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <LuTriangleAlert
-                  size={16}
-                  style={{
-                    color: n.isRead ? "var(--text3)" : "var(--primary)",
-                  }}
-                />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    flexWrap: "wrap",
-                    marginBottom: 3,
-                  }}
-                >
-                  {!n.isRead && (
-                    <span
-                      style={{
-                        width: 7,
-                        height: 7,
-                        background: "var(--primary)",
-                        borderRadius: "50%",
-                        flexShrink: 0,
+        <div className="notifications-feed">
+          {groupedNotifs.map((group) => (
+            <section key={group.dayKey} className="notifications-day-group">
+              <header className="notifications-day-heading">
+                {group.heading}
+              </header>
+              <div className="notifications-day-list">
+                {group.items.map((n) => {
+                  const message = formatSystemNotificationMessage(
+                    n,
+                    t,
+                    language,
+                  );
+                  const summary = getNotificationSummary(message);
+                  const fallbackTitle = n.order?.customer?.firstName
+                    ? `${n.order.customer.firstName}${
+                        n.order?.customer?.billNumber
+                          ? ` #${n.order.customer.billNumber}`
+                          : ""
+                      }`
+                    : t("createOrder.emergencyOrder", "Emergency");
+
+                  return (
+                    <article
+                      key={n.id}
+                      className={`notif-feed-item notif-feed-item--page ${
+                        !n.isRead ? "notif-feed-item--unread" : ""
+                      }`}
+                      onClick={() => {
+                        if (!n?.orderId) return;
+                        if (!n.isRead) readMut.mutate(n.id);
+                        navigate(`/orders/${n.orderId}/edit`);
                       }}
-                    />
-                  )}
-                  <span className="badge bg-red" style={{ fontSize: 10 }}>
-                    {t("createOrder.emergencyOrder", "Emergency")}
-                  </span>
-                  <span style={{ fontSize: 13, fontWeight: 600 }}>
-                    {n.order?.customer?.firstName}
-                    {n.order?.customer?.billNumber && (
+                      style={{ cursor: n?.orderId ? "pointer" : "default" }}
+                    >
                       <span
-                        style={{
-                          fontFamily: "monospace",
-                          fontWeight: 400,
-                          color: "var(--primary)",
-                          marginInlineStart: 6,
-                        }}
+                        className="notif-feed-item__icon"
+                        aria-hidden="true"
                       >
-                        #{n.order.customer.billNumber}
+                        <LuTriangleAlert
+                          size={15}
+                          style={{
+                            color: n.isRead ? "var(--text3)" : "var(--danger)",
+                          }}
+                        />
                       </span>
-                    )}
-                  </span>
-                </div>
-                <NotificationText
-                  language={language}
-                  style={{ fontSize: 13, lineHeight: 1.5 }}
-                >
-                  {formatSystemNotificationMessage(n, t, language)}
-                </NotificationText>
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 14,
-                    marginTop: 5,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <span style={{ fontSize: 11, color: "var(--text3)" }}>
-                    {t("notificationsPage.created")}:{" "}
-                    {formatDateTimeLocale(n.createdAt, language)}
-                  </span>
-                  <span style={{ fontSize: 11, color: "var(--text3)" }}>
-                    {t("notificationsPage.next")}:{" "}
-                    {formatDateTimeLocale(n.nextAlert, language)}
-                  </span>
-                  {n.expiresAt && (
-                    <span style={{ fontSize: 11, color: "#DC2626" }}>
-                      {t("notificationsPage.expires")}:{" "}
-                      {formatDateLocale(n.expiresAt, language)}
-                    </span>
-                  )}
-                </div>
+                      <div className="notif-feed-item__copy">
+                        <div className="notif-feed-item__topline">
+                          {!n.isRead && (
+                            <span className="notif-feed-item__dot" />
+                          )}
+                          <span
+                            className="badge bg-red"
+                            style={{ fontSize: 10 }}
+                          >
+                            {t("createOrder.emergencyOrder", "Emergency")}
+                          </span>
+                          <p className="notif-feed-item__title">
+                            {summary.title || fallbackTitle}
+                          </p>
+                        </div>
+                        {summary.message && (
+                          <NotificationText
+                            language={language}
+                            className="notif-feed-item__message"
+                          >
+                            {summary.message}
+                          </NotificationText>
+                        )}
+                        <div className="notif-feed-item__meta">
+                          <span>
+                            {t("notificationsPage.created")}:{" "}
+                            {formatDateTimeLocale(n.createdAt, language)}
+                          </span>
+                          <span>
+                            {t("notificationsPage.next")}:{" "}
+                            {formatDateTimeLocale(n.nextAlert, language)}
+                          </span>
+                          {n.expiresAt && (
+                            <span className="notif-feed-item__meta-danger">
+                              {t("notificationsPage.expires")}:{" "}
+                              {formatDateLocale(n.expiresAt, language)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="notif-feed-item__actions">
+                        {!n.isRead && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              readMut.mutate(n.id);
+                            }}
+                            className="btn btn-outline btn-sm"
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 4,
+                            }}
+                          >
+                            <LuCheck size={12} /> {t("notificationsPage.read")}
+                          </button>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteNotifTarget(n);
+                          }}
+                          className="notif-feed-item__delete"
+                          title={t("common.delete")}
+                        >
+                          <LuTrash2 size={12} />
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
-              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                {!n.isRead && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      readMut.mutate(n.id);
-                    }}
-                    className="btn btn-outline btn-sm"
-                    style={{ display: "flex", alignItems: "center", gap: 4 }}
-                  >
-                    <LuCheck size={12} /> {t("notificationsPage.read")}
-                  </button>
-                )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDeleteNotifTarget(n);
-                  }}
-                  style={{
-                    background: "#FFF1F2",
-                    color: "#BE123C",
-                    border: "none",
-                    borderRadius: 5,
-                    padding: "4px 8px",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                  }}
-                >
-                  <LuTrash2 size={12} />
-                </button>
-              </div>
-            </div>
+            </section>
           ))}
         </div>
       )}

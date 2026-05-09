@@ -751,6 +751,8 @@
   "notificationsPage": {
     "title": "Notifications",
     "unread": "{{count}} unread",
+    "today": "Today",
+    "yesterday": "Yesterday",
     "empty": "No notifications yet.",
     "markAllRead": "Mark all read",
     "markReadFailed": "Failed to mark as read.",

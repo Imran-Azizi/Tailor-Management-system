@@ -6,8 +6,6 @@ import {
   LuSearch,
   LuPhone,
   LuReceipt,
-  LuTrendingUp,
-  LuTrendingDown,
   LuClock,
 } from "react-icons/lu";
 import api from "../lib/api.js";
@@ -20,6 +18,7 @@ import {
   Pagination,
   Badge,
 } from "../components/ui/index.jsx";
+import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 
 function formatMoney(v, language) {
   return formatCurrency(v, language || "en", {
@@ -395,7 +394,7 @@ export default function CustomerTransactions() {
           {
             label: t("dadAndStud.totalOutstanding"),
             value: formatMoney(totalRemaining, language),
-            Icon: LuTrendingDown,
+            Icon: AfCurrencyIcon,
             color: "#DC2626",
             isText: true,
           },

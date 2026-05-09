@@ -95,11 +95,14 @@ function LangBtn() {
 }
 
 export default function Login() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { login, logout } = useAuth();
   const { dark, toggle } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
+  const language = (i18n.resolvedLanguage || i18n.language || "").toLowerCase();
+  const isDariPashto =
+    language.startsWith("dari") || language.startsWith("pashto");
   const from = location.state?.from?.pathname || "/dashboard";
 
   const [phone, setPhone] = useState("");
@@ -242,16 +245,7 @@ export default function Login() {
               {t("common.phone", "Phone")}
             </label>
             <div className="iw" style={{ position: "relative" }}>
-              <LuPhone
-                size={15}
-                style={{
-                  position: "absolute",
-                  insetInlineStart: 12,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "var(--text3)",
-                }}
-              />
+              <LuPhone size={15} className="ico" />
               <input
                 type="tel"
                 className="inp with-leading-icon"
@@ -259,7 +253,6 @@ export default function Login() {
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="0700000000"
                 style={{
-                  padding: "10px 12px",
                   borderRadius: 8,
                   background: "var(--surface2)",
                   boxSizing: "border-box",
@@ -284,16 +277,7 @@ export default function Login() {
               {t("auth.password")}
             </label>
             <div className="iw" style={{ position: "relative" }}>
-              <LuLock
-                size={15}
-                style={{
-                  position: "absolute",
-                  insetInlineStart: 12,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "var(--text3)",
-                }}
-              />
+              <LuLock size={15} className="ico" />
               <input
                 type={showPw ? "text" : "password"}
                 className="inp with-leading-icon with-trailing-icon"
@@ -301,7 +285,7 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="********"
                 style={{
-                  padding: "10px 12px",
+                  ...(isDariPashto ? { paddingInlineEnd: 60 } : {}),
                   borderRadius: 8,
                   background: "var(--surface2)",
                   boxSizing: "border-box",
@@ -311,12 +295,15 @@ export default function Login() {
               />
               <button
                 type="button"
+                className="end-action"
                 onClick={() => setShowPw((s) => !s)}
                 style={{
-                  position: "absolute",
-                  insetInlineEnd: 12,
-                  top: "50%",
-                  transform: "translateY(-50%)",
+                  ...(isDariPashto
+                    ? {
+                        insetInlineStart: "auto",
+                        insetInlineEnd: 36,
+                      }
+                    : {}),
                   background: "none",
                   border: "none",
                   cursor: "pointer",

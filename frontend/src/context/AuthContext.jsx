@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
 } from "react";
 import api from "../lib/api.js";
 
@@ -76,28 +77,43 @@ export function AuthProvider({ children }) {
   const canManageOrders = isAdmin || isDokan;
 
   // Helper to check if user has a specific role
-  const hasRole = (...roles) => roles.includes(user?.accountType);
-
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        login,
-        logout,
-        isAdmin,
-        isDokan,
-        isDokht,
-        isQichikar,
-        isFinance,
-        isWorker,
-        canManageOrders,
-        hasRole,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const hasRole = useCallback(
+    (...roles) => roles.includes(user?.accountType),
+    [user?.accountType],
   );
+
+  const value = useMemo(
+    () => ({
+      user,
+      loading,
+      login,
+      logout,
+      isAdmin,
+      isDokan,
+      isDokht,
+      isQichikar,
+      isFinance,
+      isWorker,
+      canManageOrders,
+      hasRole,
+    }),
+    [
+      user,
+      loading,
+      login,
+      logout,
+      isAdmin,
+      isDokan,
+      isDokht,
+      isQichikar,
+      isFinance,
+      isWorker,
+      canManageOrders,
+      hasRole,
+    ],
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export const useAuth = () => {

@@ -3,6 +3,7 @@ import {
   parseNumberLocale,
   normalizeText,
   normalizePhone,
+  toAsciiDigits,
 } from "../lib/normalize.js";
 import { createCustomerWithSequentialBill } from "../lib/billNumber.js";
 import {
@@ -743,10 +744,45 @@ const getRolePaymentSnapshot = (order, role) => {
   };
 };
 
+const normalizeWorkerRole = (role) => {
+  if (role === "QICHIKAR" || role === "DOKHT") return role;
+  return "WORKER";
+};
+
+const getPaymentAmountByRole = (order, role) => {
+  if (role === "QICHIKAR") return Number(order?.qichikarPaymentAmount || 0);
+  if (role === "DOKHT") return Number(order?.dokhtPaymentAmount || 0);
+  return Number(order?.workerPaymentAmount || 0);
+};
+
+const getReceiptMapKey = (orderId, workerRole) =>
+  `${String(orderId)}:${normalizeWorkerRole(workerRole)}`;
+
+const getCompletedWorkerForRole = (order, role) => {
+  if (role === "QICHIKAR") {
+    return (
+      order?.qichikarAssignedTo ||
+      (order?.assignedTo?.accountType === "QICHIKAR" ? order.assignedTo : null)
+    );
+  }
+
+  if (role === "DOKHT") {
+    return (
+      order?.dokhtAssignedTo ||
+      (order?.assignedTo?.accountType === "DOKHT" ? order.assignedTo : null)
+    );
+  }
+
+  return order?.assignedTo || null;
+};
+
 const buildCompletedWorkerPaymentRows = (order) => {
   const rows = [];
 
-  if (order?.qichikarCompletedAt && order?.qichikarAssignedTo) {
+  const qichikarWorker = getCompletedWorkerForRole(order, "QICHIKAR");
+  const dokhtWorker = getCompletedWorkerForRole(order, "DOKHT");
+
+  if (order?.qichikarCompletedAt && qichikarWorker) {
     const paymentSnapshot = getRolePaymentSnapshot(order, "QICHIKAR");
     const editMeta = getWorkerPaymentEditMeta(
       paymentSnapshot.status,
@@ -756,7 +792,7 @@ const buildCompletedWorkerPaymentRows = (order) => {
       ...order,
       rowId: `${order.id}:QICHIKAR`,
       workerRole: "QICHIKAR",
-      assignedTo: order.qichikarAssignedTo,
+      assignedTo: qichikarWorker,
       completedAt: order.qichikarCompletedAt,
       workerPaymentStatus: paymentSnapshot.status,
       workerPaymentAmount: paymentSnapshot.amount,
@@ -766,7 +802,7 @@ const buildCompletedWorkerPaymentRows = (order) => {
     });
   }
 
-  if (order?.dokhtCompletedAt && order?.dokhtAssignedTo) {
+  if (order?.dokhtCompletedAt && dokhtWorker) {
     const paymentSnapshot = getRolePaymentSnapshot(order, "DOKHT");
     const editMeta = getWorkerPaymentEditMeta(
       paymentSnapshot.status,
@@ -776,7 +812,7 @@ const buildCompletedWorkerPaymentRows = (order) => {
       ...order,
       rowId: `${order.id}:DOKHT`,
       workerRole: "DOKHT",
-      assignedTo: order.dokhtAssignedTo,
+      assignedTo: dokhtWorker,
       completedAt: order.dokhtCompletedAt,
       workerPaymentStatus: paymentSnapshot.status,
       workerPaymentAmount: paymentSnapshot.amount,
@@ -889,6 +925,9 @@ export const getAllOrders = async ({
 } = {}) => {
   const skip = (Number(page) - 1) * Number(limit);
   const where = {};
+  const normalizedSearch = String(normalizeText(search || "") || "")
+    .replace(/\s+/g, " ")
+    .trim();
   if (status === "completed") {
     where.isCompleted = true;
   }
@@ -917,11 +956,36 @@ export const getAllOrders = async ({
       month: parsedMonth,
       year: parsedYear,
     });
-    // Match orders with explicit entryMonth/Year OR (for legacy orders) by createdAt range
-    where.OR = [
-      ...(where.OR || []),
-      { entryMonth: parsedMonth, entryYear: parsedYear },
-      { entryMonth: null, createdAt: { gte: monthStart, lte: monthEnd } },
+    // Match current selected month orders.
+    const currentMonthScope = {
+      OR: [
+        { entryMonth: parsedMonth, entryYear: parsedYear },
+        { entryMonth: null, createdAt: { gte: monthStart, lte: monthEnd } },
+      ],
+    };
+
+    // Carry forward unfinished orders from previous months into later month views.
+    const carryForwardPendingScope = {
+      AND: [
+        { isCompleted: false },
+        {
+          OR: [
+            { entryYear: { lt: parsedYear } },
+            { entryYear: parsedYear, entryMonth: { lt: parsedMonth } },
+            { entryMonth: null, createdAt: { lt: monthStart } },
+          ],
+        },
+      ],
+    };
+
+    where.AND = [
+      ...(where.AND || []),
+      {
+        OR:
+          status === "completed"
+            ? [currentMonthScope]
+            : [currentMonthScope, carryForwardPendingScope],
+      },
     ];
   }
 
@@ -930,8 +994,10 @@ export const getAllOrders = async ({
     where.createdByFinanceId = String(financeUserId);
   }
 
-  if (search)
-    where.customer = { firstName: { contains: search, mode: "insensitive" } };
+  if (normalizedSearch)
+    where.customer = {
+      firstName: { contains: normalizedSearch, mode: "insensitive" },
+    };
   if (
     searchBill !== undefined &&
     searchBill !== null &&
@@ -1111,7 +1177,9 @@ export const lookupOrdersByBillOrPhone = async ({
     return text;
   };
 
-  const normalizedBillNumber = normalizeLookupValue(billNumber);
+  const normalizedBillNumber = toAsciiDigits(normalizeLookupValue(billNumber))
+    .replace(/\s+/g, "")
+    .replace(/[^0-9]/g, "");
   const normalizedPhoneNumber = normalizeLookupValue(phoneNumber);
 
   const hasBill = normalizedBillNumber !== "";
@@ -1125,7 +1193,7 @@ export const lookupOrdersByBillOrPhone = async ({
 
   let parsedBillNumber = null;
   if (hasBill) {
-    const n = Number(normalizedBillNumber);
+    const n = parseNumberLocale(normalizedBillNumber);
     if (!Number.isFinite(n)) {
       if (hasPhone) {
         // If phone is also provided, ignore invalid bill input and continue with phone lookup.
@@ -1197,6 +1265,10 @@ export const getCompletedOrdersFromWorkers = async ({
   month = null,
   year = null,
 } = {}) => {
+  const normalizedSearch = String(normalizeText(search || "") || "")
+    .replace(/\s+/g, " ")
+    .trim();
+
   const skip = (Number(page) - 1) * Number(limit);
   const where = {
     AND: [
@@ -1237,9 +1309,9 @@ export const getCompletedOrdersFromWorkers = async ({
     });
   }
 
-  if (search && String(search).trim()) {
-    const q = String(search).trim();
-    const maybeBill = Number.parseInt(q, 10);
+  if (normalizedSearch) {
+    const q = normalizedSearch;
+    const maybeBill = Math.trunc(parseNumberLocale(toAsciiDigits(q)));
     where.AND.push({
       OR: [
         { customer: { firstName: { contains: q, mode: "insensitive" } } },
@@ -1255,7 +1327,6 @@ export const getCompletedOrdersFromWorkers = async ({
 
   const wantsPaymentStatusFilter =
     paymentStatus && ["UNPAID", "PAID_TO_WORKER"].includes(paymentStatus);
-
   if (qichikarUserId && String(qichikarUserId).trim()) {
     where.AND.push({
       qichikarAssignedToId: String(qichikarUserId).trim(),
@@ -1286,6 +1357,12 @@ export const getCompletedOrdersFromWorkers = async ({
     ORDER_LIST_INCLUDE_BASE,
   );
 
+  const normalizedSearchLower = normalizedSearch.toLowerCase();
+  const normalizedSearchDigits = toAsciiDigits(normalizedSearchLower).replace(
+    /\D/g,
+    "",
+  );
+
   const normalizedData = (
     await enrichOrdersWithDisplayMeta(enrichOrderListAssignment(data))
   )
@@ -1314,19 +1391,21 @@ export const getCompletedOrdersFromWorkers = async ({
         return false;
       }
 
-      if (!search || !String(search).trim()) {
+      if (!normalizedSearch) {
         return true;
       }
 
-      const q = String(search).trim().toLowerCase();
+      const q = normalizedSearchLower;
       const billNumber = String(row.customer?.billNumber || "").toLowerCase();
+      const billDigits = toAsciiDigits(billNumber).replace(/\D/g, "");
       const customerName = String(row.customer?.firstName || "").toLowerCase();
       const workerName = String(row.assignedTo?.name || "").toLowerCase();
 
       return (
         customerName.includes(q) ||
         workerName.includes(q) ||
-        billNumber.includes(q)
+        billNumber.includes(q) ||
+        (normalizedSearchDigits && billDigits.includes(normalizedSearchDigits))
       );
     })
     .sort((left, right) => {
@@ -1345,19 +1424,79 @@ export const getCompletedOrdersFromWorkers = async ({
       return rightTime - leftTime;
     });
 
-  const total = normalizedData.length;
-  const paginatedData = normalizedData.slice(skip, skip + Number(limit));
+  const scopedOrderIds = Array.from(
+    new Set(normalizedData.map((row) => row.id)),
+  );
+  const receipts = scopedOrderIds.length
+    ? await prisma.workerPaymentReceipt.findMany({
+        where: {
+          orderId: { in: scopedOrderIds },
+        },
+        include: {
+          receivedByAdmin: { select: { id: true, name: true } },
+          worker: { select: { id: true, name: true, accountType: true } },
+        },
+      })
+    : [];
 
-  const paidCount = normalizedData.filter(
+  const receiptByRowKey = new Map(
+    receipts.map((receipt) => [
+      getReceiptMapKey(receipt.orderId, receipt.workerRole),
+      receipt,
+    ]),
+  );
+
+  const filteredWithReceipt = normalizedData
+    .map((row) => {
+    const role = normalizeWorkerRole(
+      row.workerRole || row.assignedTo?.accountType,
+    );
+    const receipt = receiptByRowKey.get(getReceiptMapKey(row.id, role));
+    const paidAmount =
+      row.workerPaymentStatus === "PAID_TO_WORKER"
+        ? getPaymentAmountByRole(row, role)
+        : 0;
+    const receivedAmount = receipt ? Number(receipt.paidAmount || 0) : 0;
+
+      return {
+        ...row,
+        workerRole: role,
+        paidAmount,
+        moneyReceiptStatus: receipt ? "RECEIVED" : "PENDING",
+        moneyReceiptAmount: receivedAmount,
+        moneyReceiptDate: receipt?.receiptDate || null,
+        moneyReceiptAdmin: receipt?.receivedByAdmin || null,
+        moneyReceiptWorker: receipt?.worker || null,
+      };
+    })
+    // This page is the pending receipt queue. Received rows are moved to receipt history page.
+    .filter((row) => row.moneyReceiptStatus !== "RECEIVED");
+
+  const total = filteredWithReceipt.length;
+  const paginatedData = filteredWithReceipt.slice(skip, skip + Number(limit));
+
+  const paidCount = filteredWithReceipt.filter(
     (order) => order.workerPaymentStatus === "PAID_TO_WORKER",
   ).length;
-  const unpaidCount = normalizedData.length - paidCount;
-  const totalPaidAmount = normalizedData.reduce(
+  const unpaidCount = filteredWithReceipt.length - paidCount;
+  const totalPaidAmount = filteredWithReceipt.reduce(
     (sum, order) =>
       sum +
       (order.workerPaymentStatus === "PAID_TO_WORKER"
         ? Number(order.workerPaymentAmount || 0)
         : 0),
+    0,
+  );
+  const totalReceiptAmount = filteredWithReceipt.reduce(
+    (sum, order) =>
+      sum +
+      (order.workerPaymentStatus === "PAID_TO_WORKER"
+        ? Number(order.moneyReceiptAmount || 0)
+        : 0),
+    0,
+  );
+  const totalPendingReceiptAmount = Math.max(
+    totalPaidAmount - totalReceiptAmount,
     0,
   );
 
@@ -1367,10 +1506,304 @@ export const getCompletedOrdersFromWorkers = async ({
     page: Number(page),
     limit: Number(limit),
     stats: {
-      totalOrders: normalizedData.length,
+      totalOrders: filteredWithReceipt.length,
       paidOrders: paidCount,
       unpaidOrders: unpaidCount,
       totalPaidAmount,
+      totalReceiptAmount,
+      totalPendingReceiptAmount,
+    },
+  };
+};
+
+export const markCompletedWorkerOrdersAsReceived = async ({
+  items = [],
+  adminId,
+}) => {
+  const normalizedItems = Array.isArray(items)
+    ? items
+        .map((item) => ({
+          orderId: String(item?.orderId || "").trim(),
+          workerRole: normalizeWorkerRole(item?.workerRole),
+        }))
+        .filter((item) => item.orderId)
+    : [];
+
+  if (!normalizedItems.length) {
+    throw Object.assign(new Error("At least one order must be selected."), {
+      status: 400,
+    });
+  }
+
+  const uniqueKeys = new Set();
+  const uniqueItems = [];
+  for (const item of normalizedItems) {
+    const key = getReceiptMapKey(item.orderId, item.workerRole);
+    if (uniqueKeys.has(key)) continue;
+    uniqueKeys.add(key);
+    uniqueItems.push(item);
+  }
+
+  const results = await prisma.$transaction(async (tx) => {
+    const output = [];
+
+    for (const item of uniqueItems) {
+      const order = await tx.order.findUnique({
+        where: { id: item.orderId },
+        include: {
+          customer: { select: { firstName: true, billNumber: true } },
+          qichikarAssignedTo: {
+            select: { id: true, name: true, accountType: true },
+          },
+          dokhtAssignedTo: {
+            select: { id: true, name: true, accountType: true },
+          },
+          assignedTo: { select: { id: true, name: true, accountType: true } },
+        },
+      });
+
+      if (!order) {
+        throw Object.assign(
+          new Error("One or more selected orders were not found."),
+          {
+            status: 404,
+          },
+        );
+      }
+
+      const completionRows = buildCompletedWorkerPaymentRows(order);
+      const targetRow = completionRows.find(
+        (row) => normalizeWorkerRole(row.workerRole) === item.workerRole,
+      );
+
+      if (!targetRow) {
+        throw Object.assign(
+          new Error("Selected row is not a valid completed worker order."),
+          { status: 400 },
+        );
+      }
+
+      if (targetRow.workerPaymentStatus !== "PAID_TO_WORKER") {
+        throw Object.assign(
+          new Error("Only paid worker orders can be marked as receipt."),
+          { status: 400 },
+        );
+      }
+
+      const paidAmount = Number(targetRow.workerPaymentAmount || 0);
+      if (!Number.isFinite(paidAmount) || paidAmount <= 0) {
+        throw Object.assign(
+          new Error("Paid amount is invalid for selected order."),
+          {
+            status: 400,
+          },
+        );
+      }
+
+      const worker =
+        item.workerRole === "QICHIKAR"
+          ? order.qichikarAssignedTo
+          : item.workerRole === "DOKHT"
+            ? order.dokhtAssignedTo
+            : order.assignedTo;
+
+      if (!worker) {
+        throw Object.assign(
+          new Error("Selected order does not have an assigned worker."),
+          { status: 400 },
+        );
+      }
+
+      const now = new Date();
+      const receipt = await tx.workerPaymentReceipt.upsert({
+        where: {
+          orderId_workerRole: {
+            orderId: order.id,
+            workerRole: item.workerRole,
+          },
+        },
+        create: {
+          orderId: order.id,
+          workerId: worker.id,
+          workerRole: item.workerRole,
+          paidAmount,
+          receiptDate: now,
+          receivedByAdminId: adminId,
+          status: "RECEIVED",
+        },
+        update: {
+          workerId: worker.id,
+          paidAmount,
+          receiptDate: now,
+          receivedByAdminId: adminId,
+          status: "RECEIVED",
+        },
+        include: {
+          receivedByAdmin: { select: { id: true, name: true } },
+          worker: { select: { id: true, name: true, accountType: true } },
+        },
+      });
+
+      await tx.userNotification.create({
+        data: {
+          userId: worker.id,
+          orderId: order.id,
+          type: "WORKER_PAYMENT",
+          message: `Receipt confirmed by admin for your ${item.workerRole === "DOKHT" ? "Dokht" : item.workerRole === "QICHIKAR" ? "Qichikar" : "worker"} payment - Bill #${order.customer?.billNumber || "-"} (${order.customer?.firstName || "Customer"}) - Amount: ${paidAmount.toLocaleString("en-US")} AF.`,
+        },
+      });
+
+      output.push({
+        orderId: order.id,
+        workerRole: item.workerRole,
+        paidAmount,
+        receipt,
+      });
+    }
+
+    return output;
+  });
+
+  const totalAmount = results.reduce(
+    (sum, row) => sum + Number(row.paidAmount || 0),
+    0,
+  );
+
+  return {
+    data: results,
+    totalCount: results.length,
+    totalAmount,
+  };
+};
+
+export const getCompletedWorkerOrderReceipts = async ({
+  page = 1,
+  limit = 20,
+  search = "",
+  workerId,
+  workerRole,
+  status,
+  month = null,
+  year = null,
+} = {}) => {
+  const skip = (Number(page) - 1) * Number(limit);
+  const normalizedSearch = String(normalizeText(search || "") || "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const where = {};
+  const effectiveRole = ["QICHIKAR", "DOKHT", "WORKER"].includes(workerRole)
+    ? workerRole
+    : null;
+
+  if (workerId && String(workerId).trim()) {
+    where.workerId = String(workerId).trim();
+  }
+  if (effectiveRole) {
+    where.workerRole = effectiveRole;
+  }
+  if (status && String(status).trim() && status !== "ALL") {
+    where.status = String(status).trim().toUpperCase();
+  }
+
+  const parsedMonth = month != null ? Number(month) : null;
+  const parsedYear = year != null ? Number(year) : null;
+  if (
+    parsedMonth &&
+    parsedYear &&
+    Number.isFinite(parsedMonth) &&
+    Number.isFinite(parsedYear)
+  ) {
+    const { start, end } = getAfghanMonthDateRange({
+      month: parsedMonth,
+      year: parsedYear,
+    });
+    where.receiptDate = { gte: start, lte: end };
+  }
+
+  if (normalizedSearch) {
+    const searchDigits = toAsciiDigits(normalizedSearch).replace(/\D/g, "");
+    const maybeBill = Number.parseInt(searchDigits, 10);
+    const normalizedSearchUpper = normalizedSearch.toUpperCase();
+    const matchedOrderType = [
+      "OUTFIT",
+      "WASKAT",
+      "KORTY",
+      "YAKHANQAQ",
+    ].includes(normalizedSearchUpper)
+      ? normalizedSearchUpper
+      : null;
+
+    where.OR = [
+      { worker: { name: { contains: normalizedSearch, mode: "insensitive" } } },
+      {
+        receivedByAdmin: {
+          name: { contains: normalizedSearch, mode: "insensitive" },
+        },
+      },
+      ...(matchedOrderType
+        ? [
+            {
+              order: {
+                type: matchedOrderType,
+              },
+            },
+          ]
+        : []),
+      {
+        order: {
+          customer: {
+            firstName: { contains: normalizedSearch, mode: "insensitive" },
+          },
+        },
+      },
+      ...(Number.isFinite(maybeBill)
+        ? [
+            {
+              order: {
+                customer: {
+                  billNumber: maybeBill,
+                },
+              },
+            },
+          ]
+        : []),
+    ];
+  }
+
+  const [rows, total, aggregate] = await Promise.all([
+    prisma.workerPaymentReceipt.findMany({
+      where,
+      skip,
+      take: Number(limit),
+      orderBy: { receiptDate: "desc" },
+      include: {
+        worker: { select: { id: true, name: true, accountType: true } },
+        receivedByAdmin: { select: { id: true, name: true } },
+        order: {
+          select: {
+            id: true,
+            type: true,
+            customer: { select: { billNumber: true, firstName: true } },
+          },
+        },
+      },
+    }),
+    prisma.workerPaymentReceipt.count({ where }),
+    prisma.workerPaymentReceipt.aggregate({
+      where,
+      _sum: { paidAmount: true },
+    }),
+  ]);
+
+  return {
+    data: rows,
+    total,
+    page: Number(page),
+    limit: Number(limit),
+    stats: {
+      totalReceipts: total,
+      totalPaidAmount: Number(aggregate?._sum?.paidAmount || 0),
     },
   };
 };

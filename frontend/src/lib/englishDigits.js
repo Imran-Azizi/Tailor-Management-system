@@ -104,7 +104,14 @@ function normalizeInputElementDigits(element) {
 
   const start = element.selectionStart;
   const end = element.selectionEnd;
-  element.value = nextValue;
+  const prototype = Object.getPrototypeOf(element);
+  const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
+
+  if (typeof descriptor?.set === "function") {
+    descriptor.set.call(element, nextValue);
+  } else {
+    element.value = nextValue;
+  }
 
   if (typeof start === "number" && typeof end === "number") {
     try {

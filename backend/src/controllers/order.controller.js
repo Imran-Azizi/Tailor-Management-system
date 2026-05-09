@@ -251,6 +251,29 @@ export const getCompletedFromWorkers = async (req, res, next) => {
   }
 };
 
+export const markCompletedWorkerReceipts = async (req, res, next) => {
+  try {
+    const result = await service.markCompletedWorkerOrdersAsReceived({
+      items: req.body?.items,
+      adminId: req.user.id,
+    });
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getCompletedWorkerReceipts = async (req, res, next) => {
+  try {
+    const result = await service.getCompletedWorkerOrderReceipts(
+      req.query || {},
+    );
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const create = async (req, res, next) => {
   try {
     const body = createOrderSchema.parse(req.body);
@@ -463,7 +486,7 @@ export const markComplete = async (req, res, next) => {
 
       await service.recalculateOrderBenefit(req.params.id);
 
-      const msg = `Dokht Name: ${user.name} | Bill Number: ${order.customer.billNumber} | Order Type: ${order.type} | Customer Name: ${order.customer.firstName} | Stitching completed successfully and waiting for full payment / admin completion.`;
+      const msg = `Worker Name: ${user.name} | Bill Number: ${order.customer.billNumber} | Order Type: ${order.type} | Customer Name: ${order.customer.firstName} | This order has been completed successfully.`;
       await Promise.all(
         admins.map((admin) =>
           prisma.userNotification.create({
@@ -927,8 +950,8 @@ export const payWorkerForCompletedOrder = async (req, res, next) => {
 
     const roleLabel = paymentRole === "DOKHT" ? "Dokht" : "Qichikar";
     const payoutMsg = isPaidAlready
-      ? `Admin updated your completed ${roleLabel} payment - Bill #${order.customer.billNumber} (${order.customer.firstName}) - New Amount: ${Number(paymentAmount).toLocaleString()} AF.`
-      : `Admin paid your completed ${roleLabel} order - Bill #${order.customer.billNumber} (${order.customer.firstName}) - Amount: ${Number(paymentAmount).toLocaleString()} AF.`;
+      ? `Admin updated your completed ${roleLabel} payment - Bill #${order.customer.billNumber} (${order.customer.firstName}) - New Amount: ${Number(paymentAmount).toLocaleString("en-US")} AF.`
+      : `Admin paid your completed ${roleLabel} order - Bill #${order.customer.billNumber} (${order.customer.firstName}) - Amount: ${Number(paymentAmount).toLocaleString("en-US")} AF.`;
 
     await prisma.userNotification.create({
       data: {
@@ -1210,7 +1233,7 @@ export const assign = async (req, res, next) => {
     const normalizedOrder = service.enrichOrderAssignment(order);
 
     if (assignedToId) {
-      const msg = `New order assigned by ${req.user.name}: ${order.customer.firstName} - Bill #${order.customer.billNumber} (${order.type}) - Price: ${Number(normalizedAssignmentPrice || 0).toLocaleString()} AF${normalizedOrder.assignmentNote ? `. Note: ${normalizedOrder.assignmentNote}` : ""}`;
+      const msg = `New order assigned by ${req.user.name}: ${order.customer.firstName} - Bill #${order.customer.billNumber} (${order.type}) - Price: ${Number(normalizedAssignmentPrice || 0).toLocaleString("en-US")} AF${normalizedOrder.assignmentNote ? `. Note: ${normalizedOrder.assignmentNote}` : ""}`;
       await prisma.userNotification.create({
         data: {
           userId: assignedToId,

@@ -4,6 +4,7 @@ import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import { errorHandler } from "./middleware/errorHandler.js";
+import { normalizeDigitsMiddleware } from "./middleware/normalizeDigits.middleware.js";
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import customerRoutes from "./routes/customer.routes.js";
@@ -96,6 +97,7 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(normalizeDigitsMiddleware);
 
 app.use(
   rateLimit({

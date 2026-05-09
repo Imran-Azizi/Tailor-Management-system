@@ -265,6 +265,7 @@ function BackupListCard({
   onDownload,
   onDelete,
   downloading,
+  deleting = false,
   language = "en",
   isRtl = false,
 }) {
@@ -368,20 +369,21 @@ function BackupListCard({
         </div>
       </Card>
 
-      {pendingDelete && (
-        <ConfirmDeleteModal
-          title={t("backup.deleteTitle", "Delete Backup")}
-          message={t(
-            "backup.deleteConfirm",
-            "Delete this backup permanently? This cannot be undone.",
-          )}
-          onConfirm={() => {
-            onDelete(pendingDelete.key);
-            setPendingDelete(null);
-          }}
-          onCancel={() => setPendingDelete(null)}
-        />
-      )}
+      <ConfirmDeleteModal
+        open={Boolean(pendingDelete)}
+        title={t("backup.deleteTitle", "Delete Backup")}
+        message={t(
+          "backup.deleteConfirm",
+          "Delete this backup permanently? This cannot be undone.",
+        )}
+        onConfirm={() => {
+          if (!pendingDelete?.key) return;
+          onDelete(pendingDelete.key);
+          setPendingDelete(null);
+        }}
+        onClose={() => setPendingDelete(null)}
+        isPending={deleting}
+      />
     </>
   );
 }
@@ -456,7 +458,7 @@ export default function BackupManagement() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (key) => api.delete(`/backups/?key=${encodeURIComponent(key)}`),
+    mutationFn: (key) => api.delete("/backups", { params: { key } }),
     onSuccess: () => {
       toast.success(t("backup.deleted", "Backup deleted."));
       qc.invalidateQueries({ queryKey: ["backup-list"] });
@@ -539,14 +541,6 @@ export default function BackupManagement() {
           language={language}
         />
 
-        {status?.restoreTests?.length > 0 && (
-          <RestoreTestsCard
-            tests={status.restoreTests}
-            language={language}
-            isRtl={isRtl}
-          />
-        )}
-
         {listLoading ? (
           <Card title={t("backup.listTitle", "All Backups")}>
             <Spinner />
@@ -557,6 +551,15 @@ export default function BackupManagement() {
             onDownload={handleDownload}
             onDelete={(key) => deleteMutation.mutate(key)}
             downloading={downloadingKey}
+            deleting={deleteMutation.isPending}
+            language={language}
+            isRtl={isRtl}
+          />
+        )}
+
+        {status?.restoreTests?.length > 0 && (
+          <RestoreTestsCard
+            tests={status.restoreTests}
             language={language}
             isRtl={isRtl}
           />

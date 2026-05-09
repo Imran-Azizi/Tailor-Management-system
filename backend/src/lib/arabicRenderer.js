@@ -11,11 +11,40 @@
  */
 
 import { createRequire } from "module";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 const require = createRequire(import.meta.url);
 const fontkit = require("fontkit");
+
+// RTL text shaping parameters
+// These are optimized for Dari, Pashto, and other Persian-script languages
 const RTL_SCRIPT = "arab";
-const RTL_LANGUAGE = "dflt";
+const RTL_LANGUAGE = "dflt"; // Default; can be overridden per-language
 const RTL_DIRECTION = "rtl";
+
+// Map report language codes to fontkit language codes
+const LANGUAGE_MAP = {
+  dari: "fa", // Dari/Farsi to fontkit "fa"
+  pashto: "ps", // Pashto to fontkit "ps"
+  farsi: "fa", // Farsi to fontkit "fa"
+  fa: "fa", // Already correct
+  ps: "ps", // Already correct
+  ur: "ur", // Urdu
+  ar: "ar", // Arabic
+  en: "dflt", // English uses default
+};
+
+// Language-specific OpenType feature sets for better contextual forms
+const LANGUAGE_FEATURES = {
+  fa: ["ccmp", "liga", "dlig", "calt", "rlig"], // Farsi/Dari
+  ps: ["ccmp", "liga", "dlig", "calt", "rlig"], // Pashto
+  ur: ["ccmp", "liga", "dlig", "calt", "rlig"], // Urdu
+  ar: ["ccmp", "liga", "dlig", "calt", "rlig"], // Arabic
+  dflt: [], // Default: let fontkit use standard features
+};
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Cache open fontkit font objects (keyed by file path)
 const _fontCache = new Map();
@@ -134,16 +163,43 @@ export function drawArabicTextSync(
   opts,
   fkFont,
   fillColor = "#0F172A",
+  language = "fa",
 ) {
   if (!text || !fkFont) return 0;
 
   const { width, align = "left", fontSize = doc._fontSize || 12 } = opts;
 
   const scale = fontSize / fkFont.unitsPerEm;
-  const run = fkFont.layout(text, [], RTL_SCRIPT, RTL_LANGUAGE, RTL_DIRECTION);
+
+  // Map report language codes (dari, pashto, etc.) to fontkit language codes (fa, ps, etc.)
+  const mappedLanguage = LANGUAGE_MAP[language] || LANGUAGE_MAP.fa;
+
+  // Use language-specific OpenType features for better contextual form support
+  const layoutFeatures =
+    LANGUAGE_FEATURES[mappedLanguage] || LANGUAGE_FEATURES.dflt;
+  const run = fkFont.layout(
+    text,
+    layoutFeatures,
+    RTL_SCRIPT,
+    mappedLanguage || RTL_LANGUAGE,
+    RTL_DIRECTION,
+  );
   const { glyphs, positions } = run;
 
   if (!glyphs.length) return 0;
+
+  // DEBUG: Log fontkit output for troubleshooting character separation
+  if (process.env.DEBUG_ARABIC_RENDERING === "true") {
+    console.log(
+      `[Arabic Render] text: "${text}", glyphCount: ${glyphs.length}, font: ${fkFont.fullName}, lang: ${language} -> ${mappedLanguage}`,
+    );
+    glyphs.slice(0, 10).forEach((g, i) => {
+      const pos = positions[i];
+      console.log(
+        `  [${i}] glyphId: ${g.id}, name: ${g.name}, xAdv: ${pos.xAdvance.toFixed(1)}, xOff: ${pos.xOffset.toFixed(1)}, yOff: ${pos.yOffset.toFixed(1)}, hasPath: ${!!g.path}`,
+      );
+    });
+  }
 
   const totalWidthPts = positions.reduce(
     (sum, p) => sum + p.xAdvance * scale,
@@ -179,16 +235,25 @@ export function drawArabicTextSync(
       continue;
     }
     const svgPath = path.toSVG();
-    if (!svgPath || svgPath.length < 5) {
+    if (!svgPath || svgPath.trim() === "M0 0" || svgPath.length < 5) {
       curX += pos.xAdvance * scale;
       continue;
     }
 
+    // Save the current graphics state before applying transforms
     doc.save();
+
+    // Apply the transformation matrix:
+    // - Scale X by +scale to enlarge glyph
+    // - Scale Y by -scale to flip from font coordinates (Y-up) to PDF coordinates (Y-down)
+    // - Translate to (glyphX, glyphY) which is the glyph's position on the page
     doc.transform(scale, 0, 0, -scale, glyphX, glyphY);
+
+    // Draw the glyph's SVG path and fill it
     doc.path(svgPath).fill();
     doc.restore();
 
+    // Move to the next glyph position using the advance width
     curX += pos.xAdvance * scale;
   }
 
@@ -203,4 +268,50 @@ export function drawArabicTextSync(
  */
 export async function loadArabicFont(fontPath) {
   return openFont(fontPath);
+}
+
+/**
+ * Resolve the best available Arabic-capable font path for report PDFs.
+ * This includes env overrides, bundled project fonts, and OS fallbacks.
+ */
+export function resolveArabicReportFontPath() {
+  const cwd = process.cwd();
+  const candidates = [
+    process.env.PDF_REPORT_FONT_PATH,
+    process.env.PDF_DARI_PASHTO_FONT_PATH,
+    process.env.PDF_BAHIJ_FONT_PATH,
+    process.env.PDF_VAZIRMATN_FONT_PATH,
+    process.env.PDF_ARABIC_FONT_PATH,
+
+    // Bundled fonts (source tree)
+    path.join(__dirname, "../fonts/Vazirmatn-Regular.ttf"),
+    path.join(__dirname, "../fonts/NotoNaskhArabic-Regular.ttf"),
+    path.join(__dirname, "../fonts/NotoSansArabic-Regular.ttf"),
+    path.join(__dirname, "../fonts/NotoNastaliqUrdu-Regular.ttf"),
+    path.join(__dirname, "../fonts/Bahij_Zar.ttf"),
+    path.join(__dirname, "../fonts/Bahij-Zar.ttf"),
+    path.join(__dirname, "../fonts/BahijZar.ttf"),
+
+    // Bundled fonts (runtime cwd variants)
+    path.join(cwd, "src/fonts/Vazirmatn-Regular.ttf"),
+    path.join(cwd, "backend/src/fonts/Vazirmatn-Regular.ttf"),
+    path.join(cwd, "fonts/Vazirmatn-Regular.ttf"),
+
+    // Windows fallbacks
+    "C:/Windows/Fonts/bahij.ttf",
+    "C:/Windows/Fonts/bahij-zar.ttf",
+    "C:/Windows/Fonts/Bahij_Zar.ttf",
+    "C:/Windows/Fonts/Bahij Zar.ttf",
+    "C:/Windows/Fonts/segoeui.ttf",
+    "C:/Windows/Fonts/tahoma.ttf",
+    "C:/Windows/Fonts/arial.ttf",
+    "C:/Windows/Fonts/aldhabi.ttf",
+
+    // Linux fallbacks
+    "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+  ].filter(Boolean);
+
+  return candidates.find((fontPath) => fs.existsSync(fontPath)) ?? null;
 }

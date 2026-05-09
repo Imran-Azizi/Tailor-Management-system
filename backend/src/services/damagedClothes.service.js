@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma.js";
+import { parseNumberLocale, toAsciiDigits } from "../lib/normalize.js";
 import { getOrderBenefitDetails } from "./order.service.js";
 import { buildOrderWorkedByUserWhere } from "./orderWorkerRelation.service.js";
 
@@ -133,10 +134,11 @@ export const searchOrdersForPenalty = async ({
   }
 
   const trimmedQuery = String(query || "").trim();
+  const normalizedQueryDigits = toAsciiDigits(trimmedQuery);
   const queryUpper = trimmedQuery.toUpperCase();
   const orderTypeQuery = ORDER_TYPES.includes(queryUpper) ? queryUpper : null;
-  const queryAsInt = Number.parseInt(trimmedQuery, 10);
-  const isNumericQuery = /^\d+$/.test(trimmedQuery);
+  const queryAsInt = Math.trunc(parseNumberLocale(normalizedQueryDigits));
+  const isNumericQuery = /^\d+$/.test(normalizedQueryDigits);
   const skip = (page - 1) * limit;
   const workerWhere = buildOrderWorkedByUserWhere({ userId, roleType });
 

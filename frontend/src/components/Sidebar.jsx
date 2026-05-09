@@ -37,10 +37,10 @@ function getDefaultOpenGroupKey(sections, pathname) {
   return null;
 }
 
-function loadOpenGroupKey(storageKey, sections, pathname) {
+function loadOpenGroupKey(storageKey, sections, pathname, validKeysOverride) {
   try {
     const raw = localStorage.getItem(storageKey);
-    const validKeys = getDropdownKeys(sections);
+    const validKeys = validKeysOverride || getDropdownKeys(sections);
     const activeGroupKey = getDefaultOpenGroupKey(sections, pathname);
 
     if (activeGroupKey) {
@@ -106,20 +106,34 @@ export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
     () => withLocalizedLabels(getSidebarSections(role), t),
     [role, t],
   );
+  const validDropdownKeys = useMemo(
+    () => getDropdownKeys(sections),
+    [sections],
+  );
   const activeDropdownId = useMemo(
     () => getDefaultOpenGroupKey(sections, location.pathname),
     [sections, location.pathname],
   );
 
   const [openDropdownId, setOpenDropdownId] = useState(() =>
-    loadOpenGroupKey(expandedStorageKey, sections, location.pathname),
+    loadOpenGroupKey(
+      expandedStorageKey,
+      sections,
+      location.pathname,
+      validDropdownKeys,
+    ),
   );
 
   useEffect(() => {
     setOpenDropdownId(
-      loadOpenGroupKey(expandedStorageKey, sections, location.pathname),
+      loadOpenGroupKey(
+        expandedStorageKey,
+        sections,
+        location.pathname,
+        validDropdownKeys,
+      ),
     );
-  }, [expandedStorageKey, sections, location.pathname]);
+  }, [expandedStorageKey, sections, location.pathname, validDropdownKeys]);
 
   useEffect(() => {
     if (!activeDropdownId) return;
@@ -263,6 +277,7 @@ export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
             <SidebarGroup
               key={group.key}
               group={group}
+              pathname={location.pathname}
               collapsed={collapsed}
               accent={accent}
               isRtl={isRtl}

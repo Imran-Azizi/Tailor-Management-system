@@ -5,8 +5,6 @@ import {
   LuChartBar,
   LuUsers,
   LuReceipt,
-  LuTrendingDown,
-  LuTrendingUp,
   LuPhone,
   LuCalendar,
   LuDownload,
@@ -30,6 +28,7 @@ import { getOrderTypeLabel } from "../lib/orderType.js";
 import { formatSystemDate } from "../lib/locale.js";
 import { formatCurrency } from "../lib/currency.js";
 import { Spinner, Badge } from "../components/ui/index.jsx";
+import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 
 function formatMoney(v, language = "en") {
   return formatCurrency(v, language, {
@@ -188,7 +187,7 @@ export default function CustomerReport() {
               {
                 label: t("report.totalRevenue"),
                 value: formatMoney(analytics?.totalRevenue, language),
-                Icon: LuTrendingUp,
+                Icon: AfCurrencyIcon,
                 color: "#16a34a",
                 isText: true,
               },
@@ -198,7 +197,7 @@ export default function CustomerReport() {
                   analytics?.totalRemaining ?? analytics?.totalPending,
                   language,
                 ),
-                Icon: LuTrendingDown,
+                Icon: AfCurrencyIcon,
                 color: "#DC2626",
                 isText: true,
               },

@@ -50,6 +50,69 @@ export const toAsciiDigits = (input) => {
   return s;
 };
 
+const DEFAULT_SKIP_DIGIT_KEYS = new Set([
+  "password",
+  "passwordhash",
+  "refreshtoken",
+  "accesstoken",
+  "token",
+  "secret",
+  "hash",
+]);
+
+const isPlainObject = (value) => {
+  if (!value || typeof value !== "object") return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+};
+
+const normalizeSkipKeys = (skipKeys = DEFAULT_SKIP_DIGIT_KEYS) => {
+  if (skipKeys instanceof Set) return skipKeys;
+  return new Set(
+    Array.from(skipKeys || [], (key) => String(key).toLowerCase()),
+  );
+};
+
+export const shouldSkipDigitNormalization = (key, skipKeys) => {
+  if (key === null || key === undefined) return false;
+  return normalizeSkipKeys(skipKeys).has(String(key).toLowerCase());
+};
+
+export const normalizeDigits = (input, options = {}) => {
+  const normalizedOptions = {
+    skipKeys: normalizeSkipKeys(options.skipKeys),
+  };
+
+  if (input === null || input === undefined) return input;
+  if (typeof input === "string") return toAsciiDigits(input);
+  if (
+    typeof input === "number" ||
+    typeof input === "boolean" ||
+    typeof input === "bigint" ||
+    typeof input === "function"
+  ) {
+    return input;
+  }
+  if (input instanceof Date) return input;
+  if (typeof Buffer !== "undefined" && Buffer.isBuffer(input)) return input;
+  if (Array.isArray(input)) {
+    return input.map((item) => normalizeDigits(item, normalizedOptions));
+  }
+  if (!isPlainObject(input)) return input;
+
+  return Object.fromEntries(
+    Object.entries(input).map(([key, value]) => {
+      if (shouldSkipDigitNormalization(key, normalizedOptions.skipKeys)) {
+        return [key, value];
+      }
+      return [key, normalizeDigits(value, normalizedOptions)];
+    }),
+  );
+};
+
+export const normalizeDigitsDeep = normalizeDigits;
+export const convertToEnglishNumbers = toAsciiDigits;
+
 export const parseNumberLocale = (input) => {
   if (input === null || input === undefined) return NaN;
   if (typeof input === "number") return input;

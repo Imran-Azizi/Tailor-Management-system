@@ -75,71 +75,31 @@ export const StatCard = ({
       className={`stat-card${isInteractive ? " stat-card--interactive" : ""}`}
       onClick={onClick}
       type={isInteractive ? "button" : undefined}
-      style={
-        isInteractive
-          ? {
-              width: "100%",
-              textAlign: "start",
-              fontFamily: "inherit",
-              appearance: "none",
-            }
-          : undefined
-      }
+      style={{
+        "--stat-accent": accent,
+        width: isInteractive ? "100%" : undefined,
+        textAlign: "start",
+        fontFamily: "inherit",
+        appearance: isInteractive ? "none" : undefined,
+      }}
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          gap: 10,
-        }}
-      >
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p
-            style={{
-              fontSize: 11.5,
-              fontWeight: 600,
-              color: "var(--text3)",
-              textTransform: "uppercase",
-              letterSpacing: ".06em",
-              marginBottom: 8,
-            }}
-          >
-            {label}
-          </p>
-          <p
-            style={{
-              fontSize: 24,
-              fontWeight: 700,
-              color: accent,
-              letterSpacing: "-.02em",
-              lineHeight: 1,
-            }}
-          >
+      <div className="stat-card__shell">
+        <div className="stat-card__copy">
+          <p className="stat-card__label">{label}</p>
+          <p className="stat-card__value" style={{ unicodeBidi: "plaintext" }}>
             {value}
           </p>
-          {sub && (
-            <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 6 }}>
+          {sub ? (
+            <p className="stat-card__sub" style={{ unicodeBidi: "plaintext" }}>
               {sub}
             </p>
-          )}
+          ) : null}
         </div>
-        {Icon && (
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 10,
-              background: "var(--surface2)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-            }}
-          >
-            <Icon size={20} style={{ color: accent }} />
-          </div>
-        )}
+        {Icon ? (
+          <span className="stat-card__icon">
+            <Icon size={20} />
+          </span>
+        ) : null}
       </div>
     </WrapperTag>
   );
@@ -230,10 +190,16 @@ export const NotificationText = ({
   return (
     <Tag
       {...props}
+      dir={rtl ? "rtl" : "ltr"}
       style={{
         direction: rtl ? "rtl" : "ltr",
-        textAlign: "start",
+        textAlign: rtl ? "right" : "left",
         unicodeBidi: "plaintext",
+        whiteSpace: "pre-line",
+        overflowWrap: "anywhere",
+        wordBreak: "break-word",
+        lineHeight: 1.7,
+        display: "block",
         ...style,
       }}
     >

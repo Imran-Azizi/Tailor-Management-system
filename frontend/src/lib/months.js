@@ -15,13 +15,6 @@ export const MONTHS = [
 
 const AFGHANISTAN_TIMEZONE = "Asia/Kabul";
 
-function resolveMonthLocaleTag(language) {
-  const l = String(language || "en").toLowerCase();
-  if (l.startsWith("dari") || l.startsWith("fa")) return "fa-AF-u-ca-persian";
-  if (l.startsWith("pashto") || l.startsWith("ps")) return "ps-AF-u-ca-persian";
-  return "en-US";
-}
-
 const normalizeNumber = (value) => {
   if (typeof value !== "string") return String(value || "");
   const map = {
@@ -116,8 +109,7 @@ export function formatMonthYearLabel(month, year, language) {
   const { month: displayMonth, year: displayYear } =
     getDisplayMonthYearForLanguage(month, year, language);
   const label = getMonthLabel(displayMonth, language) || String(displayMonth);
-  const localeTag = resolveMonthLocaleTag(language);
-  const yearLabel = new Intl.NumberFormat(localeTag, {
+  const yearLabel = new Intl.NumberFormat("en-US", {
     useGrouping: false,
     maximumFractionDigits: 0,
   }).format(displayYear);

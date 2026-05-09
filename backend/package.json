@@ -16,7 +16,6 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.901.0",
-    "@fontsource/noto-naskh-arabic": "^5.2.11",
     "@prisma/client": "^5.14.0",
     "arabic-persian-reshaper": "^1.0.1",
     "bcryptjs": "^3.0.3",
@@ -31,7 +30,6 @@
     "node-cron": "^3.0.3",
     "nodemailer": "^8.0.7",
     "pdfkit": "^0.18.0",
-    "tailor-system": "file:..",
     "zod": "^3.23.8"
   },
   "devDependencies": {

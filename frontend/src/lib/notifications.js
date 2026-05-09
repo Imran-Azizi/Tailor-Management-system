@@ -1,8 +1,11 @@
 import { getOrderTypeLabel } from "./orderType.js";
 import { formatSystemDate } from "./locale.js";
 
+const LTR_ISOLATE_OPEN = "\u2066";
+const LTR_ISOLATE_CLOSE = "\u2069";
+
 const ASSIGNMENT_REGEX =
-  /^New order assigned by (.+?): (.+?) - Bill #(\d+) \((.+?)\)(?: - Price: (?:\$\s*|AF\s*)?([\d,]+(?:\.\d+)?)(?:\s*AF)?)?(?:\. Note: (.+))?\.?$/i;
+  /^New order assigned by (.+?): (.+?) - Bill #(\d+) \((.+?)\)(?: - Price: (?:AF\s*)?([\d,]+(?:\.\d+)?)(?:\s*AF)?)?(?:\. Note: (.+))?\.?$/i;
 const WORK_STARTED_REGEX =
   /^(.+?) started working on order for (.+?) - Bill #(\d+) \((.+?)\)\.?$/i;
 const WORK_STARTED_PIPE_REGEX =
@@ -11,6 +14,8 @@ const WORK_COMPLETED_REGEX =
   /^Order completed successfully - (.+?) - (.+?) - Bill #(\d+) \((.+?)\)\.?$/i;
 const WORK_COMPLETED_PIPE_REGEX =
   /^Worker Name:\s*(.+?)\s*\|\s*Bill Number:\s*(\d+)\s*\|\s*Order Type:\s*(.+?)\s*\|\s*Customer Name:\s*(.+?)\s*\|\s*This order has been completed successfully\.?$/i;
+const DOKHT_COMPLETED_PIPE_REGEX =
+  /^Dokht Name:\s*(.+?)\s*\|\s*Bill Number:\s*(\d+)\s*\|\s*Order Type:\s*(.+?)\s*\|\s*Customer Name:\s*(.+?)\s*\|\s*Stitching completed successfully and waiting for full payment \/ admin completion\.?$/i;
 const QICHIKAR_READY_PIPE_REGEX =
   /^Qichikar Name:\s*(.+?)\s*\|\s*Bill Number:\s*(\d+)\s*\|\s*Order Type:\s*(.+?)\s*\|\s*Customer Name:\s*(.+?)\s*\|\s*Cutting completed successfully and ready for Dokht\.?$/i;
 const ORDER_COMPLETED_BY_REGEX =
@@ -32,8 +37,76 @@ const normalizeOrderTypeFromText = (typeText) => {
   return "";
 };
 
+const isolateLtr = (value) => {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return "-";
+  return `${LTR_ISOLATE_OPEN}${normalized}${LTR_ISOLATE_CLOSE}`;
+};
+
+const buildNotificationBody = (title, lines = []) =>
+  [title, ...lines.filter(Boolean)].join("\n");
+
+const buildLine = (label, value) => {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return "";
+  return `${label}: ${normalized}`;
+};
+
+const getLocalizedCurrencyUnit = (t) =>
+  t("notificationMessages.currencyUnit", "AF");
+
+const normalizeCurrencySymbols = (value, t) => {
+  const currencyUnit = getLocalizedCurrencyUnit(t);
+  return String(value || "")
+    .replace(/\bUS\$/gi, currencyUnit)
+    .replace(/\bUSD\b/gi, currencyUnit)
+    .replace(/\$\s*(?=\d)/g, `${currencyUnit} `)
+    .replace(/\$/g, currencyUnit);
+};
+
+const localizeFallbackPart = (part, t) => {
+  const raw = String(part || "").trim();
+  if (!raw) return "";
+
+  const fieldLabels = {
+    "worker name": t("notificationMessages.workerLabel", "Worker"),
+    "qichikar name": t("notificationMessages.workerLabel", "Worker"),
+    "dokht name": t("notificationMessages.workerLabel", "Worker"),
+    "customer name": t("notificationMessages.customerLabel", "Customer"),
+    "bill number": t("notificationMessages.billNumberLabel", "Bill Number"),
+    "order type": t("notificationMessages.orderTypeLabel", "Order Type"),
+    price: t("notificationMessages.priceLabel", "Price"),
+    note: t("notificationMessages.noteLabel", "Note"),
+    amount: t("notificationMessages.amountLabel", "Amount"),
+    date: t("notificationMessages.dateLabel", "Date"),
+    box: t("notificationMessages.boxLabel", "Box"),
+  };
+
+  const colonIndex = raw.indexOf(":");
+  if (colonIndex === -1) {
+    return normalizeCurrencySymbols(
+      raw.replace(/\bAF\b/g, getLocalizedCurrencyUnit(t)),
+      t,
+    );
+  }
+
+  const label = raw.slice(0, colonIndex).trim();
+  const value = raw.slice(colonIndex + 1).trim();
+  const localizedLabel = fieldLabels[label.toLowerCase()] || label;
+  const localizedValue = normalizeCurrencySymbols(
+    value.replace(/\bAF\b/g, getLocalizedCurrencyUnit(t)),
+    t,
+  );
+
+  return buildLine(localizedLabel, localizedValue);
+};
+
 const parseKnownUserNotification = (notification) => {
-  const msg = String(notification?.message || "");
+  const msg = String(notification?.message || "")
+    .replace(/\bUS\$/gi, "AF")
+    .replace(/\bUSD\b/gi, "AF")
+    .replace(/\$\s*(?=\d)/g, "AF ")
+    .replace(/\$/g, "AF");
   let matched = msg.match(ASSIGNMENT_REGEX);
   if (matched) {
     return {
@@ -81,6 +154,17 @@ const parseKnownUserNotification = (notification) => {
   }
 
   matched = msg.match(WORK_COMPLETED_PIPE_REGEX);
+  if (matched) {
+    return {
+      kind: "WORK_COMPLETED",
+      actor: matched[1],
+      billNumber: matched[2],
+      orderType: normalizeOrderTypeFromText(matched[3]),
+      customerName: matched[4],
+    };
+  }
+
+  matched = msg.match(DOKHT_COMPLETED_PIPE_REGEX);
   if (matched) {
     return {
       kind: "WORK_COMPLETED",
@@ -157,15 +241,17 @@ const parseKnownUserNotification = (notification) => {
   return null;
 };
 
-const formatReadableFallback = (message) => {
+const formatReadableFallback = (message, t) => {
   const raw = String(message || "").trim();
   if (!raw) return "";
-  if (!raw.includes("|")) return raw;
+  if (!raw.includes("|")) {
+    return t ? localizeFallbackPart(raw, t) : raw;
+  }
   return raw
     .split("|")
-    .map((part) => part.trim())
+    .map((part) => (t ? localizeFallbackPart(part, t) : part.trim()))
     .filter(Boolean)
-    .join(" • ");
+    .join("\n");
 };
 
 export function formatUserNotificationMessage(
@@ -174,97 +260,159 @@ export function formatUserNotificationMessage(
   language = "en",
 ) {
   const parsed = parseKnownUserNotification(notification);
-  if (!parsed) return formatReadableFallback(notification?.message);
+  if (!parsed) return formatReadableFallback(notification?.message, t);
 
   const orderTypeLabel = parsed.orderType
     ? getOrderTypeLabel(parsed.orderType, language)
     : parsed.orderType;
+  const currencyUnit = getLocalizedCurrencyUnit(t);
+  const labels = {
+    assignedBy: t("notificationMessages.assignedByLabel", "Assigned by"),
+    worker: t("notificationMessages.workerLabel", "Worker"),
+    customer: t("notificationMessages.customerLabel", "Customer"),
+    billNumber: t("notificationMessages.billNumberLabel", "Bill Number"),
+    orderType: t("notificationMessages.orderTypeLabel", "Order Type"),
+    price: t("notificationMessages.priceLabel", "Price"),
+    note: t("notificationMessages.noteLabel", "Note"),
+    box: t("notificationMessages.boxLabel", "Box"),
+    amount: t("notificationMessages.amountLabel", "Amount"),
+    date: t("notificationMessages.dateLabel", "Date"),
+    nextStep: t("notificationMessages.nextStepLabel", "Next step"),
+  };
 
   if (parsed.kind === "ASSIGNMENT") {
-    const notePart = parsed.note
-      ? t("notificationMessages.notePart", { note: parsed.note })
-      : "";
-    return t("notificationMessages.assignment", {
-      assignedBy: parsed.actor || "-",
-      customer: parsed.customerName || "-",
-      billNumber: parsed.billNumber || "-",
-      orderType: orderTypeLabel || "-",
-      price: parsed.price || "0",
-      notePart,
-    });
+    return buildNotificationBody(
+      t("notificationMessages.assignmentTitle", "New order assigned"),
+      [
+        buildLine(labels.assignedBy, parsed.actor || "-"),
+        buildLine(labels.customer, parsed.customerName || "-"),
+        buildLine(
+          labels.billNumber,
+          isolateLtr(`#${parsed.billNumber || "-"}`),
+        ),
+        buildLine(labels.orderType, orderTypeLabel || "-"),
+        buildLine(
+          labels.price,
+          `${isolateLtr(parsed.price || "0")} ${currencyUnit}`,
+        ),
+        parsed.note ? buildLine(labels.note, parsed.note) : "",
+      ],
+    );
   }
 
   if (parsed.kind === "WORK_STARTED") {
-    return t("notificationMessages.workStarted", {
-      user: parsed.actor || "-",
-      customer: parsed.customerName || "-",
-      billNumber: parsed.billNumber || "-",
-      orderType: orderTypeLabel || "-",
-    });
+    return buildNotificationBody(
+      t("notificationMessages.workStartedTitle", "Work started"),
+      [
+        buildLine(labels.worker, parsed.actor || "-"),
+        buildLine(labels.customer, parsed.customerName || "-"),
+        buildLine(
+          labels.billNumber,
+          isolateLtr(`#${parsed.billNumber || "-"}`),
+        ),
+        buildLine(labels.orderType, orderTypeLabel || "-"),
+      ],
+    );
   }
 
   if (parsed.kind === "WORK_COMPLETED") {
-    return t("notificationMessages.workCompleted", {
-      user: parsed.actor || "-",
-      customer: parsed.customerName || "-",
-      billNumber: parsed.billNumber || "-",
-      orderType: orderTypeLabel || "-",
-    });
+    return buildNotificationBody(
+      t(
+        "notificationMessages.workCompletedTitle",
+        "Work completed successfully",
+      ),
+      [
+        buildLine(labels.worker, parsed.actor || "-"),
+        buildLine(labels.customer, parsed.customerName || "-"),
+        buildLine(
+          labels.billNumber,
+          isolateLtr(`#${parsed.billNumber || "-"}`),
+        ),
+        buildLine(labels.orderType, orderTypeLabel || "-"),
+      ],
+    );
   }
 
   if (parsed.kind === "QICHIKAR_READY_FOR_DOKHT") {
-    return t("notificationMessages.qichikarReadyForDokht", {
-      user: parsed.actor || "-",
-      customer: parsed.customerName || "-",
-      billNumber: parsed.billNumber || "-",
-      orderType: orderTypeLabel || "-",
-    });
+    return buildNotificationBody(
+      t("notificationMessages.qichikarReadyForDokhtTitle", "Ready for Dokht"),
+      [
+        buildLine(labels.worker, parsed.actor || "-"),
+        buildLine(labels.customer, parsed.customerName || "-"),
+        buildLine(
+          labels.billNumber,
+          isolateLtr(`#${parsed.billNumber || "-"}`),
+        ),
+        buildLine(labels.orderType, orderTypeLabel || "-"),
+        buildLine(
+          labels.nextStep,
+          t("notificationMessages.readyForDokhtValue", "Hand over to Dokht"),
+        ),
+      ],
+    );
   }
 
   if (parsed.kind === "WORK_RECEIVED") {
-    return t("notificationMessages.workReceived", {
-      user: parsed.actor || "-",
-      customer: parsed.customerName || "-",
-      billNumber: parsed.billNumber || "-",
-      orderType: orderTypeLabel || "-",
-    });
+    return buildNotificationBody(
+      t("notificationMessages.workReceivedTitle", "Order received"),
+      [
+        buildLine(labels.worker, parsed.actor || "-"),
+        buildLine(labels.customer, parsed.customerName || "-"),
+        buildLine(
+          labels.billNumber,
+          isolateLtr(`#${parsed.billNumber || "-"}`),
+        ),
+        buildLine(labels.orderType, orderTypeLabel || "-"),
+      ],
+    );
   }
 
   if (parsed.kind === "BOX_CAPACITY_FULL") {
-    if (parsed.boxName) {
-      return t("notificationMessages.boxCapacityFull", {
-        boxName: parsed.boxName,
-        customer: parsed.customerName || "-",
-        billNumber: parsed.billNumber || "-",
-        orderType: orderTypeLabel || "-",
-      });
-    }
-    return t("notificationMessages.boxCapacityFullNoName", {
-      customer: parsed.customerName || "-",
-      billNumber: parsed.billNumber || "-",
-      orderType: orderTypeLabel || "-",
-    });
+    return buildNotificationBody(
+      t("notificationMessages.boxCapacityFullTitle", "Box capacity full"),
+      [
+        parsed.boxName ? buildLine(labels.box, parsed.boxName) : "",
+        buildLine(labels.customer, parsed.customerName || "-"),
+        buildLine(
+          labels.billNumber,
+          isolateLtr(`#${parsed.billNumber || "-"}`),
+        ),
+        buildLine(labels.orderType, orderTypeLabel || "-"),
+      ],
+    );
   }
 
   if (parsed.kind === "BOX_NOT_FOUND") {
-    return t("notificationMessages.boxNotFound", {
-      customer: parsed.customerName || "-",
-      billNumber: parsed.billNumber || "-",
-      orderType: orderTypeLabel || "-",
-    });
+    return buildNotificationBody(
+      t("notificationMessages.boxNotFoundTitle", "Box not found"),
+      [
+        buildLine(labels.customer, parsed.customerName || "-"),
+        buildLine(
+          labels.billNumber,
+          isolateLtr(`#${parsed.billNumber || "-"}`),
+        ),
+        buildLine(labels.orderType, orderTypeLabel || "-"),
+      ],
+    );
   }
 
   if (parsed.kind === "ADMIN_PAYMENT") {
     const formattedDate = parsed.date
       ? formatSystemDate(parsed.date, language)
       : parsed.date;
-    return t("notificationMessages.adminPayment", {
-      amount: parsed.amount,
-      date: formattedDate,
-    });
+    return buildNotificationBody(
+      t("notificationMessages.adminPaymentTitle", "Payment received"),
+      [
+        buildLine(
+          labels.amount,
+          `${isolateLtr(parsed.amount)} ${currencyUnit}`,
+        ),
+        buildLine(labels.date, formattedDate || "-"),
+      ],
+    );
   }
 
-  return formatReadableFallback(notification?.message);
+  return formatReadableFallback(notification?.message, t);
 }
 
 export function formatSystemNotificationMessage(
@@ -274,11 +422,23 @@ export function formatSystemNotificationMessage(
 ) {
   const order = notification?.order;
   if (!order?.type || !order?.customer?.firstName) {
-    return formatReadableFallback(notification?.message);
+    return formatReadableFallback(notification?.message, t);
   }
-  return t("notificationMessages.emergencyOrder", {
-    orderType: getOrderTypeLabel(order.type, language),
-    customer: order.customer.firstName,
-    billNumber: order.customer.billNumber ?? "-",
-  });
+  return buildNotificationBody(
+    t("notificationMessages.emergencyOrderTitle", "Emergency order alert"),
+    [
+      buildLine(
+        t("notificationMessages.customerLabel", "Customer"),
+        order.customer.firstName,
+      ),
+      buildLine(
+        t("notificationMessages.billNumberLabel", "Bill Number"),
+        isolateLtr(`#${order.customer.billNumber ?? "-"}`),
+      ),
+      buildLine(
+        t("notificationMessages.orderTypeLabel", "Order Type"),
+        getOrderTypeLabel(order.type, language),
+      ),
+    ],
+  );
 }

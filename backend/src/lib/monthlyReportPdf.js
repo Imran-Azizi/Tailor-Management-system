@@ -1,11 +1,9 @@
 import PDFDocument from "pdfkit";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
 import {
   formatReportLabelValue,
   formatMonthlyReportHeaderDateTime,
   formatReportNumber,
+  normalizeReportPdfText,
   normalizeReportLanguage,
   isRtlReportLanguage,
   resolveReportText,
@@ -14,9 +12,11 @@ import {
   AFGHANISTAN_TIMEZONE,
   getAfghanMonthDateRange,
 } from "./afghanistanDate.js";
-import { loadArabicFont, drawArabicTextSync } from "./arabicRenderer.js";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import {
+  loadArabicFont,
+  drawArabicTextSync,
+  resolveArabicReportFontPath,
+} from "./arabicRenderer.js";
 
 const ARABIC_SCRIPT_REGEX =
   /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
@@ -29,50 +29,12 @@ function hasLatinScript(value) {
   return /[A-Za-z]/.test(String(value || ""));
 }
 
-// ─── Font resolution ─────────────────────────────────────────────────────────
-// Returns the best available font path for Arabic/Dari/Pashto
-// Priority: bundled NotoNaskhArabic / Segoe UI / Tahoma → Linux paths → Aldhabi fallback
-function resolveArabicFontPath() {
-  const candidates = [
-    process.env.PDF_REPORT_FONT_PATH,
-    process.env.PDF_DARI_PASHTO_FONT_PATH,
-    process.env.PDF_BAHIJ_FONT_PATH,
-    process.env.PDF_VAZIRMATN_FONT_PATH,
-    process.env.PDF_ARABIC_FONT_PATH,
-    // Preferred bundled fonts first for predictable production output
-    path.join(__dirname, "../fonts/Vazirmatn-Regular.ttf"),
-    path.join(__dirname, "../fonts/NotoNaskhArabic-Regular.ttf"),
-    path.join(__dirname, "../fonts/NotoSansArabic-Regular.ttf"),
-    path.join(__dirname, "../fonts/NotoNastaliqUrdu-Regular.ttf"),
-    // Bahij family (if installed locally)
-    "C:/Windows/Fonts/bahij.ttf",
-    "C:/Windows/Fonts/bahij-zar.ttf",
-    "C:/Windows/Fonts/Bahij_Zar.ttf",
-    "C:/Windows/Fonts/Bahij Zar.ttf",
-    // Additional bundled compatibility names
-    path.join(__dirname, "../fonts/Bahij_Zar.ttf"),
-    path.join(__dirname, "../fonts/Bahij-Zar.ttf"),
-    path.join(__dirname, "../fonts/BahijZar.ttf"),
-    // Windows clean UI-first fallbacks
-    "C:/Windows/Fonts/segoeui.ttf",
-    "C:/Windows/Fonts/tahoma.ttf",
-    "C:/Windows/Fonts/arial.ttf",
-    // Aldhabi is kept as a last-resort fallback (decorative)
-    "C:/Windows/Fonts/aldhabi.ttf",
-    // Linux
-    "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf",
-    "/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf",
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-  ].filter(Boolean);
-
-  return candidates.find((p) => fs.existsSync(p)) ?? null;
-}
-
 // ─── Write text (auto-selects Arabic renderer vs Helvetica) ──────────────────
 // fkFont: pre-loaded fontkit font object (only for RTL mode), or null for EN
 // fillColor: hex color string for the current text
 // bold: whether to use bold weight (Helvetica-Bold for EN; ignored for Arabic paths)
 // fontSize: current font size in points
+// This is defined once before buildMonthlyReportPdf to maintain backward compatibility
 function wt(
   doc,
   rawText,
@@ -83,8 +45,9 @@ function wt(
   fillColor,
   bold = false,
   fontSize = 10,
+  language = "fa",
 ) {
-  const text = String(rawText ?? "");
+  const text = normalizeReportPdfText(rawText, language);
   if (fkFont && hasArabicScript(text)) {
     drawArabicTextSync(
       doc,
@@ -94,6 +57,7 @@ function wt(
       { ...opts, fontSize },
       fkFont,
       fillColor || "#000000",
+      language,
     );
   } else {
     doc.font(bold ? "Helvetica-Bold" : "Helvetica").text(text, x, y, opts);
@@ -219,8 +183,8 @@ function formatHeaderDate(date, language = "en") {
 
 function formatAfCurrency(value, language, isRtl) {
   const formatted = fmt(value, language);
-  // Wrap entire currency string in LTR marks for RTL languages to keep minus sign on left
-  return isRtl ? `\u200E${formatted} AF` : `${formatted} AF`;
+  // Keep the full currency token LTR so AF remains visually on the right side.
+  return isRtl ? `\u200E${formatted} AF\u200E` : `${formatted} AF`;
 }
 
 function orderTypeLabel(type, language = "en") {
@@ -283,7 +247,7 @@ function rtlAwareAlign(isRtl, fallback = "left") {
 }
 
 function tokenWidth(doc, token, fkFont, fontSize = 10) {
-  const text = String(token ?? "");
+  const text = normalizeReportPdfText(token, "dari");
   if (!text) return 0;
 
   if (fkFont && hasArabicScript(text)) {
@@ -296,7 +260,7 @@ function tokenWidth(doc, token, fkFont, fontSize = 10) {
 }
 
 function truncateTextToWidth(doc, value, width, fkFont, fontSize = 10) {
-  const text = String(value ?? "").trim();
+  const text = normalizeReportPdfText(value, "dari");
   if (!text || width <= 10) return text;
   if (tokenWidth(doc, text, fkFont, fontSize) <= width) return text;
 
@@ -317,7 +281,7 @@ function truncateTextToWidth(doc, value, width, fkFont, fontSize = 10) {
 }
 
 function getWrappedLineCount(doc, value, width, fkFont, fontSize = 10) {
-  const text = String(value ?? "").trim();
+  const text = normalizeReportPdfText(value, "dari");
   if (!text || width <= 12) return 1;
   if (tokenWidth(doc, text, fkFont, fontSize) <= width) return 1;
 
@@ -350,8 +314,9 @@ function drawRtlMixedValue(
   fontSize = 10,
   fillColor = "#000000",
   bold = false,
+  language = "dari",
 ) {
-  const text = String(value ?? "");
+  const text = normalizeReportPdfText(value, language);
   if (!text) return;
 
   const tokens = text.match(/(\d[\d,./:-]*|\s+|[^\d\s]+)/g) || [text];
@@ -449,7 +414,18 @@ function drawHeaderMetaLine(
       false,
       fontSize,
     );
-    drawRtlMixedValue(doc, safeValue, valueX, y, valueW, fkFont, fontSize);
+    drawRtlMixedValue(
+      doc,
+      safeValue,
+      valueX,
+      y,
+      valueW,
+      fkFont,
+      fontSize,
+      "#000000",
+      false,
+      language,
+    );
     return;
   }
 
@@ -486,7 +462,15 @@ function mirrorColumns(columns, tableX, tableWidth) {
 
 const COL_RTL = mirrorColumns(COL, TABLE_X, TABLE_W);
 
-function drawTableHeader(doc, y, labels, fkFont, isRtl, colMap) {
+function drawTableHeader(
+  doc,
+  y,
+  labels,
+  fkFont,
+  isRtl,
+  colMap,
+  language = "dari",
+) {
   doc.save();
   doc.rect(TABLE_X, y, TABLE_W, ROW_H).fill("#FFFFFF");
   doc
@@ -544,6 +528,7 @@ function drawTableHeader(doc, y, labels, fkFont, isRtl, colMap) {
       "#000000",
       true,
       9.5,
+      language,
     );
   });
 
@@ -668,6 +653,7 @@ function drawRow(
     "#000000",
     false,
     8.8,
+    language,
   );
   const typeText = getLocalizedTypeDisplay(order, language, isRtl);
   const displayTypeText = truncateTextToWidth(
@@ -692,6 +678,7 @@ function drawRow(
     "#000000",
     false,
     8.8,
+    language,
   );
 
   wt(
@@ -708,6 +695,7 @@ function drawRow(
     "#000000",
     true,
     8.7,
+    language,
   );
 
   return y + rowHeight;
@@ -888,7 +876,7 @@ export async function buildMonthlyReportPdf({
   let fkFont = null;
   if (isRtl) {
     try {
-      const fontPath = resolveArabicFontPath();
+      const fontPath = resolveArabicReportFontPath();
       if (!fontPath) throw new Error("No Arabic font found");
       fkFont = await loadArabicFont(fontPath);
       console.info(`[PDF] Monthly RTL font: ${fontPath}`);
@@ -918,6 +906,22 @@ export async function buildMonthlyReportPdf({
     const normalizedLanguage = normalizeReportLanguage(language);
     const reportMetaLabels =
       REPORT_META_LABELS[normalizedLanguage] || REPORT_META_LABELS.en;
+
+    // Create a language-aware wrapper for wt() that automatically passes the language parameter
+    const wtLang = (doc, text, x, y, opts, fkFont, fillColor, bold, fontSize) =>
+      wt(
+        doc,
+        text,
+        x,
+        y,
+        opts,
+        fkFont,
+        fillColor,
+        bold,
+        fontSize,
+        normalizedLanguage,
+      );
+
     const safeMonth = Number(month);
     const safeYear = Number(year);
 
@@ -982,6 +986,7 @@ export async function buildMonthlyReportPdf({
       "#000000",
       true,
       17,
+      normalizedLanguage,
     );
 
     drawHeaderMetaLine(doc, {
@@ -1033,6 +1038,7 @@ export async function buildMonthlyReportPdf({
       "#000000",
       true,
       12,
+      normalizedLanguage,
     );
     y += 16;
     y = ensurePageSpace(doc, y, 320);
@@ -1081,6 +1087,7 @@ export async function buildMonthlyReportPdf({
       "#000000",
       true,
       12.5,
+      normalizedLanguage,
     );
     y += 28;
 
@@ -1096,10 +1103,19 @@ export async function buildMonthlyReportPdf({
         "#333333",
         false,
         11,
+        normalizedLanguage,
       );
     } else {
       const colMap = isRtl ? COL_RTL : COL;
-      y = drawTableHeader(doc, y, labels, fkFont, isRtl, colMap);
+      y = drawTableHeader(
+        doc,
+        y,
+        labels,
+        fkFont,
+        isRtl,
+        colMap,
+        normalizedLanguage,
+      );
 
       const footerThreshold = doc.page.height - FOOTER_THRESHOLD_MARGIN;
 
@@ -1117,9 +1133,18 @@ export async function buildMonthlyReportPdf({
             "#000000",
             true,
             10,
+            normalizedLanguage,
           );
           y += 28;
-          y = drawTableHeader(doc, y, labels, fkFont, isRtl, colMap);
+          y = drawTableHeader(
+            doc,
+            y,
+            labels,
+            fkFont,
+            isRtl,
+            colMap,
+            normalizedLanguage,
+          );
         }
         y = drawRow(
           doc,
@@ -1178,6 +1203,7 @@ export async function buildMonthlyReportPdf({
         "#000000",
         true,
         isRtl ? 9.3 : 9.5,
+        normalizedLanguage,
       );
       // Totals values are numbers — always Helvetica
       doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#000000");
@@ -1215,6 +1241,7 @@ export async function buildMonthlyReportPdf({
       "#333333",
       false,
       8,
+      normalizedLanguage,
     );
 
     doc.end();

@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma.js";
+import { getAfghanMonthDateRange } from "../lib/afghanistanDate.js";
 
 const dedupeByOrderId = (notifications = []) => {
   const seen = new Set();
@@ -14,13 +15,41 @@ const dedupeByOrderId = (notifications = []) => {
   return unique;
 };
 
-export const getAllNotifications = async ({ unreadOnly = false } = {}) => {
+export const getAllNotifications = async ({
+  unreadOnly = false,
+  month,
+  year,
+} = {}) => {
+  const parsedMonth = month != null ? Number(month) : null;
+  const parsedYear = year != null ? Number(year) : null;
+  const hasMonthFilter =
+    parsedMonth &&
+    parsedYear &&
+    Number.isFinite(parsedMonth) &&
+    Number.isFinite(parsedYear);
+
+  const monthFilter = hasMonthFilter
+    ? (() => {
+        const { start, end } = getAfghanMonthDateRange({
+          month: parsedMonth,
+          year: parsedYear,
+        });
+        return {
+          OR: [
+            { entryMonth: parsedMonth, entryYear: parsedYear },
+            { entryMonth: null, createdAt: { gte: start, lte: end } },
+          ],
+        };
+      })()
+    : null;
+
   const notifications = await prisma.notification.findMany({
     where: {
       ...(unreadOnly ? { isRead: false } : {}),
       order: {
         isEmergency: true,
         isCompleted: false,
+        ...(monthFilter || {}),
       },
     },
     orderBy: [{ isRead: "asc" }, { updatedAt: "desc" }],

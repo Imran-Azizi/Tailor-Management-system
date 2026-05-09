@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,6 +17,7 @@ import {
 import api from "../lib/api.js";
 import { buildSelectStyles } from "../lib/dailyTasks.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
+import { parseNumberLocale, toAsciiDigits } from "../lib/normalize.js";
 import {
   getOrderLabelParts,
   getOrderPrimaryDisplayName,
@@ -43,7 +44,7 @@ const createSchema = (t) =>
     })
     .superRefine((value, ctx) => {
       if (value.forRakht === "NO") {
-        const amount = Number(value.amount);
+        const amount = parseNumberLocale(value.amount);
         if (!Number.isFinite(amount) || amount <= 0) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
@@ -125,6 +126,7 @@ function DailyTaskForm({ onSuccess }) {
   const [orderTypeAmounts, setOrderTypeAmounts] = useState({});
   const [allocationError, setAllocationError] = useState("");
   const [searchingOrder, setSearchingOrder] = useState(false);
+  const billSearchInputRef = useRef(null);
   const forRakhtValue = watch("forRakht") || "NO";
 
   const { data: dokanUsers = [], isLoading: loadingDokanUsers } = useQuery({
@@ -183,8 +185,12 @@ function DailyTaskForm({ onSuccess }) {
   });
 
   const searchOrderByBill = async () => {
-    const raw = String(orderBillSearch || "").trim();
-    if (!raw) {
+    const latestInput = billSearchInputRef.current?.value;
+    const raw = String(latestInput ?? orderBillSearch ?? "").trim();
+    const normalizedBill = toAsciiDigits(raw).replace(/\s+/g, "");
+    const billNumber = normalizedBill.replace(/[^0-9]/g, "");
+
+    if (!billNumber) {
       setOrderSearchError(t("dailyTasks.billSearchRequired"));
       setLookupCustomer(null);
       setFoundOrders([]);
@@ -203,7 +209,7 @@ function DailyTaskForm({ onSuccess }) {
     setOrderTypeAmounts({});
     try {
       const { data: lookup } = await api.get("/orders/lookup", {
-        params: { billNumber: raw },
+        params: { billNumber },
       });
 
       const orders = Array.isArray(lookup?.orders) ? lookup.orders : [];
@@ -260,7 +266,7 @@ function DailyTaskForm({ onSuccess }) {
       }
 
       const invalid = selectedOrderIds.some((orderId) => {
-        const amount = Number(orderTypeAmounts[orderId]);
+        const amount = parseNumberLocale(orderTypeAmounts[orderId]);
         return !Number.isFinite(amount) || amount <= 0;
       });
 
@@ -273,7 +279,7 @@ function DailyTaskForm({ onSuccess }) {
 
       const allocations = selectedOrderIds.map((orderId) => ({
         orderId,
-        amount: Number(orderTypeAmounts[orderId]),
+        amount: parseNumberLocale(orderTypeAmounts[orderId]),
       }));
 
       mutation.mutate({
@@ -289,7 +295,7 @@ function DailyTaskForm({ onSuccess }) {
     mutation.mutate({
       fromName: data.fromName.value,
       recipientName: data.recipientName.trim(),
-      amount: Number(data.amount || 0),
+      amount: parseNumberLocale(data.amount || 0),
       taskDate: new Date(data.taskDate).toISOString(),
       note: data.note?.trim() || undefined,
     });
@@ -396,6 +402,7 @@ function DailyTaskForm({ onSuccess }) {
             >
               <div style={{ display: "flex", gap: 8 }}>
                 <input
+                  ref={billSearchInputRef}
                   className="inp"
                   inputMode="numeric"
                   placeholder={t("dailyTasks.billNumberPlaceholder")}
@@ -521,10 +528,8 @@ function DailyTaskForm({ onSuccess }) {
                             required
                           >
                             <input
-                              type="number"
+                              type="text"
                               inputMode="decimal"
-                              min="0.01"
-                              step="0.01"
                               className="inp"
                               placeholder="0.00"
                               value={orderTypeAmounts[orderId] || ""}
@@ -570,10 +575,8 @@ function DailyTaskForm({ onSuccess }) {
             required
           >
             <input
-              type="number"
+              type="text"
               inputMode="decimal"
-              min="0.01"
-              step="0.01"
               className={`inp${errors.amount ? " inp-err" : ""}`}
               placeholder="0.00"
               {...register("amount")}

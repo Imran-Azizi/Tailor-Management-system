@@ -332,6 +332,9 @@ function getPrintDateTime(settings, timestamp) {
 function PrintBillHeader({ settings, title, date, time }) {
   const alignClass = settings.isRtl ? "text-right" : "text-left";
   const rowDirClass = settings.isRtl ? "flex-row-reverse" : "flex-row";
+  const shopInfoAlignClass = settings.isRtl
+    ? "items-end text-right"
+    : "items-start text-left";
   const logoUrl = SHOP_CONFIG.logoUrl || SHOP_CONFIG.logo || "";
   const shopInitials = String(PRINT_SHOP_HEADER_NAME || "KR")
     .split(" ")
@@ -341,10 +344,11 @@ function PrintBillHeader({ settings, title, date, time }) {
     .toUpperCase();
 
   return (
-    <div className="border-b-2 border-slate-800 bg-slate-50 px-3 py-2.5">
+    <div className="print-bill-header relative overflow-hidden border-b-2 border-slate-800 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-3 py-2.5 text-white">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,.18),transparent_58%)]" />
       <div className={`flex items-center justify-between gap-3 ${rowDirClass}`}>
         <div className={`flex min-w-0 items-center gap-2.5 ${rowDirClass}`}>
-          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-slate-300 bg-white">
+          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-white/35 bg-white shadow-sm">
             {logoUrl ? (
               <img
                 src={logoUrl}
@@ -357,23 +361,29 @@ function PrintBillHeader({ settings, title, date, time }) {
               </div>
             )}
           </div>
-          <div className={`min-w-0 ${alignClass}`}>
-            <p className="truncate text-[14px] font-black text-slate-900">
+          <div
+            className={`flex min-w-0 flex-col ${shopInfoAlignClass}`}
+            style={{ textAlign: settings.isRtl ? "right" : "left" }}
+          >
+            <p className="truncate text-[14px] font-black text-white">
               {PRINT_SHOP_HEADER_NAME}
             </p>
-            <p className="truncate text-[10px] text-slate-600">
+            <p className="print-shop-meta truncate text-[10px] text-white/90">
               {SHOP_CONFIG.address}
             </p>
-            <p className="text-[10px] text-slate-600">
-              {(SHOP_CONFIG.phones || []).join(" â€¢ ")}
+            <p
+              className="print-shop-meta text-[10px] text-white/90 [direction:ltr] [unicode-bidi:embed]"
+              style={{ textAlign: settings.isRtl ? "right" : "left" }}
+            >
+              {(SHOP_CONFIG.phones || []).join(" | ")}
             </p>
           </div>
         </div>
         <div className={`shrink-0 ${alignClass}`}>
-          <p className="text-[10px] font-bold uppercase tracking-[0.06em] text-slate-600">
+          <p className="inline-flex rounded-full border border-white/35 bg-white/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-white/95">
             {title}
           </p>
-          <p className="text-[10px] font-semibold text-slate-700 [direction:ltr] [unicode-bidi:embed]">
+          <p className="mt-1 text-[10px] font-semibold text-white/90 [direction:ltr] [unicode-bidi:embed]">
             {date} | {time}
           </p>
         </div>
@@ -452,13 +462,24 @@ export function CustomerBill({ customer, order }) {
     : "text-[9px] font-extrabold uppercase tracking-[0.06em] text-slate-700";
   const billNo = toEnglishDigits(customer?.billNumber);
   const isEmergency = order?.isEmergency;
+  const billTypographyStyle = {
+    fontFamily: settings.fontFamily,
+    ...(settings.isRtl
+      ? {
+          textAlign: "right",
+          letterSpacing: "0",
+          wordSpacing: "0",
+          fontFeatureSettings: '"rlig" 1, "liga" 1, "calt" 1',
+        }
+      : {}),
+  };
 
   return (
     <div
       lang={settings.htmlLang}
       dir={settings.dir}
-      className="print-a6-sheet overflow-hidden rounded-[6px] border-2 border-slate-800 bg-white"
-      style={{ fontFamily: settings.fontFamily }}
+      className="print-a6-sheet overflow-hidden rounded-[8px] border-2 border-slate-800 bg-white shadow-[0_10px_28px_rgba(15,23,42,.18)]"
+      style={billTypographyStyle}
     >
       <PrintBillHeader
         settings={settings}
@@ -476,7 +497,7 @@ export function CustomerBill({ customer, order }) {
       )}
 
       {/* Customer info strip â€” 4 columns */}
-      <div className="grid grid-cols-4 bg-slate-100 text-[9px] text-slate-800">
+      <div className="grid grid-cols-4 bg-gradient-to-r from-slate-100 to-slate-50 text-[9px] text-slate-800">
         <div
           className={`border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
         >
@@ -511,7 +532,7 @@ export function CustomerBill({ customer, order }) {
 
       {/* Financial summary table */}
       <table className="w-full border-collapse table-fixed text-[9px] text-slate-800">
-        <thead className="bg-slate-100">
+        <thead className="bg-slate-100/95">
           <tr>
             <th
               className={`border-b border-r border-slate-800 px-2 py-1.5 ${tableHeadClass} ${alignClass}`}
@@ -561,8 +582,14 @@ export function CustomerBill({ customer, order }) {
 
       {/* Barcode + Qty row */}
       <div className="grid grid-cols-2 border-b border-slate-800">
-        <div className={`border-r border-slate-800 px-2 py-1.5 ${alignClass}`}>
-          <Barcode value={customer?.billNumber} />
+        <div
+          className={`border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
+          style={{ display: "flex", flexDirection: "column", gap: 4 }}
+        >
+          <p className={tableHeadClass}>{txt.billNo}</p>
+          <div className="print-barcode-wrap rounded-md border border-slate-300 bg-white p-1.5">
+            <Barcode value={customer?.billNumber} style={{ maxWidth: 148 }} />
+          </div>
         </div>
         <div
           className={`flex flex-col justify-center gap-2 px-2 py-1.5 ${alignClass}`}
@@ -682,13 +709,24 @@ export function CustomerCombinedBill({ customer, orders = [] }) {
   const tableHeadClass = settings.isRtl
     ? "text-[9px] font-extrabold text-slate-700"
     : "text-[9px] font-extrabold uppercase tracking-[0.06em] text-slate-700";
+  const billTypographyStyle = {
+    fontFamily: settings.fontFamily,
+    ...(settings.isRtl
+      ? {
+          textAlign: "right",
+          letterSpacing: "0",
+          wordSpacing: "0",
+          fontFeatureSettings: '"rlig" 1, "liga" 1, "calt" 1',
+        }
+      : {}),
+  };
 
   return (
     <div
       lang={settings.htmlLang}
       dir={settings.dir}
-      className="print-a6-sheet overflow-hidden rounded-[6px] border-2 border-slate-800 bg-white"
-      style={{ fontFamily: settings.fontFamily }}
+      className="print-a6-sheet overflow-hidden rounded-[8px] border-2 border-slate-800 bg-white shadow-[0_10px_28px_rgba(15,23,42,.18)]"
+      style={billTypographyStyle}
     >
       <PrintBillHeader
         settings={settings}
@@ -705,8 +743,9 @@ export function CustomerCombinedBill({ customer, orders = [] }) {
         </div>
       ) : null}
 
-      <table className="w-full border-collapse table-fixed text-[9px] text-slate-800">
-        <thead className="bg-slate-100">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] border-collapse table-fixed text-[9px] text-slate-800 sm:min-w-0">
+          <thead className="bg-slate-100/95">
           <tr>
             <th
               className={`w-[15%] border-b border-r border-slate-800 px-1.5 py-1 ${tableHeadClass} ${alignClass}`}
@@ -750,7 +789,7 @@ export function CustomerCombinedBill({ customer, orders = [] }) {
             </th>
           </tr>
         </thead>
-        <tbody>
+          <tbody>
           {rowItems.length === 0 ? (
             <tr>
               <td
@@ -769,7 +808,7 @@ export function CustomerCombinedBill({ customer, orders = [] }) {
                   <p className="font-black [direction:ltr] [unicode-bidi:embed]">
                     #{billNo}
                   </p>
-                  <div className="mt-1">
+                  <div className="print-barcode-wrap mt-1 rounded-md border border-slate-300 bg-white p-1">
                     <Barcode
                       value={customer?.billNumber || "0"}
                       width={1}
@@ -835,8 +874,9 @@ export function CustomerCombinedBill({ customer, orders = [] }) {
               </tr>
             ))
           )}
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
 
       <table className="w-full border-collapse table-fixed text-[10px] text-slate-800">
         <thead className="bg-slate-100">
@@ -993,8 +1033,8 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
   const customerBarcode = customer?.billNumber || "-";
   const alignClass = settings.isRtl ? "text-right" : "text-left";
   const tableHeadClass = settings.isRtl
-    ? "text-[10px] font-extrabold text-slate-700"
-    : "text-[10px] font-extrabold uppercase tracking-[0.08em] text-slate-700";
+    ? "text-[9px] font-extrabold text-slate-700"
+    : "text-[9px] font-extrabold uppercase tracking-[0.1em] text-slate-700";
 
   const allEntries = Object.entries(measurements || {}).filter(
     ([key, value]) =>
@@ -1046,14 +1086,25 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
 
   const sectionHeadClass = settings.isRtl
     ? "text-[8px] font-extrabold text-white"
-    : "text-[8px] font-extrabold uppercase tracking-[0.1em] text-white";
+    : "text-[8px] font-extrabold uppercase tracking-[0.12em] text-white";
+  const billTypographyStyle = {
+    fontFamily: settings.fontFamily,
+    ...(settings.isRtl
+      ? {
+          textAlign: "right",
+          letterSpacing: "0",
+          wordSpacing: "0",
+          fontFeatureSettings: '"rlig" 1, "liga" 1, "calt" 1',
+        }
+      : {}),
+  };
 
   return (
     <div
       lang={settings.htmlLang}
       dir={settings.dir}
-      className="print-a6-sheet overflow-hidden rounded-[4px] border-2 border-slate-800 bg-white"
-      style={{ fontFamily: settings.fontFamily }}
+      className="print-a6-sheet overflow-hidden rounded-[8px] border-2 border-slate-800 bg-white shadow-[0_10px_28px_rgba(15,23,42,.18)]"
+      style={billTypographyStyle}
     >
       <PrintBillHeader
         settings={settings}
@@ -1063,7 +1114,7 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
       />
 
       {/* Customer info strip â€” 5 columns: Bill# | Name | Order Type | Box | Qty */}
-      <div className="grid grid-cols-5 bg-slate-100 text-[9px] text-slate-800">
+      <div className="grid grid-cols-5 bg-gradient-to-r from-slate-100 to-slate-50 text-[9px] text-slate-800">
         <div
           className={`border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
         >
@@ -1103,42 +1154,43 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
       </div>
 
       {/* Measurements + Styles table â€” 4 columns */}
-      <table className="w-full border-collapse table-fixed">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[560px] border-collapse table-fixed text-slate-800 sm:min-w-0">
         <thead>
           {/* Section group header */}
           <tr>
             <th
               colSpan={2}
-              className={`border-b border-r-2 border-slate-800 bg-slate-700 px-2 py-1 ${sectionHeadClass} ${alignClass}`}
+              className={`border-b border-r-2 border-slate-800 bg-gradient-to-r from-slate-800 to-slate-700 px-2 py-1.5 ${sectionHeadClass} ${alignClass}`}
             >
               {txt.measurementInformation}
             </th>
             <th
               colSpan={2}
-              className={`border-b border-slate-800 bg-slate-600 px-2 py-1 ${sectionHeadClass} ${alignClass}`}
+              className={`border-b border-slate-800 bg-gradient-to-r from-slate-700 to-slate-600 px-2 py-1.5 ${sectionHeadClass} ${alignClass}`}
             >
               {txt.stylesInformation}
             </th>
           </tr>
           {/* Column labels */}
-          <tr className="bg-slate-100">
+          <tr className="bg-slate-100/90">
             <th
-              className={`w-[30%] border-b border-r border-dashed border-slate-400 px-2 py-1 ${tableHeadClass} ${alignClass}`}
+              className={`w-[30%] border-b border-r border-dashed border-slate-400 px-2 py-1.5 ${tableHeadClass} ${alignClass}`}
             >
               {t("createOrder.measurements")}
             </th>
             <th
-              className={`w-[12%] border-b border-r-2 border-slate-800 px-2 py-1 text-center ${tableHeadClass}`}
+              className={`w-[12%] border-b border-r-2 border-slate-800 px-2 py-1.5 text-center ${tableHeadClass}`}
             >
               {txt.value}
             </th>
             <th
-              className={`w-[34%] border-b border-r border-dashed border-slate-400 px-2 py-1 ${tableHeadClass} ${alignClass}`}
+              className={`w-[34%] border-b border-r border-dashed border-slate-400 px-2 py-1.5 ${tableHeadClass} ${alignClass}`}
             >
               {t("createOrder.styleOptions")}
             </th>
             <th
-              className={`w-[24%] border-b border-slate-800 px-2 py-1 ${tableHeadClass} ${alignClass}`}
+              className={`w-[24%] border-b border-slate-800 px-2 py-1.5 ${tableHeadClass} ${alignClass}`}
             >
               {txt.value}
             </th>
@@ -1146,29 +1198,33 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
         </thead>
         <tbody>
           {zippedRows.map(({ mLabel, mValue, sLabel, sValue }, i) => (
-            <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-slate-50/40"}>
+            <tr
+              key={i}
+              className={i % 2 === 0 ? "bg-white" : "bg-slate-50/55"}
+            >
               <td
-                className={`border-b border-r border-dashed border-slate-300 px-2 py-1 text-[10px] ${alignClass} text-slate-700`}
+                className={`border-b border-r border-dashed border-slate-300 px-2 py-1.5 text-[10px] leading-tight ${alignClass} text-slate-700`}
               >
-                {mLabel}
+                {mLabel || "-"}
               </td>
-              <td className="border-b border-r-2 border-slate-800 px-2 py-1 text-center text-[10px] font-bold text-slate-900 [direction:ltr] [unicode-bidi:embed]">
-                {mValue}
-              </td>
-              <td
-                className={`border-b border-r border-dashed border-slate-300 px-2 py-1 text-[10px] ${alignClass} text-slate-700`}
-              >
-                {sLabel}
+              <td className="border-b border-r-2 border-slate-800 px-2 py-1.5 text-center text-[10px] font-extrabold text-slate-900 [direction:ltr] [unicode-bidi:embed]">
+                {mValue || "-"}
               </td>
               <td
-                className={`border-b border-dashed border-slate-300 px-2 py-1 text-[10px] font-bold text-slate-900 ${alignClass}`}
+                className={`border-b border-r border-dashed border-slate-300 px-2 py-1.5 text-[10px] leading-tight ${alignClass} text-slate-700`}
               >
-                {sValue}
+                {sLabel || "-"}
+              </td>
+              <td
+                className={`border-b border-dashed border-slate-300 px-2 py-1.5 text-[10px] leading-tight font-extrabold text-slate-900 ${alignClass}`}
+              >
+                {sValue || "-"}
               </td>
             </tr>
           ))}
         </tbody>
-      </table>
+        </table>
+      </div>
 
       {/* Rakht (Fabric) section */}
       <div className="border-t-2 border-slate-800">
@@ -1224,7 +1280,9 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
 
       {/* Barcode */}
       <div className="border-b border-slate-800 px-2 py-1.5">
-        <Barcode value={customerBarcode} />
+        <div className="print-barcode-wrap inline-flex rounded-md border border-slate-300 bg-white p-1.5">
+          <Barcode value={customerBarcode} style={{ maxWidth: 150 }} />
+        </div>
       </div>
 
       {/* Footer */}
@@ -1332,10 +1390,26 @@ export function printElement(id, options = {}) {
             text-align:${isRtl ? "right" : "left"};
             -webkit-print-color-adjust:exact;
             print-color-adjust:exact;
+            text-rendering:optimizeLegibility;
           }
           .print-a6-sheet{width:100%;max-width:100%;margin:0;box-sizing:border-box}
+          .print-bill-header{border-bottom-width:2px !important}
+          .print-bill-header .print-shop-meta{line-height:1.35}
+          .print-a6-sheet table th,
+          .print-a6-sheet table td{vertical-align:top}
+          .print-barcode-wrap{box-shadow:inset 0 0 0 1px rgba(15,23,42,.02)}
           .print-a6-sheet[dir="rtl"] .border-r{border-right-width:0;border-inline-end-width:1px}
           .print-a6-sheet[dir="rtl"] .border-r-2{border-right-width:0;border-inline-end-width:2px}
+          .print-a6-sheet[dir="rtl"]{
+            text-align:right;
+            letter-spacing:normal;
+            word-spacing:normal;
+            font-feature-settings:"rlig" 1,"liga" 1,"calt" 1;
+          }
+          @media (max-width:640px){
+            body{padding:2.5mm}
+            .print-a6-sheet{border-width:1.5px}
+          }
           @media print{*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}body{padding:4mm;margin:0}}
         </style>
       </head>

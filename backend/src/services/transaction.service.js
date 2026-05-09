@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { getAfghanMonthDateRange } from "../lib/afghanistanDate.js";
+import { normalizePhone, normalizeText } from "../lib/normalize.js";
 import { recalculateOrderBenefit } from "./order.service.js";
 
 const USER_SELECT = {
@@ -115,49 +116,79 @@ export const getTransactionSummaryForUser = async (
         ? "qichikarPaymentAmount"
         : "workerPaymentAmount";
 
-  const [loanAggregate, penaltyAggregate, completedPaymentsAggregate] =
-    await Promise.all([
-      prisma.transaction.aggregate({
-        where: {
-          userId,
-          kind: "LOAN",
-          source: "MANUAL",
-          damagedClothesPenalty: null,
-          ...(paidDateFilter
-            ? {
-                transactionDate: paidDateFilter,
-              }
-            : {}),
-        },
-        _sum: { amount: true },
-      }),
-      prisma.damagedClothesPenalty.aggregate({
-        where: {
-          userId,
-          ...(paidDateFilter
-            ? {
-                createdAt: paidDateFilter,
-              }
-            : {}),
-        },
-        _sum: { totalExpense: true },
-      }),
-      prisma.order.aggregate({
-        where: completedPaymentWhere,
-        _sum: { [paymentSumField]: true },
-      }),
-    ]);
+  const receiptRole =
+    accountType === "DOKHT"
+      ? "DOKHT"
+      : accountType === "QICHIKAR"
+        ? "QICHIKAR"
+        : "WORKER";
+
+  const [
+    loanAggregate,
+    penaltyAggregate,
+    completedPaymentsAggregate,
+    receiptAggregate,
+  ] = await Promise.all([
+    prisma.transaction.aggregate({
+      where: {
+        userId,
+        kind: "LOAN",
+        source: "MANUAL",
+        damagedClothesPenalty: null,
+        ...(paidDateFilter
+          ? {
+              transactionDate: paidDateFilter,
+            }
+          : {}),
+      },
+      _sum: { amount: true },
+    }),
+    prisma.damagedClothesPenalty.aggregate({
+      where: {
+        userId,
+        ...(paidDateFilter
+          ? {
+              createdAt: paidDateFilter,
+            }
+          : {}),
+      },
+      _sum: { totalExpense: true },
+    }),
+    prisma.order.aggregate({
+      where: completedPaymentWhere,
+      _sum: { [paymentSumField]: true },
+    }),
+    prisma.workerPaymentReceipt.aggregate({
+      where: {
+        workerId: userId,
+        workerRole: receiptRole,
+        ...(paidDateFilter
+          ? {
+              receiptDate: paidDateFilter,
+            }
+          : {}),
+      },
+      _sum: { paidAmount: true },
+    }),
+  ]);
 
   const loanTotal = Number(loanAggregate._sum.amount || 0);
   const damagePenaltyTotal = Number(penaltyAggregate?._sum?.totalExpense || 0);
-  const totalCompletedPayments = Number(
+  const totalCompletedPaymentsGross = Number(
     completedPaymentsAggregate._sum?.[paymentSumField] || 0,
+  );
+  const moneyReceiptTotal = Number(receiptAggregate._sum?.paidAmount || 0);
+  const totalCompletedPayments = Math.max(
+    totalCompletedPaymentsGross - moneyReceiptTotal,
+    0,
   );
 
   return {
     loanTotal,
     damagePenaltyTotal,
+    totalCompletedPaymentsGross,
     totalCompletedPayments,
+    moneyReceiptTotal,
     currentBalance: totalCompletedPayments - loanTotal - damagePenaltyTotal,
   };
 };
@@ -171,11 +202,20 @@ export const getTransactions = async ({
   year = null,
 }) => {
   const skip = (page - 1) * limit;
+  const normalizedSearch = String(normalizeText(search || "") || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const normalizedPhoneSearch = normalizePhone(search || "");
 
   const where = { source: "MANUAL", damagedClothesPenalty: null };
   if (accountType) where.accountType = accountType;
-  if (search) {
-    where.user = { name: { contains: search, mode: "insensitive" } };
+  if (normalizedSearch) {
+    where.OR = [
+      { user: { name: { contains: normalizedSearch, mode: "insensitive" } } },
+      ...(normalizedPhoneSearch
+        ? [{ user: { phoneNumber: { contains: normalizedPhoneSearch } } }]
+        : []),
+    ];
   }
 
   const parsedMonth = month != null ? Number(month) : null;

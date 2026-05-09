@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { LuDot } from "react-icons/lu";
 import { isRouteActive } from "./routeMatch.js";
 
@@ -9,6 +9,7 @@ function badgeText(value) {
 
 export default function SidebarItem({
   item,
+  pathname,
   collapsed,
   accent,
   isRtl,
@@ -16,13 +17,12 @@ export default function SidebarItem({
   badgeValue,
   depth = 0,
 }) {
-  const location = useLocation();
   const Icon = item.icon;
   const badge = badgeText(badgeValue);
   const isChild = depth > 0;
   const paddingClass = isChild ? "ps-3 pe-2" : "px-3";
   const linkEnd = item.end ?? isChild;
-  const active = isRouteActive(location.pathname, item.path, linkEnd);
+  const active = isRouteActive(pathname, item.path, linkEnd);
 
   const groupClass = "group";
   const baseClass = isChild

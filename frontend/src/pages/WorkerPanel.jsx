@@ -9,7 +9,6 @@ import {
   LuClipboardList,
   LuEye,
   LuHash,
-  LuPhone,
   LuPlay,
   LuSearch,
   LuSquareCheck,
@@ -24,6 +23,10 @@ import {
 } from "../lib/orderType.js";
 import { formatUserNotificationMessage } from "../lib/notifications.js";
 import { formatDateTimeLocale, formatSystemDate } from "../lib/locale.js";
+import {
+  getNotificationSummary,
+  groupNotificationsByDay,
+} from "../lib/notificationGrouping.js";
 import { formatCurrency } from "../lib/currency.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
@@ -1067,7 +1070,19 @@ export default function WorkerPanel() {
       refetchInterval: 30000,
     });
 
-  const unreadNotifs = allNotifs.filter((n) => !n.isRead);
+  const unreadNotifs = useMemo(
+    () => allNotifs.filter((n) => !n.isRead),
+    [allNotifs],
+  );
+  const groupedUnreadNotifs = useMemo(
+    () =>
+      groupNotificationsByDay(unreadNotifs, {
+        language,
+        t,
+        getDate: (item) => item?.createdAt,
+      }),
+    [language, t, unreadNotifs],
+  );
 
   const readAllMut = useMutation({
     mutationFn: () => api.patch("/users/me/notifications/read-all"),
@@ -1239,6 +1254,7 @@ export default function WorkerPanel() {
   const totalCompletedPayments = Number(
     workerMoneySummary?.totalCompletedPayments || 0,
   );
+  const moneyReceiptTotal = Number(workerMoneySummary?.moneyReceiptTotal || 0);
   const currentMoney =
     totalCompletedPayments - totalLoanAmount - damagePenaltyTotalFromSummary;
   const damagedPenalties = Array.isArray(damagedPenaltyPayload?.data)
@@ -1270,6 +1286,15 @@ export default function WorkerPanel() {
     });
   }, [orders, user?.accountType, user?.id]);
 
+  const optimisticInProgressIdSet = useMemo(
+    () => new Set(optimisticInProgressIds),
+    [optimisticInProgressIds],
+  );
+  const optimisticCompletedIdSet = useMemo(
+    () => new Set(optimisticCompletedIds),
+    [optimisticCompletedIds],
+  );
+
   const filteredOrders = useMemo(() => {
     const accountType = user?.accountType;
     if (activeTab === "assigned")
@@ -1278,36 +1303,36 @@ export default function WorkerPanel() {
           !isWorkerCompletedForRole(order, accountType) &&
           !getRoleOrderState(order, accountType).inProgress &&
           getRoleOrderState(order, accountType).receivedById === user?.id &&
-          !optimisticInProgressIds.includes(order.id) &&
-          !optimisticCompletedIds.includes(order.id),
+          !optimisticInProgressIdSet.has(order.id) &&
+          !optimisticCompletedIdSet.has(order.id),
       );
     if (activeTab === "inProgress")
       return orders.filter(
         (order) =>
           !isWorkerCompletedForRole(order, accountType) &&
           (getRoleOrderState(order, accountType).inProgress ||
-            optimisticInProgressIds.includes(order.id)) &&
-          !optimisticCompletedIds.includes(order.id),
+            optimisticInProgressIdSet.has(order.id)) &&
+          !optimisticCompletedIdSet.has(order.id),
       );
     if (activeTab === "completed")
       return orders.filter(
         (order) =>
           isWorkerCompletedForRole(order, accountType) ||
-          optimisticCompletedIds.includes(order.id),
+          optimisticCompletedIdSet.has(order.id),
       );
     return orders.filter((order) => {
       const roleState = getRoleOrderState(order, accountType);
       return (
         isWorkerCompletedForRole(order, accountType) ||
         roleState.receivedById === user?.id ||
-        optimisticInProgressIds.includes(order.id) ||
-        optimisticCompletedIds.includes(order.id)
+        optimisticInProgressIdSet.has(order.id) ||
+        optimisticCompletedIdSet.has(order.id)
       );
     });
   }, [
     activeTab,
-    optimisticCompletedIds,
-    optimisticInProgressIds,
+    optimisticCompletedIdSet,
+    optimisticInProgressIdSet,
     orders,
     user?.accountType,
     user?.id,
@@ -1627,9 +1652,10 @@ export default function WorkerPanel() {
             }}
           >
             <span>#{order.customer?.billNumber || "-"}</span>
-            {order.customer?.phoneNumber && (
-              <span>{order.customer.phoneNumber}</span>
-            )}
+            {!["DOKHT", "QICHIKAR"].includes(user?.accountType) &&
+              order.customer?.phoneNumber && (
+                <span>{order.customer.phoneNumber}</span>
+              )}
           </div>
         </div>
 
@@ -1826,17 +1852,7 @@ export default function WorkerPanel() {
         </div>
 
         {receivedByCurrentUser ? (
-          <div
-            style={{
-              fontSize: 12,
-              color: "#166534",
-              background: "#DCFCE7",
-              border: "1px solid #86EFAC",
-              borderRadius: 8,
-              padding: "8px 10px",
-              fontWeight: 600,
-            }}
-          >
+          <div className="rounded-lg border border-emerald-300 bg-emerald-100 px-2.5 py-2 text-xs font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
             {t(
               "workerPanel.searchOrderReceivedHint",
               "This order is already in your panel.",
@@ -1853,16 +1869,7 @@ export default function WorkerPanel() {
             {t("workerPanel.receiveOrder", "Receive Order")}
           </button>
         ) : (
-          <div
-            style={{
-              fontSize: 12,
-              color: "#92400E",
-              background: "#FEF3C7",
-              border: "1px solid #FCD34D",
-              borderRadius: 8,
-              padding: "8px 10px",
-            }}
-          >
+          <div className="rounded-lg border border-amber-300 bg-amber-100 px-2.5 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
             {getAssignmentBlockReason(order) ??
               t(
                 "workerPanel.cannotReceiveOrder",
@@ -1875,7 +1882,7 @@ export default function WorkerPanel() {
   };
 
   return (
-    <div className="grid gap-4 sm:gap-5">
+    <div className="grid gap-4 text-slate-900 dark:text-slate-100 sm:gap-5">
       <div className="card p-4 sm:p-5">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
           <div>
@@ -1903,129 +1910,71 @@ export default function WorkerPanel() {
           </span>
         </div>
 
-        <div className="mt-3.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
-          <div
-            style={{
-              border: "1px solid var(--border)",
-              background: "var(--surface2)",
-              borderRadius: 10,
-              padding: "10px 12px",
-              display: "grid",
-              gap: 4,
-            }}
-          >
-            <div
-              style={{ fontSize: 12, color: "var(--text3)", fontWeight: 600 }}
-            >
+        <div className="mt-3.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-1 rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/60">
+            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
               {t(
                 "workerPanel.totalCompletedPayments",
                 "Total Money from Completed Orders",
               )}
             </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                color: "#2563EB",
-                fontWeight: 800,
-                fontSize: 20,
-              }}
-            >
+            <div className="flex items-center gap-2 text-xl font-extrabold text-blue-600 dark:text-blue-400">
               <AfCurrencyIcon size={18} />
               {formatCurrency(totalCompletedPayments, language)}
             </div>
           </div>
 
-          <div
-            style={{
-              border: "1px solid var(--border)",
-              background: "var(--surface2)",
-              borderRadius: 10,
-              padding: "10px 12px",
-              display: "grid",
-              gap: 4,
-            }}
-          >
-            <div
-              style={{ fontSize: 12, color: "var(--text3)", fontWeight: 600 }}
-            >
+          <div className="grid gap-1 rounded-[10px] border border-emerald-200 bg-emerald-50 px-3 py-2.5 dark:border-emerald-800 dark:bg-emerald-950/30">
+            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+              {t("workerPanel.moneyReceipt", "Money Receipt")}
+            </div>
+            <div className="flex items-center gap-2 text-xl font-extrabold text-emerald-700 dark:text-emerald-400">
+              <AfCurrencyIcon size={18} />
+              {formatCurrency(moneyReceiptTotal, language)}
+            </div>
+          </div>
+
+          <div className="grid gap-1 rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/60">
+            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
               {t("workerPanel.loanTotal", "Loan Total")}
             </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                color: "#B45309",
-                fontWeight: 800,
-                fontSize: 20,
-              }}
-            >
+            <div className="flex items-center gap-2 text-xl font-extrabold text-amber-700 dark:text-amber-400">
               <AfCurrencyIcon size={18} />
               {formatCurrency(totalLoanAmount, language)}
             </div>
           </div>
 
           <div
-            style={{
-              border: `1px solid ${currentMoney >= 0 ? "#86EFAC" : "#FCA5A5"}`,
-              background: currentMoney >= 0 ? "#F0FDF4" : "#FEF2F2",
-              borderRadius: 10,
-              padding: "10px 12px",
-              display: "grid",
-              gap: 4,
-            }}
+            className={`grid gap-1 rounded-[10px] px-3 py-2.5 ${
+              currentMoney >= 0
+                ? "border border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"
+                : "border border-rose-300 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/30"
+            }`}
           >
-            <div
-              style={{ fontSize: 12, color: "var(--text3)", fontWeight: 600 }}
-            >
+            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
               {t("workerPanel.currentMoney", "Current Money")}
             </div>
             <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                color: currentMoney >= 0 ? "#15803D" : "#DC2626",
-                fontWeight: 800,
-                fontSize: 20,
-              }}
+              className={`flex items-center gap-2 text-xl font-extrabold ${
+                currentMoney >= 0
+                  ? "text-emerald-700 dark:text-emerald-400"
+                  : "text-rose-700 dark:text-rose-400"
+              }`}
             >
               <AfCurrencyIcon size={18} />
               {formatCurrency(currentMoney, language)}
             </div>
           </div>
 
-          <div
-            style={{
-              border: "1px solid #FCD34D",
-              background: "#FFFBEB",
-              borderRadius: 10,
-              padding: "10px 12px",
-              display: "grid",
-              gap: 4,
-            }}
-          >
-            <div
-              style={{ fontSize: 12, color: "var(--text3)", fontWeight: 600 }}
-            >
+          <div className="grid gap-1 rounded-[10px] border border-amber-300 bg-amber-50 px-3 py-2.5 dark:border-amber-800 dark:bg-amber-950/30">
+            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
               {t("workerPanel.totalPenaltyAmount", "Total Damage Penalty")}
             </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                color: "#B45309",
-                fontWeight: 800,
-                fontSize: 20,
-              }}
-            >
+            <div className="flex items-center gap-2 text-xl font-extrabold text-amber-700 dark:text-amber-400">
               <AfCurrencyIcon size={18} />
               {formatCurrency(totalDamagePenaltyAmount, language)}
             </div>
-            <div style={{ fontSize: 11, color: "#92400E" }}>
+            <div className="text-[11px] text-amber-800 dark:text-amber-300">
               {damagedPenaltyPayload?.total || 0}{" "}
               {t("workerPanel.totalPenalties", "penalties")}
             </div>
@@ -2034,7 +1983,7 @@ export default function WorkerPanel() {
       </div>
 
       <div className="card p-3.5 sm:p-4">
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2.5">
           <div>
             <label className="lbl">
               {t("orders.billNumber", "Bill Number")}
@@ -2066,17 +2015,19 @@ export default function WorkerPanel() {
               />
             </div>
           </div>
-          <button
-            className="btn btn-gold"
-            style={{ minWidth: 110 }}
-            onClick={onSearch}
-            disabled={searchLoading}
-          >
-            <LuSearch size={14} />{" "}
-            {searchLoading
-              ? t("common.loading", "Loading...")
-              : t("common.search", "Search")}
-          </button>
+          <div className="grid">
+            <button
+              className="btn btn-gold"
+              style={{ minWidth: 110, height: 40 }}
+              onClick={onSearch}
+              disabled={searchLoading}
+            >
+              <LuSearch size={14} />{" "}
+              {searchLoading
+                ? t("common.loading", "Loading...")
+                : t("common.search", "Search")}
+            </button>
+          </div>
         </div>
 
         {searchResult?.orders?.length ? (
@@ -2084,7 +2035,7 @@ export default function WorkerPanel() {
             {searchResult.orders.map((order) => renderSearchResultCard(order))}
           </div>
         ) : hasSearchAttempt ? (
-          <div style={{ marginTop: 12, fontSize: 12, color: "var(--text3)" }}>
+          <div className="mt-3 text-xs text-slate-500 dark:text-slate-400">
             {t(
               "workerPanel.noOrderFoundByBill",
               "No order found for this bill number.",
@@ -2126,7 +2077,7 @@ export default function WorkerPanel() {
                 return (
                   <div
                     key={`new-assigned-${order.id}`}
-                    className="flex flex-col gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface2)] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+                    className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/60 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div style={{ minWidth: 0 }}>
                       <div
@@ -2185,49 +2136,71 @@ export default function WorkerPanel() {
             </div>
           )}
           {unreadNotifs.length > 0 && (
-            <div style={{ maxHeight: 250, overflowY: "auto" }}>
-              {unreadNotifs.map((item) => (
-                <div
-                  key={item.id}
-                  style={{
-                    padding: "10px 14px",
-                    borderBottom: "1px solid var(--border)",
-                    display: "flex",
-                    gap: 8,
-                  }}
+            <div className="worker-notif-scroll">
+              {groupedUnreadNotifs.map((group) => (
+                <section
+                  key={group.dayKey}
+                  className="notif-day-group worker-notif-day-group"
                 >
-                  <LuCircleAlert
-                    size={14}
-                    style={{ color: cfg.color, marginTop: 2, flexShrink: 0 }}
-                  />
-                  <div style={{ flex: 1 }}>
-                    <NotificationText
-                      language={language}
-                      style={{
-                        fontSize: 13,
-                        color: "var(--text1)",
-                        lineHeight: 1.45,
-                      }}
-                    >
-                      {formatUserNotificationMessage(item, t, language)}
-                    </NotificationText>
-                    <div
-                      style={{
-                        fontSize: 11,
-                        color: "var(--text3)",
-                        marginTop: 3,
-                      }}
-                    >
-                      {formatDateTimeLocale(item.createdAt, language)}
-                    </div>
-                  </div>
-                  <button
-                    className="btn btn-outline btn-sm"
-                    onClick={() => readOneMut.mutate(item.id)}
-                  >
-                    <LuCheck size={13} />
-                  </button>
-                </div>
+                  <div className="notif-day-heading">{group.heading}</div>
+                  {group.items.map((item) => {
+                    const isPayment = item.type === "ADMIN_PAYMENT";
+                    const message = formatUserNotificationMessage(
+                      item,
+                      t,
+                      language,
+                    );
+                    const summary = getNotificationSummary(message);
+
+                    return (
+                      <article
+                        key={item.id}
+                        className="notif-feed-item notif-feed-item--drawer worker-notif-item"
+                      >
+                        <span
+                          className="notif-feed-item__icon"
+                          aria-hidden="true"
+                        >
+                          {isPayment ? (
+                            <AfCurrencyIcon
+                              size={14}
+                              style={{ color: "var(--success)" }}
+                            />
+                          ) : (
+                            <LuCircleAlert
+                              size={14}
+                              style={{ color: cfg.color }}
+                            />
+                          )}
+                        </span>
+                        <div className="notif-feed-item__copy">
+                          <p className="notif-feed-item__title">
+                            {summary.title}
+                          </p>
+                          {summary.message && (
+                            <NotificationText
+                              language={language}
+                              className="notif-feed-item__message"
+                            >
+                              {summary.message}
+                            </NotificationText>
+                          )}
+                          <div className="notif-feed-item__meta">
+                            <span>
+                              {formatDateTimeLocale(item.createdAt, language)}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          className="btn btn-outline btn-sm worker-notif-read-btn"
+                          onClick={() => readOneMut.mutate(item.id)}
+                        >
+                          <LuCheck size={13} />
+                        </button>
+                      </article>
+                    );
+                  })}
+                </section>
               ))}
             </div>
           )}

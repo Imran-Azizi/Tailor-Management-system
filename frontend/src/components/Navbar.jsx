@@ -20,6 +20,7 @@ import {
   LuArrowLeft,
   LuArrowRight,
   LuFileText,
+  LuCircleCheck,
   LuEye,
   LuPencil,
   LuTrash2,
@@ -38,11 +39,19 @@ import {
 } from "../lib/notifications.js";
 import { formatDateTimeLocale, formatSystemDateTime } from "../lib/locale.js";
 import {
+  getNotificationSummary,
+  groupNotificationsByDay,
+} from "../lib/notificationGrouping.js";
+import {
   EMERGENCY_SOUND_MUTED_KEY,
   EMERGENCY_SOUND_LAST_SEEN_KEY,
   playEmergencyAlertSound,
   shouldPlayEmergencyAlertCycle,
 } from "../lib/emergencyAlert.js";
+import {
+  getLatestNotificationTimestamp,
+  playNotificationChime,
+} from "../lib/notificationSound.js";
 import { deleteOrderDraft, listOrderDrafts } from "../lib/orderDraftApi.js";
 import {
   getMonthLabel,
@@ -80,13 +89,19 @@ function SystemNotifPanel({
   const { t, i18n } = useTranslation();
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { viewMonth, viewYear } = useMonth();
   const language = i18n.resolvedLanguage || i18n.language || "en";
   const isRtl = (i18n.dir?.() || "ltr") === "rtl";
 
   // Emergency order alerts (Notification model)
   const { data: emergency = [] } = useQuery({
-    queryKey: ["notifs-nav"],
-    queryFn: () => api.get("/notifications?unread=true").then((r) => r.data),
+    queryKey: ["notifs-nav", viewMonth, viewYear],
+    queryFn: () =>
+      api
+        .get("/notifications", {
+          params: { unread: true, month: viewMonth, year: viewYear },
+        })
+        .then((r) => r.data),
   });
   const readEmergencyMut = useMutation({
     mutationFn: (id) => api.patch(`/notifications/${id}/read`),
@@ -108,10 +123,12 @@ function SystemNotifPanel({
 
   // Worker status notifications (UserNotification sent to this admin)
   const { data: workerNotifs = [] } = useQuery({
-    queryKey: ["admin-worker-notifs-nav"],
+    queryKey: ["admin-worker-notifs-nav", viewMonth, viewYear],
     queryFn: () =>
       api
-        .get("/users/me/notifications", { params: { unread: true } })
+        .get("/users/me/notifications", {
+          params: { unread: true, month: viewMonth, year: viewYear },
+        })
         .then((r) => r.data),
   });
   const readWorkerMut = useMutation({
@@ -140,7 +157,33 @@ function SystemNotifPanel({
     },
   });
 
-  const hasAny = emergency.length > 0 || workerNotifs.length > 0;
+  const merged = [...workerNotifs, ...emergency]
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt || 0).getTime() -
+        new Date(a.createdAt || 0).getTime(),
+    )
+    .slice(0, 14)
+    .map((entry) => {
+      const isEmergency = Boolean(entry?.orderId);
+      const message = isEmergency
+        ? formatSystemNotificationMessage(entry, t, language)
+        : formatUserNotificationMessage(entry, t, language);
+      return {
+        kind: isEmergency ? "emergency" : "worker",
+        entry,
+        message,
+        summary: getNotificationSummary(message),
+      };
+    });
+
+  const grouped = groupNotificationsByDay(merged, {
+    language,
+    t,
+    getDate: (item) => item?.entry?.createdAt,
+  });
+
+  const hasAny = grouped.length > 0;
 
   return (
     <>
@@ -192,105 +235,92 @@ function SystemNotifPanel({
 
       {hasAny ? (
         <div className="notif-panel-scroll">
-          {/* Worker status updates */}
-          {workerNotifs.length > 0 && (
-            <>
-              <div
-                style={{
-                  padding: "8px 14px 6px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  background: "var(--surface2)",
-                  borderBottom: "1px solid var(--border)",
-                }}
-              >
-                <LuBell size={12} style={{ color: "var(--primary)" }} />
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "var(--text3)",
-                    textTransform: "uppercase",
-                    letterSpacing: ".06em",
-                  }}
-                >
-                  {t("navbar.workUpdates")}
-                </span>
-              </div>
-              {workerNotifs.slice(0, 6).map((n) => {
+          {grouped.map((group) => (
+            <section key={group.dayKey} className="notif-day-group">
+              <div className="notif-day-heading">{group.heading}</div>
+              {group.items.map(({ kind, entry, summary }) => {
+                const isEmergency = kind === "emergency";
                 const isActionable =
-                  n.orderId &&
-                  (n.type === "WORK_COMPLETED" ||
-                    n.type === "QICHIKAR_READY_FOR_DOKHT");
-                const handleRowClick = () => {
-                  if (!isActionable) return;
-                  readWorkerMut.mutate(n.id);
-                  navigate(
-                    `/orders/completed-workers?orderId=${encodeURIComponent(n.orderId)}`,
-                  );
-                  onClose();
+                  kind === "worker" &&
+                  entry.orderId &&
+                  (entry.type === "WORK_COMPLETED" ||
+                    entry.type === "QICHIKAR_READY_FOR_DOKHT");
+
+                const onRowClick = () => {
+                  if (isEmergency && entry.orderId) {
+                    readEmergencyMut.mutate(entry.id);
+                    navigate(`/orders/${entry.orderId}/edit`);
+                    onClose();
+                    return;
+                  }
+                  if (isActionable) {
+                    readWorkerMut.mutate(entry.id);
+                    navigate(
+                      `/orders/completed-workers?orderId=${encodeURIComponent(entry.orderId)}`,
+                    );
+                    onClose();
+                  }
                 };
+
                 return (
-                  <div
-                    key={n.id}
-                    className="notif-panel-item"
-                    onClick={isActionable ? handleRowClick : undefined}
-                    style={isActionable ? { cursor: "pointer" } : undefined}
+                  <article
+                    key={entry.id}
+                    className={`notif-feed-item notif-feed-item--drawer ${
+                      isEmergency ? "notif-feed-item--emergency" : ""
+                    }`}
+                    onClick={
+                      isEmergency || isActionable ? onRowClick : undefined
+                    }
+                    style={
+                      isEmergency || isActionable
+                        ? { cursor: "pointer" }
+                        : undefined
+                    }
                   >
-                    <LuBell
-                      size={13}
-                      style={{
-                        color: "var(--primary)",
-                        flexShrink: 0,
-                        marginTop: 2,
-                      }}
-                    />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <NotificationText
-                        language={language}
-                        style={{
-                          fontSize: 12,
-                          lineHeight: 1.4,
-                          color: "var(--text1)",
-                        }}
-                      >
-                        {formatUserNotificationMessage(n, t, language)}
-                      </NotificationText>
-                      <p
-                        style={{
-                          fontSize: 11,
-                          color: "var(--text3)",
-                          marginTop: 2,
-                        }}
-                      >
-                        {formatDateTimeLocale(n.createdAt, language)}
-                      </p>
-                      {isActionable && (
-                        <p
-                          style={{
-                            fontSize: 11,
-                            color: "var(--primary)",
-                            marginTop: 3,
-                            fontWeight: 600,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 3,
-                          }}
-                        >
-                          {t("navbar.viewOrder", "View & Pay")}
-                          {isRtl ? (
-                            <LuArrowLeft size={11} />
-                          ) : (
-                            <LuArrowRight size={11} />
-                          )}
-                        </p>
+                    <span className="notif-feed-item__icon" aria-hidden="true">
+                      {isEmergency ? (
+                        <LuTriangleAlert
+                          size={14}
+                          style={{ color: "var(--danger)" }}
+                        />
+                      ) : (
+                        <LuBell size={14} style={{ color: "var(--primary)" }} />
                       )}
+                    </span>
+                    <div className="notif-feed-item__copy">
+                      <p className="notif-feed-item__title">{summary.title}</p>
+                      {summary.message && (
+                        <NotificationText
+                          language={language}
+                          className="notif-feed-item__message"
+                        >
+                          {summary.message}
+                        </NotificationText>
+                      )}
+                      <div className="notif-feed-item__meta">
+                        <span>
+                          {formatDateTimeLocale(entry.createdAt, language)}
+                        </span>
+                        {isActionable && (
+                          <span className="notif-feed-item__hint">
+                            {t("navbar.viewOrder", "View & Pay")}
+                            {isRtl ? (
+                              <LuArrowLeft size={11} />
+                            ) : (
+                              <LuArrowRight size={11} />
+                            )}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        readWorkerMut.mutate(n.id);
+                        if (isEmergency) {
+                          readEmergencyMut.mutate(entry.id);
+                        } else {
+                          readWorkerMut.mutate(entry.id);
+                        }
                       }}
                       title={t("navbar.markAsRead")}
                       className="notif-panel-close-btn"
@@ -298,93 +328,11 @@ function SystemNotifPanel({
                     >
                       <LuCheck size={12} />
                     </button>
-                  </div>
+                  </article>
                 );
               })}
-            </>
-          )}
-
-          {/* Emergency order alerts */}
-          {emergency.length > 0 && (
-            <>
-              <div
-                style={{
-                  padding: "8px 14px 6px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  background: "var(--surface2)",
-                  borderBottom: "1px solid var(--border)",
-                }}
-              >
-                <LuTriangleAlert size={12} style={{ color: "var(--danger)" }} />
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "var(--danger)",
-                    textTransform: "uppercase",
-                    letterSpacing: ".06em",
-                  }}
-                >
-                  {t("navbar.emergencyAlerts")}
-                </span>
-              </div>
-              {emergency.slice(0, 6).map((n) => (
-                <div
-                  key={n.id}
-                  className="notif-panel-item"
-                  onClick={() => {
-                    readEmergencyMut.mutate(n.id);
-                    navigate(`/orders/${n.orderId}/edit`);
-                    onClose();
-                  }}
-                  style={{ cursor: "pointer" }}
-                >
-                  <LuTriangleAlert
-                    size={14}
-                    style={{
-                      color: "var(--danger)",
-                      flexShrink: 0,
-                      marginTop: 2,
-                    }}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <NotificationText
-                      language={language}
-                      style={{
-                        fontSize: 13,
-                        lineHeight: 1.4,
-                        color: "var(--text1)",
-                      }}
-                    >
-                      {formatSystemNotificationMessage(n, t, language)}
-                    </NotificationText>
-                    <p
-                      style={{
-                        fontSize: 11,
-                        color: "var(--text3)",
-                        marginTop: 2,
-                      }}
-                    >
-                      {formatDateTimeLocale(n.createdAt, language)}
-                    </p>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      readEmergencyMut.mutate(n.id);
-                    }}
-                    title={t("navbar.markAsRead")}
-                    className="notif-panel-close-btn"
-                    style={{ width: 26, height: 26, borderRadius: 6 }}
-                  >
-                    <LuCheck size={12} />
-                  </button>
-                </div>
-              ))}
-            </>
-          )}
+            </section>
+          ))}
         </div>
       ) : (
         <div className="notif-panel-empty">{t("navbar.allCaughtUp")}</div>
@@ -398,13 +346,18 @@ function UserNotifPanel({ onClose }) {
   const { t, i18n } = useTranslation();
   const qc = useQueryClient();
   const { user } = useAuth();
+  const { viewMonth, viewYear } = useMonth();
   const language = i18n.resolvedLanguage || i18n.language || "en";
   const roleColor = ROLE_COLORS[user?.accountType] || "#888";
 
   const { data: notifsRaw = [] } = useQuery({
-    queryKey: ["my-notifs-nav"],
+    queryKey: ["my-notifs-nav", viewMonth, viewYear],
     queryFn: () =>
-      api.get("/users/me/notifications?unread=true").then((r) => r.data),
+      api
+        .get("/users/me/notifications", {
+          params: { unread: true, month: viewMonth, year: viewYear },
+        })
+        .then((r) => r.data),
   });
   const notifs = Array.isArray(notifsRaw) ? notifsRaw : [];
 
@@ -434,8 +387,11 @@ function UserNotifPanel({ onClose }) {
       ),
   });
 
-  const paymentNotifs = notifs.filter((n) => n.type === "ADMIN_PAYMENT");
-  const otherNotifs = notifs.filter((n) => n.type !== "ADMIN_PAYMENT");
+  const grouped = groupNotificationsByDay(notifs, {
+    language,
+    t,
+    getDate: (item) => item?.createdAt,
+  });
 
   return (
     <>
@@ -465,139 +421,58 @@ function UserNotifPanel({ onClose }) {
         <div className="notif-panel-empty">{t("navbar.allCaughtUp")}</div>
       ) : (
         <div className="notif-panel-scroll">
-          {paymentNotifs.length > 0 && (
-            <>
-              <div
-                style={{
-                  padding: "8px 14px 6px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  background: "var(--surface2)",
-                  borderBottom: "1px solid var(--border)",
-                }}
-              >
-                <AfCurrencyIcon size={12} style={{ color: "var(--success)" }} />
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "var(--success)",
-                    textTransform: "uppercase",
-                    letterSpacing: ".06em",
-                  }}
-                >
-                  {t("workerLayout.paymentsFromAdmin", "Payments from Admin")}
-                </span>
-              </div>
-              {paymentNotifs.map((n) => (
-                <div key={n.id} className="notif-panel-item">
-                  <AfCurrencyIcon
-                    size={14}
-                    style={{
-                      color: "var(--success)",
-                      flexShrink: 0,
-                      marginTop: 2,
-                    }}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <NotificationText
-                      language={language}
-                      style={{
-                        fontSize: 13,
-                        lineHeight: 1.45,
-                        color: "var(--text1)",
-                      }}
-                    >
-                      {formatUserNotificationMessage(n, t, language)}
-                    </NotificationText>
-                    <p
-                      style={{
-                        fontSize: 11,
-                        color: "var(--text3)",
-                        marginTop: 3,
-                      }}
-                    >
-                      {formatDateTimeLocale(n.createdAt, language)}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => readOneMut.mutate(n.id)}
-                    title={t("navbar.markAsRead")}
-                    className="notif-panel-close-btn"
-                    style={{ width: 26, height: 26, borderRadius: 6 }}
-                  >
-                    <LuCheck size={12} />
-                  </button>
-                </div>
-              ))}
-            </>
-          )}
+          {grouped.map((group) => (
+            <section key={group.dayKey} className="notif-day-group">
+              <div className="notif-day-heading">{group.heading}</div>
+              {group.items.map((n) => {
+                const isPayment = n.type === "ADMIN_PAYMENT";
+                const message = formatUserNotificationMessage(n, t, language);
+                const summary = getNotificationSummary(message);
 
-          {otherNotifs.length > 0 && (
-            <>
-              <div
-                style={{
-                  padding: "8px 14px 6px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  background: "var(--surface2)",
-                  borderBottom: "1px solid var(--border)",
-                }}
-              >
-                <LuBell size={12} style={{ color: roleColor }} />
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "var(--text3)",
-                    textTransform: "uppercase",
-                    letterSpacing: ".06em",
-                  }}
-                >
-                  {t("navbar.workUpdates", "Work Updates")}
-                </span>
-              </div>
-              {otherNotifs.slice(0, 8).map((n) => (
-                <div key={n.id} className="notif-panel-item">
-                  <LuBell
-                    size={13}
-                    style={{ color: roleColor, flexShrink: 0, marginTop: 3 }}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <NotificationText
-                      language={language}
-                      style={{
-                        fontSize: 12,
-                        lineHeight: 1.45,
-                        color: "var(--text1)",
-                      }}
-                    >
-                      {formatUserNotificationMessage(n, t, language)}
-                    </NotificationText>
-                    <p
-                      style={{
-                        fontSize: 11,
-                        color: "var(--text3)",
-                        marginTop: 3,
-                      }}
-                    >
-                      {formatDateTimeLocale(n.createdAt, language)}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => readOneMut.mutate(n.id)}
-                    title={t("navbar.markAsRead")}
-                    className="notif-panel-close-btn"
-                    style={{ width: 26, height: 26, borderRadius: 6 }}
+                return (
+                  <article
+                    key={n.id}
+                    className="notif-feed-item notif-feed-item--drawer"
                   >
-                    <LuCheck size={12} />
-                  </button>
-                </div>
-              ))}
-            </>
-          )}
+                    <span className="notif-feed-item__icon" aria-hidden="true">
+                      {isPayment ? (
+                        <AfCurrencyIcon
+                          size={14}
+                          style={{ color: "var(--success)" }}
+                        />
+                      ) : (
+                        <LuBell size={14} style={{ color: roleColor }} />
+                      )}
+                    </span>
+                    <div className="notif-feed-item__copy">
+                      <p className="notif-feed-item__title">{summary.title}</p>
+                      {summary.message && (
+                        <NotificationText
+                          language={language}
+                          className="notif-feed-item__message"
+                        >
+                          {summary.message}
+                        </NotificationText>
+                      )}
+                      <div className="notif-feed-item__meta">
+                        <span>
+                          {formatDateTimeLocale(n.createdAt, language)}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => readOneMut.mutate(n.id)}
+                      title={t("navbar.markAsRead")}
+                      className="notif-panel-close-btn"
+                      style={{ width: 26, height: 26, borderRadius: 6 }}
+                    >
+                      <LuCheck size={12} />
+                    </button>
+                  </article>
+                );
+              })}
+            </section>
+          ))}
         </div>
       )}
     </>
@@ -737,7 +612,7 @@ function MonthDropdown({ onClose }) {
   const selectedAccessMode = getMonthAccessMode(activeMonth, activeYear);
   const modeConfig = {
     editable: {
-      Icon: LuPencil,
+      Icon: LuCircleCheck,
       label: currentMonthText,
       cls: "month-mode-badge month-mode-badge--editable",
     },
@@ -1034,6 +909,7 @@ export default function Navbar({ onHamburger, pageTitle }) {
   const { dark, toggle } = useTheme();
   const { user, isWorker, isAdmin, isDokan, isFinance, canManageOrders } =
     useAuth();
+  const { viewMonth, viewYear } = useMonth();
   const canViewAdminNotifications = isAdmin || isDokan;
   const showNotifications = isWorker || canViewAdminNotifications;
   const qc = useQueryClient();
@@ -1059,18 +935,25 @@ export default function Navbar({ onHamburger, pageTitle }) {
 
   // Emergency order alerts for Admin/Dokan
   const { data: unreadSystem = [] } = useQuery({
-    queryKey: ["notifs-count"],
-    queryFn: () => api.get("/notifications?unread=true").then((r) => r.data),
+    queryKey: ["notifs-count", viewMonth, viewYear],
+    queryFn: () =>
+      api
+        .get("/notifications", {
+          params: { unread: true, month: viewMonth, year: viewYear },
+        })
+        .then((r) => r.data),
     refetchInterval: 60_000,
     enabled: canViewAdminNotifications,
   });
 
   // Worker status notifications sent to this admin (work-started, work-completed)
   const { data: unreadAdminWorker = [] } = useQuery({
-    queryKey: ["admin-worker-notifs-count"],
+    queryKey: ["admin-worker-notifs-count", viewMonth, viewYear],
     queryFn: () =>
       api
-        .get("/users/me/notifications", { params: { unread: true } })
+        .get("/users/me/notifications", {
+          params: { unread: true, month: viewMonth, year: viewYear },
+        })
         .then((r) => r.data),
     refetchInterval: 30_000,
     enabled: isAdmin,
@@ -1078,9 +961,13 @@ export default function Navbar({ onHamburger, pageTitle }) {
 
   // Assignment notifications for workers (Dokht / Qichikar)
   const { data: unreadUser = [] } = useQuery({
-    queryKey: ["my-notifs-count"],
+    queryKey: ["my-notifs-count", viewMonth, viewYear],
     queryFn: () =>
-      api.get("/users/me/notifications?unread=true").then((r) => r.data),
+      api
+        .get("/users/me/notifications", {
+          params: { unread: true, month: viewMonth, year: viewYear },
+        })
+        .then((r) => r.data),
     refetchInterval: 30_000,
     enabled: !!isWorker,
   });
@@ -1118,6 +1005,8 @@ export default function Navbar({ onHamburger, pageTitle }) {
     : canViewAdminNotifications
       ? unreadSystem.length + (isAdmin ? unreadAdminWorker.length : 0)
       : 0;
+  const lastAdminWorkerSoundTs = useRef(0);
+  const lastWorkerSoundTs = useRef(0);
 
   useEffect(() => {
     if (!canViewAdminNotifications || emergencyAlarmMuted) return;
@@ -1127,6 +1016,40 @@ export default function Navbar({ onHamburger, pageTitle }) {
       playEmergencyAlertSound();
     }
   }, [canViewAdminNotifications, emergencyAlarmMuted, unreadSystem]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const latestTimestamp = getLatestNotificationTimestamp(unreadAdminWorker);
+    if (!latestTimestamp) return;
+
+    if (!lastAdminWorkerSoundTs.current) {
+      lastAdminWorkerSoundTs.current = latestTimestamp;
+      return;
+    }
+
+    if (latestTimestamp > lastAdminWorkerSoundTs.current) {
+      playNotificationChime();
+      lastAdminWorkerSoundTs.current = latestTimestamp;
+    }
+  }, [isAdmin, unreadAdminWorker]);
+
+  useEffect(() => {
+    if (!isWorker) return;
+
+    const latestTimestamp = getLatestNotificationTimestamp(unreadUser);
+    if (!latestTimestamp) return;
+
+    if (!lastWorkerSoundTs.current) {
+      lastWorkerSoundTs.current = latestTimestamp;
+      return;
+    }
+
+    if (latestTimestamp > lastWorkerSoundTs.current) {
+      playNotificationChime();
+      lastWorkerSoundTs.current = latestTimestamp;
+    }
+  }, [isWorker, unreadUser]);
 
   useEffect(() => {
     setSearch("");
@@ -1365,7 +1288,7 @@ export default function Navbar({ onHamburger, pageTitle }) {
                           className="btn btn-outline btn-sm"
                           onClick={() => resumeDraft(draft.id)}
                         >
-                          <LuFileText size={13} />
+                          <LuArrowRight size={13} />
                           {t("orders.resume", "Resume")}
                         </button>
                         <button
@@ -1430,7 +1353,7 @@ export default function Navbar({ onHamburger, pageTitle }) {
                 className="btn btn-outline"
                 onClick={() => setSelectedDraft(null)}
               >
-                <LuEye size={14} />
+                <LuX size={14} />
                 {t("common.close", "Close")}
               </button>
               <button
@@ -1440,7 +1363,7 @@ export default function Navbar({ onHamburger, pageTitle }) {
                   resumeDraft(selectedDraft.id);
                 }}
               >
-                <LuFileText size={14} />
+                <LuArrowRight size={14} />
                 {t("orders.resume", "Resume")}
               </button>
               <button

@@ -5,11 +5,13 @@ export default function AfCurrencyIcon({
   ...props
 }) {
   const iconSize = Number(size) || 16;
+  const borderRadius = Math.max(3, Math.round(iconSize * 0.22));
+  const fontPx = Math.max(8, Math.round(iconSize * 0.52));
 
   return (
     <span
       role="img"
-      aria-label="Afghani currency"
+      aria-label="AF currency"
       className={className}
       style={{
         display: "inline-flex",
@@ -17,16 +19,20 @@ export default function AfCurrencyIcon({
         justifyContent: "center",
         width: iconSize,
         height: iconSize,
-        fontSize: Math.max(12, iconSize * 0.95),
-        fontWeight: 800,
+        border: "1px solid currentColor",
+        borderRadius,
+        fontSize: fontPx,
+        fontWeight: 700,
         lineHeight: 1,
-        fontFamily: "'Noto Naskh Arabic', 'Noto Sans Arabic', sans-serif",
+        letterSpacing: "0.02em",
+        fontFamily: "'Segoe UI', 'Noto Sans', sans-serif",
         color: "currentColor",
+        boxSizing: "border-box",
         ...style,
       }}
       {...props}
     >
-      ؋
+      AF
     </span>
   );
 }

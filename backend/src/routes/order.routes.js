@@ -30,6 +30,11 @@ router.get(
   authorize("ADMIN"),
   ctrl.getCompletedFromWorkers,
 );
+router.get(
+  "/completed/receipts",
+  authorize("ADMIN"),
+  ctrl.getCompletedWorkerReceipts,
+);
 router.get("/:id", ctrl.getOne);
 router.get("/:id/bill", authorize("ADMIN", "DOKAN"), ctrl.getBill);
 router.post("/", authorize("ADMIN", "DOKAN", "FINANCE"), ctrl.create);
@@ -51,6 +56,11 @@ router.patch(
   "/:id/pay-worker",
   authorize("ADMIN"),
   ctrl.payWorkerForCompletedOrder,
+);
+router.patch(
+  "/completed/from-workers/receipts",
+  authorize("ADMIN"),
+  ctrl.markCompletedWorkerReceipts,
 );
 router.delete("/:id", authorize("ADMIN"), ctrl.remove);
 export default router;

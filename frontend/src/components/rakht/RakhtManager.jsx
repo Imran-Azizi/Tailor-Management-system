@@ -7,7 +7,6 @@ import {
   LuTrash2,
   LuFactory,
   LuCalendar,
-  LuWallet,
   LuChartColumn,
   LuBoxes,
   LuFilter,
@@ -400,7 +399,7 @@ export default function RakhtManager() {
         <StatCard
           label={t("rakht.givenMoney", { defaultValue: "Given Money" })}
           value={formatCurrency(Math.round(stats.totalPaid), language)}
-          Icon={LuWallet}
+          Icon={AfCurrencyIcon}
           accent="#15803D"
         />
         <StatCard
@@ -446,7 +445,7 @@ export default function RakhtManager() {
               className="btn btn-gold"
               style={{ gap: 6 }}
             >
-              <LuWallet size={13} />
+              <AfCurrencyIcon size={13} />
               {t("rakht.giveRemainingMoney", {
                 defaultValue: "Give Remaining Money",
               })}
@@ -554,19 +553,28 @@ export default function RakhtManager() {
                   <td>{item.brandName}</td>
                   <td>{item.tonQuantity}</td>
                   <td>
-                    {formatCurrency(Math.round(Number(item.totalPrice || 0)), language)}
+                    {formatCurrency(
+                      Math.round(Number(item.totalPrice || 0)),
+                      language,
+                    )}
                   </td>
                   <td>
-                    {formatCurrency(Math.round(Number(item.givenMoney || 0)), language)}
+                    {formatCurrency(
+                      Math.round(Number(item.givenMoney || 0)),
+                      language,
+                    )}
                   </td>
                   <td>
-                    {formatCurrency(Math.round(
-                      item.remainingMoney ??
-                        Math.max(
-                          0,
-                          (item.totalPrice || 0) - (item.givenMoney || 0),
-                        ),
-                    ), language)}
+                    {formatCurrency(
+                      Math.round(
+                        item.remainingMoney ??
+                          Math.max(
+                            0,
+                            (item.totalPrice || 0) - (item.givenMoney || 0),
+                          ),
+                      ),
+                      language,
+                    )}
                   </td>
                   <td>
                     {item.date ? formatSystemDate(item.date, language) : "-"}
@@ -963,9 +971,10 @@ export default function RakhtManager() {
             </label>
             <input
               className="inp"
-              value={formatCurrency(Math.round(
-                Number(selectedPaymentSummary?.totalPrice || 0),
-              ), language)}
+              value={formatCurrency(
+                Math.round(Number(selectedPaymentSummary?.totalPrice || 0)),
+                language,
+              )}
               readOnly
             />
           </div>
@@ -976,9 +985,10 @@ export default function RakhtManager() {
             </label>
             <input
               className="inp"
-              value={formatCurrency(Math.round(
-                Number(selectedPaymentSummary?.totalPaid || 0),
-              ), language)}
+              value={formatCurrency(
+                Math.round(Number(selectedPaymentSummary?.totalPaid || 0)),
+                language,
+              )}
               readOnly
             />
           </div>
@@ -989,9 +999,10 @@ export default function RakhtManager() {
             </label>
             <input
               className="inp"
-              value={formatCurrency(Math.round(
-                Number(selectedPaymentSummary?.remaining || 0),
-              ), language)}
+              value={formatCurrency(
+                Math.round(Number(selectedPaymentSummary?.remaining || 0)),
+                language,
+              )}
               readOnly
             />
           </div>
@@ -1255,7 +1266,7 @@ export default function RakhtManager() {
                             ? (
                                 pricePerTon /
                                 (parseInt(ton.totalMeters, 10) || 1)
-                              ).toLocaleString(undefined, {
+                              ).toLocaleString("en-US", {
                                 minimumFractionDigits: 0,
                                 maximumFractionDigits: 2,
                               })
@@ -1282,7 +1293,7 @@ export default function RakhtManager() {
                             color: "var(--success, #15803D)",
                           }}
                         >
-                          {pricePerTon.toLocaleString(undefined, {
+                          {pricePerTon.toLocaleString("en-US", {
                             minimumFractionDigits: 0,
                             maximumFractionDigits: 2,
                           })}
@@ -1358,7 +1369,7 @@ export default function RakhtManager() {
               <input
                 className="inp"
                 readOnly
-                value={remainingMoney.toLocaleString()}
+                value={remainingMoney.toLocaleString("en-US")}
                 style={{ cursor: "default" }}
               />
             </div>

@@ -15,26 +15,25 @@ export default function StatCard({
     <WrapperTag
       type={isInteractive ? "button" : undefined}
       onClick={onClick}
-      className={`w-full rounded-2xl border border-slate-200 bg-white p-4 text-start shadow-sm transition hover:shadow-md dark:border-slate-700 dark:bg-slate-900 sm:p-5 border-s-4 ${isInteractive ? "cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/35" : ""} ${className}`.trim()}
+      className={`stat-card ${isInteractive ? "stat-card--interactive" : ""} w-full text-start ${className}`.trim()}
       style={{
-        borderInlineStartColor: accent,
+        "--stat-accent": accent,
         fontFamily: "inherit",
+        appearance: isInteractive ? "none" : undefined,
       }}
     >
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <p className="mb-2 text-xs font-semibold tracking-wide text-slate-500 dark:text-slate-400">
-            {label}
-          </p>
+      <div className="stat-card__shell">
+        <div className="stat-card__copy">
+          <p className="stat-card__label">{label}</p>
           <p
-            className={`${emphasize ? "text-2xl sm:text-3xl" : "text-2xl"} font-bold leading-tight text-gray-900 dark:text-slate-100`}
+            className={`stat-card__value ${emphasize ? "stat-card__value--emphasize" : ""}`}
             style={{ unicodeBidi: "plaintext" }}
           >
             {value}
           </p>
           {sub ? (
             <p
-              className="mt-2 text-xs text-slate-500 dark:text-slate-400 sm:text-sm"
+              className="stat-card__sub"
               style={{ unicodeBidi: "plaintext" }}
             >
               {sub}
@@ -43,13 +42,7 @@ export default function StatCard({
         </div>
 
         {Icon ? (
-          <span
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-            style={{
-              color: accent,
-              backgroundColor: `${accent}1A`,
-            }}
-          >
+          <span className="stat-card__icon">
             <Icon size={20} />
           </span>
         ) : null}

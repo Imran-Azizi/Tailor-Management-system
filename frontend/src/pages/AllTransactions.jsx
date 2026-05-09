@@ -9,7 +9,6 @@ import {
   LuCalendarDays,
   LuDownload,
   LuFilter,
-  LuFileSpreadsheet,
   LuFileText,
   LuRefreshCcw,
   LuSearch,
@@ -125,65 +124,6 @@ export default function AllTransactions() {
     setPage(1);
   };
 
-  const exportRows = async () => {
-    const exportLimit = Math.min(Math.max(data?.total || 20, 20), 5000);
-    const response = await api.get("/transactions", {
-      params: {
-        page: 1,
-        limit: exportLimit,
-        search,
-        accountType: typeFilter,
-        month: isAdmin ? viewMonth : undefined,
-        year: isAdmin ? viewYear : undefined,
-      },
-    });
-    return Array.isArray(response.data?.data) ? response.data.data : [];
-  };
-
-  const handleExportCsv = async () => {
-    try {
-      setExporting("csv");
-      const rows = await exportRows();
-      const header = [
-        "User",
-        "Account Type",
-        "Type",
-        "Amount",
-        "Transaction Date",
-        "Note",
-        "Created By",
-        "Created At",
-      ];
-      const csv = [header.join(",")];
-      rows.forEach((row) => {
-        const values = [
-          row.user?.name || "-",
-          row.accountType || "-",
-          formatTransactionKind(row.kind, t),
-          formatMoney(row.amount, language),
-          formatDate(row.transactionDate, language),
-          String(row.note || "-").replaceAll('"', '""'),
-          row.createdBy?.name || "-",
-          formatDate(row.createdAt, language),
-        ];
-        csv.push(values.map((value) => `"${String(value)}"`).join(","));
-      });
-      const blob = new Blob([csv.join("\n")], {
-        type: "text/csv;charset=utf-8;",
-      });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "all-transactions-report.csv";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } finally {
-      setExporting("");
-    }
-  };
-
   const handleExportPdf = async () => {
     try {
       setExporting("pdf");
@@ -243,16 +183,6 @@ export default function AllTransactions() {
               {isFetching
                 ? t("common.loading", "Loading...")
                 : t("common.refresh", "Refresh")}
-            </button>
-            <button
-              className="btn btn-outline btn-sm"
-              onClick={handleExportCsv}
-              disabled={exporting === "csv" || !transactions.length}
-            >
-              <LuFileSpreadsheet size={14} />
-              {exporting === "csv"
-                ? t("common.loading", "Loading...")
-                : t("common.exportCsv", "Export CSV")}
             </button>
             <button
               className="btn btn-outline btn-sm"

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import api from "../lib/api.js";
@@ -179,6 +179,11 @@ export default function PrintBills() {
     }
   };
 
+  const handleSearchSubmit = (event) => {
+    event.preventDefault();
+    handleSearch();
+  };
+
   const handlePrintCustomerBill = () => {
     if (!customer || !(customer.orders || []).length) {
       toast.error(t("orders.noOrders") || "No orders found for this customer.");
@@ -220,16 +225,24 @@ export default function PrintBills() {
     `preview-tailor-${order?.id || `${order?.type || "order"}-${index}`}`;
 
   const orders = customer?.orders || [];
-  const orderMeta = buildOrderItemMeta(
-    orders,
-    currentLanguage,
-    customer?.firstName,
+  const orderMeta = useMemo(
+    () => buildOrderItemMeta(orders, currentLanguage, customer?.firstName),
+    [orders, currentLanguage, customer?.firstName],
   );
-  const isBillEmergency = orders.some((order) => order.isEmergency);
-  const emergencyTypes = Array.from(
-    new Set(orders.map((order) => getOrderDisplayName(order, currentLanguage))),
+  const isBillEmergency = useMemo(
+    () => orders.some((order) => order.isEmergency),
+    [orders],
   );
-  const emergencyAnchorOrder = orders[0] || null;
+  const emergencyTypes = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          orders.map((order) => getOrderDisplayName(order, currentLanguage)),
+        ),
+      ),
+    [orders, currentLanguage],
+  );
+  const emergencyAnchorOrder = useMemo(() => orders[0] || null, [orders]);
 
   return (
     <div
@@ -280,7 +293,10 @@ export default function PrintBills() {
       </div>
 
       <div className="card" style={{ padding: 18 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 18 }}>
+        <form
+          onSubmit={handleSearchSubmit}
+          style={{ display: "grid", gridTemplateColumns: "1fr", gap: 18 }}
+        >
           <div>
             <div className="form-row">
               <div>
@@ -343,9 +359,8 @@ export default function PrintBills() {
               >
                 <button
                   aria-label={t("common.search")}
-                  type="button"
+                  type="submit"
                   className="btn btn-gold print-btn"
-                  onClick={handleSearch}
                   disabled={loading}
                 >
                   {loading ? `${t("common.loading")}` : t("common.search")}
@@ -608,7 +623,7 @@ export default function PrintBills() {
               )}
             </div>
           </div>
-        </div>
+        </form>
       </div>
 
       <div style={{ display: "none" }}>

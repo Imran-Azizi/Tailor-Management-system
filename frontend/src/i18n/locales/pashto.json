@@ -763,6 +763,8 @@
   "notificationsPage": {
     "title": "خبرتیاوې",
     "unread": "{{count}} نه لوستل شوي",
+    "today": "نن",
+    "yesterday": "پرون",
     "empty": "تراوسه هیڅ خبرتیا نشته.",
     "markAllRead": "ټولې لوستل شوې",
     "markReadFailed": "د لوستل شوي علامه ناکامه شوه.",

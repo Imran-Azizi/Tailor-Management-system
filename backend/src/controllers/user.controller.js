@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma.js";
+import { getAfghanMonthDateRange } from "../lib/afghanistanDate.js";
 
 const SALT_ROUNDS = 12;
 
@@ -205,8 +206,15 @@ export async function listDokanUsers(req, res, next) {
 export async function myNotifications(req, res, next) {
   try {
     const { unread } = req.query;
+    const month = req.query.month != null ? Number(req.query.month) : null;
+    const year = req.query.year != null ? Number(req.query.year) : null;
     const where = { userId: req.user.id };
     if (unread === "true") where.isRead = false;
+
+    if (month && year && Number.isFinite(month) && Number.isFinite(year)) {
+      const { start, end } = getAfghanMonthDateRange({ month, year });
+      where.createdAt = { gte: start, lte: end };
+    }
 
     const notifs = await prisma.userNotification.findMany({
       where,

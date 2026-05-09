@@ -65,9 +65,15 @@ export function MonthProvider({ children }) {
 
       if (monthNumber < 1 || monthNumber > 12) return false;
 
-      if (yearNumber < maxYear) return true;
-      if (yearNumber > maxYear) return false;
-      return monthNumber <= maxMonth;
+      // Allow one month beyond the policy limit for read-only analytics viewing
+      const nextMonth = maxMonth >= 12 ? 1 : maxMonth + 1;
+      const nextYear = maxMonth >= 12 ? maxYear + 1 : maxYear;
+      const extendedMaxMonth = nextMonth;
+      const extendedMaxYear = nextYear;
+
+      if (yearNumber < extendedMaxYear) return true;
+      if (yearNumber > extendedMaxYear) return false;
+      return monthNumber <= extendedMaxMonth;
     },
     [monthPolicy.allowedUntilMonth, monthPolicy.allowedUntilYear],
   );
@@ -98,9 +104,13 @@ export function MonthProvider({ children }) {
         const activeMonth = Number(data.activeMonth) || CURRENT_MONTH;
         const activeYear = Number(data.activeYear) || CURRENT_YEAR;
 
+        // Allow one month beyond policy limit (for read-only analytics viewing)
+        const extMonth = maxMonth >= 12 ? 1 : maxMonth + 1;
+        const extYear = maxMonth >= 12 ? maxYear + 1 : maxYear;
+
         const isSelectedValid =
-          selectedYear < maxYear ||
-          (selectedYear === maxYear && selectedMonth <= maxMonth);
+          selectedYear < extYear ||
+          (selectedYear === extYear && selectedMonth <= extMonth);
 
         if (!isSelectedValid) {
           setViewMonthState(activeMonth);

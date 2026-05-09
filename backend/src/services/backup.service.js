@@ -20,6 +20,7 @@ import { PrismaClient } from "@prisma/client";
 const BACKUP_STATE_DIR = path.resolve(process.cwd(), "storage", "backup");
 const BACKUP_STATE_FILE = path.join(BACKUP_STATE_DIR, "backup-state.json");
 const TEMP_BACKUP_DIR = path.resolve(process.cwd(), "tmp", "backups");
+const RESTORE_TEST_RETENTION_MS = 48 * 60 * 60 * 1000;
 const EMAIL_ARCHIVE_DIR = path.resolve(
   process.cwd(),
   "storage",
@@ -956,8 +957,72 @@ function appendBackupRecord(state, record) {
 
 function appendRestoreRecord(state, record) {
   const next = { ...state };
-  next.restoreTests = [record, ...(state.restoreTests || [])].slice(0, 50);
+  const merged = [record, ...(state.restoreTests || [])].slice(0, 50);
+  next.restoreTests = pruneRestoreTestHistory(merged);
   return next;
+}
+
+function getRestoreTestTimestamp(record) {
+  const candidates = [record?.finishedAt, record?.startedAt, record?.createdAt];
+  for (const value of candidates) {
+    const ts = new Date(value || 0).getTime();
+    if (Number.isFinite(ts) && ts > 0) return ts;
+  }
+  return 0;
+}
+
+function sortRestoreTestsByNewest(records = []) {
+  return [...records].sort(
+    (a, b) => getRestoreTestTimestamp(b) - getRestoreTestTimestamp(a),
+  );
+}
+
+function pruneRestoreTestHistory(records = [], nowTs = Date.now()) {
+  const sorted = sortRestoreTestsByNewest(records).slice(0, 50);
+  if (!sorted.length) return [];
+
+  const latest = sorted[0];
+  const retained = [latest];
+
+  for (let i = 1; i < sorted.length; i += 1) {
+    const record = sorted[i];
+    const ts = getRestoreTestTimestamp(record);
+    if (!ts) {
+      retained.push(record);
+      continue;
+    }
+    if (nowTs - ts <= RESTORE_TEST_RETENTION_MS) {
+      retained.push(record);
+    }
+  }
+
+  return retained;
+}
+
+function hasRestoreTestsChanged(prev = [], next = []) {
+  if (prev.length !== next.length) return true;
+  for (let i = 0; i < prev.length; i += 1) {
+    if (JSON.stringify(prev[i]) !== JSON.stringify(next[i])) return true;
+  }
+  return false;
+}
+
+export async function cleanupRestoreTestHistory() {
+  const state = await readBackupState();
+  const current = Array.isArray(state.restoreTests) ? state.restoreTests : [];
+  const pruned = pruneRestoreTestHistory(current);
+
+  if (!hasRestoreTestsChanged(current, pruned)) {
+    return { changed: false, removed: 0, remaining: current.length };
+  }
+
+  const next = { ...state, restoreTests: pruned };
+  await writeBackupState(next);
+  return {
+    changed: true,
+    removed: Math.max(0, current.length - pruned.length),
+    remaining: pruned.length,
+  };
 }
 
 async function cleanupLocalFiles(pathsToDelete) {
@@ -1234,6 +1299,7 @@ export async function listBackups() {
 }
 
 export async function getBackupStatus() {
+  const cleanupResult = await cleanupRestoreTestHistory();
   const state = await readBackupState();
   let backups = [];
 
@@ -1252,6 +1318,7 @@ export async function getBackupStatus() {
     restoreTests: state.restoreTests || [],
     recentBackups: state.recentBackups || [],
     totalBackups: backups.length,
+    restoreTestsCleanup: cleanupResult,
   };
 }
 

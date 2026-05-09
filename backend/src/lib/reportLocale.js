@@ -108,6 +108,42 @@ function stabilizeRtlMixedText(value) {
   );
 }
 
+export function normalizeReportPdfText(value, language = "en") {
+  let text = String(value ?? "");
+  if (!text) return text;
+
+  // Keep glyph composition stable for shaping engines.
+  text = text.normalize("NFC");
+
+  // Unify whitespace variants that can break Arabic joining in shaped runs.
+  text = text
+    .replace(/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, " ")
+    .replace(/\uFEFF/g, "")
+    .replace(/\s*\u200C\s*/g, "\u200C")
+    .replace(/ {2,}/g, " ")
+    .trim();
+
+  if (!isRtlReportLanguage(language)) {
+    return text;
+  }
+
+  // Normalize common Persian/Pashto suffix and verb half-space forms.
+  text = text
+    .replace(
+      /([\u0600-\u06FF]{2,})\s+(ها|های|تر|ترین)(?=\b|\s|$)/gu,
+      "$1\u200C$2",
+    )
+    .replace(/\b(می|نمی)\s+([\u0600-\u06FF]{2,})/gu, "$1\u200C$2");
+
+  // Heal accidental first-letter splits seen in exported PDFs (e.g. "س فارش").
+  text = text.replace(/\b([سشصض])\s+([\u0600-\u06FF]{3,})/gu, "$1$2");
+
+  // Heal accidental split in Waskat variants (e.g. "وا س کت" / "وا سکټ").
+  text = text.replace(/\bوا\s+س\s*ک([تټ])\b/gu, "واسک$1");
+
+  return text;
+}
+
 export function formatReportLabelValue(
   label,
   value,

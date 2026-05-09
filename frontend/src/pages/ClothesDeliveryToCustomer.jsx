@@ -4,7 +4,11 @@ import toast from "react-hot-toast";
 import { LuPhone, LuReceipt, LuSearch } from "react-icons/lu";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
-import { parseNumberLocale } from "../lib/normalize.js";
+import {
+  normalizePhone,
+  parseNumberLocale,
+  toAsciiDigits,
+} from "../lib/normalize.js";
 import { formatCurrency } from "../lib/currency.js";
 import {
   getOrderLabelParts,
@@ -29,12 +33,16 @@ export default function ClothesDeliveryToCustomer() {
   const language = i18n.resolvedLanguage || i18n.language;
   const normalizedLanguage = String(language || "en").toLowerCase();
   const isEnglish = normalizedLanguage.startsWith("en");
+  const isDariOrPashto =
+    normalizedLanguage.startsWith("dari") ||
+    normalizedLanguage.startsWith("pashto");
   const isRtl = (i18n.dir?.() || "ltr") === "rtl";
   const dir = isRtl ? "rtl" : "ltr";
   const receiveButtonText = isEnglish ? "Receive" : "رسید";
   const completedStatusText = t("orders.done", "Completed");
 
   const [mode, setMode] = useState("bill"); // bill | phone
+  const isBillInputRtl = isDariOrPashto && mode === "bill";
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null); // { customer, orders }
@@ -58,7 +66,9 @@ export default function ClothesDeliveryToCustomer() {
 
   const runSearch = async () => {
     const trimmed = query.trim();
-    if (!trimmed) {
+    const normalizedBill = toAsciiDigits(trimmed).replace(/\D/g, "");
+    const normalizedPhone = normalizePhone(trimmed);
+    if (!trimmed || (mode === "bill" && !normalizedBill)) {
       toast.error(
         t("common.search") +
           " " +
@@ -71,7 +81,9 @@ export default function ClothesDeliveryToCustomer() {
     setLoading(true);
     try {
       const params =
-        mode === "bill" ? { billNumber: trimmed } : { phoneNumber: trimmed };
+        mode === "bill"
+          ? { billNumber: normalizedBill }
+          : { phoneNumber: normalizedPhone };
       const { data } = await api.get("/orders/lookup", { params });
       setResult(data);
       // Default payment input to full remaining per order.
@@ -225,6 +237,9 @@ export default function ClothesDeliveryToCustomer() {
             <input
               id="delivery-search-input"
               className="inp"
+              dir={isBillInputRtl ? "rtl" : "ltr"}
+              data-field-direction={isBillInputRtl ? "rtl" : "ltr"}
+              style={isBillInputRtl ? { textAlign: "right" } : undefined}
               placeholder={
                 mode === "bill"
                   ? t("delivery.billPlaceholder")
