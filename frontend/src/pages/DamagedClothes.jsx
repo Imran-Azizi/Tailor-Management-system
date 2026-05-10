@@ -10,13 +10,13 @@ import {
   LuShieldAlert,
   LuUser,
   LuUsers,
-  LuReceiptText,
 } from "react-icons/lu";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { formatCurrency } from "../lib/currency.js";
 import { isRtlLanguage } from "../lib/locale.js";
 import { Modal, PageHeader } from "../components/ui/index.jsx";
+import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 
 function SmallSpinner() {
   return (
@@ -464,7 +464,7 @@ export default function DamagedClothes() {
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <LuReceiptText size={16} style={{ color: "var(--primary)" }} />
+              <AfCurrencyIcon size={16} style={{ color: "var(--primary)" }} />
               <span
                 style={{ fontSize: 15, fontWeight: 700, color: "var(--text1)" }}
               >

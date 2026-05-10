@@ -372,42 +372,82 @@ export default function RakhtManager() {
     <div className="card" style={{ padding: 18 }}>
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          display: "flex",
+          flexWrap: "wrap",
           gap: 12,
           marginBottom: 16,
         }}
       >
-        <StatCard
-          label={t("rakht.totalRecords", { defaultValue: "Total Records" })}
-          value={stats.totalEntries}
-          Icon={LuChartColumn}
-          accent="#2563EB"
-        />
-        <StatCard
-          label={t("rakht.totalTons", { defaultValue: "Total Tons" })}
-          value={stats.totalTons}
-          Icon={LuBoxes}
-          accent="#0F766E"
-        />
-        <StatCard
-          label={t("rakht.totalPrice", { defaultValue: "Total Price" })}
-          value={formatCurrency(Math.round(stats.totalPrice), language)}
-          Icon={AfCurrencyIcon}
-          accent="#7C3AED"
-        />
-        <StatCard
-          label={t("rakht.givenMoney", { defaultValue: "Given Money" })}
-          value={formatCurrency(Math.round(stats.totalPaid), language)}
-          Icon={AfCurrencyIcon}
-          accent="#15803D"
-        />
-        <StatCard
-          label={t("rakht.remainingMoney", { defaultValue: "Remaining" })}
-          value={formatCurrency(Math.round(stats.totalRemaining), language)}
-          Icon={AfCurrencyIcon}
-          accent="#B45309"
-        />
+        <div
+          style={{
+            flex: "0.78 1 150px",
+            minWidth: 136,
+            display: "flex",
+          }}
+        >
+          <StatCard
+            label={t("rakht.totalRecords", { defaultValue: "Total Records" })}
+            value={stats.totalEntries}
+            Icon={LuChartColumn}
+            accent="#2563EB"
+          />
+        </div>
+        <div
+          style={{
+            flex: "0.78 1 150px",
+            minWidth: 136,
+            display: "flex",
+          }}
+        >
+          <StatCard
+            label={t("rakht.totalTons", { defaultValue: "Total Tons" })}
+            value={stats.totalTons}
+            Icon={LuBoxes}
+            accent="#0F766E"
+          />
+        </div>
+        <div
+          style={{
+            flex: "1.28 1 260px",
+            minWidth: 235,
+            display: "flex",
+          }}
+        >
+          <StatCard
+            label={t("rakht.totalPrice", { defaultValue: "Total Price" })}
+            value={formatCurrency(Math.round(stats.totalPrice), language)}
+            Icon={AfCurrencyIcon}
+            accent="#7C3AED"
+          />
+        </div>
+        <div
+          style={{
+            flex: "1.28 1 260px",
+            minWidth: 235,
+            display: "flex",
+          }}
+        >
+          <StatCard
+            label={t("rakht.givenMoney", { defaultValue: "Given Money" })}
+            value={formatCurrency(Math.round(stats.totalPaid), language)}
+            Icon={AfCurrencyIcon}
+            accent="#15803D"
+          />
+        </div>
+        <div
+          style={{
+            flex: "1.28 1 260px",
+            minWidth: 235,
+            display: "flex",
+          }}
+        >
+          <StatCard
+            label={t("rakht.remainingMoney", { defaultValue: "Remaining" })}
+            value={formatCurrency(Math.round(stats.totalRemaining), language)}
+            Icon={AfCurrencyIcon}
+            accent="#B45309"
+          />
+        </div>
       </div>
 
       <div

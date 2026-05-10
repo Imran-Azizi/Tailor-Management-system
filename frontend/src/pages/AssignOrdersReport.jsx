@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
-import { LuReceipt, LuSearch } from "react-icons/lu";
+import { LuSearch } from "react-icons/lu";
+import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { parseNumberLocale } from "../lib/normalize.js";
@@ -230,21 +231,12 @@ export default function AssignOrdersReport() {
 
           <button
             type="button"
-            className="btn"
+            className="btn btn-gold"
             onClick={searchByBill}
             disabled={loading}
             style={{
               minWidth: 132,
               justifyContent: "center",
-              height: 42,
-              border: "1px solid transparent",
-              borderRadius: 10,
-              background:
-                "linear-gradient(135deg, #1D4ED8 0%, #2563EB 55%, #0EA5E9 100%)",
-              color: "#fff",
-              fontWeight: 700,
-              boxShadow: "0 8px 22px rgba(37,99,235,.28)",
-              opacity: loading ? 0.72 : 1,
             }}
           >
             <LuSearch size={14} />
@@ -322,7 +314,7 @@ export default function AssignOrdersReport() {
                             color: "var(--text2)",
                           }}
                         >
-                          {orderLabel.baseTypeLabel}
+                          {orderLabel.typeWithSequenceLabel}
                         </span>
                         <span className="badge bg-gray">
                           #{billNumber ?? "-"}
@@ -355,7 +347,7 @@ export default function AssignOrdersReport() {
                 "assignment.reportEmpty",
                 "Search by bill number to see where this order is currently assigned.",
               )}
-              Icon={LuReceipt}
+              Icon={AfCurrencyIcon}
             />
           </Card>
         )}

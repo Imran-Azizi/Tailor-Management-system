@@ -214,6 +214,7 @@ model Order {
   waskat                  Waskat?
   korty                   Korty?
   yakhanQaq               YakhanQaq?
+  readyMadeOrder          ReadyMadeOrder?
   notifications           Notification[]
   transactions            Transaction[]
   workerPaymentReceipts   WorkerPaymentReceipt[]
@@ -221,6 +222,12 @@ model Order {
   dailyTasks              DailyTask[]
   createdAt               DateTime                @default(now())
   updatedAt               DateTime                @updatedAt
+
+  // Ready-Made Clothes link
+  readyMadeClothingId    String?
+  readyMadeClothingCode  String?
+  readyMadeOriginalPrice Float?
+  readyMadeClothing      ReadyMadeClothing? @relation(fields: [readyMadeClothingId], references: [id], onDelete: SetNull)
 
   @@index([customerId])
   @@index([type])
@@ -348,6 +355,7 @@ enum OrderType {
   WASKAT
   KORTY
   YAKHANQAQ
+  READY_MADE
 }
 
 enum BoxType {
@@ -450,6 +458,43 @@ model YakhanQaq {
   yakhanQaqDesign String?
   buttonStyle     String?
   pantStyle       String?
+}
+
+// ─── Ready-Made Clothes ───────────────────────────────────────────────────────
+
+model ReadyMadeClothing {
+  id            String   @id @default(uuid())
+  clothingCode  String   @unique
+  originalPrice Float
+  quantity      Int      @default(1)
+  description   String?
+  orders        Order[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([clothingCode])
+}
+
+model ReadyMadeOrder {
+  id      String @id @default(uuid())
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  height   Float?
+  chest    Float?
+  waist    Float?
+  shoulder Float?
+  sleeve   Float?
+  neck     Float?
+  armpit   Float?
+  skirt    Float?
+  tenban   Float?
+  pantLeg  Float?
+  arm      Float?
+  calf     Float?
+  sorain   Float?
+
+  additionalNotes String?
 }
 
 model Notification {

@@ -96,7 +96,7 @@
     "contactAdmin": "دسترسی ندارید؟ با ادمین تماس بگیرید."
   },
   "users": {
-    "title": "مدیریت کاربران",
+    "title": "مدیریت کارگران",
     "addUser": "افزودن کاربر",
     "newUser": "کاربر جدید",
     "editUser": "ویرایش کاربر",
@@ -151,7 +151,7 @@
   "dashboardPage": {
     "title": "داشبورد",
     "netBenefit": "درآمد خالص",
-    "netBenefitSub": "مجموع عاید رخت + مجموع فایده سفارش‌ها",
+    "netBenefitSub": "مجموع عاید رخت + مجموع فایده سفارش‌ها + مجموع فایده لباس آماده",
     "tooltipOrders": "{{count}} سفارش",
     "totalOrders": "مجموع سفارش‌ها",
     "today": "امروز",
@@ -178,7 +178,10 @@
     "orders": "سفارش‌ها",
     "recentOrders": "سفارش‌های اخیر",
     "statusDone": "تکمیل",
-    "statusPending": "در انتظار"
+    "statusPending": "در انتظار",
+    "totalReadyMadeProfit": "مجموع فایده لباس آماده",
+    "totalReadyMadeProfitAfterExpenses": "مجموع فایده لباس آماده (بعد از همه مصارف)",
+    "afterAllExpenses": "بعد از همه مصارف"
   },
   "assignment": {
     "assignOrder": "واگذاری سفارش",
@@ -336,7 +339,8 @@
       "pantStyle": "پتلون",
       "yakhanQaqDesign": "دیزاین",
       "additionalStyleInfo": "یادداشت دیزاین",
-      "rakhtSelection": "انتخاب رخت"
+      "rakhtSelection": "انتخاب رخت",
+      "additionalNotes": "یادداشت اضافی"
     },
     "styleFields": {
       "neck": "شیپ یخن",
@@ -519,7 +523,7 @@
     "rolePlaceholder": "نقش کارگر را انتخاب کنید...",
     "workerLabel": "کارگر",
     "workerPlaceholder": "یک کارگر را انتخاب کنید...",
-    "workerHint": "فقط کاربران فعال نقش انتخاب‌شده نمایش داده می‌شوند.",
+    "workerHint": "فقط کارگران فعال نقش انتخاب‌شده نمایش داده می‌شوند.",
     "workerHintSelectRole": "ابتدا نقش را انتخاب کنید تا کارگرها بارگیری شوند.",
     "searchPlaceholder": "جستجو با شماره بل، نام مشتری، شماره تماس یا نوع سفارش...",
     "ordersTitle": "سفارش‌های یافت‌شده",
@@ -643,7 +647,8 @@
     "loadingOrders": "در حال بارگذاری سفارش‌ها...",
     "noOrdersInCategory": "هیچ سفارشی در این دسته‌بندی وجود ندارد.",
     "searchBillPlaceholder": "جستجو با شماره بل",
-    "noOrderFoundByBill": "هیچ سفارشی برای این شماره بل یافت نشد."
+    "noOrderFoundByBill": "هیچ سفارشی برای این شماره بل یافت نشد.",
+    "readyMadeOriginalPrice": "قیمت اصلی لباس آماده"
   },
   "rakht": {
     "allTitle": "همه رخت‌ها",

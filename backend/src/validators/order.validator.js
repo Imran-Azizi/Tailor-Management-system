@@ -11,7 +11,9 @@ const optionalText = z.preprocess((value) => {
 
 const orderItemSchema = z.object({
   orderItemKey: optionalText,
-  type: z.enum(["OUTFIT", "WASKAT", "KORTY", "YAKHANQAQ"]).optional(),
+  type: z
+    .enum(["OUTFIT", "WASKAT", "KORTY", "YAKHANQAQ", "READY_MADE"])
+    .optional(),
   orderName: optionalText,
   totalPrice: z.number().min(0).optional().default(0),
   discount: z.number().min(0).optional().default(0),
@@ -22,6 +24,9 @@ const orderItemSchema = z.object({
   isForeignOrder: z.boolean().default(false),
   boxId: z.number().int().optional().nullable(),
   measurements: z.record(z.any()).optional(),
+  readyMadeClothingId: optionalText,
+  readyMadeClothingCode: optionalText,
+  readyMadeOriginalPrice: z.number().min(0).optional().nullable(),
 });
 
 const orderBillItemSchema = orderItemSchema.extend({
@@ -31,7 +36,9 @@ const orderBillItemSchema = orderItemSchema.extend({
 const rakhtSelectionSchema = z.object({
   orderId: optionalText,
   orderItemKey: optionalText,
-  type: z.enum(["OUTFIT", "WASKAT", "KORTY", "YAKHANQAQ"]).optional(),
+  type: z
+    .enum(["OUTFIT", "WASKAT", "KORTY", "YAKHANQAQ", "READY_MADE"])
+    .optional(),
   rakhtId: optionalText,
   rakhtTonId: optionalText,
   requiredMeters: z.number().nonnegative().optional(),

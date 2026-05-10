@@ -151,7 +151,7 @@
   "dashboardPage": {
     "title": "Dashboard",
     "netBenefit": "Net Benefit",
-    "netBenefitSub": "Total Rakht Revenue + Total Order Benefit",
+    "netBenefitSub": "Total Rakht Revenue + Total Order Benefit + Total Ready-Made Profit",
     "tooltipOrders": "{{count}} orders",
     "totalOrders": "Total Orders",
     "today": "Today",
@@ -180,7 +180,10 @@
     "statusDone": "Done",
     "statusPending": "Pending",
     "totalRakhtRevenue": "Total Rakht Revenue",
-    "totalOrderBenefit": "Total Order Benefit"
+    "totalOrderBenefit": "Total Order Benefit",
+    "totalReadyMadeProfit": "Total Ready-Made Profit",
+    "totalReadyMadeProfitAfterExpenses": "Total Ready-Made Profit (After Expenses)",
+    "afterAllExpenses": "After all expenses"
   },
   "assignment": {
     "assignOrder": "Assign Order",
@@ -338,7 +341,8 @@
       "pantStyle": "Pants",
       "yakhanQaqDesign": "Design",
       "additionalStyleInfo": "Notes",
-      "rakhtSelection": "Rakht Selection"
+      "rakhtSelection": "Rakht Selection",
+      "additionalNotes": "Additional Notes"
     },
     "addAnotherSet": "Add Another Set",
     "nameNewSet": "Name the new measurement set",
@@ -506,7 +510,8 @@
     "loadingOrders": "Loading orders...",
     "noOrdersInCategory": "No orders in this category.",
     "searchBillPlaceholder": "Search by bill number",
-    "noOrderFoundByBill": "No order found for this bill number."
+    "noOrderFoundByBill": "No order found for this bill number.",
+    "readyMadeOriginalPrice": "Ready-Made Original Price"
   },
   "dailyTasks": {
     "title": "Daily Expenses",

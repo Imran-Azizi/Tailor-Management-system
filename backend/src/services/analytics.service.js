@@ -281,6 +281,8 @@ export const getDashboardStats = async ({
     legacyQichikarPaidAggregate,
     legacyDokhtPaidAggregate,
     allOrdersBenefitAggregate,
+    readyMadeBenefitAggregate,
+    readyMadeFinalProfitAggregate,
     totalRakhtRevenue,
   ] = await Promise.all([
     prisma.order.aggregate({
@@ -322,8 +324,23 @@ export const getDashboardStats = async ({
     prisma.order.aggregate({
       where: {
         ...monthWhere,
+        type: { not: "READY_MADE" },
       },
       _sum: { totalBenefit: true },
+    }),
+    prisma.order.aggregate({
+      where: {
+        ...monthWhere,
+        type: "READY_MADE",
+      },
+      _sum: { totalBenefit: true },
+    }),
+    prisma.order.aggregate({
+      where: {
+        ...monthWhere,
+        type: "READY_MADE",
+      },
+      _sum: { totalBenefit: true, readyMadeOriginalPrice: true },
     }),
     computeRakhtBenefitRevenue(monthWhere),
   ]);
@@ -367,6 +384,12 @@ export const getDashboardStats = async ({
     totalOrderBenefit: Number(
       allOrdersBenefitAggregate._sum?.totalBenefit || 0,
     ),
+    totalReadyMadeProfit: Number(
+      readyMadeBenefitAggregate._sum?.totalBenefit || 0,
+    ),
+    totalReadyMadeProfitAfterExpenses:
+      Number(readyMadeFinalProfitAggregate._sum?.totalBenefit || 0) -
+      Number(readyMadeFinalProfitAggregate._sum?.readyMadeOriginalPrice || 0),
     totalRakhtRevenue: Number(totalRakhtRevenue || 0),
     isFiltered: hasMonthFilter,
     filteredMonth: hasMonthFilter ? parsedMonth : null,

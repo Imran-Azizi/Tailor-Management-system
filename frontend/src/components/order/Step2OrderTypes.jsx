@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
 import {
   LuCheck,
   LuX,
@@ -8,8 +9,12 @@ import {
   LuPocket,
   LuPersonStanding,
   LuScissorsLineDashed,
+  LuTag,
+  LuChevronDown,
 } from "react-icons/lu";
 import { getOrderTypeLabel } from "../../lib/orderType.js";
+import { formatCurrency } from "../../lib/currency.js";
+import api from "../../lib/api.js";
 import styles from "./Step2OrderTypes.module.css";
 
 const TYPES = [
@@ -17,6 +22,7 @@ const TYPES = [
   { id: "WASKAT", Icon: LuPocket },
   { id: "KORTY", Icon: LuPersonStanding },
   { id: "YAKHANQAQ", Icon: LuScissorsLineDashed },
+  { id: "READY_MADE", Icon: LuTag },
 ];
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => {
@@ -34,6 +40,104 @@ function normalizeEmergencyHour(value) {
     return "08";
   }
   return String(Math.floor(numeric)).padStart(2, "0");
+}
+
+function ReadyMadeDropdown({ selectedClothingId, onChange }) {
+  const { t } = useTranslation();
+  const { data: items = [], isLoading } = useQuery({
+    queryKey: ["ready-made-clothing", "active"],
+    queryFn: () =>
+      api
+        .get("/designs/ready-made-clothing?activeOnly=true")
+        .then((r) => r.data),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  return (
+    <div
+      style={{
+        marginTop: 10,
+        padding: "12px 14px",
+        border: "1px solid var(--primary-200)",
+        borderRadius: 10,
+        background: "var(--surface2)",
+      }}
+    >
+      <label
+        style={{
+          display: "block",
+          fontSize: 11,
+          fontWeight: 700,
+          color: "var(--text3)",
+          textTransform: "uppercase",
+          letterSpacing: ".06em",
+          marginBottom: 8,
+        }}
+      >
+        {t("readyMade.selectCode", "Select Clothing Code")}
+      </label>
+      {isLoading ? (
+        <p style={{ fontSize: 13, color: "var(--text3)" }}>
+          {t("common.loading", "Loading...")}
+        </p>
+      ) : items.length === 0 ? (
+        <p style={{ fontSize: 13, color: "var(--text3)" }}>
+          {t(
+            "readyMade.noItems",
+            "No clothing items found. Add items in the Design page → Ready-Made tab.",
+          )}
+        </p>
+      ) : (
+        <div style={{ position: "relative" }}>
+          <select
+            className="inp"
+            style={{
+              height: 40,
+              fontSize: 13,
+              paddingInlineEnd: 32,
+              width: "100%",
+            }}
+            value={selectedClothingId || ""}
+            onChange={(e) => {
+              const id = e.target.value;
+              const item = items.find((i) => i.id === id) || null;
+              onChange(item);
+            }}
+          >
+            <option value="">
+              {t("readyMade.chooseCode", "— choose a clothing code —")}
+            </option>
+            {items.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.clothingCode}
+                {" — "}
+                {formatCurrency(item.originalPrice)}
+              </option>
+            ))}
+          </select>
+          <LuChevronDown
+            size={14}
+            style={{
+              position: "absolute",
+              insetInlineEnd: 10,
+              top: "50%",
+              transform: "translateY(-50%)",
+              pointerEvents: "none",
+              color: "var(--text3)",
+            }}
+          />
+        </div>
+      )}
+      {selectedClothingId && (
+        <p style={{ marginTop: 6, fontSize: 12, color: "var(--primary)" }}>
+          {t("readyMade.originalPrice", "Original Price")}:{" "}
+          {formatCurrency(
+            items.find((i) => i.id === selectedClothingId)?.originalPrice ?? 0,
+          )}
+        </p>
+      )}
+    </div>
+  );
 }
 
 export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
@@ -64,6 +168,11 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
     [entries],
   );
 
+  const readyMadeEntry = useMemo(
+    () => entries.find((e) => e.type === "READY_MADE") || null,
+    [entries],
+  );
+
   const toggleType = (id) => {
     if (selectedTypes.has(id)) {
       setEntries((current) => current.filter((entry) => entry.type !== id));
@@ -78,7 +187,10 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
         isEmergency: billEmergency,
         emergencyExpiry: billEmergency ? billEmergencyExpiry : "",
         emergencyHour: billEmergency ? billEmergencyHour : "08",
-        isForeignOrder,
+        isForeignOrder: id === "READY_MADE" ? false : isForeignOrder,
+        readyMadeClothingId: null,
+        readyMadeClothingCode: null,
+        readyMadeOriginalPrice: null,
       },
     ]);
     setBillEmergencyError("");
@@ -101,8 +213,24 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
     setEntries((current) =>
       current.map((entry) => ({
         ...entry,
-        isForeignOrder: checked,
+        // READY_MADE cannot be a foreign order
+        isForeignOrder: entry.type === "READY_MADE" ? false : checked,
       })),
+    );
+  };
+
+  const setReadyMadeClothing = (item) => {
+    setEntries((current) =>
+      current.map((entry) =>
+        entry.type === "READY_MADE"
+          ? {
+              ...entry,
+              readyMadeClothingId: item?.id || null,
+              readyMadeClothingCode: item?.clothingCode || null,
+              readyMadeOriginalPrice: item?.originalPrice ?? null,
+            }
+          : entry,
+      ),
     );
   };
 
@@ -121,6 +249,17 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
   const validateBeforeContinue = () => {
     if (!entries.length) {
       setSelectionError(t("createOrder.selectAtLeastOne"));
+      return;
+    }
+
+    const hasReadyMade = entries.some((e) => e.type === "READY_MADE");
+    if (hasReadyMade && !readyMadeEntry?.readyMadeClothingId) {
+      setSelectionError(
+        t(
+          "readyMade.selectCodeRequired",
+          "Please select a clothing code for the Ready-Made Clothes order.",
+        ),
+      );
       return;
     }
 
@@ -151,7 +290,7 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
       emergencyHour: billEmergency
         ? normalizeEmergencyHour(billEmergencyHour)
         : "08",
-      isForeignOrder,
+      isForeignOrder: entry.type === "READY_MADE" ? false : isForeignOrder,
     }));
 
     setSelectionError("");
@@ -173,41 +312,52 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
           const selected = selectedTypes.has(id);
           const label = getOrderTypeLabel(id, language);
           return (
-            <button
-              key={id}
-              type="button"
-              className={`type-card${selected ? " sel" : ""}`}
-              onClick={() => toggleType(id)}
-            >
-              {selected && (
-                <span
+            <div key={id} style={{ display: "flex", flexDirection: "column" }}>
+              <button
+                type="button"
+                className={`type-card${selected ? " sel" : ""}`}
+                onClick={() => toggleType(id)}
+              >
+                {selected && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 10,
+                      insetInlineEnd: 10,
+                      background: "var(--primary)",
+                      color: "#fff",
+                      borderRadius: "50%",
+                      width: 20,
+                      height: 20,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <LuCheck size={11} />
+                  </span>
+                )}
+                <div className="type-card-kicker">
+                  <Icon size={18} />
+                </div>
+                <p style={{ fontWeight: 700, fontSize: 15 }}>{label}</p>
+                <p
                   style={{
-                    position: "absolute",
-                    top: 10,
-                    insetInlineEnd: 10,
-                    background: "var(--primary)",
-                    color: "#fff",
-                    borderRadius: "50%",
-                    width: 20,
-                    height: 20,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
+                    fontSize: 12.5,
+                    color: "var(--text3)",
+                    marginTop: 4,
                   }}
                 >
-                  <LuCheck size={11} />
-                </span>
+                  {desc}
+                </p>
+              </button>
+              {id === "READY_MADE" && selected && (
+                <ReadyMadeDropdown
+                  selectedClothingId={readyMadeEntry?.readyMadeClothingId}
+                  onChange={setReadyMadeClothing}
+                />
               )}
-              <div className="type-card-kicker">
-                <Icon size={18} />
-              </div>
-              <p style={{ fontWeight: 700, fontSize: 15 }}>{label}</p>
-              <p
-                style={{ fontSize: 12.5, color: "var(--text3)", marginTop: 4 }}
-              >
-                {desc}
-              </p>
-            </button>
+            </div>
           );
         })}
       </div>
@@ -324,25 +474,27 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
                 )}
               </div>
 
-              {/* Foreign Order */}
-              <div>
-                <label className={styles.foreignToggle}>
-                  <input
-                    type="checkbox"
-                    checked={isForeignOrder}
-                    onChange={(e) => {
-                      const { checked } = e.target;
-                      setIsForeignOrder(checked);
-                      syncForeignFlagToEntries(checked);
-                    }}
-                  />
-                  <span className={styles.foreignToggleText}>
-                    {t("createOrder.sendToForeignCountry", {
-                      defaultValue: "Send to Foreign Country",
-                    })}
-                  </span>
-                </label>
-              </div>
+              {/* Foreign Order — not shown when only READY_MADE is selected */}
+              {!entries.every((e) => e.type === "READY_MADE") && (
+                <div>
+                  <label className={styles.foreignToggle}>
+                    <input
+                      type="checkbox"
+                      checked={isForeignOrder}
+                      onChange={(e) => {
+                        const { checked } = e.target;
+                        setIsForeignOrder(checked);
+                        syncForeignFlagToEntries(checked);
+                      }}
+                    />
+                    <span className={styles.foreignToggleText}>
+                      {t("createOrder.sendToForeignCountry", {
+                        defaultValue: "Send to Foreign Country",
+                      })}
+                    </span>
+                  </label>
+                </div>
+              )}
             </div>
           </div>
 
@@ -377,6 +529,20 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
                     >
                       {getOrderTypeLabel(entry.type, language)}
                     </span>
+                    {entry.type === "READY_MADE" &&
+                      entry.readyMadeClothingCode && (
+                        <span
+                          className={`badge ${styles["hide-on-mobile"]}`}
+                          style={{
+                            fontSize: 11,
+                            background: "var(--primary-50)",
+                            color: "var(--primary)",
+                          }}
+                        >
+                          {t("readyMade.code", "Code")}:{" "}
+                          {entry.readyMadeClothingCode}
+                        </span>
+                      )}
                     <span
                       className={styles["hide-on-mobile"]}
                       style={{ fontSize: 12, color: "var(--text3)" }}
@@ -391,7 +557,7 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
                         {t("createOrder.emergencyShort")}
                       </span>
                     )}
-                    {isForeignOrder && (
+                    {isForeignOrder && entry.type !== "READY_MADE" && (
                       <span className={styles.foreignShort}>
                         <svg
                           width="15"
@@ -454,6 +620,12 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
                   }}
                 >
                   {getOrderTypeLabel(entry.type, language)}
+                  {entry.type === "READY_MADE" &&
+                    entry.readyMadeClothingCode && (
+                      <span style={{ color: "var(--primary)", fontSize: 11 }}>
+                        ({entry.readyMadeClothingCode})
+                      </span>
+                    )}
                   <button
                     type="button"
                     onClick={() => removeType(entry.type)}

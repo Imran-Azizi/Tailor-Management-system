@@ -5,7 +5,11 @@ import Select from "react-select";
 import { LuRuler } from "react-icons/lu";
 import api from "../../lib/api.js";
 import { Field } from "../ui/index.jsx";
-import { getOrderTypeLabel } from "../../lib/orderType.js";
+import {
+  getOrderDisplayName,
+  getOrderTypeLabel,
+  withOrderTypeSequenceMeta,
+} from "../../lib/orderType.js";
 import { isRtlLanguage as detectRtlLanguage } from "../../lib/locale.js";
 import {
   MONEY_SCALE,
@@ -61,21 +65,33 @@ export default function Step2RakhtSelection({
 
   const selectionItems = useMemo(() => {
     if (Array.isArray(orderItems) && orderItems.length > 0) {
-      return orderItems.map((item, index) => {
+      return withOrderTypeSequenceMeta(orderItems).map((item, index) => {
         const key = String(
           item?.billingKey ?? `${item?.type || "ITEM"}-${index}`,
         );
         const type = item?.type;
-        const fallbackLabel = `${getOrderTypeLabel(type, language)} ${index + 1}`;
+        const fallbackLabel = getOrderDisplayName(
+          {
+            ...item,
+            orderName: item?.name?.trim() || item?.orderName?.trim() || "",
+          },
+          language,
+        );
         const label = item?.displayName?.trim() || fallbackLabel;
         return { key, type, label, orderId: item?.orderId || "" };
       });
     }
 
-    return (orderTypes || []).map((entry, index) => {
+    return withOrderTypeSequenceMeta(orderTypes || []).map((entry, index) => {
       const type = entry?.type;
       const key = `${type || "ITEM"}-${index}`;
-      const label = `${getOrderTypeLabel(type, language)} ${index + 1}`;
+      const label = getOrderDisplayName(
+        {
+          ...entry,
+          orderName: entry?.name?.trim() || entry?.orderName?.trim() || "",
+        },
+        language,
+      );
       return { key, type, label, orderId: entry?.orderId || "" };
     });
   }, [orderItems, orderTypes, language]);
@@ -557,7 +573,8 @@ export default function Step2RakhtSelection({
                                 &nbsp;-&nbsp;
                                 {formatScaled(tonEffectiveAvail, {
                                   scale: 2,
-                                })}m{" "}
+                                })}
+                                m{" "}
                                 {t("rakht.remaining", {
                                   defaultValue: "remaining",
                                 })}

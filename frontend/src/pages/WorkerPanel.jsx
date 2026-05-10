@@ -381,7 +381,7 @@ function OrderDetailsModal({ order, language, t, onClose }) {
               {orderPrimaryName}
             </h3>
             <p className="mt-1.5 text-xs text-[var(--text3)] sm:text-sm">
-              #{order.customer?.billNumber || "-"} - {orderLabel.baseTypeLabel}
+              #{order.customer?.billNumber || "-"} - {orderLabel.typeWithSequenceLabel}
             </p>
           </div>
           <button className="btn btn-outline btn-sm" onClick={onClose}>
@@ -1566,7 +1566,7 @@ export default function WorkerPanel() {
           </div>
           <div>
             <b>{t("workerPanel.orderType", "Order Type")}:</b>{" "}
-            {orderLabel.baseTypeLabel}
+            {orderLabel.typeWithSequenceLabel}
           </div>
           <div>
             <b>{t("common.customer", "Customer")}:</b>{" "}
@@ -1629,7 +1629,7 @@ export default function WorkerPanel() {
               flexShrink: 0,
             }}
           >
-            {orderLabel.baseTypeLabel}
+            {orderLabel.typeWithSequenceLabel}
           </span>
         </div>
 
@@ -1832,7 +1832,7 @@ export default function WorkerPanel() {
           </div>
           <div style={{ fontSize: 12, color: "var(--text2)" }}>
             {t("workerPanel.orderType", "Order Type")}:{" "}
-            {orderLabel.baseTypeLabel}
+            {orderLabel.typeWithSequenceLabel}
           </div>
           {(order?.rakhtBrandName || order?.rakhtColor) && (
             <div className="order-mobile-rakht">
@@ -2097,7 +2097,7 @@ export default function WorkerPanel() {
                         )}
                       </div>
                       <div style={{ fontSize: 12, color: "var(--text3)" }}>
-                        {orderLabel.baseTypeLabel}
+                        {orderLabel.typeWithSequenceLabel}
                       </div>
                       {order.assignmentPrice != null && (
                         <div

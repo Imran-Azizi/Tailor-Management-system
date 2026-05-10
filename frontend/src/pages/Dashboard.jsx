@@ -139,7 +139,11 @@ export default function Dashboard() {
 
   const totalRakhtRevenue = Number(data.totalRakhtRevenue ?? 0) || 0;
   const totalOrderBenefit = Number(data.totalOrderBenefit ?? 0) || 0;
-  const netBenefit = totalRakhtRevenue + totalOrderBenefit;
+  const totalReadyMadeProfit = Number(data.totalReadyMadeProfit ?? 0) || 0;
+  const totalReadyMadeProfitAfterExpenses =
+    Number(data.totalReadyMadeProfitAfterExpenses ?? totalReadyMadeProfit) || 0;
+  const netBenefit =
+    totalRakhtRevenue + totalOrderBenefit + totalReadyMadeProfitAfterExpenses;
   const netBenefitIsPositive = netBenefit >= 0;
   const monthLabel = formatMonthYearLabel(viewMonth, viewYear, language);
   const generatedAtLabel = formatAfghanistanReportDate(new Date(), language);
@@ -165,6 +169,7 @@ export default function Dashboard() {
       sub: t("sidebar.completed", "Completed"),
       Icon: LuCircleCheck,
       accent: "#16A34A",
+      onClick: () => navigate("/orders/completed"),
       ltrOrder: 14,
       rtlOrder: 14,
     },
@@ -175,6 +180,7 @@ export default function Dashboard() {
       sub: `${t("dashboardPage.month")}: ${formatNumberLocale(data.pendingOrders || 0, language)}`,
       Icon: LuClock,
       accent: "#D97706",
+      onClick: () => navigate("/orders/pending"),
       ltrOrder: 15,
       rtlOrder: 15,
     },
@@ -223,6 +229,7 @@ export default function Dashboard() {
       Icon: AfCurrencyIcon,
       accent: "#0F766E",
       adminOnly: true,
+      onClick: () => navigate("/rakhts/revenue"),
       ltrOrder: 7,
       rtlOrder: 7,
     },
@@ -236,8 +243,25 @@ export default function Dashboard() {
       Icon: AfCurrencyIcon,
       accent: "#7C3AED",
       adminOnly: true,
+      onClick: () => navigate("/orders/completed"),
       ltrOrder: 8,
       rtlOrder: 8,
+    },
+    {
+      key: "readyMadeProfit",
+      label: t("dashboardPage.totalReadyMadeProfitAfterExpenses", {
+        defaultValue: "Total Ready-Made Profit (After Expenses)",
+      }),
+      value: formatMoney(totalReadyMadeProfitAfterExpenses, language),
+      sub: t("dashboardPage.afterAllExpenses", {
+        defaultValue: "After all expenses",
+      }),
+      Icon: AfCurrencyIcon,
+      accent: "#059669",
+      adminOnly: true,
+      onClick: () => navigate("/orders/completed?type=READY_MADE"),
+      ltrOrder: 8.5,
+      rtlOrder: 8.5,
     },
     {
       key: "dailyExpenses",
@@ -249,7 +273,7 @@ export default function Dashboard() {
       sub: t("sidebar.dailyTasks", "Daily Expenses"),
       Icon: AfCurrencyIcon,
       accent: "#2563EB",
-      hideWhenZero: true,
+      onClick: () => navigate("/daily-tasks/all"),
       ltrOrder: 9,
       rtlOrder: 9,
     },
@@ -260,7 +284,7 @@ export default function Dashboard() {
       sub: t("transaction.loanOption", "Loan"),
       Icon: AfCurrencyIcon,
       accent: "#D97706",
-      hideWhenZero: true,
+      onClick: () => navigate("/transactions?kind=LOAN"),
       ltrOrder: 10,
       rtlOrder: 10,
     },
@@ -268,13 +292,13 @@ export default function Dashboard() {
       key: "qichikarMoney",
       label: t(
         "dashboardPage.totalQichikarUsersMoney",
-        "Total Money for Qichikar Users",
+        "Total Money for Qichikar Workers",
       ),
       value: formatMoney(data.totalQichikarUsersMoney ?? 0, language),
       sub: t("assignment.qichikarLabel", "Qichikar"),
       Icon: AfCurrencyIcon,
       accent: "#DB2777",
-      hideWhenZero: true,
+      onClick: () => navigate("/orders/completed-workers?workerRole=QICHIKAR"),
       ltrOrder: 11,
       rtlOrder: 11,
     },
@@ -282,13 +306,13 @@ export default function Dashboard() {
       key: "dokhtMoney",
       label: t(
         "dashboardPage.totalDokhtUsersMoney",
-        "Total Money for Dokht Users",
+        "Total Money for Dokht Workers",
       ),
       value: formatMoney(data.totalDokhtUsersMoney ?? 0, language),
       sub: t("assignment.dokhtLabel", "Dokht"),
       Icon: AfCurrencyIcon,
       accent: "#7C3AED",
-      hideWhenZero: true,
+      onClick: () => navigate("/orders/completed-workers?workerRole=DOKHT"),
       ltrOrder: 12,
       rtlOrder: 12,
     },
@@ -353,9 +377,9 @@ export default function Dashboard() {
       render: (order) => (
         <span
           className="block max-w-[12rem] truncate rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-          title={getOrderLabelParts(order, language).baseTypeLabel}
+          title={getOrderLabelParts(order, language).typeWithSequenceLabel}
         >
-          {getOrderLabelParts(order, language).baseTypeLabel}
+          {getOrderLabelParts(order, language).typeWithSequenceLabel}
         </span>
       ),
     },

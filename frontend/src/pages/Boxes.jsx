@@ -379,7 +379,7 @@ export default function Boxes() {
                                 className={`badge bg-${TV[order.type] || "gold"}`}
                                 style={{ fontSize: 10 }}
                               >
-                                {orderLabel.baseTypeLabel}
+                                {orderLabel.typeWithSequenceLabel}
                               </span>
                             </div>
                             <div
@@ -391,7 +391,7 @@ export default function Boxes() {
                                 gap: 8,
                               }}
                             >
-                              <span>{orderLabel.baseTypeLabel}</span>
+                              <span>{orderLabel.typeWithSequenceLabel}</span>
                               <span>
                                 {formatDateLocale(
                                   order.createdAt,

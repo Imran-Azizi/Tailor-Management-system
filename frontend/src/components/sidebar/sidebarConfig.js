@@ -11,7 +11,6 @@ import {
   LuPackagePlus,
   LuPalette,
   LuPrinter,
-  LuReceiptText,
   LuScissors,
   LuShieldCheck,
   LuTruck,
@@ -55,7 +54,7 @@ const ADMIN_SECTIONS = [
         key: "manageOrders",
         label: "sidebar.orders",
         fallback: "Orders",
-        icon: LuReceiptText,
+        icon: AfCurrencyIcon,
         children: [
           {
             key: "createOrder",
@@ -69,7 +68,7 @@ const ADMIN_SECTIONS = [
             label: "common.allOrders",
             fallback: "All Orders",
             path: "/orders",
-            icon: LuReceiptText,
+            icon: AfCurrencyIcon,
           },
           {
             key: "pendingOrders",
@@ -157,7 +156,7 @@ const ADMIN_SECTIONS = [
             label: "sidebar.workerPaymentReceipts",
             fallback: "Worker Payment Receipts",
             path: "/orders/completed-workers/receipts",
-            icon: LuReceiptText,
+            icon: AfCurrencyIcon,
           },
         ],
       },
@@ -215,14 +214,14 @@ const ADMIN_SECTIONS = [
             label: "sidebar.makeTransaction",
             fallback: "Make Loan",
             path: "/transactions/create",
-            icon: LuArrowRightLeft,
+            icon: AfCurrencyIcon,
           },
           {
             key: "allTransactions",
             label: "sidebar.allTransactions",
             fallback: "All Loans",
             path: "/transactions",
-            icon: LuFileText,
+            icon: AfCurrencyIcon,
           },
         ],
       },
@@ -297,7 +296,7 @@ const DOKAN_SECTIONS = [
         key: "manageOrders",
         label: "sidebar.orders",
         fallback: "Orders",
-        icon: LuReceiptText,
+        icon: AfCurrencyIcon,
         children: [
           {
             key: "createOrder",
@@ -311,7 +310,7 @@ const DOKAN_SECTIONS = [
             label: "common.allOrders",
             fallback: "All Orders",
             path: "/orders",
-            icon: LuReceiptText,
+            icon: AfCurrencyIcon,
           },
           {
             key: "pendingOrders",
@@ -428,14 +427,14 @@ const DOKAN_SECTIONS = [
             label: "sidebar.makeTransaction",
             fallback: "Make Loan",
             path: "/transactions/create",
-            icon: LuArrowRightLeft,
+            icon: AfCurrencyIcon,
           },
           {
             key: "allTransactions",
             label: "sidebar.allTransactions",
             fallback: "All Loans",
             path: "/transactions",
-            icon: LuFileText,
+            icon: AfCurrencyIcon,
           },
         ],
       },
@@ -482,14 +481,14 @@ const WORKER_SECTIONS = [
         key: "manageOrders",
         label: "sidebar.orders",
         fallback: "Orders",
-        icon: LuReceiptText,
+        icon: AfCurrencyIcon,
         children: [
           {
             key: "allOrders",
             label: "common.allOrders",
             fallback: "All Orders",
             path: "/orders",
-            icon: LuReceiptText,
+            icon: AfCurrencyIcon,
           },
           {
             key: "pendingOrders",
@@ -537,7 +536,7 @@ const FINANCE_SECTIONS = [
         key: "manageOrders",
         label: "sidebar.orders",
         fallback: "Orders",
-        icon: LuReceiptText,
+        icon: AfCurrencyIcon,
         children: [
           {
             key: "createOrder",
@@ -551,7 +550,7 @@ const FINANCE_SECTIONS = [
             label: "common.allOrders",
             fallback: "All Orders",
             path: "/orders",
-            icon: LuReceiptText,
+            icon: AfCurrencyIcon,
           },
           {
             key: "pendingOrders",

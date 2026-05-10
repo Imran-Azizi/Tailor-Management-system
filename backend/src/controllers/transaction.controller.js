@@ -32,6 +32,7 @@ export const listTransactions = async (req, res, next) => {
       limit = 20,
       search = "",
       accountType = "",
+      kind = "",
       month,
       year,
     } = req.query;
@@ -40,6 +41,7 @@ export const listTransactions = async (req, res, next) => {
       limit: Number(limit),
       search,
       accountType,
+      kind,
       month: month != null ? Number(month) : null,
       year: year != null ? Number(year) : null,
     });
@@ -57,6 +59,7 @@ export const listTransactionsPdf = async (req, res, next) => {
       limit = 20,
       search = "",
       accountType = "",
+      kind = "",
       month,
       year,
     } = req.query;
@@ -67,6 +70,7 @@ export const listTransactionsPdf = async (req, res, next) => {
       limit: Number(limit),
       search,
       accountType,
+      kind,
       month: month != null ? Number(month) : null,
       year: year != null ? Number(year) : null,
     });
@@ -81,6 +85,7 @@ export const listTransactionsPdf = async (req, res, next) => {
       limit: exportLimit,
       search,
       accountType,
+      kind,
       month: month != null ? Number(month) : null,
       year: year != null ? Number(year) : null,
     });
@@ -94,6 +99,7 @@ export const listTransactionsPdf = async (req, res, next) => {
       filters: {
         search,
         typeFilter: accountType,
+        kindFilter: kind,
       },
       totals: {
         currentPageTotal,

@@ -7,13 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import Select from "react-select";
-import {
-  LuClipboardList,
-  LuUsers,
-  LuFileText,
-  LuList,
-  LuSend,
-} from "react-icons/lu";
+import { LuClipboardList, LuFileText, LuList, LuSend } from "react-icons/lu";
 import api from "../lib/api.js";
 import { buildSelectStyles } from "../lib/dailyTasks.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
@@ -24,7 +18,6 @@ import {
 } from "../lib/orderType.js";
 import { Field, PageHeader } from "../components/ui/index.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
-import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 
 // ─── Zod schema ───────────────────────────────────────────────────────────────
 const createSchema = (t) =>
@@ -486,7 +479,7 @@ function DailyTaskForm({ onSuccess }) {
                           }
                         />
                         <span style={{ fontSize: 13, fontWeight: 600 }}>
-                          {orderLabel.baseTypeLabel} - {primaryName}
+                          {orderLabel.typeWithSequenceLabel} - {primaryName}
                         </span>
                       </label>
                     );
@@ -518,7 +511,7 @@ function DailyTaskForm({ onSuccess }) {
                                 lookupCustomer?.customerName,
                                 language,
                               );
-                              return `${orderLabel.baseTypeLabel} - ${primaryName}`;
+                              return `${orderLabel.typeWithSequenceLabel} - ${primaryName}`;
                             })()
                           : t("common.type", "Type");
                         return (
@@ -627,57 +620,14 @@ function DailyTaskForm({ onSuccess }) {
       >
         <button
           type="submit"
+          className="btn btn-gold"
           disabled={mutation.isPending}
           style={{
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
             minWidth: 160,
-            height: 42,
-            paddingInline: 28,
-            borderRadius: 10,
-            border: "none",
-            cursor: mutation.isPending ? "not-allowed" : "pointer",
-            background: mutation.isPending
-              ? "#6b7280"
-              : "linear-gradient(135deg, #2563EB 0%, #1d4ed8 60%, #1e40af 100%)",
-            color: "#fff",
-            fontSize: 14,
-            fontWeight: 600,
-            letterSpacing: "0.03em",
-            boxShadow: mutation.isPending
-              ? "none"
-              : "0 4px 14px rgba(37,99,235,.45), 0 1px 3px rgba(0,0,0,.12)",
-            transition: "all .2s ease",
-            opacity: mutation.isPending ? 0.75 : 1,
-          }}
-          onMouseEnter={(e) => {
-            if (!mutation.isPending)
-              e.currentTarget.style.boxShadow =
-                "0 6px 20px rgba(37,99,235,.55), 0 2px 6px rgba(0,0,0,.15)";
-          }}
-          onMouseLeave={(e) => {
-            if (!mutation.isPending)
-              e.currentTarget.style.boxShadow =
-                "0 4px 14px rgba(37,99,235,.45), 0 1px 3px rgba(0,0,0,.12)";
           }}
         >
           {mutation.isPending ? (
-            <>
-              <div
-                style={{
-                  width: 14,
-                  height: 14,
-                  borderRadius: "50%",
-                  border: "2px solid rgba(255,255,255,.35)",
-                  borderTopColor: "#fff",
-                  animation: "spin .7s linear infinite",
-                  flexShrink: 0,
-                }}
-              />
-              {t("common.loading")}
-            </>
+            t("common.loading")
           ) : (
             <>
               <LuSend size={14} />
@@ -715,28 +665,9 @@ export default function DailyTasks() {
 
       {/* ── Form layout ── */}
       <div style={{ display: "flex", justifyContent: "center" }}>
-        <div
-          style={{
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--r-lg)",
-            boxShadow: "var(--sh)",
-            overflow: "hidden",
-            width: "100%",
-            maxWidth: 640,
-          }}
-        >
+        <div className="card" style={{ width: "100%", maxWidth: 640 }}>
           {/* Card header */}
-          <div
-            style={{
-              padding: "16px 20px",
-              borderBottom: "1px solid var(--border)",
-              background: "linear-gradient(90deg, #2563EB08, transparent)",
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-            }}
-          >
+          <div className="card-hd">
             <div
               style={{
                 width: 34,
@@ -766,15 +697,11 @@ export default function DailyTasks() {
               </p>
             </div>
           </div>
-          <div style={{ padding: "20px" }}>
+          <div className="card-body" style={{ padding: 20 }}>
             <DailyTaskForm onSuccess={() => navigate("/daily-tasks/all")} />
           </div>
         </div>
       </div>
-
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
     </div>
   );
 }

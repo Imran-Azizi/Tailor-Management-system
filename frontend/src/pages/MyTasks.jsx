@@ -299,7 +299,7 @@ function OrderDetailModal({
             </h2>
             <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
               <Badge v={TYPE_V[order.type] || "gold"}>
-                {orderLabel.baseTypeLabel}
+                {orderLabel.typeWithSequenceLabel}
               </Badge>
               {order.isEmergency && <Badge v="red">⚡ Emergency</Badge>}
               <span
@@ -783,7 +783,7 @@ function OrderCard({
               #{order.customer?.billNumber}
             </span>
             <Badge v={TYPE_V[order.type] || "gold"}>
-              {orderLabel.baseTypeLabel}
+              {orderLabel.typeWithSequenceLabel}
             </Badge>
             {order.isEmergency && <Badge v="red">⚡ Emergency</Badge>}
             <span

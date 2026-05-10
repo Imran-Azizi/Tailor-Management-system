@@ -198,6 +198,7 @@ export const getTransactions = async ({
   limit = 20,
   search = "",
   accountType = "",
+  kind = "",
   month = null,
   year = null,
 }) => {
@@ -209,6 +210,7 @@ export const getTransactions = async ({
 
   const where = { source: "MANUAL", damagedClothesPenalty: null };
   if (accountType) where.accountType = accountType;
+  if (kind) where.kind = kind;
   if (normalizedSearch) {
     where.OR = [
       { user: { name: { contains: normalizedSearch, mode: "insensitive" } } },

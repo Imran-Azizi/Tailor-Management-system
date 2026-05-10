@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import {
   LuChartBar,
   LuUsers,
-  LuReceipt,
   LuPhone,
   LuCalendar,
   LuDownload,
@@ -181,7 +180,7 @@ export default function CustomerReport() {
               {
                 label: t("report.totalOrders"),
                 value: analytics?.totalOrders ?? 0,
-                Icon: LuReceipt,
+                Icon: AfCurrencyIcon,
                 color: "#7C3AED",
               },
               {

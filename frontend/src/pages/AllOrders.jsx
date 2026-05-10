@@ -8,7 +8,6 @@ import {
   LuTrash2,
   LuClipboardList,
   LuPhone,
-  LuReceipt,
   LuUserCheck,
   LuEllipsisVertical,
   LuX,
@@ -63,7 +62,7 @@ function isCompletedForWorkerType(order, workerType) {
 
 function getAllOrdersItemName(order, language) {
   const parts = getOrderLabelParts(order, language);
-  return parts.customName || parts.baseTypeLabel;
+  return parts.customName || parts.typeWithSequenceLabel;
 }
 
 function AssignModal({ order, onClose, onAssigned }) {
@@ -324,6 +323,16 @@ function formatMoney(value, language) {
   });
 }
 
+function getDisplayTotalBenefit(order) {
+  const finalTotalBenefit = Number(order?.finalTotalBenefit);
+  if (Number.isFinite(finalTotalBenefit)) return finalTotalBenefit;
+
+  const totalBenefit = Number(order?.totalBenefit || 0);
+  if (order?.type !== "READY_MADE") return totalBenefit;
+  const readyMadeOriginalPrice = Number(order?.readyMadeOriginalPrice || 0);
+  return totalBenefit - readyMadeOriginalPrice;
+}
+
 function getBenefitEntryDate(entry) {
   return entry?.date || entry?.paidAt || null;
 }
@@ -343,8 +352,6 @@ function OrderViewModal({ orderId, open, onClose }) {
   const benefitDetails = data?.benefitDetails;
   const detailOrderLabel = getOrderLabelParts(data, language);
   const detailCustomerName = String(data?.customer?.firstName || "").trim();
-  const detailItemName =
-    detailOrderLabel.customName || detailOrderLabel.typeWithSequenceLabel;
   const detailPrimaryName = getOrderPrimaryDisplayName(
     data,
     detailCustomerName || detailOrderLabel.typeWithSequenceLabel,
@@ -353,23 +360,51 @@ function OrderViewModal({ orderId, open, onClose }) {
   const detailCreatedAt = data?.createdAt
     ? formatSystemDateTime(data.createdAt, language)
     : "-";
-  const hasRakhtDetails = Boolean(
-    data?.rakhtId ||
-    data?.rakhtCompanyName ||
-    data?.rakhtBrandName ||
-    data?.rakhtTonId ||
-    data?.rakhtColor ||
-    data?.rakhtRequiredMeters != null ||
-    data?.rakhtPiecePrice != null ||
-    data?.rakhtCustomerPricePerMeter != null ||
-    data?.rakhtTotalCustomerPrice != null,
-  );
+  const hasRakhtDetails =
+    data?.type !== "READY_MADE" &&
+    Boolean(
+      data?.rakhtId ||
+      data?.rakhtCompanyName ||
+      data?.rakhtBrandName ||
+      data?.rakhtTonId ||
+      data?.rakhtColor ||
+      data?.rakhtRequiredMeters != null ||
+      data?.rakhtPiecePrice != null ||
+      data?.rakhtCustomerPricePerMeter != null ||
+      data?.rakhtTotalCustomerPrice != null,
+    );
   const rakhtMeters = Number(data?.rakhtRequiredMeters || 0);
   const rakhtPurchasePerMeter = Number(data?.rakhtPiecePrice || 0);
   const rakhtPurchaseTotal =
     rakhtMeters > 0 ? rakhtPurchasePerMeter * rakhtMeters : 0;
   const rakhtCustomerTotal = Number(data?.rakhtTotalCustomerPrice || 0);
   const rakhtBenefit = rakhtCustomerTotal - rakhtPurchaseTotal;
+  const readyMadeOriginalPrice =
+    data?.type === "READY_MADE" ? Number(data?.readyMadeOriginalPrice || 0) : 0;
+  const rawTotalBenefit = Number(
+    benefitDetails?.totalBenefit ?? data?.totalBenefit ?? 0,
+  );
+  const adjustedTotalBenefit = rawTotalBenefit - readyMadeOriginalPrice;
+  const adjustedTotalExpenses =
+    Number(benefitDetails?.totalExpenses ?? 0) + readyMadeOriginalPrice;
+  const benefitExpenseRows = [
+    ...(benefitDetails?.expenses || []),
+    ...(data?.type === "READY_MADE" && readyMadeOriginalPrice > 0
+      ? [
+          {
+            key: `ready-made-original-price-${data?.id || orderId}`,
+            labelKey: "orders.readyMadeOriginalPrice",
+            label: t(
+              "orders.readyMadeOriginalPrice",
+              "Ready-Made Original Price",
+            ),
+            orderType: "READY_MADE",
+            amount: readyMadeOriginalPrice,
+            date: data?.createdAt || null,
+          },
+        ]
+      : []),
+  ];
 
   return (
     <Modal
@@ -412,7 +447,7 @@ function OrderViewModal({ orderId, open, onClose }) {
                     }}
                   >
                     <Badge v={TV[data.type] || "gold"}>
-                      {detailOrderLabel.baseTypeLabel}
+                      {detailOrderLabel.typeWithSequenceLabel}
                     </Badge>
                     {data.isDamageOrder && (
                       <Badge v="red">
@@ -465,10 +500,6 @@ function OrderViewModal({ orderId, open, onClose }) {
                   <strong>{detailCustomerName || "-"}</strong>
                 </div>
                 <div className="order-details-info-card">
-                  <span>{t("orders.itemName", "Item Name")}</span>
-                  <strong>{detailItemName || "-"}</strong>
-                </div>
-                <div className="order-details-info-card">
                   <span>{t("orders.orderType", "Order Type")}</span>
                   <strong>
                     {detailOrderLabel.typeWithSequenceLabel || "-"}
@@ -509,21 +540,25 @@ function OrderViewModal({ orderId, open, onClose }) {
                     <strong
                       style={{
                         color:
-                          Number(
-                            benefitDetails?.totalBenefit ||
-                              data.totalBenefit ||
-                              0,
-                          ) >= 0
-                            ? "#15803D"
-                            : "#DC2626",
+                          adjustedTotalBenefit >= 0 ? "#15803D" : "#DC2626",
                       }}
                     >
-                      {formatMoney(
-                        benefitDetails?.totalBenefit ?? data.totalBenefit ?? 0,
-                        language,
-                      )}
+                      {formatMoney(adjustedTotalBenefit, language)}
                     </strong>
                   </div>
+                  {data.type === "READY_MADE" && readyMadeOriginalPrice > 0 && (
+                    <div className="order-view-kpi-item">
+                      <span>
+                        {t(
+                          "orders.readyMadeOriginalPrice",
+                          "Ready-Made Original Price",
+                        )}
+                      </span>
+                      <strong style={{ color: "#7C3AED" }}>
+                        {formatMoney(readyMadeOriginalPrice, language)}
+                      </strong>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -593,7 +628,8 @@ function OrderViewModal({ orderId, open, onClose }) {
                   <div className="order-details-info-card">
                     <span>{t("rakht.requiredMeters", "Meters Used")}</span>
                     <strong>
-                      {Number(data.rakhtRequiredMeters).toFixed(2)}m
+                      {Number(data.rakhtRequiredMeters).toFixed(2)}{" "}
+                      {t("common.meterUnit", "m")}
                     </strong>
                   </div>
                 )}
@@ -689,9 +725,7 @@ function OrderViewModal({ orderId, open, onClose }) {
                 <div style={{ fontSize: 11, color: "var(--text3)" }}>
                   {t("orders.totalExpenses", "Total Expenses")}
                 </div>
-                <strong>
-                  {formatMoney(benefitDetails?.totalExpenses ?? 0, language)}
-                </strong>
+                <strong>{formatMoney(adjustedTotalExpenses, language)}</strong>
               </div>
               <div>
                 <div style={{ fontSize: 11, color: "var(--text3)" }}>
@@ -699,18 +733,10 @@ function OrderViewModal({ orderId, open, onClose }) {
                 </div>
                 <strong
                   style={{
-                    color:
-                      Number(
-                        benefitDetails?.totalBenefit || data.totalBenefit || 0,
-                      ) >= 0
-                        ? "#15803D"
-                        : "#DC2626",
+                    color: adjustedTotalBenefit >= 0 ? "#15803D" : "#DC2626",
                   }}
                 >
-                  {formatMoney(
-                    benefitDetails?.totalBenefit ?? data.totalBenefit ?? 0,
-                    language,
-                  )}
+                  {formatMoney(adjustedTotalBenefit, language)}
                 </strong>
               </div>
             </div>
@@ -729,14 +755,14 @@ function OrderViewModal({ orderId, open, onClose }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {(benefitDetails?.expenses || []).length === 0 ? (
+                  {benefitExpenseRows.length === 0 ? (
                     <tr>
                       <td colSpan={4} style={{ textAlign: "center" }}>
                         {t("orders.noExpenses", "No expenses recorded yet.")}
                       </td>
                     </tr>
                   ) : (
-                    (benefitDetails?.expenses || []).map((entry) => (
+                    benefitExpenseRows.map((entry) => (
                       <tr key={entry.key}>
                         <td>
                           {entry.labelKey
@@ -767,12 +793,12 @@ function OrderViewModal({ orderId, open, onClose }) {
             </div>
 
             <div className="order-details-expenses-mobile">
-              {(benefitDetails?.expenses || []).length === 0 ? (
+              {benefitExpenseRows.length === 0 ? (
                 <div className="order-details-expense-empty">
                   {t("orders.noExpenses", "No expenses recorded yet.")}
                 </div>
               ) : (
-                (benefitDetails?.expenses || []).map((entry) => (
+                benefitExpenseRows.map((entry) => (
                   <div
                     key={`m-${entry.key}`}
                     className="order-details-expense-card"
@@ -1278,7 +1304,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
       <div className="order-dashboard-strip">
         <div className="order-dashboard-card order-dashboard-card--total">
           <span className="order-dashboard-icon">
-            <LuReceipt size={16} />
+            <AfCurrencyIcon size={16} />
           </span>
           <div className="order-dashboard-copy">
             <div className="order-dashboard-label">
@@ -1359,6 +1385,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
                     ) : (
                       orders.map((o) => {
                         const orderLabel = getOrderLabelParts(o, language);
+                        const displayTotalBenefit = getDisplayTotalBenefit(o);
                         const billNumber = o?.customer?.billNumber;
                         const resolvedCustomerName =
                           String(o?.customer?.firstName || "").trim() ||
@@ -1392,16 +1419,16 @@ export default function AllOrders({ filter, mode = "orders" }) {
                             </td>
                             <td>
                               <Badge v={TV[o.type] || "gold"}>
-                                {orderLabel.baseTypeLabel}
+                                {orderLabel.typeWithSequenceLabel}
                               </Badge>
                             </td>
                             <td className="order-money-cell order-money-cell--total">
                               {formatMoney(o.totalPrice, language)}
                             </td>
                             <td
-                              className={`order-money-cell ${Number(o.totalBenefit || 0) >= 0 ? "order-money-cell--paid" : "order-money-cell--remaining"}`}
+                              className={`order-money-cell ${displayTotalBenefit >= 0 ? "order-money-cell--paid" : "order-money-cell--remaining"}`}
                             >
-                              {formatMoney(o.totalBenefit || 0, language)}
+                              {formatMoney(displayTotalBenefit, language)}
                             </td>
                             <td className="order-money-cell order-money-cell--discount">
                               {formatMoney(o.discount, language)}
@@ -1495,6 +1522,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
               ) : (
                 orders.map((o) => {
                   const orderLabel = getOrderLabelParts(o, language);
+                  const displayTotalBenefit = getDisplayTotalBenefit(o);
                   const billNumber = o?.customer?.billNumber;
                   const resolvedCustomerName =
                     String(o?.customer?.firstName || "").trim() ||
@@ -1554,7 +1582,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
 
                       <div className="order-mobile-badges">
                         <Badge v={TV[o.type] || "gold"}>
-                          {orderLabel.baseTypeLabel}
+                          {orderLabel.typeWithSequenceLabel}
                         </Badge>
                         {showBillEmergencyBadge && (
                           <Badge v="red">
@@ -1586,9 +1614,9 @@ export default function AllOrders({ filter, mode = "orders" }) {
                             {t("orders.totalBenefit", "Total Benefit")}
                           </div>
                           <div
-                            className={`order-mobile-value${Number(o.totalBenefit || 0) < 0 ? " order-mobile-value--remaining" : " order-mobile-value--paid"}`}
+                            className={`order-mobile-value${displayTotalBenefit < 0 ? " order-mobile-value--remaining" : " order-mobile-value--paid"}`}
                           >
-                            {formatMoney(o.totalBenefit || 0, language)}
+                            {formatMoney(displayTotalBenefit, language)}
                           </div>
                         </div>
                         <div className="order-mobile-metric">

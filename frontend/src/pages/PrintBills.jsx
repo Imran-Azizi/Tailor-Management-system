@@ -674,7 +674,7 @@ function buildOrderItemMeta(orders = [], language, customerName) {
       order,
       index,
       itemNumber,
-      itemLabel: parts.baseTypeLabel,
+      itemLabel: parts.typeWithSequenceLabel,
       primaryName: getOrderPrimaryDisplayName(order, customerName, language, {
         totalByType: totalByType[typeKey],
         sequenceByType: itemNumber,

@@ -373,6 +373,9 @@ input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
 .month-pill:hover{background:var(--surface2);color:var(--text1)}
 .month-pill.view-pill{border-color:var(--success-soft-border);color:var(--success)}
 .month-pill.view-pill:hover{background:var(--success-soft)}
+.month-pill:focus-visible{
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 22%,transparent);
+}
 .month-pill-label{max-width:96px;overflow:hidden;text-overflow:ellipsis}
 .month-chevron{transition:transform .18s;color:inherit;flex-shrink:0}
 .month-chevron.open{transform:rotate(180deg)}
@@ -468,6 +471,10 @@ input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
 }
 .month-year-btn:hover{background:var(--surface2);color:var(--text1)}
 .month-year-btn.on{background:var(--primary);border-color:var(--primary);color:#fff}
+.month-year-btn:focus-visible{
+  outline:none;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 22%,transparent);
+}
 .month-year-btn:disabled{
   background:var(--surface2);
   border-color:var(--border);
@@ -486,6 +493,10 @@ input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
 }
 .month-cell:hover{background:var(--surface2);color:var(--text1)}
 .month-cell.on{background:var(--primary);color:#fff;font-weight:700;border-color:var(--primary)}
+.month-cell:focus-visible{
+  outline:none;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 22%,transparent);
+}
 .month-cell.current{
   background:var(--primary);
   color:#fff;
@@ -498,7 +509,7 @@ input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
   border-color:var(--border);
 }
 .month-cell.readonly:hover{
-  background:var(--surface1);
+  background:var(--surface2);
   color:var(--text2);
   opacity:0.75;
 }
@@ -545,9 +556,53 @@ input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
   color:#fff;
   box-shadow:0 2px 8px color-mix(in srgb,var(--primary) 30%,transparent);
 }
+.month-report-btn:focus-visible{
+  outline:none;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 22%,transparent);
+}
 .month-report-btn:disabled{
   opacity:.55;
   cursor:not-allowed;
+}
+
+.dark .month-pill.view-pill{
+  background:color-mix(in srgb,var(--success) 16%, transparent);
+  border-color:color-mix(in srgb,var(--success) 46%, var(--border) 54%);
+  color:var(--success-strong);
+}
+.dark .month-pill.view-pill:hover{
+  background:color-mix(in srgb,var(--success) 24%, transparent);
+  color:#dcfce7;
+}
+.dark .month-dd{
+  background:color-mix(in srgb,var(--surface) 94%, #020617 6%);
+  border-color:color-mix(in srgb,var(--border) 90%, #0f172a 10%);
+}
+.dark .month-dd-header{
+  background:linear-gradient(180deg, color-mix(in srgb,var(--surface2) 72%, transparent), transparent);
+  border-bottom-color:color-mix(in srgb,var(--border) 86%, #0f172a 14%);
+}
+.dark .month-year-row{
+  border-bottom-color:color-mix(in srgb,var(--border) 86%, #0f172a 14%);
+}
+.dark .month-year-btn{
+  background:color-mix(in srgb,var(--surface2) 58%, transparent);
+  border-color:color-mix(in srgb,var(--border2) 82%, #0f172a 18%);
+}
+.dark .month-year-btn:hover{
+  background:color-mix(in srgb,var(--surface2) 82%, transparent);
+}
+.dark .month-year-btn.current-year{
+  background:color-mix(in srgb,var(--primary) 16%, transparent);
+  border-color:color-mix(in srgb,var(--primary) 56%, var(--border) 44%);
+  color:#fde68a;
+}
+.dark .month-cell.readonly,
+.dark .month-cell:disabled{
+  background:color-mix(in srgb,var(--surface2) 74%, transparent);
+}
+.dark .month-dd-footer{
+  border-top-color:color-mix(in srgb,var(--border) 86%, #0f172a 14%);
 }
 
 [dir="rtl"] .month-dd-header,
@@ -881,6 +936,7 @@ input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
 .stat-card{
   --stat-accent: var(--primary);
   position: relative;
+  height: 100%;
   overflow: hidden;
   isolation: isolate;
   background:
@@ -2258,6 +2314,225 @@ select.inp{
 .print-a6-sheet[dir="rtl"] .border-r-2 {
   border-right-width: 0;
   border-inline-end-width: 2px;
+}
+
+/* Customer bill: polished A6 receipt layout */
+.print-customer-bill{
+  background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);
+}
+.print-customer-info-strip{
+  background:linear-gradient(135deg,#f8fafc 0%,#eef2f7 100%);
+  grid-template-columns:18% 24% 36% 22%;
+}
+.print-customer-info-cell,
+.print-customer-barcode-cell,
+.print-customer-detail-cell{
+  min-width:0;
+}
+.print-customer-info-cell p,
+.print-customer-detail-cell p,
+.print-customer-combined-table th,
+.print-customer-combined-table td{
+  max-width:100%;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+.print-customer-section-title{
+  border-bottom:1px solid #1f2937;
+  line-height:1.25;
+  letter-spacing:0;
+  text-transform:none;
+}
+.print-customer-finance-table thead{
+  background:#eef1f4;
+}
+.print-customer-finance-table th{
+  background:#eef1f4;
+  color:#111827;
+}
+.print-customer-amount{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  max-width:100%;
+  min-width:0;
+  padding:1px 5px;
+  border-radius:5px;
+  background:#f8fafc;
+  box-shadow:inset 0 0 0 1px rgba(15,23,42,.09);
+  line-height:1.35;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+.print-customer-amount--final{
+  background:#fffbeb;
+}
+.print-customer-barcode-row{
+  background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);
+}
+.print-customer-barcode-card{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  max-width:100%;
+  box-shadow:inset 0 0 0 1px rgba(15,23,42,.03);
+}
+.print-customer-barcode-card svg{
+  max-width:100%;
+  height:auto;
+}
+.print-customer-quantity{
+  display:inline-block;
+  width:max-content;
+  max-width:100%;
+  padding:1px 7px;
+  border-radius:5px;
+  background:#e0f2fe;
+  color:#075985;
+}
+.print-customer-footer{
+  background:#eef2f7;
+}
+.print-customer-combined-wrap{
+  max-width:100%;
+}
+.print-customer-combined-table{
+  background:#fff;
+}
+.print-customer-combined-table tbody tr:nth-child(even){
+  background:#f8fafc;
+}
+[dir="rtl"] .print-customer-bill{
+  direction:rtl;
+  text-align:right;
+}
+[dir="rtl"] .print-customer-combined-table th,
+[dir="rtl"] .print-customer-combined-table td{
+  direction:rtl;
+  text-align:right;
+}
+
+/* Shop bill main content: compact ledger layout (A6 friendly) */
+.print-tailor-ledger-wrap{max-width:100%;overflow-x:auto;overflow-y:hidden}
+.print-tailor-ledger-table{
+  width:100%;
+  table-layout:fixed;
+  border-collapse:collapse;
+  border:1.4px solid #4b5563;
+  background:#fff;
+}
+.print-tailor-ledger-headrow{background:#eef1f4}
+.print-tailor-ledger-headcell{
+  border-inline-end:1px solid #4b5563;
+  border-bottom:1.3px solid #4b5563;
+  padding:4px 6px;
+  font-size:8.6px;
+  font-weight:800;
+  color:#111827;
+  letter-spacing:0;
+  text-transform:none;
+  line-height:1.25;
+}
+.print-tailor-ledger-headcell:last-child{border-inline-end:0}
+.print-tailor-ledger-headcell--style{border-inline-start:2px solid #374151}
+.print-tailor-ledger-row{background:#fff}
+.print-tailor-ledger-cell{
+  border-inline-end:1px solid #4b5563;
+  border-bottom:1px dotted #6b7280;
+  padding:3.5px 6px;
+  vertical-align:top;
+  line-height:1.2;
+  color:#1f2937;
+}
+.print-tailor-ledger-row:last-child .print-tailor-ledger-cell{border-bottom:0}
+.print-tailor-ledger-cell:last-child{border-inline-end:0}
+.print-tailor-ledger-cell--style-label{border-inline-start:2px solid #374151}
+.print-tailor-ledger-cell--measure{
+  border-inline-end:2px solid #374151;
+  font-weight:800;
+  font-size:10px;
+}
+.print-tailor-ledger-cell--label{font-weight:700;font-size:9.7px}
+.print-tailor-ledger-cell--value{font-weight:700;font-size:9.7px}
+.print-tailor-ledger-text{
+  display:block;
+  max-width:100%;
+  overflow:visible;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+  text-overflow:clip;
+}
+.print-tailor-ledger-note-row{height:auto}
+.print-tailor-ledger-note-cell{
+  border-inline-end:0;
+  padding:0;
+  vertical-align:top;
+}
+.print-tailor-ledger-note-box{
+  min-height:38px;
+  padding:4px 6px 5px;
+  background:#f8fafc;
+}
+.print-tailor-ledger-note-label{
+  margin-bottom:2px;
+  font-size:8px;
+  font-weight:800;
+  line-height:1.25;
+  color:#475569;
+}
+.print-tailor-ledger-note-text{
+  display:block;
+  max-width:100%;
+  font-size:9.2px;
+  font-weight:700;
+  line-height:1.35;
+  color:#111827;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+
+[dir="rtl"] .print-tailor-ledger-table{direction:rtl}
+[dir="rtl"] .print-tailor-ledger-headcell,
+[dir="rtl"] .print-tailor-ledger-cell{direction:rtl;text-align:right}
+[dir="rtl"] .print-tailor-ledger-cell--measure{direction:ltr;text-align:center}
+[dir="rtl"] .print-tailor-ledger-note-text{direction:rtl;text-align:right}
+
+@media (max-width:640px){
+  .print-tailor-ledger-headcell{font-size:8px;padding:3px 5px}
+  .print-tailor-ledger-cell{padding:3px 5px}
+  .print-tailor-ledger-cell--label,
+  .print-tailor-ledger-cell--value{font-size:9px}
+  .print-tailor-ledger-cell--measure{font-size:9.3px}
+  .print-tailor-ledger-note-box{padding:3.5px 5px}
+  .print-tailor-ledger-note-label{font-size:7.7px}
+  .print-tailor-ledger-note-text{font-size:8.8px}
+}
+
+@media print{
+  .print-customer-info-cell{padding:4px 6px}
+  .print-customer-info-strip{grid-template-columns:17% 23% 38% 22%}
+  .print-customer-section-title{font-size:7.6px;padding:3px 5px}
+  .print-customer-finance-table th{font-size:7.8px;padding:3px 4.4px}
+  .print-customer-finance-table td{padding:7px 4.4px}
+  .print-customer-amount{padding:1px 4px;border-radius:4px}
+  .print-customer-barcode-cell,
+  .print-customer-detail-cell{padding:4px 5px}
+  .print-customer-combined-table{min-width:0!important;font-size:7.6px}
+  .print-customer-combined-table th,
+  .print-customer-combined-table td{padding:2.8px 3.6px}
+  .print-tailor-ledger-table{border-width:1.2px}
+  .print-tailor-ledger-headcell{font-size:7.8px;padding:2.8px 4.4px}
+  .print-tailor-ledger-cell{padding:2.6px 4.4px}
+  .print-tailor-ledger-note-cell{padding:0}
+  .print-tailor-ledger-cell--label,
+  .print-tailor-ledger-cell--value{font-size:8.6px}
+  .print-tailor-ledger-cell--measure{font-size:8.9px}
+  .print-tailor-ledger-note-box{min-height:30px;padding:3px 4.4px 3.5px}
+  .print-tailor-ledger-note-label{font-size:7.2px}
+  .print-tailor-ledger-note-text{font-size:8.2px;line-height:1.3}
 }
 
 /* Alignment helpers */

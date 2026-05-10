@@ -92,6 +92,7 @@ const REQUIRED_MEASUREMENT_FIELDS = {
     "sorain",
     "chest",
   ],
+  READY_MADE: [], // all fields optional for ready-made
 };
 
 const ALLOWED_MEASUREMENT_FIELDS = {
@@ -128,6 +129,22 @@ const ALLOWED_MEASUREMENT_FIELDS = {
     "buttonStyle",
     "pantStyle",
   ]),
+  READY_MADE: new Set([
+    "height",
+    "chest",
+    "waist",
+    "shoulder",
+    "sleeve",
+    "neck",
+    "armpit",
+    "skirt",
+    "tenban",
+    "pantLeg",
+    "arm",
+    "calf",
+    "sorain",
+    "additionalNotes",
+  ]),
 };
 
 export const enrichOrderAssignment = (order) => {
@@ -159,6 +176,7 @@ const ORDER_TYPE_LABELS_EN = {
   WASKAT: "Waskat",
   KORTY: "Korty",
   YAKHANQAQ: "YakhanQaq",
+  READY_MADE: "Ready-Made",
 };
 const SUPPORTED_ORDER_TYPES = new Set(Object.keys(ORDER_TYPE_LABELS_EN));
 
@@ -438,6 +456,8 @@ const ORDER_LIST_INCLUDE_BASE = {
   waskat: true,
   korty: true,
   yakhanQaq: true,
+  readyMadeOrder: true,
+  readyMadeClothing: true,
   damagedClothesPenalties: { select: { id: true }, take: 1 },
   notifications: { orderBy: { createdAt: "desc" }, take: 1 },
   assignedTo: { select: { id: true, name: true, accountType: true } },
@@ -457,6 +477,8 @@ const ORDER_DETAIL_INCLUDE_BASE = {
   waskat: true,
   korty: true,
   yakhanQaq: true,
+  readyMadeOrder: true,
+  readyMadeClothing: true,
   damagedClothesPenalties: { select: { id: true }, take: 1 },
   notifications: true,
   assignedTo: { select: { id: true, name: true, accountType: true } },
@@ -1119,8 +1141,57 @@ export const getAllOrders = async ({
     prisma.order.count({ where }),
   ]);
 
+  const orderIds = data.map((order) => order.id).filter(Boolean);
+  const dailyExpenseSums = orderIds.length
+    ? await prisma.dailyTask.groupBy({
+        by: ["orderId"],
+        where: { orderId: { in: orderIds } },
+        _sum: { amount: true },
+      })
+    : [];
+
+  const dailyExpenseByOrderId = new Map(
+    dailyExpenseSums.map((row) => [row.orderId, Number(row._sum?.amount || 0)]),
+  );
+
+  const ordersWithComputedBenefits = data.map((order) => {
+    const dailyExpenseAmount = Number(dailyExpenseByOrderId.get(order.id) || 0);
+    const linkedDailyExpenses =
+      dailyExpenseAmount > 0
+        ? [
+            {
+              id: `daily-expense-total:${order.id}`,
+              amount: dailyExpenseAmount,
+              taskDate: null,
+              recipientName: null,
+              createdBy: null,
+            },
+          ]
+        : [];
+
+    const computed = buildOrderBenefitDetails({
+      order,
+      linkedDailyExpenses,
+    });
+
+    const readyMadeOriginalPrice =
+      order?.type === "READY_MADE"
+        ? toPositiveMoney(order?.readyMadeOriginalPrice)
+        : 0;
+    const finalTotalBenefit =
+      order?.type === "READY_MADE"
+        ? subScaled(computed.totalBenefit, readyMadeOriginalPrice, MONEY_SCALE)
+        : computed.totalBenefit;
+
+    return {
+      ...order,
+      totalBenefit: computed.totalBenefit,
+      finalTotalBenefit,
+    };
+  });
+
   const enrichedData = await enrichOrdersWithDisplayMeta(
-    enrichOrderListAssignment(data),
+    enrichOrderListAssignment(ordersWithComputedBenefits),
   );
 
   return {
@@ -1448,15 +1519,15 @@ export const getCompletedOrdersFromWorkers = async ({
 
   const filteredWithReceipt = normalizedData
     .map((row) => {
-    const role = normalizeWorkerRole(
-      row.workerRole || row.assignedTo?.accountType,
-    );
-    const receipt = receiptByRowKey.get(getReceiptMapKey(row.id, role));
-    const paidAmount =
-      row.workerPaymentStatus === "PAID_TO_WORKER"
-        ? getPaymentAmountByRole(row, role)
-        : 0;
-    const receivedAmount = receipt ? Number(receipt.paidAmount || 0) : 0;
+      const role = normalizeWorkerRole(
+        row.workerRole || row.assignedTo?.accountType,
+      );
+      const receipt = receiptByRowKey.get(getReceiptMapKey(row.id, role));
+      const paidAmount =
+        row.workerPaymentStatus === "PAID_TO_WORKER"
+          ? getPaymentAmountByRole(row, role)
+          : 0;
+      const receivedAmount = receipt ? Number(receipt.paidAmount || 0) : 0;
 
       return {
         ...row,
@@ -2251,6 +2322,9 @@ export const createOrder = async ({
         isForeignOrder = false,
         quantity = 1,
         measurements,
+        readyMadeClothingId,
+        readyMadeClothingCode,
+        readyMadeOriginalPrice,
       } = item;
       if (!SUPPORTED_ORDER_TYPES.has(type)) {
         continue;
@@ -2304,6 +2378,10 @@ export const createOrder = async ({
         }
 
         foreignBoxId = foreignBox.id;
+      } else if (type === "READY_MADE") {
+        // Ready-made clothes don't go through the box/tailoring workflow
+        boxId = null;
+        foreignBoxId = null;
       } else {
         autoBox = await resolveAutoBoxForNewOrder(tx, type);
         boxId = autoBox.boxId;
@@ -2366,6 +2444,12 @@ export const createOrder = async ({
           entryMonth: resolvedEntryMonth,
           entryYear: resolvedEntryYear,
           createdByFinanceId: createdByFinanceId || null,
+          readyMadeClothingId: item.readyMadeClothingId || null,
+          readyMadeClothingCode: item.readyMadeClothingCode || null,
+          readyMadeOriginalPrice:
+            item.readyMadeOriginalPrice != null
+              ? Number(item.readyMadeOriginalPrice)
+              : null,
         },
         include: { box: true, foreignBox: true },
       });
@@ -2388,6 +2472,21 @@ export const createOrder = async ({
         await tx.yakhanQaq.create({
           data: { orderId: order.id, ...persistedMeasurements },
         });
+      } else if (type === "READY_MADE") {
+        await tx.readyMadeOrder.create({
+          data: { orderId: order.id, ...persistedMeasurements },
+        });
+        if (item.readyMadeClothingId) {
+          await tx.readyMadeClothing.updateMany({
+            where: {
+              id: item.readyMadeClothingId,
+              quantity: { gt: 0 },
+            },
+            data: {
+              quantity: { decrement: 1 },
+            },
+          });
+        }
       }
 
       // Emergency notification
@@ -2617,6 +2716,12 @@ const upsertMeasurementsForType = async (tx, type, orderId, measurements) => {
       where: { orderId },
       update: normalized,
       create: { orderId, ...persistedForCreate },
+    });
+  } else if (type === "READY_MADE") {
+    await tx.readyMadeOrder.upsert({
+      where: { orderId },
+      update: normalized,
+      create: { orderId, ...normalized },
     });
   }
 };

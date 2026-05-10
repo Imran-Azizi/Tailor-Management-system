@@ -8,7 +8,7 @@ import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { parseNumberLocale } from "../lib/normalize.js";
 import i18n from "../i18n/index.js";
-import { getOrderTypeLabel } from "../lib/orderType.js";
+import { getOrderLabelParts, getOrderTypeLabel } from "../lib/orderType.js";
 import { Spinner } from "../components/ui/index.jsx";
 import Step1CustomerInfo from "../components/order/Step1CustomerInfo.jsx";
 import Step2RakhtSelection from "../components/order/Step2RakhtSelection.jsx";
@@ -171,11 +171,15 @@ export default function EditOrder() {
       measurements[typeIdx] = ordersForType.map((order, setIdx) => {
         const meas = getMeasurementsFromOrder(order) || {};
         const safe = meas && typeof meas === "object" ? meas : {};
+        const defaultName = getOrderLabelParts(order, i18n.resolvedLanguage || i18n.language, {
+          totalByType: ordersForType.length,
+          sequenceByType: setIdx + 1,
+        }).typeWithSequenceLabel;
         return {
           ...safe,
           __name:
             order.orderName ||
-            `${getOrderTypeLabel(entry.type, i18n.resolvedLanguage || i18n.language)} ${setIdx + 1}`,
+            defaultName,
           __orderId: order.id,
         };
       });
@@ -561,7 +565,14 @@ function buildOrderItems(orderTypes, measurements) {
       const sequence = typeCounter[entry.type];
       const displayName =
         setValue?.__name?.trim() ||
-        `${getOrderTypeLabel(entry.type, i18n.resolvedLanguage || i18n.language || "en")} ${sequence}`;
+        getOrderLabelParts(
+          {
+            type: entry.type,
+            orderTypeSequence: sequence,
+            orderTypeTotal: (orderTypes || []).filter((item) => item?.type === entry.type).length,
+          },
+          i18n.resolvedLanguage || i18n.language || "en",
+        ).typeWithSequenceLabel;
       items.push({
         billingKey: `${typeIndex}-${setIndex}`,
         typeIndex,

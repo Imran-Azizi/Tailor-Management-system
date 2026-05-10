@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
   LuArrowRightLeft,
@@ -73,9 +74,13 @@ export default function AllTransactions() {
   const language = i18n.resolvedLanguage || i18n.language;
   const { isAdmin } = useAuth();
   const { viewMonth, viewYear } = useMonth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const kindFromQuery = (searchParams.get("kind") || "").trim();
+  const initialKind = kindFromQuery === "LOAN" ? "LOAN" : "";
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
+  const [kindFilter, setKindFilter] = useState(initialKind);
   const [exporting, setExporting] = useState("");
 
   useEffect(() => {
@@ -88,6 +93,7 @@ export default function AllTransactions() {
       page,
       search,
       typeFilter,
+      kindFilter,
       isAdmin ? viewMonth : null,
       isAdmin ? viewYear : null,
     ],
@@ -99,6 +105,7 @@ export default function AllTransactions() {
             limit: 20,
             search,
             accountType: typeFilter,
+            kind: kindFilter || undefined,
             month: isAdmin ? viewMonth : undefined,
             year: isAdmin ? viewYear : undefined,
           },
@@ -116,12 +123,25 @@ export default function AllTransactions() {
   const activeFilterCount = [
     Boolean(search.trim()),
     Boolean(typeFilter),
+    Boolean(kindFilter),
   ].filter(Boolean).length;
+
+  useEffect(() => {
+    const nextKind = (searchParams.get("kind") || "").trim();
+    setKindFilter(nextKind === "LOAN" ? "LOAN" : "");
+    setPage(1);
+  }, [searchParams]);
 
   const clearFilters = () => {
     setSearch("");
     setTypeFilter("");
+    setKindFilter("");
     setPage(1);
+    if (searchParams.get("kind")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("kind");
+      setSearchParams(next, { replace: true });
+    }
   };
 
   const handleExportPdf = async () => {
@@ -135,6 +155,7 @@ export default function AllTransactions() {
           accountType: typeFilter,
           month: isAdmin ? viewMonth : undefined,
           year: isAdmin ? viewYear : undefined,
+          kind: kindFilter || undefined,
           lang: language,
           _ts: Date.now(),
         },

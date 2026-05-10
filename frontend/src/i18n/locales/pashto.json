@@ -283,7 +283,8 @@
       "pantStyle": "پتلون",
       "yakhanQaqDesign": "ډیزاین",
       "additionalStyleInfo": "د ډیزاین یادداشت",
-      "rakhtSelection": "د رخت انتخاب"
+      "rakhtSelection": "د رخت انتخاب",
+      "additionalNotes": "اضافي یادښتونه"
     },
     "styleFields": {
       "neck": "شیپ یخن",
@@ -374,7 +375,7 @@
   "dashboardPage": {
     "title": "ډښبوړډ",
     "netBenefit": "خالص ګټه",
-    "netBenefitSub": "د رخت ټول عاید + د فرمایښونو ټول ګټه",
+    "netBenefitSub": "د رخت ټول عاید + د فرمایښونو ټول ګټه + د تیار لباس ټول ګټه",
     "tooltipOrders": "{{count}} فرمایښونه",
     "totalOrders": "ټول فرمایښونه",
     "today": "نن",
@@ -403,7 +404,10 @@
     "statusDone": "بښپړ ښوۍ",
     "statusPending": "نا بښپړ",
     "totalRakhtRevenue": "د رختونو ټول عاید",
-    "totalOrderBenefit": "د فرمایښونو ټوله ګټه"
+    "totalOrderBenefit": "د فرمایښونو ټوله ګټه",
+    "totalReadyMadeProfit": "د تیار لباس ټوله ګټه",
+    "totalReadyMadeProfitAfterExpenses": "د تیار لباس ټوله ګټه (د ټولو مصارفو وروسته)",
+    "afterAllExpenses": "د ټولو مصارفو وروسته"
   },
   "transaction": {
     "title": "پور ثبت کړئ",
@@ -643,7 +647,8 @@
     "loadingOrders": "فرمایښونه بارول کیەے...",
     "noOrdersInCategory": "د دې کټګوړیې کې هیہۍ فرمایښ ونه موندل ښو.",
     "searchBillPlaceholder": "د بل ښمیره سره لټون",
-    "noOrderFoundByBill": "د دې بل ښمیرې لپاره فرمایښ ونه موندل ښو."
+    "noOrderFoundByBill": "د دې بل ښمیرې لپاره فرمایښ ونه موندل ښو.",
+    "readyMadeOriginalPrice": "د تیار لباس اصلي بیه"
   },
   "rakht": {
     "allTitle": "ټول رختونه",

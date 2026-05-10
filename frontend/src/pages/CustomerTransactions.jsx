@@ -5,7 +5,6 @@ import {
   LuArrowLeftRight,
   LuSearch,
   LuPhone,
-  LuReceipt,
   LuClock,
 } from "react-icons/lu";
 import api from "../lib/api.js";
@@ -212,7 +211,7 @@ function CustomerRow({ customer, expanded, onToggle }) {
                             }[o.type] || "gold"
                           }
                         >
-                          {orderLabel.baseTypeLabel}
+                          {orderLabel.typeWithSequenceLabel}
                         </Badge>
                         {orderLabel.customName ? (
                           <div style={{ marginTop: 4, fontSize: 11 }}>
@@ -382,7 +381,7 @@ export default function CustomerTransactions() {
           {
             label: t("common.customers"),
             value: data?.total ?? 0,
-            Icon: LuReceipt,
+            Icon: AfCurrencyIcon,
             color: "#2563EB",
           },
           {

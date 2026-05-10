@@ -218,12 +218,37 @@ export default function CreateOrder() {
   };
 
   const merge = (d) => setForm((prev) => ({ ...prev, ...d }));
+
+  const isAllReadyMade = (orderTypes) => {
+    const types = Array.isArray(orderTypes)
+      ? orderTypes
+      : form.orderTypes || [];
+    return types.length > 0 && types.every((e) => e?.type === "READY_MADE");
+  };
+
+  const RAKHT_STEP_INDEX = 3;
+
   const next = (d) => {
     merge(d);
-    setStep((s) => Math.min(s + 1, STEPS.length - 1));
+    const mergedOrderTypes = d?.orderTypes ?? form.orderTypes;
+    const skipRakht = isAllReadyMade(mergedOrderTypes);
+    setStep((s) => {
+      const candidate = Math.min(s + 1, STEPS.length - 1);
+      if (candidate === RAKHT_STEP_INDEX && skipRakht) {
+        return Math.min(candidate + 1, STEPS.length - 1);
+      }
+      return candidate;
+    });
   };
   const back = () => {
-    setStep((s) => Math.max(s - 1, 0));
+    const skipRakht = isAllReadyMade(form.orderTypes);
+    setStep((s) => {
+      const candidate = Math.max(s - 1, 0);
+      if (candidate === RAKHT_STEP_INDEX && skipRakht) {
+        return Math.max(candidate - 1, 0);
+      }
+      return candidate;
+    });
     setError("");
   };
 
@@ -232,7 +257,7 @@ export default function CreateOrder() {
 
     for (const entry of entries) {
       const type = entry?.type;
-      if (!type || entry?.isForeignOrder) {
+      if (!type || entry?.isForeignOrder || type === "READY_MADE") {
         continue;
       }
 
@@ -400,6 +425,12 @@ export default function CreateOrder() {
           discount: toWholeAmount(parseNumberLocale(b.discount) || 0),
           paidAmount: toWholeAmount(parseNumberLocale(b.paidAmount) || 0),
           quantity: 1,
+          readyMadeClothingId: item.readyMadeClothingId || null,
+          readyMadeClothingCode: item.readyMadeClothingCode || null,
+          readyMadeOriginalPrice:
+            item.readyMadeOriginalPrice != null
+              ? Number(item.readyMadeOriginalPrice)
+              : null,
         };
       }),
     };
@@ -691,6 +722,9 @@ function buildOrderItems(orderTypes, measurements) {
           __name: displayName,
         },
         isEmergency: !!entry?.isEmergency,
+        readyMadeClothingId: entry?.readyMadeClothingId || null,
+        readyMadeClothingCode: entry?.readyMadeClothingCode || null,
+        readyMadeOriginalPrice: entry?.readyMadeOriginalPrice ?? null,
       });
     });
   });

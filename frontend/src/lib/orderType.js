@@ -7,6 +7,7 @@ const ORDER_TYPE_LABELS = {
     KORTY: "Korty",
     YAKHANQAQ: "YakhanQaq",
     FOREIGN_SHIPPING: "Send to Foreign Country",
+    READY_MADE: "Ready-Made Clothes",
   },
   dari: {
     OUTFIT: "پیراهن تنبان",
@@ -14,6 +15,7 @@ const ORDER_TYPE_LABELS = {
     KORTY: "کُرتی",
     YAKHANQAQ: "یخن قاق",
     FOREIGN_SHIPPING: "ارسال به کشور خارجی",
+    READY_MADE: "لباس آماده",
   },
   pashto: {
     OUTFIT: "پیرهن تنبان",
@@ -21,6 +23,7 @@ const ORDER_TYPE_LABELS = {
     KORTY: "کرتی",
     YAKHANQAQ: "یخن قاق",
     FOREIGN_SHIPPING: "بهر ته لیږل",
+    READY_MADE: "چمتو جامې",
   },
 };
 
@@ -30,6 +33,7 @@ export const ORDER_TYPE_VALUES = [
   "KORTY",
   "YAKHANQAQ",
   "FOREIGN_SHIPPING",
+  "READY_MADE",
 ];
 
 export function getOrderTypeLabel(type, language = "en") {
@@ -45,6 +49,38 @@ export function getOrderTypeOptions(language = "en") {
     value,
     label: getOrderTypeLabel(value, language),
   }));
+}
+
+export function withOrderTypeSequenceMeta(items = []) {
+  if (!Array.isArray(items) || !items.length) return [];
+
+  const totalsByType = items.reduce((acc, item) => {
+    const typeKey = item?.type || "ITEM";
+    acc[typeKey] = (acc[typeKey] || 0) + 1;
+    return acc;
+  }, {});
+
+  const seenByType = {};
+
+  return items.map((item) => {
+    const typeKey = item?.type || "ITEM";
+    seenByType[typeKey] = (seenByType[typeKey] || 0) + 1;
+
+    const parsedSequence = Number(item?.orderTypeSequence ?? item?.sequence);
+    const parsedTotal = Number(item?.orderTypeTotal);
+
+    return {
+      ...item,
+      orderTypeSequence:
+        Number.isFinite(parsedSequence) && parsedSequence > 0
+          ? parsedSequence
+          : seenByType[typeKey],
+      orderTypeTotal:
+        Number.isFinite(parsedTotal) && parsedTotal > 0
+          ? parsedTotal
+          : totalsByType[typeKey] || 1,
+    };
+  });
 }
 
 function getOrderTypeTotals(order = {}, options = {}) {

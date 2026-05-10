@@ -1,7 +1,8 @@
 ﻿import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
-import { LuPhone, LuReceipt, LuSearch } from "react-icons/lu";
+import { LuPhone, LuSearch } from "react-icons/lu";
+import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import {
@@ -172,7 +173,7 @@ export default function ClothesDeliveryToCustomer() {
                 <div
                   className={`rounded-md p-2 ${mode === "bill" ? "bg-amber-200/70 dark:bg-amber-900/40" : "bg-slate-100 dark:bg-slate-800"}`}
                 >
-                  <LuReceipt size={18} />
+                  <AfCurrencyIcon size={18} />
                 </div>
                 <div>
                   <div className="text-sm font-semibold">

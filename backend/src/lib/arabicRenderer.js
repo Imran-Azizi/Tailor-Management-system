@@ -30,19 +30,81 @@ const LANGUAGE_MAP = {
   farsi: "fa", // Farsi to fontkit "fa"
   fa: "fa", // Already correct
   ps: "ps", // Already correct
-  ur: "ur", // Urdu
-  ar: "ar", // Arabic
-  en: "dflt", // English uses default
+  ar: "ar", // Arabic to fontkit "ar"
+  ur: "ur", // Urdu to fontkit "ur"
+  dflt: "dflt", // Keep default if explicitly requested
 };
 
-// Language-specific OpenType feature sets for better contextual forms
+// If these are omitted, words can render as disconnected letters.
 const LANGUAGE_FEATURES = {
-  fa: ["ccmp", "liga", "dlig", "calt", "rlig"], // Farsi/Dari
-  ps: ["ccmp", "liga", "dlig", "calt", "rlig"], // Pashto
-  ur: ["ccmp", "liga", "dlig", "calt", "rlig"], // Urdu
-  ar: ["ccmp", "liga", "dlig", "calt", "rlig"], // Arabic
+  fa: [
+    "ccmp",
+    "locl",
+    "rlig",
+    "liga",
+    "dlig",
+    "calt",
+    "isol",
+    "fina",
+    "medi",
+    "init",
+    "mark",
+    "mkmk",
+  ], // Farsi/Dari
+  ps: [
+    "ccmp",
+    "locl",
+    "rlig",
+    "liga",
+    "dlig",
+    "calt",
+    "isol",
+    "fina",
+    "medi",
+    "init",
+    "mark",
+    "mkmk",
+  ], // Pashto
+  ur: [
+    "ccmp",
+    "locl",
+    "rlig",
+    "liga",
+    "dlig",
+    "calt",
+    "isol",
+    "fina",
+    "medi",
+    "init",
+    "mark",
+    "mkmk",
+  ], // Urdu
+  ar: [
+    "ccmp",
+    "locl",
+    "rlig",
+    "liga",
+    "dlig",
+    "calt",
+    "isol",
+    "fina",
+    "medi",
+    "init",
+    "mark",
+    "mkmk",
+  ], // Arabic
   dflt: [], // Default: let fontkit use standard features
 };
+
+function normalizeArabicInput(value) {
+  return String(value ?? "")
+    .normalize("NFC")
+    .replace(/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, " ")
+    .replace(/\uFEFF/g, "")
+    .replace(/\s*\u200C\s*/g, "\u200C")
+    .replace(/ {2,}/g, " ")
+    .trim();
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -75,16 +137,34 @@ export async function drawArabicText(
   opts,
   fontPath,
   fillColor = "#0F172A",
+  language = "fa",
 ) {
-  if (!text || !fontPath) return;
+  const safeText = normalizeArabicInput(text);
+  if (!safeText || !fontPath) return;
 
   const { width, align = "left", fontSize = doc._fontSize || 12 } = opts;
 
   const fkFont = await openFont(fontPath);
   const scale = fontSize / fkFont.unitsPerEm;
 
+  // Map report language codes (dari, pashto, etc.) to fontkit language codes.
+  const mappedLanguage = LANGUAGE_MAP[language] || LANGUAGE_MAP.fa;
+  const hasArabic = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(safeText);
+  const shapingLanguage =
+    mappedLanguage === "dflt" && hasArabic ? "fa" : mappedLanguage;
+
+  // Use language-specific OpenType features for better contextual form support.
+  const layoutFeatures =
+    LANGUAGE_FEATURES[shapingLanguage] || LANGUAGE_FEATURES.dflt;
+
   // Shape the text explicitly as Arabic RTL script for stable Dari/Pashto joining.
-  const run = fkFont.layout(text, [], RTL_SCRIPT, RTL_LANGUAGE, RTL_DIRECTION);
+  const run = fkFont.layout(
+    safeText,
+    layoutFeatures,
+    RTL_SCRIPT,
+    shapingLanguage || RTL_LANGUAGE,
+    RTL_DIRECTION,
+  );
   const { glyphs, positions } = run;
 
   if (!glyphs.length) return;
@@ -165,7 +245,8 @@ export function drawArabicTextSync(
   fillColor = "#0F172A",
   language = "fa",
 ) {
-  if (!text || !fkFont) return 0;
+  const safeText = normalizeArabicInput(text);
+  if (!safeText || !fkFont) return 0;
 
   const { width, align = "left", fontSize = doc._fontSize || 12 } = opts;
 
@@ -173,15 +254,18 @@ export function drawArabicTextSync(
 
   // Map report language codes (dari, pashto, etc.) to fontkit language codes (fa, ps, etc.)
   const mappedLanguage = LANGUAGE_MAP[language] || LANGUAGE_MAP.fa;
+  const hasArabic = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(safeText);
+  const shapingLanguage =
+    mappedLanguage === "dflt" && hasArabic ? "fa" : mappedLanguage;
 
   // Use language-specific OpenType features for better contextual form support
   const layoutFeatures =
-    LANGUAGE_FEATURES[mappedLanguage] || LANGUAGE_FEATURES.dflt;
+    LANGUAGE_FEATURES[shapingLanguage] || LANGUAGE_FEATURES.dflt;
   const run = fkFont.layout(
-    text,
+    safeText,
     layoutFeatures,
     RTL_SCRIPT,
-    mappedLanguage || RTL_LANGUAGE,
+    shapingLanguage || RTL_LANGUAGE,
     RTL_DIRECTION,
   );
   const { glyphs, positions } = run;
@@ -191,7 +275,7 @@ export function drawArabicTextSync(
   // DEBUG: Log fontkit output for troubleshooting character separation
   if (process.env.DEBUG_ARABIC_RENDERING === "true") {
     console.log(
-      `[Arabic Render] text: "${text}", glyphCount: ${glyphs.length}, font: ${fkFont.fullName}, lang: ${language} -> ${mappedLanguage}`,
+      `[Arabic Render] text: "${safeText}", glyphCount: ${glyphs.length}, font: ${fkFont.fullName}, lang: ${language} -> ${shapingLanguage}`,
     );
     glyphs.slice(0, 10).forEach((g, i) => {
       const pos = positions[i];

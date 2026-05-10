@@ -338,41 +338,14 @@ export default function MakeTransaction() {
             >
               <button
                 type="submit"
-                className="btn btn-primary"
+                className="btn btn-gold"
                 disabled={mutation.isPending}
                 style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 10,
                   minWidth: 160,
-                  padding: "10px 18px",
-                  borderRadius: 10,
-                  background: "linear-gradient(90deg, var(--primary), #7C3AED)",
-                  color: "#fff",
-                  border: "none",
-                  boxShadow: "0 8px 24px rgba(37,99,235,0.12)",
-                  cursor: mutation.isPending ? "default" : "pointer",
-                  fontWeight: 700,
-                  justifyContent: "center",
-                  transition: "transform .12s ease, box-shadow .12s ease",
-                  opacity: mutation.isPending ? 0.7 : 1,
                 }}
               >
                 {mutation.isPending ? (
-                  <>
-                    <span
-                      style={{
-                        width: 15,
-                        height: 15,
-                        border: "2px solid rgba(255,255,255,.4)",
-                        borderTopColor: "#fff",
-                        borderRadius: "50%",
-                        animation: "spin .7s linear infinite",
-                        flexShrink: 0,
-                      }}
-                    />
-                    {t("transaction.submitting")}
-                  </>
+                  t("transaction.submitting")
                 ) : (
                   <>
                     <LuCheck size={15} />

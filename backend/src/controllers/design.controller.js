@@ -368,3 +368,115 @@ export const getAllDesigns = async (req, res, next) => {
     next(e);
   }
 };
+
+// ─── Ready-Made Clothing CRUD ─────────────────────────────────────────────────
+
+export const listReadyMadeClothing = async (req, res, next) => {
+  try {
+    const activeOnly =
+      String(req.query?.activeOnly || "").toLowerCase() === "true";
+    const items = await prisma.readyMadeClothing.findMany({
+      where: activeOnly ? { quantity: { gt: 0 } } : undefined,
+      orderBy: { clothingCode: "asc" },
+    });
+    res.json(items);
+  } catch (e) {
+    next(e);
+  }
+};
+
+export const createReadyMadeClothing = async (req, res, next) => {
+  try {
+    const { clothingCode, originalPrice, description, quantity } = req.body;
+    if (!clothingCode || clothingCode.toString().trim() === "") {
+      return res.status(400).json({ error: "clothingCode is required" });
+    }
+    const price = Number(originalPrice);
+    if (!Number.isFinite(price) || price < 0) {
+      return res
+        .status(400)
+        .json({ error: "originalPrice must be a valid non-negative number" });
+    }
+    const qty = quantity == null ? 1 : Number(quantity);
+    if (!Number.isFinite(qty) || qty < 0 || !Number.isInteger(qty)) {
+      return res
+        .status(400)
+        .json({ error: "quantity must be a valid non-negative integer" });
+    }
+    const item = await prisma.readyMadeClothing.create({
+      data: {
+        clothingCode: clothingCode.toString().trim(),
+        originalPrice: price,
+        quantity: qty,
+        description: description?.toString().trim() || null,
+      },
+    });
+    res.status(201).json(item);
+  } catch (e) {
+    if (e.code === "P2002") {
+      return res
+        .status(409)
+        .json({ error: "A clothing item with this code already exists" });
+    }
+    next(e);
+  }
+};
+
+export const updateReadyMadeClothing = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { clothingCode, originalPrice, description, quantity } = req.body;
+    if (!clothingCode || clothingCode.toString().trim() === "") {
+      return res.status(400).json({ error: "clothingCode is required" });
+    }
+    const price = Number(originalPrice);
+    if (!Number.isFinite(price) || price < 0) {
+      return res
+        .status(400)
+        .json({ error: "originalPrice must be a valid non-negative number" });
+    }
+    const qty = quantity == null ? 1 : Number(quantity);
+    if (!Number.isFinite(qty) || qty < 0 || !Number.isInteger(qty)) {
+      return res
+        .status(400)
+        .json({ error: "quantity must be a valid non-negative integer" });
+    }
+    const item = await prisma.readyMadeClothing.update({
+      where: { id },
+      data: {
+        clothingCode: clothingCode.toString().trim(),
+        originalPrice: price,
+        quantity: qty,
+        description: description?.toString().trim() || null,
+      },
+    });
+    res.json(item);
+  } catch (e) {
+    if (e.code === "P2025") {
+      return res
+        .status(404)
+        .json({ error: "Ready-made clothing item not found" });
+    }
+    if (e.code === "P2002") {
+      return res
+        .status(409)
+        .json({ error: "A clothing item with this code already exists" });
+    }
+    next(e);
+  }
+};
+
+export const deleteReadyMadeClothing = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    await prisma.readyMadeClothing.delete({ where: { id } });
+    res.status(204).send();
+  } catch (e) {
+    if (e.code === "P2025") {
+      return res
+        .status(404)
+        .json({ error: "Ready-made clothing item not found" });
+    }
+    next(e);
+  }
+};

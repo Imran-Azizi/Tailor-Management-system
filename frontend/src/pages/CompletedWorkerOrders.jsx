@@ -6,7 +6,6 @@ import toast from "react-hot-toast";
 import {
   LuCalendarCheck,
   LuRefreshCcw,
-  LuReceiptText,
   LuSearch,
   LuSquareCheckBig,
   LuUser,
@@ -149,6 +148,10 @@ export default function CompletedWorkerOrders() {
   const { viewMonth, viewYear } = useMonth();
   const [searchParams, setSearchParams] = useSearchParams();
   const highlightOrderId = searchParams.get("orderId") || "";
+  const workerRoleFilterRaw = (searchParams.get("workerRole") || "").trim();
+  const workerRoleFilter = ["QICHIKAR", "DOKHT"].includes(workerRoleFilterRaw)
+    ? workerRoleFilterRaw
+    : "";
 
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -194,6 +197,7 @@ export default function CompletedWorkerOrders() {
     if (qichikarUserId) next.qichikarUserId = qichikarUserId;
     if (dokhtUserId) next.dokhtUserId = dokhtUserId;
     if (highlightOrderId) next.orderId = highlightOrderId;
+    if (workerRoleFilter) next.workerRole = workerRoleFilter;
     if (isAdmin) {
       next.month = viewMonth;
       next.year = viewYear;
@@ -207,6 +211,7 @@ export default function CompletedWorkerOrders() {
     paymentStatus,
     qichikarUserId,
     search,
+    workerRoleFilter,
     viewMonth,
     viewYear,
   ]);
@@ -395,9 +400,21 @@ export default function CompletedWorkerOrders() {
     setDokhtUserId("");
     setPage(1);
     setSelectedRowKeys({});
-    if (highlightOrderId) {
-      setSearchParams({}, { replace: true });
+    if (highlightOrderId || workerRoleFilter) {
+      const nextParams = new URLSearchParams();
+      if (highlightOrderId) {
+        nextParams.set("orderId", highlightOrderId);
+      }
+      setSearchParams(nextParams, { replace: true });
     }
+  };
+
+  const clearRoleFilter = () => {
+    if (!workerRoleFilter) return;
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("workerRole");
+    setSearchParams(nextParams, { replace: true });
+    setPage(1);
   };
 
   const handleSavePayment = (order) => {
@@ -555,13 +572,40 @@ export default function CompletedWorkerOrders() {
         </div>
       )}
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
-          gap: 12,
-        }}
-      >
+      {workerRoleFilter && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            padding: "10px 16px",
+            borderRadius: 10,
+            background: "#F5F3FF",
+            border: "1px solid #DDD6FE",
+            marginBottom: 4,
+          }}
+        >
+          <span style={{ fontSize: 13, color: "#5B21B6", fontWeight: 500 }}>
+            {t(
+              "completedWorkerOrders.filteredByRole",
+              "Showing only {{role}} worker payments.",
+              {
+                role: workerRoleLabel(workerRoleFilter, t),
+              },
+            )}
+          </span>
+          <button
+            onClick={clearRoleFilter}
+            className="inline-flex items-center gap-1 bg-transparent text-xs font-semibold text-violet-700 transition hover:text-violet-800 dark:text-violet-300 dark:hover:text-violet-200"
+          >
+            <LuX size={13} />
+            {t("common.clear", "Clear")}
+          </button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(210px,1fr))] gap-3">
         <StatCard
           label={t("completedWorkerOrders.totalOrders", "Matching Orders")}
           value={stats.totalOrders}
@@ -595,7 +639,7 @@ export default function CompletedWorkerOrders() {
             minimumFractionDigits: 0,
             maximumFractionDigits: 0,
           })}
-          Icon={LuReceiptText}
+          Icon={AfCurrencyIcon}
           accent="#0F766E"
         />
         <StatCard
@@ -607,7 +651,7 @@ export default function CompletedWorkerOrders() {
             minimumFractionDigits: 0,
             maximumFractionDigits: 0,
           })}
-          Icon={LuSquareCheckBig}
+          Icon={AfCurrencyIcon}
           accent="#B45309"
         />
       </div>
@@ -615,25 +659,15 @@ export default function CompletedWorkerOrders() {
       <Card>
         <form
           onSubmit={onSearch}
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-            gap: 12,
-            alignItems: "end",
-          }}
+          className="grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] items-end gap-3"
         >
           <div>
             <label className="lbl">{t("common.search", "Search")}</label>
-            <div style={{ position: "relative" }}>
+            <div className="relative">
               <LuSearch
                 size={14}
-                style={{
-                  position: "absolute",
-                  insetInlineStart: 10,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "var(--text3)",
-                }}
+                className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-[var(--text3)]"
+                style={{ insetInlineStart: 10 }}
               />
               <input
                 className="inp"
@@ -728,7 +762,7 @@ export default function CompletedWorkerOrders() {
           <button
             type="submit"
             className="btn btn-outline"
-            style={{ minWidth: 110, height: 40, fontWeight: 600, gap: 8 }}
+            style={{ minWidth: 110, height: 40, gap: 8 }}
           >
             <LuSearch size={14} />
             {t("common.search", "Search")}
@@ -744,18 +778,8 @@ export default function CompletedWorkerOrders() {
           </button>
         </form>
 
-        <div
-          style={{
-            marginTop: 14,
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 8,
-            alignItems: "center",
-          }}
-        >
-          <span
-            style={{ fontSize: 12, color: "var(--text3)", fontWeight: 700 }}
-          >
+        <div className="mt-3.5 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-bold text-[var(--text3)]">
             {t("completedWorkerOrders.activeFilters", "Active Filters")}:{" "}
             {activeFilterCount}
           </span>
@@ -786,7 +810,7 @@ export default function CompletedWorkerOrders() {
         title={t("completedWorkerOrders.tableTitle", "Completed Worker Orders")}
         action={
           isFetching ? (
-            <span style={{ fontSize: 12, color: "var(--text3)" }}>
+            <span className="text-xs text-[var(--text3)]">
               {t("common.loading", "Loading...")}
             </span>
           ) : null
@@ -804,32 +828,8 @@ export default function CompletedWorkerOrders() {
           />
         ) : (
           <>
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 10,
-                marginBottom: 10,
-                padding: "14px 16px",
-                borderRadius: 14,
-                border: "1px solid #D6DCE8",
-                background:
-                  "linear-gradient(135deg, #F8FAFF 0%, #F2F6FE 55%, #EEF4FF 100%)",
-                boxShadow: "0 8px 20px rgba(15, 23, 42, 0.06)",
-              }}
-            >
-              <label
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 10,
-                  fontWeight: 600,
-                  fontSize: 14,
-                  color: "#0F172A",
-                }}
-              >
+            <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 via-slate-50 to-sky-50 px-4 py-3 shadow-sm dark:border-slate-700 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
+              <label className="inline-flex items-center gap-2.5 text-sm font-semibold text-slate-900 dark:text-slate-100">
                 <input
                   type="checkbox"
                   checked={allEligibleSelected}
@@ -839,28 +839,12 @@ export default function CompletedWorkerOrders() {
                 {t("completedWorkerOrders.selectAll", "Select All")}
               </label>
 
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 12,
-                }}
-              >
-                <span style={{ fontSize: 13, color: "var(--text2)" }}>
+              <div className="inline-flex items-center gap-3">
+                <span className="text-[13px] text-[var(--text2)]">
                   {t("completedWorkerOrders.selectedOrders", "Selected")}:{" "}
                   <b>{selectedItems.length}</b>
                 </span>
-                <span
-                  style={{
-                    fontSize: 13,
-                    color: "#1E293B",
-                    background: "rgba(37, 99, 235, 0.1)",
-                    border: "1px solid rgba(37, 99, 235, 0.25)",
-                    borderRadius: 999,
-                    padding: "6px 10px",
-                    fontWeight: 600,
-                  }}
-                >
+                <span className="rounded-full border border-sky-300/60 bg-sky-100/70 px-2.5 py-1.5 text-[13px] font-semibold text-slate-800 dark:border-sky-700/60 dark:bg-sky-900/30 dark:text-sky-200">
                   {t("completedWorkerOrders.selectedTotal", "Total")}:{" "}
                   <b>{formatCurrency(selectedTotalAmount, "en")}</b>
                 </span>
@@ -870,7 +854,7 @@ export default function CompletedWorkerOrders() {
                   onClick={() => setConfirmReceipt(true)}
                   disabled={!hasSelectedRows || receiptMut.isPending}
                 >
-                  <LuReceiptText size={14} />
+                  <AfCurrencyIcon size={14} />
                   {receiptMut.isPending
                     ? t("common.loading", "Loading...")
                     : t("completedWorkerOrders.receipt", "Receipt")}
@@ -958,22 +942,20 @@ export default function CompletedWorkerOrders() {
                         </td>
                         <td>#{order.customer?.billNumber || "-"}</td>
                         <td>
-                          <div style={{ display: "grid", gap: 3 }}>
-                            <strong style={{ color: "var(--text1)" }}>
+                          <div className="grid gap-0.5">
+                            <strong className="text-[var(--text1)]">
                               {getOrderPrimaryDisplayName(
                                 order,
                                 order.customer?.firstName,
                                 language,
                               )}
                             </strong>
-                            <span
-                              style={{ fontSize: 12, color: "var(--text3)" }}
-                            >
+                            <span className="text-xs text-[var(--text3)]">
                               {order.customer?.phoneNumber || "-"}
                             </span>
                           </div>
                         </td>
-                        <td>{orderLabel.baseTypeLabel}</td>
+                        <td>{orderLabel.typeWithSequenceLabel}</td>
                         <td>
                           {formatDateLocale(
                             order.completedAt || order.updatedAt,
@@ -1144,7 +1126,7 @@ export default function CompletedWorkerOrders() {
               onClick={submitReceipt}
               disabled={receiptMut.isPending || !hasSelectedRows}
             >
-              <LuReceiptText size={14} />
+              <AfCurrencyIcon size={14} />
               {receiptMut.isPending
                 ? t("common.loading", "Loading...")
                 : t("completedWorkerOrders.receipt", "Receipt")}
@@ -1217,7 +1199,7 @@ export default function CompletedWorkerOrders() {
                 <b>{t("workerPanel.orderType", "Order Type")}:</b>{" "}
                 {
                   getOrderLabelParts(confirmPayment.order, language)
-                    .baseTypeLabel
+                    .typeWithSequenceLabel
                 }
               </div>
               <div>

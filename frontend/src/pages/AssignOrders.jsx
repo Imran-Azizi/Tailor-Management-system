@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
-import { LuReceipt, LuSearch, LuUserCheck } from "react-icons/lu";
+import { LuSearch, LuUserCheck } from "react-icons/lu";
+import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { parseNumberLocale } from "../lib/normalize.js";
@@ -266,14 +267,7 @@ export default function AssignOrders() {
   });
 
   return (
-    <div
-      className="page"
-      style={{
-        padding: "20px 18px 56px",
-        maxWidth: 1240,
-        margin: "0 auto",
-      }}
-    >
+    <div className="page mx-auto max-w-[1240px] px-4 pb-14 pt-5">
       <PageHeader
         title={t("assignment.assignOrder", "Assign Order")}
         subtitle={t(
@@ -282,37 +276,13 @@ export default function AssignOrders() {
         )}
       />
 
-      <div
-        style={{
-          borderRadius: 14,
-          overflow: "hidden",
-          boxShadow: "var(--sh)",
-          border: "1px solid var(--border)",
-          background: "var(--surface)",
-        }}
-      >
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <Card noPad>
-          <div
-            style={{
-              padding: "18px 20px",
-              borderBottom: "1px solid var(--border)",
-              background:
-                "linear-gradient(135deg, color-mix(in oklab, var(--primary) 10%, white), color-mix(in oklab, #0EA5E9 8%, white))",
-            }}
-          >
-            <h3
-              style={{
-                margin: 0,
-                fontSize: 16,
-                fontWeight: 800,
-                color: "var(--text1)",
-              }}
-            >
+          <div className="border-b border-slate-200 bg-gradient-to-br from-sky-50 via-cyan-50 to-white px-5 py-4 dark:border-slate-700 dark:from-slate-800 dark:via-slate-800 dark:to-slate-900">
+            <h3 className="m-0 text-base font-extrabold text-slate-900 dark:text-slate-100">
               {t("assignment.assignmentSetup", "Assignment Setup")}
             </h3>
-            <p
-              style={{ margin: "4px 0 0", fontSize: 12, color: "var(--text2)" }}
-            >
+            <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
               {t(
                 "assignment.setupHint",
                 "Pick clothes type, account type, user account, then search by bill number.",
@@ -320,14 +290,8 @@ export default function AssignOrders() {
             </p>
           </div>
 
-          <div style={{ padding: 18 }}>
-            <div
-              style={{
-                display: "grid",
-                gap: 14,
-                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              }}
-            >
+          <div className="p-4 sm:p-5">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
               <Field
                 label={t("assignment.clothesType", "Clothes type")}
                 required
@@ -395,7 +359,7 @@ export default function AssignOrders() {
               </Field>
 
               <Field label={t("orders.billNumber", "Bill Number")} required>
-                <div style={{ display: "flex", gap: 8 }}>
+                <div className="flex gap-2">
                   <input
                     className="inp"
                     value={billNumber}
@@ -414,17 +378,7 @@ export default function AssignOrders() {
                     className="btn btn-outline"
                     onClick={searchByBill}
                     disabled={loadingResult || assignMutation.isPending}
-                    style={{
-                      whiteSpace: "nowrap",
-                      padding: "0 14px",
-                      fontWeight: 600,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 8,
-                      opacity:
-                        loadingResult || assignMutation.isPending ? 0.65 : 1,
-                      height: 40,
-                    }}
+                    style={{ whiteSpace: "nowrap" }}
                   >
                     <LuSearch size={14} />
                     {t("common.search", "Search")}
@@ -440,22 +394,14 @@ export default function AssignOrders() {
         {loadingResult ? (
           <Spinner />
         ) : !lookupResult ? (
-          <div
-            style={{
-              borderRadius: 14,
-              overflow: "hidden",
-              boxShadow: "var(--sh)",
-              border: "1px solid var(--border)",
-              background: "var(--surface)",
-            }}
-          >
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
             <Card title={t("assignment.searchResult", "Search Result")} noPad>
               <EmptyState
                 message={t(
                   "assignment.searchResultHint",
                   "Select clothes type and search by bill number to start assignment.",
                 )}
-                Icon={LuReceipt}
+                Icon={AfCurrencyIcon}
               />
             </Card>
           </div>
@@ -464,54 +410,21 @@ export default function AssignOrders() {
             <Card
               title={t("assignment.customerInfo", "Customer & Order Selection")}
             >
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                  gap: 10,
-                  marginBottom: 14,
-                }}
-              >
-                <div
-                  style={{
-                    border: "1px solid var(--border)",
-                    borderRadius: 10,
-                    padding: "11px 12px",
-                    background: "var(--surface2)",
-                  }}
-                >
-                  <p
-                    style={{
-                      fontSize: 12,
-                      color: "var(--text3)",
-                      marginBottom: 3,
-                    }}
-                  >
+              <div className="mb-3.5 grid grid-cols-1 gap-2.5 md:grid-cols-2">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/70">
+                  <p className="mb-0.5 text-xs text-slate-500 dark:text-slate-400">
                     {t("common.customer", "Customer")}
                   </p>
-                  <p style={{ fontWeight: 800, color: "var(--text1)" }}>
+                  <p className="font-extrabold text-slate-900 dark:text-slate-100">
                     {lookupResult.customer?.firstName || "-"}
                   </p>
                 </div>
 
-                <div
-                  style={{
-                    border: "1px solid var(--border)",
-                    borderRadius: 10,
-                    padding: "11px 12px",
-                    background: "var(--surface2)",
-                  }}
-                >
-                  <p
-                    style={{
-                      fontSize: 12,
-                      color: "var(--text3)",
-                      marginBottom: 3,
-                    }}
-                  >
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/70">
+                  <p className="mb-0.5 text-xs text-slate-500 dark:text-slate-400">
                     {t("orders.billNumber", "Bill Number")}
                   </p>
-                  <p style={{ fontWeight: 800, color: "var(--text1)" }}>
+                  <p className="font-extrabold text-slate-900 dark:text-slate-100">
                     #{lookupResult.customer?.billNumber || "-"}
                   </p>
                 </div>
@@ -525,7 +438,7 @@ export default function AssignOrders() {
                   )}
                 />
               ) : (
-                <div style={{ display: "grid", gap: 10 }}>
+                <div className="grid gap-2.5">
                   {matchedOrders.map((order, idx) => {
                     const orderLabel = getOrderLabelParts(order, language);
                     const active = selectedOrderId === order.id;
@@ -534,42 +447,15 @@ export default function AssignOrders() {
                         key={order.id}
                         type="button"
                         onClick={() => setSelectedOrderId(order.id)}
-                        style={{
-                          width: "100%",
-                          textAlign: "start",
-                          transition:
-                            "border-color .16s ease, box-shadow .16s ease, transform .16s ease",
-                          border: active
-                            ? "1px solid #0284C7"
-                            : "1px solid var(--border)",
-                          borderRadius: 12,
-                          padding: "12px 14px",
-                          background: active
-                            ? "linear-gradient(135deg, rgba(2,132,199,.10), rgba(15,118,110,.08))"
-                            : "var(--surface)",
-                          cursor: "pointer",
-                          boxShadow: active
-                            ? "0 8px 24px rgba(2,132,199,.13)"
-                            : "none",
-                        }}
+                        className={`w-full cursor-pointer rounded-xl border px-3.5 py-3 text-left transition ${
+                          active
+                            ? "border-sky-500 bg-gradient-to-br from-sky-50 to-cyan-50 shadow-sm dark:border-sky-400 dark:from-slate-800 dark:to-slate-800"
+                            : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600"
+                        }`}
                       >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            gap: 12,
-                            flexWrap: "wrap",
-                          }}
-                        >
+                        <div className="flex flex-wrap items-center justify-between gap-3">
                           <div>
-                            <p
-                              style={{
-                                fontSize: 13,
-                                fontWeight: 700,
-                                color: "var(--text1)",
-                              }}
-                            >
+                            <p className="text-[13px] font-bold text-slate-900 dark:text-slate-100">
                               {t(
                                 "assignment.orderLabelWithNumber",
                                 "Order #{{number}}",
@@ -577,43 +463,25 @@ export default function AssignOrders() {
                                   number: idx + 1,
                                 },
                               )}{" "}
-                              - {orderLabel.baseTypeLabel}
+                              - {orderLabel.typeWithSequenceLabel}
                             </p>
-                            <p
-                              style={{
-                                fontSize: 12,
-                                color: "var(--text3)",
-                                marginTop: 2,
-                              }}
-                            >
+                            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                               {orderLabel.customName ||
                                 t("assignment.noOrderName", "No custom name")}
                             </p>
                           </div>
-                          <div style={{ textAlign: "end" }}>
-                            <p style={{ fontSize: 12, color: "var(--text3)" }}>
+                          <div className="text-right">
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
                               {t("assignment.quantity", "Quantity")}
                             </p>
-                            <p
-                              style={{
-                                fontSize: 13,
-                                fontWeight: 700,
-                                color: "var(--text2)",
-                                marginTop: 2,
-                              }}
-                            >
+                            <p className="mt-0.5 text-[13px] font-bold text-slate-700 dark:text-slate-200">
                               {order.quantity || 1}
                             </p>
-                            <p style={{ fontSize: 12, color: "var(--text3)" }}>
+                            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                               {t("common.total", "Total")}
                             </p>
-                            <p
-                              style={{
-                                fontSize: 14,
-                                fontWeight: 800,
-                                color: "var(--text1)",
-                              }}
-                            >
+                            <p className="mt-0.5 inline-flex items-center gap-1 text-sm font-extrabold text-slate-900 dark:text-slate-100">
+                              <AfCurrencyIcon size={13} />
                               {formatMoney(order.totalPrice, language)}
                             </p>
                           </div>
@@ -632,14 +500,7 @@ export default function AssignOrders() {
                   "Selected Order Summary",
                 )}
               >
-                <div
-                  style={{
-                    display: "grid",
-                    gap: 16,
-                    gridTemplateColumns: "minmax(240px, 1fr)",
-                    alignItems: "start",
-                  }}
-                >
+                <div className="grid grid-cols-1 gap-4">
                   <Field
                     label={t("assignment.priceForWorker", "Price for worker")}
                     required
@@ -648,57 +509,59 @@ export default function AssignOrders() {
                       "Enter the sewing or cutting price before sending this order.",
                     )}
                   >
-                    <input
-                      className="inp"
-                      value={assignmentPrice}
-                      onChange={(e) => setAssignmentPrice(e.target.value)}
-                      placeholder={t(
-                        "assignment.pricePlaceholder",
-                        "Enter assignment price",
-                      )}
-                      inputMode="decimal"
-                    />
+                    <div className="relative">
+                      <span className="pointer-events-none absolute inset-y-0 left-3 inline-flex items-center text-slate-500 dark:text-slate-300">
+                        <AfCurrencyIcon size={13} />
+                      </span>
+                      <input
+                        className="inp pl-9"
+                        value={assignmentPrice}
+                        onChange={(e) => setAssignmentPrice(e.target.value)}
+                        placeholder={t(
+                          "assignment.pricePlaceholder",
+                          "Enter assignment price",
+                        )}
+                        inputMode="decimal"
+                      />
+                    </div>
                   </Field>
-                </div>
 
-                <div style={{ marginTop: 12 }}>
-                  <Field label={t("assignment.note", "Note")}>
-                    <textarea
-                      className="inp"
-                      rows={3}
-                      value={assignmentNote}
-                      onChange={(e) => setAssignmentNote(e.target.value)}
-                      placeholder={t(
-                        "assignment.notePlaceholder",
-                        "Add note (optional)",
+                  <div className="mt-3">
+                    <Field label={t("assignment.note", "Note")}>
+                      <textarea
+                        className="inp"
+                        rows={3}
+                        value={assignmentNote}
+                        onChange={(e) => setAssignmentNote(e.target.value)}
+                        placeholder={t(
+                          "assignment.notePlaceholder",
+                          "Add note (optional)",
+                        )}
+                        style={{ resize: "vertical" }}
+                      />
+                    </Field>
+                  </div>
+
+                  <div className="mt-1">
+                    <button
+                      type="button"
+                      className="btn btn-gold"
+                      onClick={() => assignMutation.mutate()}
+                      disabled={
+                        assignMutation.isPending || !workerType || !workerId
+                      }
+                      style={{ minWidth: 170, justifyContent: "center" }}
+                    >
+                      {assignMutation.isPending ? (
+                        t("common.loading", "Loading...")
+                      ) : (
+                        <>
+                          <LuUserCheck size={14} />
+                          <span>{t("assignment.send", "Send")}</span>
+                        </>
                       )}
-                      style={{ resize: "vertical" }}
-                    />
-                  </Field>
-                </div>
-
-                <div style={{ marginTop: 4 }}>
-                  <button
-                    type="button"
-                    className="btn btn-gold"
-                    onClick={() => assignMutation.mutate()}
-                    disabled={
-                      assignMutation.isPending || !workerType || !workerId
-                    }
-                    style={{
-                      minWidth: 170,
-                      justifyContent: "center",
-                    }}
-                  >
-                    {assignMutation.isPending ? (
-                      t("common.loading", "Loading...")
-                    ) : (
-                      <>
-                        <LuUserCheck size={14} />
-                        <span>{t("assignment.send", "Send")}</span>
-                      </>
-                    )}
-                  </button>
+                    </button>
+                  </div>
                 </div>
               </Card>
             )}

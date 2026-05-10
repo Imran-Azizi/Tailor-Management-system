@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { LuReceiptText, LuRefreshCcw, LuSearch } from "react-icons/lu";
+import { LuRefreshCcw, LuSearch } from "react-icons/lu";
 import api from "../lib/api.js";
 import { formatCurrency } from "../lib/currency.js";
 import { formatDateLocale } from "../lib/locale.js";
@@ -116,7 +116,7 @@ export default function WorkerPaymentReceipts() {
         <StatCard
           label={t("workerReceipts.totalReceipts", "Total Receipts")}
           value={stats.totalReceipts}
-          Icon={LuReceiptText}
+          Icon={AfCurrencyIcon}
           accent="#0F766E"
         />
         <StatCard
@@ -283,7 +283,7 @@ export default function WorkerPaymentReceipts() {
           <Spinner />
         ) : rows.length === 0 ? (
           <EmptyState
-            Icon={LuReceiptText}
+            Icon={AfCurrencyIcon}
             message={t("workerReceipts.empty", "No receipt records found.")}
           />
         ) : (

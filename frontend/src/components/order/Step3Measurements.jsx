@@ -14,103 +14,23 @@ import {
   LuPalette,
 } from "react-icons/lu";
 import api from "../../lib/api.js";
-import { getOrderTypeLabel } from "../../lib/orderType.js";
+import { getOrderLabelParts, getOrderTypeLabel } from "../../lib/orderType.js";
 import {
   getMeasurementFieldLabel,
   getStyleFieldLabel,
 } from "./measurementLabels.js";
-
-const FIELDS = {
-  OUTFIT: [
-    ["height", "height"],
-    ["shoulder", "shoulder"],
-    ["sleeve", "sleeve"],
-    ["neck", "neck"],
-    ["chest", "chest"],
-    ["armpit", "armpit"],
-    ["waist", "waist"],
-    ["skirt", "skirt"],
-    ["tenban", "tenban"],
-    ["pantLeg", "pantLeg"],
-    ["arm", "arm"],
-    ["calf", "calf"],
-  ],
-  WASKAT: [
-    ["height", "height"],
-    ["shoulder", "shoulder"],
-    ["neck", "neck"],
-    ["chest", "chest"],
-    ["waist", "waist"],
-    ["sorain", "sorain"],
-  ],
-  KORTY: [
-    ["height", "height"],
-    ["arm", "arm"],
-    ["shoulder", "shoulder"],
-    ["neck", "neck"],
-    ["sleeve", "sleeve"],
-    ["patlonHeight", "patlonHeight"],
-    ["kamerPatlon", "kamerPatlon"],
-    ["doroBaghlePatlon", "doroBaghlePatlon"],
-    ["waist", "waist"],
-    ["sorainPatlon", "sorainPatlon"],
-    ["sorain", "sorain"],
-    ["patPatlon", "patPatlon"],
-    ["pachaPatlon", "pachaPatlon"],
-  ],
-  YAKHANQAQ: [
-    ["height", "height"],
-    ["sleeve", "sleeve"],
-    ["shoulder", "shoulder"],
-    ["neck", "neck"],
-    ["armpit", "armpit"],
-    ["sorain", "sorain"],
-    ["chest", "chest"],
-  ],
-};
-
-const STYLES = {
-  OUTFIT: [
-    ["neckStyle", "neck", "neckoutfit"],
-    ["sleeveStyle", "sleeve", "astin"],
-    ["sleeveSize", "sleeveSize", null],
-    ["skirtStyle", "skirt", "daman"],
-    ["outfitDesign", "design", "tenbanship"],
-    ["outfitStyle", "style", "outfitdesign"],
-    ["buttonStyle", "button", "buttonship"],
-    ["pantStyle", "pant", "patyship"],
-  ],
-  WASKAT: [
-    ["neckStyle", "neck", "neckwaskat"],
-    ["shoulderState", "shoulderState", "shoulderstate"],
-    ["waskatStyle", "style", "__textarea"],
-  ],
-  KORTY: [["style", "style", "__textarea"]],
-  YAKHANQAQ: [
-    ["neckStyle", "neck", "yakhanqaqneck"],
-    ["sleeveStyle", "sleeve", "yakhanqaqsleeve"],
-    ["sleeveSize", "sleeveSize", null],
-    ["skirtStyle", "skirt", "yakhanqaqskirt"],
-    ["yakhanQaqDesign", "yakhanQaqDesign", "yakhanqaqdesign"],
-    ["buttonStyle", "button", "yakhanqaqbutton"],
-    ["pantStyle", "pant", "yakhanqaqpant"],
-  ],
-};
-
-const POCKETS = {
-  OUTFIT: [
-    ["frontPocket", "frontPocket"],
-    ["sidePocket", "sidePocket"],
-    ["underPocket", "underPocket"],
-  ],
-  YAKHANQAQ: [["frontPocket", "frontPocket"]],
-};
+import {
+  MEASUREMENT_FIELDS as FIELDS,
+  POCKET_FIELDS as POCKETS,
+  STYLE_FIELDS as STYLES,
+} from "./measurementStepConfig.js";
 
 const REQUIRED_LABELS = {
   OUTFIT: {},
   WASKAT: {},
   KORTY: {},
   YAKHANQAQ: {},
+  READY_MADE: {},
 };
 
 const selStyles = {
@@ -159,7 +79,25 @@ function getOrderTypeDisplayName(type, language = "en") {
 }
 
 function buildDefaultItemName(type, sequence, language = "en") {
-  return `${getOrderTypeDisplayName(type, language)} ${sequence}`;
+  return getOrderTypeDisplayName(type, language);
+}
+
+function buildMeasurementEntryLabel(
+  entry,
+  setValue,
+  setIdx,
+  totalSets,
+  language,
+) {
+  return getOrderLabelParts(
+    {
+      ...entry,
+      orderName: setValue?.__name?.trim() || entry?.name?.trim() || "",
+      orderTypeSequence: setIdx + 1,
+      orderTypeTotal: totalSets,
+    },
+    language,
+  );
 }
 
 function useDesign(model) {
@@ -186,6 +124,7 @@ function MeasureBlock({
   const language = i18n.resolvedLanguage || i18n.language;
   const isRtl = i18n.dir?.(language) === "rtl";
   const [open, setOpen] = useState(true);
+  const labelParts = getOrderLabelParts(entry, language);
   const fields = FIELDS[entry.type] || [];
   const styles = STYLES[entry.type] || [];
   const pockets = POCKETS[entry.type] || [];
@@ -248,11 +187,13 @@ function MeasureBlock({
           }}
         >
           <span className="badge bg-gold" style={{ fontSize: 11 }}>
-            {getOrderTypeLabel(entry.type, language)}
+            {entry.displayLabel || labelParts.typeWithSequenceLabel}
           </span>
-          <span style={{ fontSize: 13, fontWeight: 600 }}>
-            {entry.name || t("createOrder.measurements")}
-          </span>
+          {(entry.customName || labelParts.customName) && (
+            <span style={{ fontSize: 13, fontWeight: 600 }}>
+              {entry.customName || labelParts.customName}
+            </span>
+          )}
           {entry.isEmergency && (
             <span className="badge bg-red" style={{ fontSize: 10 }}>
               <LuTriangleAlert size={9} /> {t("createOrder.emergencyShort")}
@@ -571,9 +512,16 @@ export default function Step3Measurements({
         });
 
         if (missingLabels.length) {
+          const labelParts = buildMeasurementEntryLabel(
+            entry,
+            setValue,
+            setIdx,
+            sets.length,
+            language,
+          );
           const setLabel =
+            labelParts.fullLabel ||
             setValue.__name?.trim() ||
-            entry.name?.trim() ||
             `Set ${setIdx + 1}`;
           const message = t("createOrder.completeMeasurements", {
             type: getOrderTypeLabel(entry.type, language),
@@ -613,42 +561,80 @@ export default function Step3Measurements({
             key={`${entry.type}-${typeIdx}`}
             className="measure-order-card"
           >
-            <div className="measure-order-card-head">
-              <div>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    flexWrap: "wrap",
-                    marginBottom: 6,
-                  }}
-                >
-                  <span style={{ fontSize: 17, fontWeight: 800 }}>
-                    {getOrderTypeLabel(entry.type, language)}
-                  </span>
-                  {entry.name && (
-                    <span className="badge bg-gold">{entry.name}</span>
-                  )}
-                  {entry.isEmergency && (
-                    <span className="badge bg-red">
-                      <LuTriangleAlert size={10} />{" "}
-                      {t("createOrder.emergencyShort")}
-                    </span>
-                  )}
+            {(() => {
+              const totalSets = (data[typeIdx] || [{}]).length;
+              const headerLabel = buildMeasurementEntryLabel(
+                entry,
+                { __name: entry.name || "" },
+                0,
+                totalSets,
+                language,
+              );
+
+              return (
+                <div className="measure-order-card-head">
+                  <div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        flexWrap: "wrap",
+                        marginBottom: 6,
+                      }}
+                    >
+                      <span style={{ fontSize: 17, fontWeight: 800 }}>
+                        {headerLabel.typeWithSequenceLabel}
+                      </span>
+                      {headerLabel.customName && (
+                        <span className="badge bg-gold">
+                          {headerLabel.customName}
+                        </span>
+                      )}
+                      {entry.isEmergency && (
+                        <span className="badge bg-red">
+                          <LuTriangleAlert size={10} />{" "}
+                          {t("createOrder.emergencyShort")}
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ fontSize: 12.5, color: "var(--text3)" }}>
+                      {entry.isEmergency && entry.emergencyExpiry
+                        ? t("createOrder.emergencyExpiry", {
+                            date: entry.emergencyExpiry,
+                          })
+                        : t("createOrder.fillMeasurements")}
+                    </p>
+                    {entry.type === "READY_MADE" && (
+                      <p
+                        style={{
+                          fontSize: 12,
+                          color: "#059669",
+                          marginTop: 4,
+                          fontWeight: 600,
+                        }}
+                      >
+                        {t(
+                          "createOrder.readyMadeAllOptional",
+                          "All measurements are optional for Ready-Made Clothes",
+                        )}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <p style={{ fontSize: 12.5, color: "var(--text3)" }}>
-                  {entry.isEmergency && entry.emergencyExpiry
-                    ? t("createOrder.emergencyExpiry", {
-                        date: entry.emergencyExpiry,
-                      })
-                    : t("createOrder.fillMeasurements")}
-                </p>
-              </div>
-            </div>
+              );
+            })()}
 
             <div className="measure-block-stack">
               {(data[typeIdx] || [{}]).map((setValue, setIdx) => {
+                const totalSets = (data[typeIdx] || [{}]).length;
+                const labelParts = buildMeasurementEntryLabel(
+                  entry,
+                  setValue,
+                  setIdx,
+                  totalSets,
+                  language,
+                );
                 const blockErrors = Object.fromEntries(
                   Object.entries(fieldErrors)
                     .filter(([key]) => key.startsWith(`${typeIdx}-${setIdx}-`))
@@ -663,10 +649,11 @@ export default function Step3Measurements({
                     key={`${typeIdx}-${setIdx}`}
                     entry={{
                       ...entry,
-                      name:
-                        setValue.__name?.trim() ||
-                        entry.name ||
-                        buildDefaultItemName(entry.type, setIdx + 1, language),
+                      name: setValue.__name?.trim() || entry.name || "",
+                      orderTypeSequence: setIdx + 1,
+                      orderTypeTotal: totalSets,
+                      displayLabel: labelParts.typeWithSequenceLabel,
+                      customName: labelParts.customName,
                     }}
                     value={setValue}
                     errors={blockErrors}
@@ -679,11 +666,7 @@ export default function Step3Measurements({
                     onRemove={() => removeSet(typeIdx, setIdx)}
                     canRemove={(data[typeIdx] || []).length > 1}
                     showNameInput={setIdx > 0}
-                    defaultName={buildDefaultItemName(
-                      entry.type,
-                      setIdx + 1,
-                      language,
-                    )}
+                    defaultName={labelParts.typeWithSequenceLabel}
                     setFieldError={(field) =>
                       clearFieldError(typeIdx, setIdx, field)
                     }

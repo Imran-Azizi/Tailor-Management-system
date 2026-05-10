@@ -2,7 +2,11 @@ import { useMemo, useState } from "react";
 import { parseNumberLocale } from "../../lib/normalize.js";
 import { useTranslation } from "react-i18next";
 import { formatCurrency } from "../../lib/currency.js";
-import { getOrderTypeLabel } from "../../lib/orderType.js";
+import {
+  getOrderDisplayName,
+  getOrderTypeLabel,
+  withOrderTypeSequenceMeta,
+} from "../../lib/orderType.js";
 
 const DEFAULT_BILLING = {
   totalPrice: "",
@@ -30,10 +34,16 @@ function sanitizeWholeInput(raw = "") {
 
 function getDisplayLabel(entry, index, language = "en") {
   if (entry?.displayName?.trim()) return entry.displayName.trim();
-  if (entry?.name?.trim()) return entry.name.trim();
-  const orderType = getOrderTypeLabel(entry?.type, language);
-  const sequence = Number(entry?.sequence || 0) || index + 1;
-  return `${orderType} ${sequence}`;
+  return getOrderDisplayName(
+    {
+      ...entry,
+      orderName: entry?.name?.trim() || entry?.orderName?.trim() || "",
+      orderTypeSequence:
+        Number(entry?.orderTypeSequence ?? entry?.sequence) || index + 1,
+      orderTypeTotal: Number(entry?.orderTypeTotal) || 1,
+    },
+    language,
+  );
 }
 
 function buildBillingEntries(
@@ -42,17 +52,19 @@ function buildBillingEntries(
   language = "en",
 ) {
   if (Array.isArray(orderItems) && orderItems.length > 0) {
-    return orderItems.map((item, index) => ({
+    return withOrderTypeSequenceMeta(orderItems).map((item, index) => ({
       ...item,
-      sequence: Number(item?.sequence || 0) || index + 1,
+      sequence:
+        Number(item?.orderTypeSequence ?? item?.sequence ?? 0) || index + 1,
       billingKey: String(item?.billingKey ?? item?.key ?? index),
       displayName: getDisplayLabel(item, index, language),
     }));
   }
 
-  return (orderTypes || []).map((entry, index) => ({
+  return withOrderTypeSequenceMeta(orderTypes || []).map((entry, index) => ({
     ...entry,
-    sequence: index + 1,
+    sequence:
+      Number(entry?.orderTypeSequence ?? entry?.sequence ?? 0) || index + 1,
     billingKey: String(index),
     displayName: getDisplayLabel(entry, index, language),
   }));
@@ -135,6 +147,32 @@ function BillingCard({ entry, value, onChange, billingKey }) {
           </span>
         )}
       </div>
+
+      {entry.type === "READY_MADE" && entry.readyMadeOriginalPrice != null && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "8px 14px",
+            borderRadius: 8,
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            marginBottom: 12,
+          }}
+        >
+          <span
+            style={{ fontSize: 12, color: "var(--text3)", fontWeight: 600 }}
+          >
+            {t("createOrder.originalPrice", "Original Price")}
+          </span>
+          <span
+            style={{ fontSize: 15, fontWeight: 700, color: "var(--text2)" }}
+          >
+            {formatCurrency(Number(entry.readyMadeOriginalPrice), language)}
+          </span>
+        </div>
+      )}
 
       <div
         style={{

@@ -57,7 +57,13 @@ const TAB_GROUPS = {
   ],
 };
 
-const PAGE_TABS = ["OUTFIT", "WASKAT", "YAKHANQAQ", "CONTRIBUTOR"];
+const PAGE_TABS = [
+  "OUTFIT",
+  "WASKAT",
+  "YAKHANQAQ",
+  "READY_MADE",
+  "CONTRIBUTOR",
+];
 
 function ContributorSection() {
   const { t, i18n } = useTranslation();
@@ -1193,14 +1199,390 @@ function DesignCard({ model }) {
   );
 }
 
+function ReadyMadeClothingSection() {
+  const { t, i18n } = useTranslation();
+  const qc = useQueryClient();
+  const language = i18n.resolvedLanguage || i18n.language;
+  const { isAdmin } = useAuth();
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [deleteItem, setDeleteItem] = useState(null);
+  const [formError, setFormError] = useState("");
+  const [form, setForm] = useState({
+    clothingCode: "",
+    originalPrice: "",
+    description: "",
+    quantity: "1",
+  });
+
+  const { data: items = [], isLoading } = useQuery({
+    queryKey: ["ready-made-clothing"],
+    queryFn: () => api.get("/designs/ready-made-clothing").then((r) => r.data),
+  });
+
+  const createMut = useMutation({
+    mutationFn: (payload) => api.post("/designs/ready-made-clothing", payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ready-made-clothing"] });
+      setModalOpen(false);
+      setEditing(null);
+      setForm({
+        clothingCode: "",
+        originalPrice: "",
+        description: "",
+        quantity: "1",
+      });
+      toast.success(
+        t("designs.readyMade.created", {
+          defaultValue: "Ready-made clothing created.",
+        }),
+      );
+    },
+    onError: (err) => {
+      setFormError(getApiErrorMessage(err));
+    },
+  });
+
+  const updateMut = useMutation({
+    mutationFn: (payload) =>
+      api.put(`/designs/ready-made-clothing/${editing.id}`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ready-made-clothing"] });
+      setModalOpen(false);
+      setEditing(null);
+      setForm({
+        clothingCode: "",
+        originalPrice: "",
+        description: "",
+        quantity: "1",
+      });
+      toast.success(
+        t("designs.readyMade.updated", {
+          defaultValue: "Ready-made clothing updated.",
+        }),
+      );
+    },
+    onError: (err) => {
+      setFormError(getApiErrorMessage(err));
+    },
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: () =>
+      api.delete(`/designs/ready-made-clothing/${deleteItem.id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ready-made-clothing"] });
+      setDeleteItem(null);
+      toast.success(
+        t("designs.readyMade.deleted", {
+          defaultValue: "Ready-made clothing deleted.",
+        }),
+      );
+    },
+    onError: (err) => {
+      toast.error(getApiErrorMessage(err));
+    },
+  });
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm({
+      clothingCode: "",
+      originalPrice: "",
+      description: "",
+      quantity: "1",
+    });
+    setFormError("");
+    setModalOpen(true);
+  };
+
+  const openEdit = (item) => {
+    setEditing(item);
+    setForm({
+      clothingCode: item.clothingCode,
+      originalPrice: String(item.originalPrice),
+      description: item.description || "",
+      quantity: String(item.quantity ?? 1),
+    });
+    setFormError("");
+    setModalOpen(true);
+  };
+
+  const handleSubmit = () => {
+    if (!form.clothingCode.trim()) {
+      setFormError(
+        t("designs.readyMade.codeRequired", {
+          defaultValue: "Clothing code is required.",
+        }),
+      );
+      return;
+    }
+    const price = parseFloat(form.originalPrice);
+    if (!form.originalPrice || isNaN(price) || price < 0) {
+      setFormError(
+        t("designs.readyMade.priceRequired", {
+          defaultValue: "Valid original price is required.",
+        }),
+      );
+      return;
+    }
+    const quantity = Number(form.quantity);
+    if (!Number.isInteger(quantity) || quantity < 0) {
+      setFormError(
+        t("designs.readyMade.quantityRequired", {
+          defaultValue: "Valid quantity is required.",
+        }),
+      );
+      return;
+    }
+    const payload = {
+      clothingCode: form.clothingCode.trim(),
+      originalPrice: price,
+      description: form.description.trim() || undefined,
+      quantity,
+    };
+    if (editing) updateMut.mutate(payload);
+    else createMut.mutate(payload);
+  };
+
+  const isPending = createMut.isPending || updateMut.isPending;
+
+  return (
+    <div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          marginBottom: 16,
+        }}
+      >
+        <button type="button" className="btn btn-gold" onClick={openCreate}>
+          <LuPlus size={15} />
+          {t("designs.readyMade.addNew", { defaultValue: "Add Clothing" })}
+        </button>
+      </div>
+
+      {isLoading && (
+        <p style={{ fontSize: 13, color: "var(--text3)" }}>
+          {t("common.loading", { defaultValue: "Loading..." })}
+        </p>
+      )}
+
+      {!isLoading && items.length === 0 && (
+        <p style={{ fontSize: 13, color: "var(--text3)", fontStyle: "italic" }}>
+          {t("designs.readyMade.empty", {
+            defaultValue: "No ready-made clothing records yet.",
+          })}
+        </p>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {items.map((item) => (
+          <div
+            key={item.id}
+            style={{
+              border: "1px solid var(--border2)",
+              borderRadius: 10,
+              padding: "12px 16px",
+              background: "var(--surface2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontWeight: 700, fontSize: 14 }}>
+                {item.clothingCode}
+              </span>
+              <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                {t("designs.readyMade.quantity", { defaultValue: "Quantity" })}:{" "}
+                {item.quantity ?? 0}
+              </span>
+              {item.description && (
+                <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                  {item.description}
+                </span>
+              )}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span
+                style={{
+                  fontWeight: 700,
+                  fontSize: 15,
+                  color: "var(--primary)",
+                }}
+              >
+                {formatCurrency(item.originalPrice, language)}
+              </span>
+              <button
+                type="button"
+                className="btn btn-outline"
+                style={{ padding: "5px 10px" }}
+                onClick={() => openEdit(item)}
+              >
+                <LuPencil size={13} />
+              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  style={{
+                    padding: "5px 10px",
+                    color: "#dc2626",
+                    borderColor: "#dc2626",
+                  }}
+                  onClick={() => setDeleteItem(item)}
+                >
+                  <LuTrash2 size={13} />
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <Modal
+        open={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          setEditing(null);
+        }}
+        title={
+          editing
+            ? t("designs.readyMade.editTitle", {
+                defaultValue: "Edit Clothing",
+              })
+            : t("designs.readyMade.addTitle", {
+                defaultValue: "Add Ready-Made Clothing",
+              })
+        }
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {formError && <div className="info-box ib-red">{formError}</div>}
+          <div>
+            <label className="lbl">
+              {t("designs.readyMade.clothingCode", {
+                defaultValue: "Clothing Code",
+              })}
+            </label>
+            <input
+              className="inp"
+              value={form.clothingCode}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, clothingCode: e.target.value }));
+                setFormError("");
+              }}
+              placeholder="e.g. RM-001"
+            />
+          </div>
+          <div>
+            <label className="lbl">
+              {t("designs.readyMade.originalPrice", {
+                defaultValue: "Original Price",
+              })}
+            </label>
+            <input
+              className="inp"
+              type="number"
+              min="0"
+              value={form.originalPrice}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, originalPrice: e.target.value }));
+                setFormError("");
+              }}
+              placeholder="0"
+            />
+          </div>
+          <div>
+            <label className="lbl">
+              {t("designs.readyMade.quantity", { defaultValue: "Quantity" })}
+            </label>
+            <input
+              className="inp"
+              type="number"
+              min="0"
+              step="1"
+              value={form.quantity}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, quantity: e.target.value }));
+                setFormError("");
+              }}
+              placeholder="1"
+            />
+          </div>
+          <div>
+            <label className="lbl">
+              {t("designs.readyMade.description", {
+                defaultValue: "Description (optional)",
+              })}
+            </label>
+            <textarea
+              className="inp"
+              rows={3}
+              value={form.description}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, description: e.target.value }))
+              }
+              placeholder={t("designs.readyMade.descriptionPlaceholder", {
+                defaultValue: "Brief description...",
+              })}
+              style={{ resize: "vertical", minHeight: 64 }}
+            />
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              type="button"
+              className="btn btn-outline"
+              style={{ flex: 1 }}
+              onClick={() => {
+                setModalOpen(false);
+                setEditing(null);
+              }}
+              disabled={isPending}
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              type="button"
+              className="btn btn-gold"
+              style={{ flex: 1 }}
+              onClick={handleSubmit}
+              disabled={isPending}
+            >
+              {isPending
+                ? t("common.saving", { defaultValue: "Saving..." })
+                : t("common.save")}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <ConfirmDeleteModal
+        open={!!deleteItem}
+        onClose={() => setDeleteItem(null)}
+        onConfirm={() => deleteMut.mutate()}
+        itemName={deleteItem?.clothingCode || ""}
+        isPending={deleteMut.isPending}
+      />
+    </div>
+  );
+}
+
 export default function Designs() {
   const { t } = useTranslation();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isFinance } = useAuth();
   const [activeTab, setActiveTab] = useState("OUTFIT");
   const availableTabs = useMemo(
     () =>
-      isAdmin ? PAGE_TABS : PAGE_TABS.filter((tab) => tab !== "CONTRIBUTOR"),
-    [isAdmin],
+      PAGE_TABS.filter((tab) => {
+        if (tab === "CONTRIBUTOR") return isAdmin;
+        if (tab === "READY_MADE") return isAdmin || isFinance;
+        return true;
+      }),
+    [isAdmin, isFinance],
   );
 
   useEffect(() => {
@@ -1214,6 +1596,7 @@ export default function Designs() {
     WASKAT: t("designs.tabs.waskat", { defaultValue: "Waskat" }),
     CONTRIBUTOR: t("designs.tabs.contributor", { defaultValue: "Contributor" }),
     YAKHANQAQ: t("designs.tabs.yakhanaqq", { defaultValue: "یخن قاق" }),
+    READY_MADE: t("designs.tabs.readyMade", { defaultValue: "Ready-Made" }),
   };
 
   const modelsToShow = (TAB_GROUPS[activeTab] || [])
@@ -1248,6 +1631,8 @@ export default function Designs() {
 
       {activeTab === "CONTRIBUTOR" ? (
         <ContributorSection />
+      ) : activeTab === "READY_MADE" ? (
+        <ReadyMadeClothingSection />
       ) : (
         <div className="g-designs designs-grid">
           {modelsToShow.length === 0 ? (
