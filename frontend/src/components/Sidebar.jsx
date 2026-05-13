@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -11,8 +11,13 @@ import {
 import { useAuth } from "../context/AuthContext.jsx";
 import api from "../lib/api.js";
 import SidebarGroup from "./sidebar/SidebarGroup.jsx";
+import SidebarItem from "./sidebar/SidebarItem.jsx";
 import { isRouteActive } from "./sidebar/routeMatch.js";
-import { getRoleAccent, getSidebarSections } from "./sidebar/sidebarConfig.js";
+import {
+  getRoleAccent,
+  getSidebarFooterItems,
+  getSidebarSections,
+} from "./sidebar/sidebarConfig.js";
 
 function getDropdownKeys(sections) {
   return new Set(
@@ -92,6 +97,13 @@ function withLocalizedLabels(sections, t) {
   }));
 }
 
+function withLocalizedItems(items, t) {
+  return items.map((item) => ({
+    ...item,
+    text: t(item.label, item.fallback),
+  }));
+}
+
 export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
@@ -104,6 +116,10 @@ export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
 
   const sections = useMemo(
     () => withLocalizedLabels(getSidebarSections(role), t),
+    [role, t],
+  );
+  const footerItems = useMemo(
+    () => withLocalizedItems(getSidebarFooterItems(role), t),
     [role, t],
   );
   const validDropdownKeys = useMemo(
@@ -150,7 +166,7 @@ export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
   }, [expandedStorageKey, openDropdownId]);
 
   const { data: pendingOrdersData } = useQuery({
-    queryKey: ["orders-sidebar-pending-count", role],
+    queryKey: ["orders-sidebar-pending-count", role, user?.id],
     queryFn: () =>
       api
         .get("/orders", {
@@ -175,18 +191,19 @@ export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
     [pendingCount],
   );
 
-  const handleNavigate = ({
-    openDropdownId: nextOpenDropdownId = null,
-  } = {}) => {
-    setOpenDropdownId(nextOpenDropdownId);
-    onNavigate?.();
-  };
+  const handleNavigate = useCallback(
+    ({ openDropdownId: nextOpenDropdownId = null } = {}) => {
+      setOpenDropdownId(nextOpenDropdownId);
+      onNavigate?.();
+    },
+    [onNavigate],
+  );
 
-  const toggleGroup = (groupKey) => {
+  const toggleGroup = useCallback((groupKey) => {
     setOpenDropdownId((currentDropdownId) =>
       currentDropdownId === groupKey ? null : groupKey,
     );
-  };
+  }, []);
 
   return (
     <aside
@@ -289,6 +306,29 @@ export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
           ))}
         </div>
       </nav>
+
+      {footerItems.length > 0 && (
+        <div className="relative z-[1] shrink-0 border-t border-[var(--sb-bdr)] px-2 py-3">
+          {!collapsed && (
+            <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--sb-section)]">
+              {t("supportTeam.title", "Support Team")}
+            </div>
+          )}
+          <div className="space-y-0.5">
+            {footerItems.map((item) => (
+              <SidebarItem
+                key={item.key}
+                item={item}
+                pathname={location.pathname}
+                collapsed={collapsed}
+                accent={accent}
+                isRtl={isRtl}
+                onNavigate={handleNavigate}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {!collapsed && (
         <footer className="relative z-[1] shrink-0 border-t border-[var(--sb-bdr)] px-3 py-2 text-center text-[11px] text-[var(--sb-subtitle)]">

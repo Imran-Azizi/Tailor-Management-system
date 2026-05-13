@@ -73,7 +73,27 @@ export default function PrintBills() {
 
   const fetchCustomerDetails = async (id) => {
     const res = await api.get(`/customers/${id}`);
-    return res.data;
+    const customerDetails = res.data;
+    const firstOrderId = customerDetails?.orders?.[0]?.id;
+    if (!firstOrderId) return customerDetails;
+
+    try {
+      const billRes = await api.get(`/orders/${firstOrderId}/bill`);
+      const billData = billRes.data;
+      if (billData?.customer && Array.isArray(billData.orders)) {
+        return {
+          ...customerDetails,
+          ...billData.customer,
+          orders: billData.orders,
+        };
+      }
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error("Bill detail hydration failed", error);
+      }
+    }
+
+    return customerDetails;
   };
 
   useEffect(() => {
@@ -89,7 +109,9 @@ export default function PrintBills() {
       })
       .catch((error) => {
         if (ignore) return;
-        console.error("Auto-select customer failed", error);
+        if (import.meta.env.DEV) {
+          console.error("Auto-select customer failed", error);
+        }
         toast.error(t("createOrder.customerLookupFailed") || "Search failed");
       })
       .finally(() => {
@@ -168,7 +190,9 @@ export default function PrintBills() {
 
       toast(t("orders.searchCustomers"));
     } catch (error) {
-      console.error("Search failed", error);
+      if (import.meta.env.DEV) {
+        console.error("Search failed", error);
+      }
       if (error?.response?.status === 404) {
         toast.error(t("createOrder.customerNotFound"));
       } else {
@@ -196,7 +220,9 @@ export default function PrintBills() {
         title: t("orders.orderDocuments"),
       });
     } catch (error) {
-      console.error("Print failed", error);
+      if (import.meta.env.DEV) {
+        console.error("Print failed", error);
+      }
       toast.error(t("orders.printFailed") || "Print failed");
     }
   };
@@ -216,7 +242,9 @@ export default function PrintBills() {
         title: t("orders.orderDocuments"),
       });
     } catch (error) {
-      console.error("Print failed", error);
+      if (import.meta.env.DEV) {
+        console.error("Print failed", error);
+      }
       toast.error(t("orders.printFailed") || "Print failed");
     }
   };

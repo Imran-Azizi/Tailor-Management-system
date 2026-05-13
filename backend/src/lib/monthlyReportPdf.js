@@ -719,7 +719,10 @@ function drawDashboardStatsCards(
 ) {
   const statLabels = labels.stats || {};
   const netBenefit =
-    Number(stats.totalRakhtRevenue || 0) + Number(stats.totalOrderBenefit || 0);
+    Number(stats.totalRakhtRevenue || 0) +
+    Number(stats.totalOrderBenefit || 0) +
+    Number(stats.totalReadyMadeProfitAfterExpenses || 0) +
+    Number(stats.totalReadyMadeWaskatProfitAfterExpenses || 0);
 
   const cards = [
     {
@@ -741,6 +744,26 @@ function drawDashboardStatsCards(
     {
       label: statLabels.totalOrderBenefit,
       value: formatAfCurrency(stats.totalOrderBenefit || 0, language, isRtl),
+    },
+    {
+      label:
+        statLabels.totalReadyMadeProfitAfterExpenses ||
+        "Total Ready-Made Profit (After Expenses)",
+      value: formatAfCurrency(
+        stats.totalReadyMadeProfitAfterExpenses || 0,
+        language,
+        isRtl,
+      ),
+    },
+    {
+      label:
+        statLabels.totalReadyMadeWaskatProfitAfterExpenses ||
+        "Total Ready-Made Waskat Profit (After Expenses)",
+      value: formatAfCurrency(
+        stats.totalReadyMadeWaskatProfitAfterExpenses || 0,
+        language,
+        isRtl,
+      ),
     },
     {
       label: statLabels.totalRakhtRevenue,
@@ -879,7 +902,9 @@ export async function buildMonthlyReportPdf({
       const fontPath = resolveArabicReportFontPath();
       if (!fontPath) throw new Error("No Arabic font found");
       fkFont = await loadArabicFont(fontPath);
-      console.info(`[PDF] Monthly RTL font: ${fontPath}`);
+      if (process.env.DEBUG_PDF_FONTS === "true") {
+        console.info(`[PDF] Monthly RTL font: ${fontPath}`);
+      }
     } catch (err) {
       console.error("[PDF] Arabic font load failed:", err.message);
       fkFont = null;

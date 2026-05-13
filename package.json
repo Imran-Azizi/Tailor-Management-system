@@ -6,8 +6,5 @@
   "scripts": {
     "build": "npm install --prefix frontend --include=dev && npm install --prefix backend --include=dev && npm --prefix frontend run build",
     "start": "npm --prefix backend run start"
-  },
-  "devDependencies": {
-    "concurrently": "^8.2.2"
   }
 }

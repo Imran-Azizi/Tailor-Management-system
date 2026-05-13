@@ -23,6 +23,7 @@ import {
   LuTriangleAlert,
   LuCalendarCheck,
   LuUsers,
+  LuFactory,
 } from "react-icons/lu";
 import { useTranslation } from "react-i18next";
 import api from "../lib/api.js";
@@ -59,6 +60,24 @@ const CURRENCY_FORMAT_OPTIONS = {
 
 function formatMoney(value, language) {
   return formatCurrency(value, language, CURRENCY_FORMAT_OPTIONS);
+}
+
+function getOrderRevenue(order) {
+  const finalTotalBenefit = Number(order?.finalTotalBenefit);
+  if (Number.isFinite(finalTotalBenefit)) return finalTotalBenefit;
+
+  const baseBenefit = Number(order?.totalBenefit || 0);
+  if (order?.type !== "READY_MADE" && order?.type !== "READY_MADE_WASKAT") {
+    return baseBenefit;
+  }
+
+  const readyMadeOriginalPrice = Number(
+    order?.type === "READY_MADE"
+      ? order?.readyMadeOriginalPrice || 0
+      : order?.readyMadeWaskatOriginalPrice || 0,
+  );
+
+  return baseBenefit - readyMadeOriginalPrice;
 }
 
 const TooltipCard = ({ active, payload, label, language, t, isRtl }) => {
@@ -120,6 +139,21 @@ export default function Dashboard() {
     refetchInterval: 60_000,
   });
 
+  // Fetch other items total profit (مجموع مفاد اجناس دیگر)
+  const { data: otherItemsStats } = useQuery({
+    queryKey: ["other-items-stats", viewMonth, viewYear],
+    queryFn: () =>
+      api
+        .get("/item-sales/stats", {
+          params: {
+            month: viewMonth,
+            year: viewYear,
+          },
+        })
+        .then((res) => res.data),
+    refetchInterval: 60_000,
+  });
+
   if (isLoading) {
     return (
       <div className="page">
@@ -142,8 +176,23 @@ export default function Dashboard() {
   const totalReadyMadeProfit = Number(data.totalReadyMadeProfit ?? 0) || 0;
   const totalReadyMadeProfitAfterExpenses =
     Number(data.totalReadyMadeProfitAfterExpenses ?? totalReadyMadeProfit) || 0;
+  const totalReadyMadeWaskatProfit =
+    Number(data.totalReadyMadeWaskatProfit ?? 0) || 0;
+  const totalReadyMadeWaskatProfitAfterExpenses =
+    Number(
+      data.totalReadyMadeWaskatProfitAfterExpenses ??
+        totalReadyMadeWaskatProfit,
+    ) || 0;
+
+  // Other items total profit (مجموع مفاد اجناس دیگر)
+  const otherItemsTotalProfit = Number(otherItemsStats?.totalProfit ?? 0) || 0;
+
   const netBenefit =
-    totalRakhtRevenue + totalOrderBenefit + totalReadyMadeProfitAfterExpenses;
+    totalRakhtRevenue +
+    totalOrderBenefit +
+    totalReadyMadeProfitAfterExpenses +
+    totalReadyMadeWaskatProfitAfterExpenses +
+    otherItemsTotalProfit;
   const netBenefitIsPositive = netBenefit >= 0;
   const monthLabel = formatMonthYearLabel(viewMonth, viewYear, language);
   const generatedAtLabel = formatAfghanistanReportDate(new Date(), language);
@@ -152,6 +201,24 @@ export default function Dashboard() {
   // rtlOrder = position when reading right→left (Dari/Pashto)
   // In RTL grid (dir="rtl"), the item with rtlOrder:1 lands in the rightmost slot.
   const statCards = [
+    {
+      key: "otherItemsTotalProfit",
+      label: t(
+        "dashboardPage.otherItemsTotalProfit",
+        "Other Items Total Profit",
+      ),
+      value: formatMoney(otherItemsTotalProfit, language),
+      sub: t(
+        "dashboardPage.otherItemsTotalProfitSub",
+        "From item sales records",
+      ),
+      Icon: LuFactory,
+      accent: "#F59E42",
+      adminOnly: true,
+      onClick: () => navigate("/item-sales/records"),
+      ltrOrder: 8.7,
+      rtlOrder: 8.7,
+    },
     {
       key: "totalOrders",
       label: t("dashboardPage.totalOrders"),
@@ -224,7 +291,8 @@ export default function Dashboard() {
       }),
       value: formatMoney(totalRakhtRevenue, language),
       sub: t("dashboardPage.netBenefitSub", {
-        defaultValue: "Total Rakht Revenue + Total Order Benefit",
+        defaultValue:
+          "Total Rakht Revenue + Total Order Benefit + Total Ready-Made Profit + Total Ready-Made Waskat Profit",
       }),
       Icon: AfCurrencyIcon,
       accent: "#0F766E",
@@ -262,6 +330,22 @@ export default function Dashboard() {
       onClick: () => navigate("/orders/completed?type=READY_MADE"),
       ltrOrder: 8.5,
       rtlOrder: 8.5,
+    },
+    {
+      key: "readyMadeWaskatProfit",
+      label: t("dashboardPage.totalReadyMadeWaskatProfitAfterExpenses", {
+        defaultValue: "Total Ready-Made Waskat Profit (After Expenses)",
+      }),
+      value: formatMoney(totalReadyMadeWaskatProfitAfterExpenses, language),
+      sub: t("dashboardPage.afterAllExpenses", {
+        defaultValue: "After all expenses",
+      }),
+      Icon: AfCurrencyIcon,
+      accent: "#0284C7",
+      adminOnly: true,
+      onClick: () => navigate("/orders/completed?type=READY_MADE_WASKAT"),
+      ltrOrder: 8.6,
+      rtlOrder: 8.6,
     },
     {
       key: "dailyExpenses",
@@ -390,6 +474,14 @@ export default function Dashboard() {
       isNumeric: true,
       cellClassName: "whitespace-nowrap font-medium",
       render: (order) => formatMoney(order.totalPrice, language),
+    },
+    {
+      key: "revenue",
+      label: t("dashboardPage.revenue", "Revenue"),
+      width: "10rem",
+      isNumeric: true,
+      cellClassName: "whitespace-nowrap font-medium",
+      render: (order) => formatMoney(getOrderRevenue(order), language),
     },
     {
       key: "paid",

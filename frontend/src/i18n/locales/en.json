@@ -54,6 +54,7 @@
     "noDataThisMonth": "No data found for this month"
   },
   "sidebar": {
+    "dokanPanel": "Dokan Panel",
     "overview": "Overview",
     "orders": "Orders",
     "management": "Management",
@@ -72,7 +73,8 @@
     "allTransactions": "All Loans",
     "damagedClothes": "Damaged Clothes",
     "completedFromWorkers": "Completed From Workers",
-    "dailyTasks": "Daily Expenses"
+    "dailyTasks": "Daily Expenses",
+    "itemSalesRecords": "Sold Item Records"
   },
   "navbar": {
     "searchPlaceholder": "Search orders, customers...",
@@ -121,7 +123,7 @@
     "defaultPasswordHint": "Default password will be set to the phone number.",
     "roles": {
       "admin": "Admin",
-      "dokan": "Shop",
+      "dokan": "Dokan",
       "dokht": "Tailor",
       "qichikar": "Cutter",
       "finance": "Finance"
@@ -151,7 +153,9 @@
   "dashboardPage": {
     "title": "Dashboard",
     "netBenefit": "Net Benefit",
-    "netBenefitSub": "Total Rakht Revenue + Total Order Benefit + Total Ready-Made Profit",
+    "netBenefitSub": "Total Rakht Revenue + Total Order Benefit + Total Ready-Made Profit + Total Ready-Made Waskat Profit",
+    "otherItemsTotalProfit": "Other Items Total Profit",
+    "otherItemsTotalProfitSub": "From item sales records",
     "tooltipOrders": "{{count}} orders",
     "totalOrders": "Total Orders",
     "today": "Today",
@@ -183,6 +187,8 @@
     "totalOrderBenefit": "Total Order Benefit",
     "totalReadyMadeProfit": "Total Ready-Made Profit",
     "totalReadyMadeProfitAfterExpenses": "Total Ready-Made Profit (After Expenses)",
+    "totalReadyMadeWaskatProfit": "Total Ready-Made Waskat Profit",
+    "totalReadyMadeWaskatProfitAfterExpenses": "Total Ready-Made Waskat Profit (After Expenses)",
     "afterAllExpenses": "After all expenses"
   },
   "assignment": {
@@ -265,6 +271,7 @@
     "orderDocuments": "Order Documents",
     "printPackCopy": "View the customer bill and the tailor copy in one place, with clean print and PDF actions.",
     "billNumber": "Bill Number",
+    "createdBy": "Created By",
     "createdOn": "Created on {{date}}",
     "currentRemaining": "Current Remaining",
     "editOrder": "Edit Order",
@@ -274,6 +281,8 @@
     "orderType": "Order Type",
     "viewingMonth": "Viewing data for",
     "noDataThisMonth": "No orders found for this month",
+    "financeCreatedTotal": "Created by You",
+    "financeCreatedTotalSub": "All orders from your Finance account",
     "printFailed": "Print failed",
     "orderNotFound": "Order not found"
   },
@@ -511,7 +520,8 @@
     "noOrdersInCategory": "No orders in this category.",
     "searchBillPlaceholder": "Search by bill number",
     "noOrderFoundByBill": "No order found for this bill number.",
-    "readyMadeOriginalPrice": "Ready-Made Original Price"
+    "readyMadeOriginalPrice": "Ready-Made Original Price",
+    "readyMadeWaskatOriginalPrice": "Ready-Made Waskat Original Price"
   },
   "dailyTasks": {
     "title": "Daily Expenses",
@@ -832,6 +842,8 @@
     "tabs": {
       "outfit": "Outfit",
       "waskat": "Waskat",
+      "readyMade": "Ready-Made",
+      "readyMadeWaskat": "Ready-Made Waskat",
       "contributor": "Contributor",
       "yakhanaqq": "Yakhan Qaq"
     },
@@ -892,9 +904,52 @@
       }
     }
   },
+  "readyMade": {
+    "selectCode": "Select Clothing Code",
+    "noItems": "No clothing items found. Add items in the Design page -> Ready-Made tab.",
+    "chooseCode": "- choose a clothing code -",
+    "originalPrice": "Original Price",
+    "code": "Code",
+    "selectCodeRequired": "Please select a clothing code for the Ready-Made Clothes order."
+  },
+  "readyMadeWaskat": {
+    "selectCode": "Select Waskat Code",
+    "noItems": "No ready-made waskat items found. Add items in the Design page -> Ready-Made Waskat tab.",
+    "chooseCode": "- choose a waskat code -",
+    "originalPrice": "Original Price",
+    "code": "Code",
+    "selectCodeRequired": "Please select a waskat code for the Ready-Made Waskat order."
+  },
   "ui": {
     "pageSummary": "Page {{page}} of {{pages}} · {{total}} total",
     "prev": "Previous",
     "next": "Next"
+  },
+  "globalSearch": {
+    "title": "Global Order Search",
+    "description": "Search orders across all months by customer name, phone number, or bill number.",
+    "placeholder": "Search by name, phone, or bill number...",
+    "searchByName": "Customer Name",
+    "searchByPhone": "Phone Number",
+    "searchByBill": "Bill Number",
+    "startTyping": "Start typing to search across all months",
+    "resultsCount": "{{count}} order(s) found",
+    "noResults": "No orders found matching your search.",
+    "searchFailed": "Search failed. Please try again.",
+    "newOrder": "New Order",
+    "prefillNotice": "Order data has been pre-filled from an existing order. Please review and update before saving.",
+    "prefillError": "Failed to load order data. Please try again.",
+    "col": {
+      "bill": "Bill #",
+      "billNumber": "Bill Number",
+      "customer": "Customer",
+      "phone": "Phone",
+      "type": "Type",
+      "month": "Month / Year",
+      "price": "Price",
+      "status": "Status",
+      "action": "Action"
+    },
+    "searchHint": "Search another order by customer name, phone number, or bill number."
   }
 }

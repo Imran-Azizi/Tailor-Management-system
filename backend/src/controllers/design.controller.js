@@ -74,7 +74,10 @@ const getNetBenefit = async (req) => {
   });
 
   return (
-    Number(stats.totalRakhtRevenue || 0) + Number(stats.totalOrderBenefit || 0)
+    Number(stats.totalRakhtRevenue || 0) +
+    Number(stats.totalOrderBenefit || 0) +
+    Number(stats.totalReadyMadeProfitAfterExpenses || 0) +
+    Number(stats.totalReadyMadeWaskatProfitAfterExpenses || 0)
   );
 };
 
@@ -476,6 +479,120 @@ export const deleteReadyMadeClothing = async (req, res, next) => {
       return res
         .status(404)
         .json({ error: "Ready-made clothing item not found" });
+    }
+    next(e);
+  }
+};
+
+// ─── Ready-Made Waskat CRUD ──────────────────────────────────────────────────
+
+export const listReadyMadeWaskatClothing = async (req, res, next) => {
+  try {
+    const activeOnly =
+      String(req.query?.activeOnly || "").toLowerCase() === "true";
+    const items = await prisma.readyMadeWaskatClothing.findMany({
+      where: activeOnly ? { quantity: { gt: 0 } } : undefined,
+      orderBy: { waskatCode: "asc" },
+    });
+    res.json(items);
+  } catch (e) {
+    next(e);
+  }
+};
+
+export const createReadyMadeWaskatClothing = async (req, res, next) => {
+  try {
+    const { waskatCode, originalPrice, description, quantity } = req.body;
+    if (!waskatCode || waskatCode.toString().trim() === "") {
+      return res.status(400).json({ error: "waskatCode is required" });
+    }
+    const price = Number(originalPrice);
+    if (!Number.isFinite(price) || price < 0) {
+      return res
+        .status(400)
+        .json({ error: "originalPrice must be a valid non-negative number" });
+    }
+    const qty = quantity == null ? 1 : Number(quantity);
+    if (!Number.isFinite(qty) || qty < 0 || !Number.isInteger(qty)) {
+      return res
+        .status(400)
+        .json({ error: "quantity must be a valid non-negative integer" });
+    }
+
+    const item = await prisma.readyMadeWaskatClothing.create({
+      data: {
+        waskatCode: waskatCode.toString().trim(),
+        originalPrice: price,
+        quantity: qty,
+        description: description?.toString().trim() || null,
+      },
+    });
+    res.status(201).json(item);
+  } catch (e) {
+    if (e.code === "P2002") {
+      return res
+        .status(409)
+        .json({ error: "A ready-made waskat with this code already exists" });
+    }
+    next(e);
+  }
+};
+
+export const updateReadyMadeWaskatClothing = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { waskatCode, originalPrice, description, quantity } = req.body;
+    if (!waskatCode || waskatCode.toString().trim() === "") {
+      return res.status(400).json({ error: "waskatCode is required" });
+    }
+    const price = Number(originalPrice);
+    if (!Number.isFinite(price) || price < 0) {
+      return res
+        .status(400)
+        .json({ error: "originalPrice must be a valid non-negative number" });
+    }
+    const qty = quantity == null ? 1 : Number(quantity);
+    if (!Number.isFinite(qty) || qty < 0 || !Number.isInteger(qty)) {
+      return res
+        .status(400)
+        .json({ error: "quantity must be a valid non-negative integer" });
+    }
+
+    const item = await prisma.readyMadeWaskatClothing.update({
+      where: { id },
+      data: {
+        waskatCode: waskatCode.toString().trim(),
+        originalPrice: price,
+        quantity: qty,
+        description: description?.toString().trim() || null,
+      },
+    });
+    res.json(item);
+  } catch (e) {
+    if (e.code === "P2025") {
+      return res
+        .status(404)
+        .json({ error: "Ready-made waskat item not found" });
+    }
+    if (e.code === "P2002") {
+      return res
+        .status(409)
+        .json({ error: "A ready-made waskat with this code already exists" });
+    }
+    next(e);
+  }
+};
+
+export const deleteReadyMadeWaskatClothing = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    await prisma.readyMadeWaskatClothing.delete({ where: { id } });
+    res.status(204).send();
+  } catch (e) {
+    if (e.code === "P2025") {
+      return res
+        .status(404)
+        .json({ error: "Ready-made waskat item not found" });
     }
     next(e);
   }

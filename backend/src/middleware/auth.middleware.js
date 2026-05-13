@@ -46,4 +46,43 @@ export function authorize(...roles) {
   };
 }
 
+/** For Dokan, allow access only to orders created by the authenticated user. */
+export function authorizeDokanOrderOwner(paramName = 'id') {
+  return async (req, res, next) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required.' });
+      }
+
+      if (req.user.accountType !== 'DOKAN') {
+        return next();
+      }
+
+      const orderId = req.params?.[paramName];
+      if (!orderId) {
+        return res.status(400).json({ error: 'Order id is required.' });
+      }
+
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        select: { id: true, createdById: true },
+      });
+
+      if (!order) {
+        return res.status(404).json({ error: 'Order not found.' });
+      }
+
+      if (order.createdById !== req.user.id) {
+        return res
+          .status(403)
+          .json({ error: 'You do not have permission to access this order.' });
+      }
+
+      next();
+    } catch (err) {
+      next(err);
+    }
+  };
+}
+
 export { JWT_SECRET };

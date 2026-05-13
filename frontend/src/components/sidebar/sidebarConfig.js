@@ -6,6 +6,7 @@ import {
   LuClipboardList,
   LuFactory,
   LuLayoutDashboard,
+  LuLifeBuoy,
   LuListChecks,
   LuListTodo,
   LuPackagePlus,
@@ -18,6 +19,9 @@ import {
   LuFileText,
   LuDatabaseBackup,
   LuShieldAlert,
+  LuSearchCode,
+  LuShoppingBag,
+  LuChartColumn,
 } from "react-icons/lu";
 import AfCurrencyIcon from "../ui/AfCurrencyIcon.jsx";
 
@@ -27,6 +31,14 @@ const ROLE_ACCENT = {
   QICHIKAR: "#D97706",
   DOKHT: "#DB2777",
   FINANCE: "#059669",
+};
+
+const SUPPORT_NAV_ITEM = {
+  key: "supportTeam",
+  label: "supportTeam.title",
+  fallback: "Support Team",
+  path: "/support-team",
+  icon: LuLifeBuoy,
 };
 
 const ADMIN_SECTIONS = [
@@ -91,6 +103,13 @@ const ADMIN_SECTIONS = [
             fallback: "Clothes Status",
             path: "/orders/assignments/report",
             icon: LuClipboardCheck,
+          },
+          {
+            key: "damagedClothes",
+            label: "sidebar.damagedClothes",
+            fallback: "Damaged Clothes",
+            path: "/damaged-clothes",
+            icon: LuShieldAlert,
           },
           {
             key: "printBills",
@@ -226,18 +245,33 @@ const ADMIN_SECTIONS = [
         ],
       },
       {
+        key: "itemsDropdown",
+        label: "sidebar.itemsDropdown",
+        fallback: "اجناس دیگر",
+        icon: LuShoppingBag,
+        children: [
+          {
+            key: "otherItems",
+            label: "sidebar.sellItem",
+            fallback: "فروش جنس",
+            path: "/other-items",
+            icon: LuShoppingBag,
+          },
+          {
+            key: "itemSalesRecords",
+            label: "sidebar.itemSalesRecords",
+            fallback: "Sold Item Records",
+            path: "/item-sales-records",
+            icon: LuChartColumn,
+          },
+        ],
+      },
+      {
         key: "users",
         label: "users.title",
         fallback: "User Management",
         path: "/users",
         icon: LuShieldCheck,
-      },
-      {
-        key: "damagedClothes",
-        label: "sidebar.damagedClothes",
-        fallback: "Damaged Clothes",
-        path: "/damaged-clothes",
-        icon: LuShieldAlert,
       },
       {
         key: "backupManagement",
@@ -267,6 +301,7 @@ const ADMIN_SECTIONS = [
         path: "/notifications",
         icon: LuBell,
       },
+      SUPPORT_NAV_ITEM,
     ],
   },
 ];
@@ -340,6 +375,13 @@ const DOKAN_SECTIONS = [
             fallback: "Print Bills",
             path: "/print-bills",
             icon: LuPrinter,
+          },
+          {
+            key: "globalSearch",
+            label: "globalSearch.title",
+            fallback: "Global Search",
+            path: "/orders/global-search",
+            icon: LuSearchCode,
           },
           {
             key: "delivery",
@@ -439,6 +481,42 @@ const DOKAN_SECTIONS = [
         ],
       },
       {
+        key: "itemsDropdown",
+        label: "sidebar.itemsDropdown",
+        fallback: "اجناس دیگر",
+        icon: LuShoppingBag,
+        children: [
+          {
+            key: "otherItems",
+            label: "sidebar.sellItem",
+            fallback: "فروش جنس",
+            path: "/other-items",
+            icon: LuShoppingBag,
+          },
+          {
+            key: "itemSalesRecords",
+            label: "sidebar.itemSalesRecords",
+            fallback: "Sold Item Records",
+            path: "/item-sales-records",
+            icon: LuChartColumn,
+          },
+        ],
+      },
+      {
+        key: "otherItems",
+        label: "sidebar.otherItems",
+        fallback: "Other Items",
+        path: "/other-items",
+        icon: LuShoppingBag,
+      },
+      {
+        key: "itemSalesRecords",
+        label: "sidebar.itemSalesRecords",
+        fallback: "Sold Item Records",
+        path: "/item-sales-records",
+        icon: LuChartColumn,
+      },
+      {
         key: "designs",
         label: "sidebar.settings",
         fallback: "Settings",
@@ -459,6 +537,7 @@ const DOKAN_SECTIONS = [
         path: "/notifications",
         icon: LuBell,
       },
+      SUPPORT_NAV_ITEM,
     ],
   },
 ];
@@ -507,26 +586,12 @@ const WORKER_SECTIONS = [
           },
         ],
       },
+      SUPPORT_NAV_ITEM,
     ],
   },
 ];
 
 const FINANCE_SECTIONS = [
-  {
-    key: "overview",
-    label: "sidebar.overview",
-    fallback: "Overview",
-    items: [
-      {
-        key: "dashboard",
-        label: "common.dashboard",
-        fallback: "Dashboard",
-        path: "/dashboard",
-        icon: LuLayoutDashboard,
-        end: true,
-      },
-    ],
-  },
   {
     key: "orders",
     label: "sidebar.orders",
@@ -621,6 +686,28 @@ const FINANCE_SECTIONS = [
     fallback: "Management",
     items: [
       {
+        key: "itemsDropdown",
+        label: "sidebar.itemsDropdown",
+        fallback: "Other Items",
+        icon: LuShoppingBag,
+        children: [
+          {
+            key: "otherItems",
+            label: "sidebar.sellItem",
+            fallback: "Sell Item",
+            path: "/other-items",
+            icon: LuShoppingBag,
+          },
+          {
+            key: "itemSalesRecords",
+            label: "sidebar.itemSalesRecords",
+            fallback: "Sold Item Records",
+            path: "/item-sales-records",
+            icon: LuChartColumn,
+          },
+        ],
+      },
+      {
         key: "designs",
         label: "sidebar.settings",
         fallback: "Settings",
@@ -634,13 +721,40 @@ const FINANCE_SECTIONS = [
         path: "/boxes",
         icon: LuArchive,
       },
+      SUPPORT_NAV_ITEM,
+    ],
+  },
+];
+
+const DOKAN_ALLOWED_SECTIONS = [
+  {
+    key: "dokanPanel",
+    label: "sidebar.dokanPanel",
+    fallback: "Dokan Panel",
+    items: [
+      {
+        key: "createOrder",
+        label: "common.createOrder",
+        fallback: "Create Order",
+        path: "/orders/create",
+        icon: LuPackagePlus,
+        end: true,
+      },
+      {
+        key: "allOrders",
+        label: "common.allOrders",
+        fallback: "All Orders",
+        path: "/orders",
+        icon: AfCurrencyIcon,
+        end: true,
+      },
     ],
   },
 ];
 
 const ROLE_SECTIONS = {
   ADMIN: ADMIN_SECTIONS,
-  DOKAN: DOKAN_SECTIONS,
+  DOKAN: DOKAN_ALLOWED_SECTIONS,
   QICHIKAR: WORKER_SECTIONS,
   DOKHT: WORKER_SECTIONS,
   FINANCE: FINANCE_SECTIONS,
@@ -652,4 +766,8 @@ export function getRoleAccent(role) {
 
 export function getSidebarSections(role) {
   return ROLE_SECTIONS[role] || ADMIN_SECTIONS;
+}
+
+export function getSidebarFooterItems(role) {
+  return role === "DOKAN" ? [SUPPORT_NAV_ITEM] : [];
 }

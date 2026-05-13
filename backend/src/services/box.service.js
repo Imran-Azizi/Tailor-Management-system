@@ -8,12 +8,15 @@ const ORDER_TYPE_LABELS_EN = {
 };
 
 const getOrderTypeLabelEn = (type) => ORDER_TYPE_LABELS_EN[type] || type || "-";
+// Patch: Remove READY_MADE and READY_MADE_WASKAT as valid box types
 const BOX_TYPE_VALUES = new Set([
   "OUTFIT",
   "WASKAT",
   "KORTY",
   "YAKHANQAQ",
   "FOREIGN_COUNTRY",
+  // "READY_MADE", // removed
+  // "READY_MADE_WASKAT", // removed
 ]);
 
 const normalizeNameForCompare = (value) =>
@@ -184,15 +187,11 @@ export const getAllBoxes = async ({ type } = {}) => {
     include: {
       _count: { select: { orders: true, foreignOrders: true } },
       orders: {
-        include: {
-          customer: true,
-        },
+        include: { customer: true },
         orderBy: { createdAt: "desc" },
       },
       foreignOrders: {
-        include: {
-          customer: true,
-        },
+        include: { customer: true },
         orderBy: { createdAt: "desc" },
       },
     },
@@ -278,7 +277,8 @@ export const assignOrderToBox = async (orderId, boxId) => {
     throw Object.assign(new Error("Order not found"), { status: 404 });
   }
 
-  if (!boxId) {
+  // Prevent assigning READY_MADE_WASKAT to any box
+  if (order.type === "READY_MADE_WASKAT") {
     return prisma.order.update({
       where: { id: orderId },
       data: { boxId: null },
@@ -286,7 +286,29 @@ export const assignOrderToBox = async (orderId, boxId) => {
     });
   }
 
-  const numericBoxId = Number(boxId);
+  // Always assign READY_MADE to Outfit box
+  let effectiveBoxId = boxId;
+  if (order.type === "READY_MADE") {
+    // Find the first Outfit box
+    const outfitBox = await prisma.box.findFirst({
+      where: { boxType: "OUTFIT" },
+      orderBy: { createdAt: "asc" },
+    });
+    if (!outfitBox) {
+      throw Object.assign(new Error("No Outfit box found for READY_MADE order."), { status: 404 });
+    }
+    effectiveBoxId = outfitBox.id;
+  }
+
+  if (!effectiveBoxId) {
+    return prisma.order.update({
+      where: { id: orderId },
+      data: { boxId: null },
+      include: { customer: true, box: true },
+    });
+  }
+
+  const numericBoxId = Number(effectiveBoxId);
   const box = await prisma.box.findUnique({
     where: { id: numericBoxId },
     include: { _count: { select: { orders: true } } },
@@ -295,7 +317,12 @@ export const assignOrderToBox = async (orderId, boxId) => {
     throw Object.assign(new Error("Box not found"), { status: 404 });
   }
 
-  if (box.boxType !== order.type) {
+  // For READY_MADE, allow only Outfit box
+  if (order.type === "READY_MADE" && box.boxType !== "OUTFIT") {
+    throw Object.assign(new Error("READY_MADE orders must be assigned to Outfit box."), { status: 400 });
+  }
+
+  if (order.type !== "READY_MADE" && box.boxType !== order.type) {
     throw Object.assign(new Error("Order type and box type do not match."), {
       status: 400,
     });

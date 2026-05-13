@@ -173,8 +173,11 @@ export default function RakhtRevenue() {
           </div>
 
           <div>
-            <label className="lbl">{t("rakht.companyName", "Company")}</label>
+            <label className="lbl" htmlFor="companyName-select">
+              {t("rakht.companyName", "Company")}
+            </label>
             <select
+              id="companyName-select"
               className="inp"
               value={filters.companyName}
               onChange={(event) =>
@@ -186,63 +189,20 @@ export default function RakhtRevenue() {
               }
             >
               <option value="">{t("common.all", "All")}</option>
-              {summary.filters.companies.map((name) => (
-                <option key={name} value={name}>
-                  {name}
+              {summary.filters.companies.map((company) => (
+                <option key={company} value={company}>
+                  {company}
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="lbl">{t("rakht.brandName", "Brand")}</label>
-            <select
-              className="inp"
-              value={filters.brandName}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  brandName: event.target.value,
-                  page: 1,
-                }))
-              }
-            >
-              <option value="">{t("common.all", "All")}</option>
-              {summary.filters.brands.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="lbl">{t("rakht.tonName", "Ton")}</label>
-            <select
-              className="inp"
-              value={filters.tonName}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  tonName: event.target.value,
-                  page: 1,
-                }))
-              }
-            >
-              <option value="">{t("common.all", "All")}</option>
-              {summary.filters.tons.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="lbl">
+            <label className="lbl" htmlFor="orderType-select">
               {t("createOrder.orderTypes", "Order Type")}
             </label>
             <select
+              id="orderType-select"
               className="inp"
               value={filters.orderType}
               onChange={(event) =>
@@ -364,7 +324,7 @@ export default function RakhtRevenue() {
         >
           <p style={{ fontSize: 12, color: "var(--text3)" }}>
             {t("ui.pageSummary", {
-              defaultValue: "Page {{page}} of {{pages}} · {{total}} total",
+              defaultValue: "Page {{page}} of {{pages}} - {{total}} total",
               page: summary.pagination.page,
               pages: summary.pagination.totalPages,
               total: summary.pagination.total,

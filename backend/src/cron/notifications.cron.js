@@ -27,7 +27,6 @@ export const startCronJobs = () => {
   // Run every 15 minutes to catch due alerts reliably.
   cron.schedule("*/15 * * * *", async () => {
     const now = new Date();
-    console.log("[Cron] Running notification check at", now.toISOString());
 
     // 1. Delete expired notifications
     const deleted = await prisma.notification.deleteMany({
@@ -73,6 +72,4 @@ export const startCronJobs = () => {
       );
     }
   });
-
-  console.log("[Cron] Notification scheduler started");
 };

@@ -907,10 +907,10 @@ export default function Navbar({ onHamburger, pageTitle }) {
   const language = i18n.resolvedLanguage || i18n.language || "en";
   const isRtl = (i18n.dir?.() || "ltr") === "rtl";
   const { dark, toggle } = useTheme();
-  const { user, isWorker, isAdmin, isDokan, isFinance, canManageOrders } =
+  const { user, isWorker, isAdmin, isFinance, canManageOrders } =
     useAuth();
   const { viewMonth, viewYear } = useMonth();
-  const canViewAdminNotifications = isAdmin || isDokan;
+  const canViewAdminNotifications = isAdmin;
   const showNotifications = isWorker || canViewAdminNotifications;
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
@@ -1067,10 +1067,24 @@ export default function Navbar({ onHamburger, pageTitle }) {
     });
   };
 
+  const canUseGlobalSearch = isAdmin || isFinance;
+
+  const submitTopbarSearch = () => {
+    const term = search.trim();
+    if (!term) return;
+
+    if (canUseGlobalSearch) {
+      navigate(`/orders/global-search?q=${encodeURIComponent(term)}`);
+    } else {
+      navigate("/orders", { state: { search: term } });
+    }
+
+    setSearch("");
+  };
+
   const onSearch = (e) => {
-    if (e.key === "Enter" && search.trim()) {
-      navigate("/orders", { state: { search: search.trim() } });
-      setSearch("");
+    if (e.key === "Enter") {
+      submitTopbarSearch();
     }
   };
 
@@ -1102,11 +1116,28 @@ export default function Navbar({ onHamburger, pageTitle }) {
           <LuSearch size={14} className="ns-ico" />
           <input
             type="text"
-            placeholder={t("navbar.searchPlaceholder")}
+            placeholder={
+              canUseGlobalSearch
+                ? t(
+                    "globalSearch.placeholder",
+                    "Search by name, phone, or bill number...",
+                  )
+                : t("navbar.searchPlaceholder")
+            }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={onSearch}
           />
+          <button
+            type="button"
+            className="ns-go"
+            onClick={submitTopbarSearch}
+            disabled={!search.trim()}
+            aria-label={t("common.search", "Search")}
+            title={t("common.search", "Search")}
+          >
+            <LuArrowRight size={14} />
+          </button>
         </div>
 
         {canManageOrders && (

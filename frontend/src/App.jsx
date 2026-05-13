@@ -8,6 +8,7 @@ import {
   RoleRoute,
   WorkerProtectedRoute,
 } from "./components/ProtectedRoute.jsx";
+import { useAuth } from "./context/AuthContext.jsx";
 import ScrollToTop from "./components/ScrollToTop.jsx";
 
 const Layout = lazy(() => import("./components/Layout.jsx"));
@@ -50,8 +51,15 @@ const PaymentHistory = lazy(() => import("./pages/PaymentHistory.jsx"));
 const RakhtRevenue = lazy(() => import("./pages/RakhtRevenue.jsx"));
 const BackupManagement = lazy(() => import("./pages/BackupManagement.jsx"));
 const DamagedClothes = lazy(() => import("./pages/DamagedClothes.jsx"));
+const GlobalOrderSearch = lazy(() => import("./pages/GlobalOrderSearch.jsx"));
+const OtherItems = lazy(() => import("./pages/OtherItems.jsx"));
+const ItemSalesRecords = lazy(() => import("./pages/ItemSalesRecords.jsx"));
+const SupportTeam = lazy(() => import("./pages/SupportTeam.jsx"));
 
 function RoleBasedRedirect() {
+  const { isDokan, isFinance } = useAuth();
+  if (isDokan) return <Navigate to="/orders/create" replace />;
+  if (isFinance) return <Navigate to="/orders" replace />;
   return <Navigate to="/dashboard" replace />;
 }
 
@@ -82,8 +90,22 @@ export default function App() {
                   }
                 >
                   <Route index element={<RoleBasedRedirect />} />
-                  <Route path="dashboard" element={<Dashboard />} />
-                  <Route path="my-tasks" element={<MyTasks />} />
+                  <Route
+                    path="dashboard"
+                    element={
+                      <RoleRoute roles={["ADMIN"]}>
+                        <Dashboard />
+                      </RoleRoute>
+                    }
+                  />
+                  <Route
+                    path="my-tasks"
+                    element={
+                      <RoleRoute roles={["ADMIN"]}>
+                        <MyTasks />
+                      </RoleRoute>
+                    }
+                  />
 
                   <Route
                     path="orders/create"
@@ -96,23 +118,42 @@ export default function App() {
                   <Route
                     path="orders/:id/edit"
                     element={
-                      <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
                         <EditOrder />
                       </RoleRoute>
                     }
                   />
-                  <Route path="orders" element={<AllOrders />} />
+                  <Route
+                    path="orders"
+                    element={
+                      <RoleRoute roles={["ADMIN", "DOKAN", "FINANCE"]}>
+                        <AllOrders />
+                      </RoleRoute>
+                    }
+                  />
                   <Route
                     path="orders/pending"
-                    element={<AllOrders filter="pending" />}
+                    element={
+                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
+                        <AllOrders filter="pending" />
+                      </RoleRoute>
+                    }
                   />
                   <Route
                     path="orders/completed"
-                    element={<AllOrders filter="completed" />}
+                    element={
+                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
+                        <AllOrders filter="completed" />
+                      </RoleRoute>
+                    }
                   />
                   <Route
                     path="orders/remaining"
-                    element={<AllOrders filter="remaining" />}
+                    element={
+                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
+                        <AllOrders filter="remaining" />
+                      </RoleRoute>
+                    }
                   />
                   <Route
                     path="orders/assignments"
@@ -157,7 +198,7 @@ export default function App() {
                   <Route
                     path="delivery"
                     element={
-                      <RoleRoute roles={["ADMIN", "DOKAN", "FINANCE"]}>
+                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
                         <ClothesDeliveryToCustomer />
                       </RoleRoute>
                     }
@@ -166,7 +207,7 @@ export default function App() {
                   <Route
                     path="customers"
                     element={
-                      <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <RoleRoute roles={["ADMIN"]}>
                         <Customers />
                       </RoleRoute>
                     }
@@ -174,7 +215,7 @@ export default function App() {
                   <Route
                     path="customers/create"
                     element={
-                      <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <RoleRoute roles={["ADMIN"]}>
                         <Customers openCreate />
                       </RoleRoute>
                     }
@@ -182,7 +223,7 @@ export default function App() {
                   <Route
                     path="customers/transactions"
                     element={
-                      <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <RoleRoute roles={["ADMIN"]}>
                         <CustomerTransactions />
                       </RoleRoute>
                     }
@@ -190,7 +231,7 @@ export default function App() {
                   <Route
                     path="customers/report"
                     element={
-                      <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <RoleRoute roles={["ADMIN"]}>
                         <CustomerReport />
                       </RoleRoute>
                     }
@@ -198,7 +239,7 @@ export default function App() {
                   <Route
                     path="boxes"
                     element={
-                      <RoleRoute roles={["ADMIN", "DOKAN", "FINANCE"]}>
+                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
                         <Boxes />
                       </RoleRoute>
                     }
@@ -206,7 +247,7 @@ export default function App() {
                   <Route
                     path="designs"
                     element={
-                      <RoleRoute roles={["ADMIN", "DOKAN", "FINANCE"]}>
+                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
                         <Designs />
                       </RoleRoute>
                     }
@@ -214,7 +255,7 @@ export default function App() {
                   <Route
                     path="print-bills"
                     element={
-                      <RoleRoute roles={["ADMIN", "DOKAN", "FINANCE"]}>
+                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
                         <PrintBills />
                       </RoleRoute>
                     }
@@ -222,7 +263,7 @@ export default function App() {
                   <Route
                     path="rakht/create"
                     element={
-                      <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <RoleRoute roles={["ADMIN"]}>
                         <CreateRakht />
                       </RoleRoute>
                     }
@@ -230,7 +271,7 @@ export default function App() {
                   <Route
                     path="rakhts"
                     element={
-                      <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <RoleRoute roles={["ADMIN"]}>
                         <AllRakhts />
                       </RoleRoute>
                     }
@@ -238,7 +279,7 @@ export default function App() {
                   <Route
                     path="rakhts/payment-history"
                     element={
-                      <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <RoleRoute roles={["ADMIN"]}>
                         <PaymentHistory />
                       </RoleRoute>
                     }
@@ -246,7 +287,7 @@ export default function App() {
                   <Route
                     path="rakhts/revenue"
                     element={
-                      <RoleRoute roles={["ADMIN", "DOKAN", "FINANCE"]}>
+                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
                         <RakhtRevenue />
                       </RoleRoute>
                     }
@@ -254,7 +295,7 @@ export default function App() {
                   <Route
                     path="notifications"
                     element={
-                      <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <RoleRoute roles={["ADMIN"]}>
                         <Notifications />
                       </RoleRoute>
                     }
@@ -288,7 +329,7 @@ export default function App() {
                   <Route
                     path="transactions/create"
                     element={
-                      <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <RoleRoute roles={["ADMIN"]}>
                         <MakeTransaction />
                       </RoleRoute>
                     }
@@ -296,7 +337,7 @@ export default function App() {
                   <Route
                     path="transactions"
                     element={
-                      <RoleRoute roles={["ADMIN", "DOKAN"]}>
+                      <RoleRoute roles={["ADMIN"]}>
                         <AllTransactions />
                       </RoleRoute>
                     }
@@ -305,7 +346,7 @@ export default function App() {
                   <Route
                     path="daily-tasks"
                     element={
-                      <RoleRoute roles={["ADMIN", "DOKAN", "FINANCE"]}>
+                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
                         <DailyTasks />
                       </RoleRoute>
                     }
@@ -313,14 +354,47 @@ export default function App() {
                   <Route
                     path="daily-tasks/all"
                     element={
-                      <RoleRoute roles={["ADMIN", "DOKAN", "FINANCE"]}>
+                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
                         <AllDailyTasks />
+                      </RoleRoute>
+                    }
+                  />
+                  <Route
+                    path="orders/global-search"
+                    element={
+                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
+                        <GlobalOrderSearch />
+                      </RoleRoute>
+                    }
+                  />
+                  <Route
+                    path="other-items"
+                    element={
+                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
+                        <OtherItems />
+                      </RoleRoute>
+                    }
+                  />
+                  <Route
+                    path="item-sales-records"
+                    element={
+                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
+                        <ItemSalesRecords />
+                      </RoleRoute>
+                    }
+                  />
+                  <Route
+                    path="support-team"
+                    element={
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE", "QICHIKAR", "DOKHT"]}
+                      >
+                        <SupportTeam />
                       </RoleRoute>
                     }
                   />
                 </Route>
 
-                {/* Worker panel — Dokht and Qichikar */}
                 <Route
                   path="/panel"
                   element={
@@ -335,7 +409,7 @@ export default function App() {
                 {/* Fallback */}
                 <Route
                   path="*"
-                  element={<Navigate to="/dashboard" replace />}
+                  element={<Navigate to="/" replace />}
                 />
               </Routes>
             </Suspense>

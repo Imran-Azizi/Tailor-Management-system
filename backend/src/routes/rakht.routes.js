@@ -8,17 +8,17 @@ router.use(authenticate);
 router.get("/", ctrl.getAll);
 router.get(
   "/revenue/summary",
-  authorize("ADMIN", "DOKAN", "FINANCE"),
+  authorize("ADMIN", "FINANCE"),
   ctrl.getRevenueSummary,
 );
 router.get(
   "/payment-history",
-  authorize("ADMIN", "DOKAN"),
+  authorize("ADMIN"),
   ctrl.getPaymentHistory,
 );
 router.get(
   "/payment-history/pdf",
-  authorize("ADMIN", "DOKAN"),
+  authorize("ADMIN"),
   ctrl.getPaymentHistoryPdf,
 );
 router.get("/:id", ctrl.getOne);

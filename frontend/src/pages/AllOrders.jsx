@@ -41,12 +41,14 @@ import {
 } from "../components/ui/index.jsx";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import { OrderDocumentPack } from "../components/order/OrderDocumentPack.jsx";
+import OrderCreatorBadge from "../components/order/OrderCreatorBadge.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
 import { formatMonthYearLabel } from "../lib/months.js";
 import {
   formatSystemDate,
   formatSystemDateTime,
+  formatNumberLocale,
   isRtlLanguage,
 } from "../lib/locale.js";
 
@@ -328,8 +330,14 @@ function getDisplayTotalBenefit(order) {
   if (Number.isFinite(finalTotalBenefit)) return finalTotalBenefit;
 
   const totalBenefit = Number(order?.totalBenefit || 0);
-  if (order?.type !== "READY_MADE") return totalBenefit;
-  const readyMadeOriginalPrice = Number(order?.readyMadeOriginalPrice || 0);
+  if (order?.type !== "READY_MADE" && order?.type !== "READY_MADE_WASKAT") {
+    return totalBenefit;
+  }
+  const readyMadeOriginalPrice = Number(
+    order?.type === "READY_MADE"
+      ? order?.readyMadeOriginalPrice || 0
+      : order?.readyMadeWaskatOriginalPrice || 0,
+  );
   return totalBenefit - readyMadeOriginalPrice;
 }
 
@@ -362,6 +370,7 @@ function OrderViewModal({ orderId, open, onClose }) {
     : "-";
   const hasRakhtDetails =
     data?.type !== "READY_MADE" &&
+    data?.type !== "READY_MADE_WASKAT" &&
     Boolean(
       data?.rakhtId ||
       data?.rakhtCompanyName ||
@@ -380,31 +389,20 @@ function OrderViewModal({ orderId, open, onClose }) {
   const rakhtCustomerTotal = Number(data?.rakhtTotalCustomerPrice || 0);
   const rakhtBenefit = rakhtCustomerTotal - rakhtPurchaseTotal;
   const readyMadeOriginalPrice =
-    data?.type === "READY_MADE" ? Number(data?.readyMadeOriginalPrice || 0) : 0;
-  const rawTotalBenefit = Number(
+    data?.type === "READY_MADE"
+      ? Number(data?.readyMadeOriginalPrice || 0)
+      : data?.type === "READY_MADE_WASKAT"
+        ? Number(data?.readyMadeWaskatOriginalPrice || 0)
+        : 0;
+  const displayTotalBenefit = Number(
     benefitDetails?.totalBenefit ?? data?.totalBenefit ?? 0,
   );
-  const adjustedTotalBenefit = rawTotalBenefit - readyMadeOriginalPrice;
-  const adjustedTotalExpenses =
-    Number(benefitDetails?.totalExpenses ?? 0) + readyMadeOriginalPrice;
-  const benefitExpenseRows = [
-    ...(benefitDetails?.expenses || []),
-    ...(data?.type === "READY_MADE" && readyMadeOriginalPrice > 0
-      ? [
-          {
-            key: `ready-made-original-price-${data?.id || orderId}`,
-            labelKey: "orders.readyMadeOriginalPrice",
-            label: t(
-              "orders.readyMadeOriginalPrice",
-              "Ready-Made Original Price",
-            ),
-            orderType: "READY_MADE",
-            amount: readyMadeOriginalPrice,
-            date: data?.createdAt || null,
-          },
-        ]
-      : []),
-  ];
+  const displayTotalExpenses = Number(benefitDetails?.totalExpenses ?? 0);
+  const displayTotalCardValue =
+    data?.type === "READY_MADE_WASKAT"
+      ? Math.max(0, Number(data?.totalPrice || 0) - readyMadeOriginalPrice)
+      : Number(data?.totalPrice || 0);
+  const benefitExpenseRows = benefitDetails?.expenses || [];
 
   return (
     <Modal
@@ -511,13 +509,59 @@ function OrderViewModal({ orderId, open, onClose }) {
                     {data.customer?.phoneNumber || "-"}
                   </strong>
                 </div>
+                <div className="order-details-info-card">
+                  <span>{t("orders.createdBy", "Created By")}</span>
+                  <strong>
+                    <OrderCreatorBadge order={data} />
+                  </strong>
+                </div>
+                {data.type === "READY_MADE" && data.readyMadeClothingCode && (
+                  <div className="order-details-info-card">
+                    <span>{t("readyMade.code", "Code")}</span>
+                    <strong>{data.readyMadeClothingCode}</strong>
+                  </div>
+                )}
+                {data.type === "READY_MADE_WASKAT" &&
+                  data.readyMadeWaskatClothingCode && (
+                    <div className="order-details-info-card">
+                      <span>{t("readyMadeWaskat.code", "Code")}</span>
+                      <strong>{data.readyMadeWaskatClothingCode}</strong>
+                    </div>
+                  )}
+                {data.type === "READY_MADE" &&
+                  data.readyMadeOriginalPrice != null && (
+                    <div className="order-details-info-card">
+                      <span>
+                        {t("readyMade.originalPrice", "Original Price")}
+                      </span>
+                      <strong style={{ color: "#7C3AED" }}>
+                        {formatMoney(data.readyMadeOriginalPrice, language)}
+                      </strong>
+                    </div>
+                  )}
+                {data.type === "READY_MADE_WASKAT" &&
+                  data.readyMadeWaskatOriginalPrice != null && (
+                    <div className="order-details-info-card">
+                      <span>
+                        {t("readyMadeWaskat.originalPrice", "Original Price")}
+                      </span>
+                      <strong style={{ color: "#7C3AED" }}>
+                        {formatMoney(
+                          data.readyMadeWaskatOriginalPrice,
+                          language,
+                        )}
+                      </strong>
+                    </div>
+                  )}
               </div>
 
               <div className="order-details-kpi-block">
                 <div className="order-view-kpi-grid">
                   <div className="order-view-kpi-item">
                     <span>{t("common.total", "Total")}</span>
-                    <strong>{formatMoney(data.totalPrice, language)}</strong>
+                    <strong>
+                      {formatMoney(displayTotalCardValue, language)}
+                    </strong>
                   </div>
                   <div className="order-view-kpi-item">
                     <span>{t("common.paid", "Paid")}</span>
@@ -539,11 +583,10 @@ function OrderViewModal({ orderId, open, onClose }) {
                     <span>{t("orders.totalBenefit", "Total Benefit")}</span>
                     <strong
                       style={{
-                        color:
-                          adjustedTotalBenefit >= 0 ? "#15803D" : "#DC2626",
+                        color: displayTotalBenefit >= 0 ? "#15803D" : "#DC2626",
                       }}
                     >
-                      {formatMoney(adjustedTotalBenefit, language)}
+                      {formatMoney(displayTotalBenefit, language)}
                     </strong>
                   </div>
                   {data.type === "READY_MADE" && readyMadeOriginalPrice > 0 && (
@@ -552,6 +595,19 @@ function OrderViewModal({ orderId, open, onClose }) {
                         {t(
                           "orders.readyMadeOriginalPrice",
                           "Ready-Made Original Price",
+                        )}
+                      </span>
+                      <strong style={{ color: "#7C3AED" }}>
+                        {formatMoney(readyMadeOriginalPrice, language)}
+                      </strong>
+                    </div>
+                  )}
+                  {data.type === "READY_MADE_WASKAT" && (
+                    <div className="order-view-kpi-item">
+                      <span>
+                        {t(
+                          "orders.readyMadeWaskatOriginalPrice",
+                          "Ready-Made Waskat Original Price",
                         )}
                       </span>
                       <strong style={{ color: "#7C3AED" }}>
@@ -725,7 +781,7 @@ function OrderViewModal({ orderId, open, onClose }) {
                 <div style={{ fontSize: 11, color: "var(--text3)" }}>
                   {t("orders.totalExpenses", "Total Expenses")}
                 </div>
-                <strong>{formatMoney(adjustedTotalExpenses, language)}</strong>
+                <strong>{formatMoney(displayTotalExpenses, language)}</strong>
               </div>
               <div>
                 <div style={{ fontSize: 11, color: "var(--text3)" }}>
@@ -733,10 +789,10 @@ function OrderViewModal({ orderId, open, onClose }) {
                 </div>
                 <strong
                   style={{
-                    color: adjustedTotalBenefit >= 0 ? "#15803D" : "#DC2626",
+                    color: displayTotalBenefit >= 0 ? "#15803D" : "#DC2626",
                   }}
                 >
-                  {formatMoney(adjustedTotalBenefit, language)}
+                  {formatMoney(displayTotalBenefit, language)}
                 </strong>
               </div>
             </div>
@@ -940,6 +996,8 @@ function RowDropdown({
     },
   ].filter(Boolean);
 
+  if (items.length === 0) return null;
+
   return (
     <>
       <button
@@ -993,7 +1051,7 @@ const ORDER_TYPE_FILTER_VALUES = [
 export default function AllOrders({ filter, mode = "orders" }) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
-  const { isAdmin, isFinance } = useAuth();
+  const { user, isAdmin, isFinance } = useAuth();
   const { viewMonth, viewYear, getMonthAccessMode } = useMonth();
   const qc = useQueryClient();
   const location = useLocation();
@@ -1060,6 +1118,8 @@ export default function AllOrders({ filter, mode = "orders" }) {
       typeFilter,
       viewMonth,
       viewYear,
+      user?.id,
+      user?.accountType,
     ],
     queryFn: () =>
       api
@@ -1077,6 +1137,13 @@ export default function AllOrders({ filter, mode = "orders" }) {
           },
         })
         .then((r) => r.data),
+  });
+
+  const { data: financeCreatedStats } = useQuery({
+    queryKey: ["orders", "finance-created-stats", user?.id],
+    enabled: isFinance && Boolean(user?.id),
+    queryFn: () =>
+      api.get("/orders/stats/finance-created").then((r) => r.data),
   });
 
   const refreshOrders = () => {
@@ -1302,6 +1369,31 @@ export default function AllOrders({ filter, mode = "orders" }) {
       </Card>
 
       <div className="order-dashboard-strip">
+        {isFinance && (
+          <div className="order-dashboard-card order-dashboard-card--finance">
+            <span className="order-dashboard-icon">
+              <LuUserCheck size={16} />
+            </span>
+            <div className="order-dashboard-copy">
+              <div className="order-dashboard-label">
+                {t("orders.financeCreatedTotal", {
+                  defaultValue: "Created by You",
+                })}
+              </div>
+              <strong className="order-dashboard-value order-dashboard-value--finance">
+                {formatNumberLocale(
+                  financeCreatedStats?.totalCreated || 0,
+                  language,
+                )}
+              </strong>
+              <span className="order-dashboard-sub">
+                {t("orders.financeCreatedTotalSub", {
+                  defaultValue: "All orders from your Finance account",
+                })}
+              </span>
+            </div>
+          </div>
+        )}
         <div className="order-dashboard-card order-dashboard-card--total">
           <span className="order-dashboard-icon">
             <AfCurrencyIcon size={16} />
@@ -1365,6 +1457,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
                         t("common.paid", "Paid"),
                         t("common.remaining", "Remaining"),
                         t("common.status", "Status"),
+                        t("orders.createdBy", "Created By"),
                         t("common.date", "Date"),
                         t("common.actions", "Actions"),
                       ].map((h) => (
@@ -1375,7 +1468,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
                   <tbody>
                     {orders.length === 0 ? (
                       <tr>
-                        <td colSpan={11}>
+                        <td colSpan={12}>
                           <EmptyState
                             message={t("orders.noOrders")}
                             Icon={LuClipboardList}
@@ -1460,6 +1553,9 @@ export default function AllOrders({ filter, mode = "orders" }) {
                                   );
                                 })()}
                               </div>
+                            </td>
+                            <td>
+                              <OrderCreatorBadge order={o} compact />
                             </td>
                             <td className="order-date-text">
                               {formatSystemDate(o.createdAt, language)}
@@ -1578,6 +1674,9 @@ export default function AllOrders({ filter, mode = "orders" }) {
                       </div>
                       <div className="order-mobile-phone">
                         {o.customer?.phoneNumber}
+                      </div>
+                      <div style={{ marginTop: 6 }}>
+                        <OrderCreatorBadge order={o} compact />
                       </div>
 
                       <div className="order-mobile-badges">

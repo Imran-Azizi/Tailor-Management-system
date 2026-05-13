@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import Sidebar from "./Sidebar.jsx";
@@ -17,6 +17,7 @@ function getInitialCollapsed() {
 const TITLES = {
   "/dashboard": "common.dashboard",
   "/orders/create": "common.createOrder",
+  "/orders/global-search": "globalSearch.title",
   "/orders": "common.allOrders",
   "/orders/pending": "common.pendingOrders",
   "/orders/completed": "common.completedOrders",
@@ -38,6 +39,7 @@ const TITLES = {
   "/customers/report": "report.title",
   "/transactions/create": "transaction.title",
   "/transactions": "transaction.allTitle",
+  "/support-team": "supportTeam.title",
 };
 const SORTED_TITLE_ENTRIES = Object.entries(TITLES).sort(
   (a, b) => b[0].length - a[0].length,
@@ -48,6 +50,9 @@ export default function Layout() {
   const [collapsed, setCollapsed] = useState(getInitialCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
   const loc = useLocation();
+  const toggleCollapsed = useCallback(() => setCollapsed((c) => !c), []);
+  const closeMobileSidebar = useCallback(() => setMobileOpen(false), []);
+  const toggleMobileSidebar = useCallback(() => setMobileOpen((o) => !o), []);
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
@@ -77,17 +82,17 @@ export default function Layout() {
     <>
       <Sidebar
         collapsed={collapsed}
-        onToggle={() => setCollapsed((c) => !c)}
+        onToggle={toggleCollapsed}
         open={mobileOpen}
-        onNavigate={() => setMobileOpen(false)}
+        onNavigate={closeMobileSidebar}
       />
       <div
         className={`sb-overlay${mobileOpen ? " on" : ""}`}
-        onClick={() => setMobileOpen(false)}
+        onClick={closeMobileSidebar}
       />
       <div className={`app-shell${collapsed ? " collapsed" : ""}`}>
         <Navbar
-          onHamburger={() => setMobileOpen((o) => !o)}
+          onHamburger={toggleMobileSidebar}
           pageTitle={t(titleKey)}
         />
         <main className="min-w-0" style={{ flex: 1 }}>

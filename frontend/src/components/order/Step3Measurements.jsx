@@ -31,7 +31,14 @@ const REQUIRED_LABELS = {
   KORTY: {},
   YAKHANQAQ: {},
   READY_MADE: {},
+  READY_MADE_WASKAT: {},
 };
+
+const READY_MADE_CLOTHES_TYPES = new Set(["READY_MADE", "READY_MADE_CLOTHES"]);
+
+function isReadyMadeClothesType(type) {
+  return READY_MADE_CLOTHES_TYPES.has(type);
+}
 
 const selStyles = {
   control: (base, state) => ({
@@ -363,7 +370,7 @@ function MeasureBlock({
             </div>
           )}
 
-          {entry.type === "OUTFIT" && (
+          {(entry.type === "OUTFIT" || isReadyMadeClothesType(entry.type)) && (
             <div style={{ marginTop: 18 }}>
               <label className="lbl">{t("createOrder.additionalNotes")}</label>
               <textarea
@@ -390,15 +397,31 @@ export default function Step3Measurements({
   orderTypes = [],
   initial = {},
 }) {
+  const orderTypeEntries = Array.isArray(orderTypes) ? orderTypes : [];
+  const typeList = orderTypeEntries.map((entry) => entry?.type);
+  const hasReadyMadeClothes = typeList.some((type) =>
+    READY_MADE_CLOTHES_TYPES.has(type),
+  );
+  const hasReadyMadeWaskat = typeList.includes("READY_MADE_WASKAT");
+  const hideReadyMadeWaskatMeasurements =
+    hasReadyMadeClothes && hasReadyMadeWaskat;
+  const visibleMeasurementEntries = orderTypeEntries
+    .map((entry, originalIndex) => ({ entry, originalIndex }))
+    .filter(
+      ({ entry }) =>
+        !(
+          hideReadyMadeWaskatMeasurements && entry?.type === "READY_MADE_WASKAT"
+        ),
+    );
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
   const [data, setData] = useState(() => {
     const draft = {};
-    orderTypes.forEach((entry, index) => {
-      const source = initial[index]
-        ? Array.isArray(initial[index])
-          ? initial[index]
-          : [initial[index]]
+    visibleMeasurementEntries.forEach(({ entry, originalIndex }) => {
+      const source = initial[originalIndex]
+        ? Array.isArray(initial[originalIndex])
+          ? initial[originalIndex]
+          : [initial[originalIndex]]
         : [];
 
       const normalized = (source.length ? source : [{}]).map(
@@ -416,7 +439,7 @@ export default function Step3Measurements({
         },
       );
 
-      draft[index] = normalized;
+      draft[originalIndex] = normalized;
     });
     return draft;
   });
@@ -477,8 +500,7 @@ export default function Step3Measurements({
   const validateBeforeContinue = () => {
     const nextFieldErrors = {};
 
-    for (let typeIdx = 0; typeIdx < orderTypes.length; typeIdx += 1) {
-      const entry = orderTypes[typeIdx];
+    for (const { entry, originalIndex: typeIdx } of visibleMeasurementEntries) {
       const sets = data[typeIdx] || [{}];
       const required = REQUIRED_LABELS[entry.type] || {};
 
@@ -556,7 +578,7 @@ export default function Step3Measurements({
       )}
 
       <div className="measure-order-stack">
-        {orderTypes.map((entry, typeIdx) => (
+        {visibleMeasurementEntries.map(({ entry, originalIndex: typeIdx }) => (
           <section
             key={`${entry.type}-${typeIdx}`}
             className="measure-order-card"
@@ -605,7 +627,8 @@ export default function Step3Measurements({
                           })
                         : t("createOrder.fillMeasurements")}
                     </p>
-                    {entry.type === "READY_MADE" && (
+                    {(entry.type === "READY_MADE" ||
+                      entry.type === "READY_MADE_WASKAT") && (
                       <p
                         style={{
                           fontSize: 12,
@@ -614,10 +637,15 @@ export default function Step3Measurements({
                           fontWeight: 600,
                         }}
                       >
-                        {t(
-                          "createOrder.readyMadeAllOptional",
-                          "All measurements are optional for Ready-Made Clothes",
-                        )}
+                        {entry.type === "READY_MADE"
+                          ? t(
+                              "createOrder.readyMadeAllOptional",
+                              "All measurements are optional for Ready-Made Clothes",
+                            )
+                          : t(
+                              "createOrder.readyMadeWaskatAllOptional",
+                              "All measurements are optional for Ready-Made Waskat",
+                            )}
                       </p>
                     )}
                   </div>

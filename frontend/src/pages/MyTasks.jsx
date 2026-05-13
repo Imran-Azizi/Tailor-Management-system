@@ -301,7 +301,9 @@ function OrderDetailModal({
               <Badge v={TYPE_V[order.type] || "gold"}>
                 {orderLabel.typeWithSequenceLabel}
               </Badge>
-              {order.isEmergency && <Badge v="red">⚡ Emergency</Badge>}
+              {order.isEmergency && (
+                <Badge v="red">⚡ {t("orders.emergencyBadge")}</Badge>
+              )}
               <span
                 style={{
                   fontSize: 11,
@@ -785,7 +787,9 @@ function OrderCard({
             <Badge v={TYPE_V[order.type] || "gold"}>
               {orderLabel.typeWithSequenceLabel}
             </Badge>
-            {order.isEmergency && <Badge v="red">⚡ Emergency</Badge>}
+            {order.isEmergency && (
+              <Badge v="red">⚡ {t("orders.emergencyBadge")}</Badge>
+            )}
             <span
               style={{
                 fontSize: 11,

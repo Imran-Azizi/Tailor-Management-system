@@ -283,6 +283,8 @@ export const getDashboardStats = async ({
     allOrdersBenefitAggregate,
     readyMadeBenefitAggregate,
     readyMadeFinalProfitAggregate,
+    readyMadeWaskatBenefitAggregate,
+    readyMadeWaskatFinalProfitAggregate,
     totalRakhtRevenue,
   ] = await Promise.all([
     prisma.order.aggregate({
@@ -324,7 +326,7 @@ export const getDashboardStats = async ({
     prisma.order.aggregate({
       where: {
         ...monthWhere,
-        type: { not: "READY_MADE" },
+        type: { notIn: ["READY_MADE", "READY_MADE_WASKAT"] },
       },
       _sum: { totalBenefit: true },
     }),
@@ -342,8 +344,41 @@ export const getDashboardStats = async ({
       },
       _sum: { totalBenefit: true, readyMadeOriginalPrice: true },
     }),
+    prisma.order.aggregate({
+      where: {
+        ...monthWhere,
+        type: "READY_MADE_WASKAT",
+      },
+      _sum: { totalBenefit: true },
+    }),
+    prisma.order.aggregate({
+      where: {
+        ...monthWhere,
+        type: "READY_MADE_WASKAT",
+      },
+      _sum: { totalBenefit: true, readyMadeWaskatOriginalPrice: true },
+    }),
     computeRakhtBenefitRevenue(monthWhere),
   ]);
+
+  const recentOrdersWithRevenue = recentOrders.map((order) => {
+    const readyMadeOriginalPrice =
+      order?.type === "READY_MADE"
+        ? Number(order?.readyMadeOriginalPrice || 0)
+        : order?.type === "READY_MADE_WASKAT"
+          ? Number(order?.readyMadeWaskatOriginalPrice || 0)
+          : 0;
+    const baseBenefit = Number(order?.totalBenefit || 0);
+    const finalTotalBenefit =
+      order?.type === "READY_MADE" || order?.type === "READY_MADE_WASKAT"
+        ? baseBenefit - readyMadeOriginalPrice
+        : baseBenefit;
+
+    return {
+      ...order,
+      finalTotalBenefit,
+    };
+  });
 
   const monthlyRevenue = await getMonthlyRevenue(financeUserId, {
     month: hasMonthFilter ? parsedMonth : null,
@@ -364,7 +399,7 @@ export const getDashboardStats = async ({
     totalDiscount: revenueData._sum.discount || 0,
     totalPaid: paidData._sum.paidAmount || 0,
     totalRemaining: remainingData._sum.remaining || 0,
-    recentOrders,
+    recentOrders: recentOrdersWithRevenue,
     monthlyRevenue,
     ordersByType: ordersByType.map((o) => ({
       type: o.type,
@@ -390,6 +425,15 @@ export const getDashboardStats = async ({
     totalReadyMadeProfitAfterExpenses:
       Number(readyMadeFinalProfitAggregate._sum?.totalBenefit || 0) -
       Number(readyMadeFinalProfitAggregate._sum?.readyMadeOriginalPrice || 0),
+    totalReadyMadeWaskatProfit: Number(
+      readyMadeWaskatBenefitAggregate._sum?.totalBenefit || 0,
+    ),
+    totalReadyMadeWaskatProfitAfterExpenses:
+      Number(readyMadeWaskatFinalProfitAggregate._sum?.totalBenefit || 0) -
+      Number(
+        readyMadeWaskatFinalProfitAggregate._sum
+          ?.readyMadeWaskatOriginalPrice || 0,
+      ),
     totalRakhtRevenue: Number(totalRakhtRevenue || 0),
     isFiltered: hasMonthFilter,
     filteredMonth: hasMonthFilter ? parsedMonth : null,

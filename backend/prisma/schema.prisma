@@ -72,7 +72,10 @@ model User {
   createdDailyTasks              DailyTask[]             @relation("CreatedDailyTasks")
   orderDrafts                    OrderDraft[]
   rakhtPaymentHistories          RakhtPaymentHistory[]
+  createdOrders                  Order[]                 @relation("CreatedOrders")
   financeCreatedOrders           Order[]                 @relation("FinanceCreatedOrders")
+  createdItems                   Item[]
+  createdItemSales               ItemSale[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -95,6 +98,7 @@ model UserNotification {
 
   @@index([userId])
   @@index([isRead])
+  @@index([userId, isRead, createdAt])
 }
 
 // ─── Customers ────────────────────────────────────────────────────────────────
@@ -139,19 +143,18 @@ model Order {
   isCompleted                Boolean   @default(false)
   inProgress                 Boolean   @default(false)
 
-  // Entry month/year — set by admin at order creation time
   entryMonth Int?
   entryYear  Int?
 
-  // Finance user who created this order (null for orders created by ADMIN/DOKAN)
   createdByFinanceId String?
+  createdById        String?
+  createdByName      String?
+  createdByRole      AccountType?
+  assignedToId       String?
+  assignedById       String?
+  assignedAt         DateTime?
+  assignmentNote     String?
 
-  // Assignment fields
-  assignedToId String?
-
-  assignedById    String?
-  assignedAt      DateTime?
-  assignmentNote  String?
   assignmentPrice Float?
   receivedById    String?
   receivedAt      DateTime?
@@ -201,6 +204,7 @@ model Order {
   workerPaidBy       User? @relation("WorkerPaidByOrders", fields: [workerPaidById], references: [id])
   qichikarPaidBy     User? @relation("QichikarPaidByOrders", fields: [qichikarPaidById], references: [id])
   dokhtPaidBy        User? @relation("DokhtPaidByOrders", fields: [dokhtPaidById], references: [id])
+  createdBy          User? @relation("CreatedOrders", fields: [createdById], references: [id])
   createdByFinance   User? @relation("FinanceCreatedOrders", fields: [createdByFinanceId], references: [id])
 
   customer                Customer                @relation(fields: [customerId], references: [id])
@@ -215,6 +219,7 @@ model Order {
   korty                   Korty?
   yakhanQaq               YakhanQaq?
   readyMadeOrder          ReadyMadeOrder?
+  readyMadeWaskatOrder    ReadyMadeWaskatOrder?
   notifications           Notification[]
   transactions            Transaction[]
   workerPaymentReceipts   WorkerPaymentReceipt[]
@@ -228,6 +233,12 @@ model Order {
   readyMadeClothingCode  String?
   readyMadeOriginalPrice Float?
   readyMadeClothing      ReadyMadeClothing? @relation(fields: [readyMadeClothingId], references: [id], onDelete: SetNull)
+
+  // Ready-Made Waskat link
+  readyMadeWaskatClothingId    String?
+  readyMadeWaskatClothingCode  String?
+  readyMadeWaskatOriginalPrice Float?
+  readyMadeWaskatClothing      ReadyMadeWaskatClothing? @relation(fields: [readyMadeWaskatClothingId], references: [id], onDelete: SetNull)
 
   @@index([customerId])
   @@index([type])
@@ -252,7 +263,13 @@ model Order {
   @@index([dokhtCompletedAt])
   @@index([entryMonth])
   @@index([entryYear])
+  @@index([createdById])
   @@index([createdByFinanceId])
+  @@index([createdAt])
+  @@index([customerId, type, createdAt])
+  @@index([entryYear, entryMonth])
+  @@index([createdByFinanceId, entryYear, entryMonth])
+  @@index([isCompleted, createdAt])
 }
 
 model WorkerPaymentReceipt {
@@ -313,6 +330,7 @@ model Rakht {
 
   @@index([companyName])
   @@index([brandName])
+  @@index([date])
 }
 
 model RakhtPaymentHistory {
@@ -356,6 +374,7 @@ enum OrderType {
   KORTY
   YAKHANQAQ
   READY_MADE
+  READY_MADE_WASKAT
 }
 
 enum BoxType {
@@ -494,6 +513,53 @@ model ReadyMadeOrder {
   calf     Float?
   sorain   Float?
 
+  neckStyle           String?
+  sleeveStyle         String?
+  sleeveSize          String?
+  skirtStyle          String?
+  frontPocket         Boolean @default(false)
+  sidePocket          Boolean @default(false)
+  underPocket         Boolean @default(false)
+  outfitDesign        String?
+  outfitStyle         String?
+  buttonStyle         String?
+  pantStyle           String?
+  additionalStyleInfo String?
+  additionalNotes     String?
+}
+
+model ReadyMadeWaskatClothing {
+  id            String   @id @default(uuid())
+  waskatCode    String   @unique
+  originalPrice Float
+  quantity      Int      @default(1)
+  description   String?
+  orders        Order[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([waskatCode])
+}
+
+model ReadyMadeWaskatOrder {
+  id      String @id @default(uuid())
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  height   Float?
+  chest    Float?
+  waist    Float?
+  shoulder Float?
+  sleeve   Float?
+  neck     Float?
+  armpit   Float?
+  skirt    Float?
+  tenban   Float?
+  pantLeg  Float?
+  arm      Float?
+  calf     Float?
+  sorain   Float?
+
   additionalNotes String?
 }
 
@@ -510,6 +576,8 @@ model Notification {
 
   @@index([orderId])
   @@index([isRead])
+  @@index([nextAlert])
+  @@index([expiresAt])
 }
 
 model Box {
@@ -521,6 +589,8 @@ model Box {
   foreignOrders Order[]  @relation("ForeignOrderToBox")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  @@index([boxType])
 }
 
 model Yakhan {
@@ -718,6 +788,9 @@ model Transaction {
   @@index([source])
   @@index([createdById])
   @@index([userId, source, kind])
+  @@index([transactionDate])
+  @@index([source, kind, transactionDate])
+  @@index([createdById, transactionDate])
 }
 
 model DamagedClothesPenalty {
@@ -752,5 +825,57 @@ model DamagedClothesPenalty {
   @@index([orderId])
   @@index([createdById])
   @@index([roleType])
+  @@index([createdAt])
+}
+
+enum ItemType {
+  WATCH
+  PERFUME
+  BOOT
+  RING
+  SLIPPER
+}
+
+model Item {
+  id            String     @id @default(uuid())
+  type          ItemType
+  name          String
+  brand         String
+  code          String     @unique
+  quantity      Int        @default(0)
+  originalPrice Float
+  notes         String?
+  sales         ItemSale[]
+  createdById   String
+  createdBy     User       @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([type])
+  @@index([brand])
+  @@index([name])
+  @@index([code])
+}
+
+model ItemSale {
+  id            String   @id @default(uuid())
+  itemId        String
+  item          Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  type          ItemType
+  name          String
+  brand         String
+  code          String
+  originalPrice Float
+  customerPrice Float
+  profit        Float
+  quantitySold  Int      @default(1)
+  createdById   String
+  createdBy     User     @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt     DateTime @default(now())
+
+  @@index([itemId])
+  @@index([type])
+  @@index([brand])
+  @@index([code])
   @@index([createdAt])
 }

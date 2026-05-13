@@ -23,6 +23,7 @@ const TYPES = [
   { id: "KORTY", Icon: LuPersonStanding },
   { id: "YAKHANQAQ", Icon: LuScissorsLineDashed },
   { id: "READY_MADE", Icon: LuTag },
+  { id: "READY_MADE_WASKAT", Icon: LuTag },
 ];
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => {
@@ -42,16 +43,23 @@ function normalizeEmergencyHour(value) {
   return String(Math.floor(numeric)).padStart(2, "0");
 }
 
-function ReadyMadeDropdown({ selectedClothingId, onChange }) {
+function ReadyMadeCatalogDropdown({
+  queryKey,
+  endpoint,
+  selectedId,
+  onChange,
+  selectLabel,
+  noItemsLabel,
+  chooseLabel,
+  codeField,
+}) {
   const { t } = useTranslation();
   const { data: items = [], isLoading } = useQuery({
-    queryKey: ["ready-made-clothing", "active"],
-    queryFn: () =>
-      api
-        .get("/designs/ready-made-clothing?activeOnly=true")
-        .then((r) => r.data),
+    queryKey,
+    queryFn: () => api.get(endpoint).then((r) => r.data),
     staleTime: 5 * 60 * 1000,
   });
+  const hasAnyAvailable = items.some((item) => Number(item?.quantity || 0) > 0);
 
   return (
     <div
@@ -74,21 +82,25 @@ function ReadyMadeDropdown({ selectedClothingId, onChange }) {
           marginBottom: 8,
         }}
       >
-        {t("readyMade.selectCode", "Select Clothing Code")}
+        {selectLabel}
       </label>
       {isLoading ? (
         <p style={{ fontSize: 13, color: "var(--text3)" }}>
           {t("common.loading", "Loading...")}
         </p>
       ) : items.length === 0 ? (
-        <p style={{ fontSize: 13, color: "var(--text3)" }}>
-          {t(
-            "readyMade.noItems",
-            "No clothing items found. Add items in the Design page → Ready-Made tab.",
-          )}
-        </p>
+        <p style={{ fontSize: 13, color: "var(--text3)" }}>{noItemsLabel}</p>
       ) : (
-        <div style={{ position: "relative" }}>
+        <>
+          {!hasAnyAvailable && (
+            <p style={{ fontSize: 12, color: "#B45309", marginBottom: 8 }}>
+              {t(
+                "createOrder.noStockAvailable",
+                "Items are available in Design page, but all are out of stock.",
+              )}
+            </p>
+          )}
+          <div style={{ position: "relative" }}>
           <select
             className="inp"
             style={{
@@ -97,21 +109,24 @@ function ReadyMadeDropdown({ selectedClothingId, onChange }) {
               paddingInlineEnd: 32,
               width: "100%",
             }}
-            value={selectedClothingId || ""}
+            value={selectedId || ""}
             onChange={(e) => {
               const id = e.target.value;
               const item = items.find((i) => i.id === id) || null;
               onChange(item);
             }}
           >
-            <option value="">
-              {t("readyMade.chooseCode", "— choose a clothing code —")}
-            </option>
+            <option value="">{chooseLabel}</option>
             {items.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.clothingCode}
+              <option
+                key={item.id}
+                value={item.id}
+                disabled={Number(item?.quantity || 0) <= 0}
+              >
+                {item?.[codeField]}
                 {" — "}
                 {formatCurrency(item.originalPrice)}
+                {` (${t("common.quantity", "Quantity")}: ${Number(item?.quantity || 0)})`}
               </option>
             ))}
           </select>
@@ -126,13 +141,14 @@ function ReadyMadeDropdown({ selectedClothingId, onChange }) {
               color: "var(--text3)",
             }}
           />
-        </div>
+          </div>
+        </>
       )}
-      {selectedClothingId && (
+      {selectedId && (
         <p style={{ marginTop: 6, fontSize: 12, color: "var(--primary)" }}>
           {t("readyMade.originalPrice", "Original Price")}:{" "}
           {formatCurrency(
-            items.find((i) => i.id === selectedClothingId)?.originalPrice ?? 0,
+            items.find((i) => i.id === selectedId)?.originalPrice ?? 0,
           )}
         </p>
       )}
@@ -172,6 +188,10 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
     () => entries.find((e) => e.type === "READY_MADE") || null,
     [entries],
   );
+  const readyMadeWaskatEntry = useMemo(
+    () => entries.find((e) => e.type === "READY_MADE_WASKAT") || null,
+    [entries],
+  );
 
   const toggleType = (id) => {
     if (selectedTypes.has(id)) {
@@ -187,10 +207,16 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
         isEmergency: billEmergency,
         emergencyExpiry: billEmergency ? billEmergencyExpiry : "",
         emergencyHour: billEmergency ? billEmergencyHour : "08",
-        isForeignOrder: id === "READY_MADE" ? false : isForeignOrder,
+        isForeignOrder:
+          id === "READY_MADE" || id === "READY_MADE_WASKAT"
+            ? false
+            : isForeignOrder,
         readyMadeClothingId: null,
         readyMadeClothingCode: null,
         readyMadeOriginalPrice: null,
+        readyMadeWaskatClothingId: null,
+        readyMadeWaskatClothingCode: null,
+        readyMadeWaskatOriginalPrice: null,
       },
     ]);
     setBillEmergencyError("");
@@ -213,21 +239,32 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
     setEntries((current) =>
       current.map((entry) => ({
         ...entry,
-        // READY_MADE cannot be a foreign order
-        isForeignOrder: entry.type === "READY_MADE" ? false : checked,
+        // Ready-made types cannot be foreign orders
+        isForeignOrder:
+          entry.type === "READY_MADE" || entry.type === "READY_MADE_WASKAT"
+            ? false
+            : checked,
       })),
     );
   };
 
-  const setReadyMadeClothing = (item) => {
+  const setReadyMadeCatalogItem = (targetType, item) => {
     setEntries((current) =>
       current.map((entry) =>
-        entry.type === "READY_MADE"
+        entry.type === targetType
           ? {
               ...entry,
-              readyMadeClothingId: item?.id || null,
-              readyMadeClothingCode: item?.clothingCode || null,
-              readyMadeOriginalPrice: item?.originalPrice ?? null,
+              ...(targetType === "READY_MADE"
+                ? {
+                    readyMadeClothingId: item?.id || null,
+                    readyMadeClothingCode: item?.clothingCode || null,
+                    readyMadeOriginalPrice: item?.originalPrice ?? null,
+                  }
+                : {
+                    readyMadeWaskatClothingId: item?.id || null,
+                    readyMadeWaskatClothingCode: item?.waskatCode || null,
+                    readyMadeWaskatOriginalPrice: item?.originalPrice ?? null,
+                  }),
             }
           : entry,
       ),
@@ -263,6 +300,22 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
       return;
     }
 
+    const hasReadyMadeWaskat = entries.some(
+      (e) => e.type === "READY_MADE_WASKAT",
+    );
+    if (
+      hasReadyMadeWaskat &&
+      !readyMadeWaskatEntry?.readyMadeWaskatClothingId
+    ) {
+      setSelectionError(
+        t(
+          "readyMadeWaskat.selectCodeRequired",
+          "Please select a waskat code for the Ready-Made Waskat order.",
+        ),
+      );
+      return;
+    }
+
     if (billEmergency) {
       if (!billEmergencyExpiry) {
         setBillEmergencyError(t("createOrder.expiryRequired"));
@@ -290,7 +343,10 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
       emergencyHour: billEmergency
         ? normalizeEmergencyHour(billEmergencyHour)
         : "08",
-      isForeignOrder: entry.type === "READY_MADE" ? false : isForeignOrder,
+      isForeignOrder:
+        entry.type === "READY_MADE" || entry.type === "READY_MADE_WASKAT"
+          ? false
+          : isForeignOrder,
     }));
 
     setSelectionError("");
@@ -352,9 +408,49 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
                 </p>
               </button>
               {id === "READY_MADE" && selected && (
-                <ReadyMadeDropdown
-                  selectedClothingId={readyMadeEntry?.readyMadeClothingId}
-                  onChange={setReadyMadeClothing}
+                <ReadyMadeCatalogDropdown
+                  queryKey={["ready-made-clothing", "catalog"]}
+                  endpoint="/designs/ready-made-clothing"
+                  selectedId={readyMadeEntry?.readyMadeClothingId}
+                  onChange={(item) =>
+                    setReadyMadeCatalogItem("READY_MADE", item)
+                  }
+                  selectLabel={t(
+                    "readyMade.selectCode",
+                    "Select Clothing Code",
+                  )}
+                  noItemsLabel={t(
+                    "readyMade.noItems",
+                    "No clothing items found. Add items in the Design page -> Ready-Made tab.",
+                  )}
+                  chooseLabel={t(
+                    "readyMade.chooseCode",
+                    "- choose a clothing code -",
+                  )}
+                  codeField="clothingCode"
+                />
+              )}
+              {id === "READY_MADE_WASKAT" && selected && (
+                <ReadyMadeCatalogDropdown
+                  queryKey={["ready-made-waskat-clothing", "catalog"]}
+                  endpoint="/designs/ready-made-waskat-clothing"
+                  selectedId={readyMadeWaskatEntry?.readyMadeWaskatClothingId}
+                  onChange={(item) =>
+                    setReadyMadeCatalogItem("READY_MADE_WASKAT", item)
+                  }
+                  selectLabel={t(
+                    "readyMadeWaskat.selectCode",
+                    "Select Waskat Code",
+                  )}
+                  noItemsLabel={t(
+                    "readyMadeWaskat.noItems",
+                    "No ready-made waskat items found. Add items in the Design page -> Ready-Made Waskat tab.",
+                  )}
+                  chooseLabel={t(
+                    "readyMadeWaskat.chooseCode",
+                    "- choose a waskat code -",
+                  )}
+                  codeField="waskatCode"
                 />
               )}
             </div>
@@ -475,7 +571,10 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
               </div>
 
               {/* Foreign Order — not shown when only READY_MADE is selected */}
-              {!entries.every((e) => e.type === "READY_MADE") && (
+              {!entries.every(
+                (e) =>
+                  e.type === "READY_MADE" || e.type === "READY_MADE_WASKAT",
+              ) && (
                 <div>
                   <label className={styles.foreignToggle}>
                     <input
@@ -543,6 +642,20 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
                           {entry.readyMadeClothingCode}
                         </span>
                       )}
+                    {entry.type === "READY_MADE_WASKAT" &&
+                      entry.readyMadeWaskatClothingCode && (
+                        <span
+                          className={`badge ${styles["hide-on-mobile"]}`}
+                          style={{
+                            fontSize: 11,
+                            background: "var(--primary-50)",
+                            color: "var(--primary)",
+                          }}
+                        >
+                          {t("readyMadeWaskat.code", "Code")}:{" "}
+                          {entry.readyMadeWaskatClothingCode}
+                        </span>
+                      )}
                     <span
                       className={styles["hide-on-mobile"]}
                       style={{ fontSize: 12, color: "var(--text3)" }}
@@ -557,25 +670,27 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
                         {t("createOrder.emergencyShort")}
                       </span>
                     )}
-                    {isForeignOrder && entry.type !== "READY_MADE" && (
-                      <span className={styles.foreignShort}>
-                        <svg
-                          width="15"
-                          height="15"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          className={styles.foreignShortIcon}
-                        >
-                          <path
-                            fill="#2563eb"
-                            d="M21.5 12.5a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-8.25-4.25a.75.75 0 0 0-1.5 0v3.19l-2.72 2.72a.75.75 0 1 0 1.06 1.06l2.94-2.94V8.25Z"
-                          />
-                        </svg>
-                        {t("createOrder.foreignShort", {
-                          defaultValue: "ارسال به کشور خارجی",
-                        })}
-                      </span>
-                    )}
+                    {isForeignOrder &&
+                      entry.type !== "READY_MADE" &&
+                      entry.type !== "READY_MADE_WASKAT" && (
+                        <span className={styles.foreignShort}>
+                          <svg
+                            width="15"
+                            height="15"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            className={styles.foreignShortIcon}
+                          >
+                            <path
+                              fill="#2563eb"
+                              d="M21.5 12.5a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-8.25-4.25a.75.75 0 0 0-1.5 0v3.19l-2.72 2.72a.75.75 0 1 0 1.06 1.06l2.94-2.94V8.25Z"
+                            />
+                          </svg>
+                          {t("createOrder.foreignShort", {
+                            defaultValue: "ارسال به کشور خارجی",
+                          })}
+                        </span>
+                      )}
                   </div>
                   <button
                     type="button"
@@ -624,6 +739,12 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
                     entry.readyMadeClothingCode && (
                       <span style={{ color: "var(--primary)", fontSize: 11 }}>
                         ({entry.readyMadeClothingCode})
+                      </span>
+                    )}
+                  {entry.type === "READY_MADE_WASKAT" &&
+                    entry.readyMadeWaskatClothingCode && (
+                      <span style={{ color: "var(--primary)", fontSize: 11 }}>
+                        ({entry.readyMadeWaskatClothingCode})
                       </span>
                     )}
                   <button

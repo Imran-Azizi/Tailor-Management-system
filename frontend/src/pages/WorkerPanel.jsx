@@ -28,11 +28,13 @@ import {
   groupNotificationsByDay,
 } from "../lib/notificationGrouping.js";
 import { formatCurrency } from "../lib/currency.js";
+
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
 import { formatMonthYearLabel } from "../lib/months.js";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import { NotificationText } from "../components/ui/index.jsx";
+import OrderCreatorBadge from "../components/order/OrderCreatorBadge.jsx";
 
 const ROLE_CONFIG = {
   DOKHT: {
@@ -381,8 +383,12 @@ function OrderDetailsModal({ order, language, t, onClose }) {
               {orderPrimaryName}
             </h3>
             <p className="mt-1.5 text-xs text-[var(--text3)] sm:text-sm">
-              #{order.customer?.billNumber || "-"} - {orderLabel.typeWithSequenceLabel}
+              #{order.customer?.billNumber || "-"} -{" "}
+              {orderLabel.typeWithSequenceLabel}
             </p>
+            <div className="mt-2">
+              <OrderCreatorBadge order={order} compact />
+            </div>
           </div>
           <button className="btn btn-outline btn-sm" onClick={onClose}>
             {t("common.close", "Close")}
@@ -1657,6 +1663,9 @@ export default function WorkerPanel() {
                 <span>{order.customer.phoneNumber}</span>
               )}
           </div>
+          <div style={{ marginTop: 6 }}>
+            <OrderCreatorBadge order={order} compact />
+          </div>
         </div>
 
         {(order?.rakhtBrandName || order?.rakhtColor) && (
@@ -1834,6 +1843,7 @@ export default function WorkerPanel() {
             {t("workerPanel.orderType", "Order Type")}:{" "}
             {orderLabel.typeWithSequenceLabel}
           </div>
+          <OrderCreatorBadge order={order} compact />
           {(order?.rakhtBrandName || order?.rakhtColor) && (
             <div className="order-mobile-rakht">
               <span className="order-rakht-chip order-rakht-chip--brand">
@@ -1881,6 +1891,19 @@ export default function WorkerPanel() {
     );
   };
 
+  // Determine RTL based on language, hoisted to top scope
+  const lang =
+    typeof i18n !== "undefined" && i18n.resolvedLanguage
+      ? i18n.resolvedLanguage
+      : typeof language !== "undefined"
+        ? language
+        : "en";
+  const isRtl =
+    typeof i18n !== "undefined" && typeof i18n.dir === "function"
+      ? i18n.dir(lang) === "rtl"
+      : ["fa", "prs", "ps", "ar", "ur"].some((code) => lang.startsWith(code));
+  window.__isRtl = isRtl; // for debugging
+
   return (
     <div className="grid gap-4 text-slate-900 dark:text-slate-100 sm:gap-5">
       <div className="card p-4 sm:p-5">
@@ -1910,73 +1933,87 @@ export default function WorkerPanel() {
           </span>
         </div>
 
-        <div className="mt-3.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-5">
-          <div className="grid gap-1 rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/60">
-            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              {t(
-                "workerPanel.totalCompletedPayments",
-                "Total Money from Completed Orders",
-              )}
-            </div>
-            <div className="flex items-center gap-2 text-xl font-extrabold text-blue-600 dark:text-blue-400">
-              <AfCurrencyIcon size={18} />
-              {formatCurrency(totalCompletedPayments, language)}
-            </div>
-          </div>
-
-          <div className="grid gap-1 rounded-[10px] border border-emerald-200 bg-emerald-50 px-3 py-2.5 dark:border-emerald-800 dark:bg-emerald-950/30">
-            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              {t("workerPanel.moneyReceipt", "Money Receipt")}
-            </div>
-            <div className="flex items-center gap-2 text-xl font-extrabold text-emerald-700 dark:text-emerald-400">
-              <AfCurrencyIcon size={18} />
-              {formatCurrency(moneyReceiptTotal, language)}
-            </div>
-          </div>
-
-          <div className="grid gap-1 rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/60">
-            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              {t("workerPanel.loanTotal", "Loan Total")}
-            </div>
-            <div className="flex items-center gap-2 text-xl font-extrabold text-amber-700 dark:text-amber-400">
-              <AfCurrencyIcon size={18} />
-              {formatCurrency(totalLoanAmount, language)}
-            </div>
-          </div>
-
+        {/* Stat Cards Section - Dokht/Qichikar only */}
+        <div className="mt-3.5 grid gap-2.5">
+          {/* Current Money - full width, visually prominent */}
           <div
-            className={`grid gap-1 rounded-[10px] px-3 py-2.5 ${
-              currentMoney >= 0
-                ? "border border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"
-                : "border border-rose-300 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/30"
-            }`}
+            className={`w-full rounded-[12px] border-2 px-4 py-4 shadow-sm transition-all
+              ${
+                currentMoney >= 0
+                  ? "border-emerald-400 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950/40"
+                  : "border-rose-400 bg-rose-50 dark:border-rose-700 dark:bg-rose-950/40"
+              }
+              flex flex-col items-${isRtl ? "end" : "start"} justify-center
+            `}
+            style={{
+              gridColumn: "1 / -1",
+              direction: isRtl ? "rtl" : "ltr",
+              boxShadow: "0 2px 12px 0 rgba(16,185,129,0.08)",
+            }}
           >
-            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+            <div className="text-base font-bold text-slate-600 dark:text-slate-300 mb-1">
               {t("workerPanel.currentMoney", "Current Money")}
             </div>
             <div
-              className={`flex items-center gap-2 text-xl font-extrabold ${
+              className={`flex items-center gap-2 text-2xl font-extrabold ${
                 currentMoney >= 0
-                  ? "text-emerald-700 dark:text-emerald-400"
-                  : "text-rose-700 dark:text-rose-400"
+                  ? "text-emerald-700 dark:text-emerald-300"
+                  : "text-rose-700 dark:text-rose-300"
               }`}
+              style={{ fontFamily: "inherit" }}
             >
-              <AfCurrencyIcon size={18} />
+              <AfCurrencyIcon size={22} />
               {formatCurrency(currentMoney, language)}
             </div>
           </div>
 
-          <div className="grid gap-1 rounded-[10px] border border-amber-300 bg-amber-50 px-3 py-2.5 dark:border-amber-800 dark:bg-amber-950/30">
-            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              {t("workerPanel.totalPenaltyAmount", "Total Damage Penalty")}
+          {/* Other stat cards in responsive grid */}
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-1 rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/60">
+              <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                {t(
+                  "workerPanel.totalCompletedPayments",
+                  "Total Money from Completed Orders",
+                )}
+              </div>
+              <div className="flex items-center gap-2 text-xl font-extrabold text-blue-600 dark:text-blue-400">
+                <AfCurrencyIcon size={18} />
+                {formatCurrency(totalCompletedPayments, language)}
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-xl font-extrabold text-amber-700 dark:text-amber-400">
-              <AfCurrencyIcon size={18} />
-              {formatCurrency(totalDamagePenaltyAmount, language)}
+
+            <div className="grid gap-1 rounded-[10px] border border-emerald-200 bg-emerald-50 px-3 py-2.5 dark:border-emerald-800 dark:bg-emerald-950/30">
+              <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                {t("workerPanel.moneyReceipt", "Money Receipt")}
+              </div>
+              <div className="flex items-center gap-2 text-xl font-extrabold text-emerald-700 dark:text-emerald-400">
+                <AfCurrencyIcon size={18} />
+                {formatCurrency(moneyReceiptTotal, language)}
+              </div>
             </div>
-            <div className="text-[11px] text-amber-800 dark:text-amber-300">
-              {damagedPenaltyPayload?.total || 0}{" "}
-              {t("workerPanel.totalPenalties", "penalties")}
+
+            <div className="grid gap-1 rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/60">
+              <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                {t("workerPanel.loanTotal", "Loan Total")}
+              </div>
+              <div className="flex items-center gap-2 text-xl font-extrabold text-amber-700 dark:text-amber-400">
+                <AfCurrencyIcon size={18} />
+                {formatCurrency(totalLoanAmount, language)}
+              </div>
+            </div>
+
+            <div className="grid gap-1 rounded-[10px] border border-amber-300 bg-amber-50 px-3 py-2.5 dark:border-amber-800 dark:bg-amber-950/30">
+              <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                {t("workerPanel.totalPenaltyAmount", "Total Damage Penalty")}
+              </div>
+              <div className="flex items-center gap-2 text-xl font-extrabold text-amber-700 dark:text-amber-400">
+                <AfCurrencyIcon size={18} />
+                {formatCurrency(totalDamagePenaltyAmount, language)}
+              </div>
+              <div className="text-[11px] text-amber-800 dark:text-amber-300">
+                {damagedPenaltyPayload?.total || 0}{" "}
+                {t("workerPanel.totalPenalties", "penalties")}
+              </div>
             </div>
           </div>
         </div>
@@ -2098,6 +2135,9 @@ export default function WorkerPanel() {
                       </div>
                       <div style={{ fontSize: 12, color: "var(--text3)" }}>
                         {orderLabel.typeWithSequenceLabel}
+                      </div>
+                      <div style={{ marginTop: 4 }}>
+                        <OrderCreatorBadge order={order} compact />
                       </div>
                       {order.assignmentPrice != null && (
                         <div

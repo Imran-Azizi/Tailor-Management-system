@@ -148,31 +148,41 @@ function BillingCard({ entry, value, onChange, billingKey }) {
         )}
       </div>
 
-      {entry.type === "READY_MADE" && entry.readyMadeOriginalPrice != null && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "8px 14px",
-            borderRadius: 8,
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            marginBottom: 12,
-          }}
-        >
-          <span
-            style={{ fontSize: 12, color: "var(--text3)", fontWeight: 600 }}
+      {(entry.type === "READY_MADE" || entry.type === "READY_MADE_WASKAT") &&
+        (entry.type === "READY_MADE"
+          ? entry.readyMadeOriginalPrice != null
+          : entry.readyMadeWaskatOriginalPrice != null) && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "8px 14px",
+              borderRadius: 8,
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              marginBottom: 12,
+            }}
           >
-            {t("createOrder.originalPrice", "Original Price")}
-          </span>
-          <span
-            style={{ fontSize: 15, fontWeight: 700, color: "var(--text2)" }}
-          >
-            {formatCurrency(Number(entry.readyMadeOriginalPrice), language)}
-          </span>
-        </div>
-      )}
+            <span
+              style={{ fontSize: 12, color: "var(--text3)", fontWeight: 600 }}
+            >
+              {t("createOrder.originalPrice", "Original Price")}
+            </span>
+            <span
+              style={{ fontSize: 15, fontWeight: 700, color: "var(--text2)" }}
+            >
+              {formatCurrency(
+                Number(
+                  entry.type === "READY_MADE"
+                    ? entry.readyMadeOriginalPrice
+                    : entry.readyMadeWaskatOriginalPrice,
+                ),
+                language,
+              )}
+            </span>
+          </div>
+        )}
 
       <div
         style={{

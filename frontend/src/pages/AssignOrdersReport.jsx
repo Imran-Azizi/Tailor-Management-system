@@ -14,6 +14,7 @@ import {
   PageHeader,
   Spinner,
 } from "../components/ui/index.jsx";
+import OrderCreatorBadge from "../components/order/OrderCreatorBadge.jsx";
 
 function resolveOrderState(order) {
   if (order?.isDamageOrder) {
@@ -319,6 +320,7 @@ export default function AssignOrdersReport() {
                         <span className="badge bg-gray">
                           #{billNumber ?? "-"}
                         </span>
+                        <OrderCreatorBadge order={order} compact />
                       </div>
 
                       <div

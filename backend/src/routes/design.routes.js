@@ -32,6 +32,24 @@ router.delete(
   ctrl.deleteReadyMadeClothing,
 );
 
+// Ready-Made Waskat catalog
+router.get("/ready-made-waskat-clothing", ctrl.listReadyMadeWaskatClothing);
+router.post(
+  "/ready-made-waskat-clothing",
+  authorize("ADMIN", "FINANCE"),
+  ctrl.createReadyMadeWaskatClothing,
+);
+router.put(
+  "/ready-made-waskat-clothing/:id",
+  authorize("ADMIN", "FINANCE"),
+  ctrl.updateReadyMadeWaskatClothing,
+);
+router.delete(
+  "/ready-made-waskat-clothing/:id",
+  authorize("ADMIN"),
+  ctrl.deleteReadyMadeWaskatClothing,
+);
+
 router.get("/:model", ctrl.getAll);
 router.post("/:model", authorize("ADMIN", "FINANCE"), ctrl.create);
 router.put("/:model/:id", authorize("ADMIN", "FINANCE"), ctrl.update);

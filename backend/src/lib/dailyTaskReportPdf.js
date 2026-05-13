@@ -690,7 +690,9 @@ export async function buildDailyTaskReportPdf(report, language = "en") {
       const fontPath = resolveArabicReportFontPath();
       if (!fontPath) throw new Error("No Arabic font found");
       fkFont = await loadArabicFont(fontPath);
-      console.info(`[PDF] Daily RTL font: ${fontPath}`);
+      if (process.env.DEBUG_PDF_FONTS === "true") {
+        console.info(`[PDF] Daily RTL font: ${fontPath}`);
+      }
     } catch (err) {
       console.error("[PDF] Arabic font load failed:", err.message);
       fkFont = null;

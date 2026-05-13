@@ -309,6 +309,8 @@ export const getCustomerById = async (id) => {
           waskat: true,
           korty: true,
           yakhanQaq: true,
+          readyMadeOrder: true,
+          readyMadeWaskatOrder: true,
           box: true,
           foreignBox: true,
         },

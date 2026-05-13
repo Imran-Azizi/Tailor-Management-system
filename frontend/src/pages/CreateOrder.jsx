@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { parseNumberLocale } from "../lib/normalize.js";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { LuCheck, LuFileText, LuCalendarDays } from "react-icons/lu";
 import toast from "react-hot-toast";
 import api from "../lib/api.js";
@@ -69,11 +69,21 @@ const STEP_FALLBACKS = {
   Billing: "Billing",
 };
 
+const MEASUREMENT_STEP_INDEX = 2;
+const RAKHT_STEP_INDEX = 3;
+const RAKHT_SELECTION_TYPES = new Set([
+  "OUTFIT",
+  "WASKAT",
+  "KORTY",
+  "YAKHANQAQ",
+]);
+
 export default function CreateOrder() {
   const { t, i18n: i18nInstance } = useTranslation();
   const language =
     i18nInstance.resolvedLanguage || i18nInstance.language || "en";
   const navigate = useNavigate();
+  const location = useLocation();
   const qc = useQueryClient();
   const { isAdmin } = useAuth();
   const {
@@ -88,7 +98,87 @@ export default function CreateOrder() {
   } = useMonth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [step, setStep] = useState(0);
-  const [form, setForm] = useState({});
+
+  // Pre-fill from global order search (copy/duplicate)
+  const prefillData = location.state?.prefillData || null;
+
+  const buildInitialFormFromPrefill = (pd) => {
+    if (!pd) return {};
+    // Step3Measurements expects measurements keyed by order type index: { 0: [{ field: value }] }
+    const measurementSet = {
+      ...(pd.measurements || {}),
+      ...(pd.orderName ? { __name: pd.orderName } : {}),
+    };
+    const measurementsForForm =
+      Object.keys(measurementSet).length > 0 ? { 0: [measurementSet] } : {};
+
+    const orderTypes = pd.orderType
+      ? [
+          {
+            type: pd.orderType,
+            isForeignOrder: pd.isForeignOrder || false,
+            isEmergency: pd.isEmergency || false,
+            emergencyExpiry: pd.emergencyExpiry
+              ? String(pd.emergencyExpiry).slice(0, 10)
+              : "",
+            emergencyHour:
+              pd.emergencyHour != null
+                ? String(Number(pd.emergencyHour)).padStart(2, "0")
+                : "08",
+            readyMadeClothingId: pd.readyMadeClothingId || null,
+            readyMadeClothingCode: pd.readyMadeClothingCode || null,
+            readyMadeOriginalPrice: pd.readyMadeOriginalPrice ?? null,
+            readyMadeWaskatClothingId: pd.readyMadeWaskatClothingId || null,
+            readyMadeWaskatClothingCode: pd.readyMadeWaskatClothingCode || null,
+            readyMadeWaskatOriginalPrice:
+              pd.readyMadeWaskatOriginalPrice ?? null,
+          },
+        ]
+      : [];
+
+    const orderItems = buildOrderItems(orderTypes, measurementsForForm);
+    const primaryBillingKey = orderItems[0]?.billingKey || "0-0";
+
+    const billing = orderTypes.length
+      ? {
+          [primaryBillingKey]: {
+            totalPrice: pd.billing?.totalPrice ?? "",
+            discount: pd.billing?.discount ?? "",
+            paidAmount:
+              pd.orderType === "READY_MADE" ||
+              pd.orderType === "READY_MADE_WASKAT"
+                ? ""
+                : (pd.billing?.paidAmount ?? ""),
+          },
+        }
+      : {};
+
+    const rakhtSelections = pd.rakhtSelection
+      ? [
+          {
+            ...pd.rakhtSelection,
+            orderId: pd.orderId,
+            type: pd.orderType,
+            orderItemKey: primaryBillingKey,
+          },
+        ]
+      : [];
+
+    return {
+      customerId: pd.customer?.customerId || "",
+      firstName: pd.customer?.firstName || "",
+      phoneNumber: pd.customer?.phoneNumber || "",
+      orderTypes,
+      measurements: measurementsForForm,
+      orderItems,
+      rakhtSelections,
+      billing,
+    };
+  };
+
+  const [form, setForm] = useState(() =>
+    buildInitialFormFromPrefill(prefillData),
+  );
   const [error, setError] = useState("");
   const [draftId, setDraftId] = useState("");
   const [draftClientKey, setDraftClientKey] = useState(
@@ -109,7 +199,7 @@ export default function CreateOrder() {
     const requestedId = draftParam;
 
     if (!requestedId) {
-      setForm({});
+      setForm(buildInitialFormFromPrefill(prefillData));
       setStep(0);
       setDraftId("");
       setDraftClientKey(
@@ -160,7 +250,7 @@ export default function CreateOrder() {
     return () => {
       cancelled = true;
     };
-  }, [draftParam, setSearchParams]);
+  }, [draftParam, prefillData, setSearchParams]);
 
   const saveDraft = async () => {
     const hasCustomer =
@@ -219,56 +309,104 @@ export default function CreateOrder() {
 
   const merge = (d) => setForm((prev) => ({ ...prev, ...d }));
 
-  const isAllReadyMade = (orderTypes) => {
+  // Professional step logic for READY_MADE_CLOTHES and READY_MADE_WASKAT
+  const getVisibleStepIndices = (orderTypes) => {
     const types = Array.isArray(orderTypes)
-      ? orderTypes
-      : form.orderTypes || [];
-    return types.length > 0 && types.every((e) => e?.type === "READY_MADE");
+      ? orderTypes.map((e) => e?.type)
+      : [];
+    const hasReadyMade = types.includes("READY_MADE");
+    const hasReadyMadeWaskat = types.includes("READY_MADE_WASKAT");
+    const hasRakhtSelectionType = types.some((type) =>
+      RAKHT_SELECTION_TYPES.has(type),
+    );
+    const withRakhtStep = (steps) =>
+      hasRakhtSelectionType && !steps.includes(RAKHT_STEP_INDEX)
+        ? [...steps.slice(0, -1), RAKHT_STEP_INDEX, steps[steps.length - 1]]
+        : steps;
+    // Preserve existing non-Rakht step behavior; add Rakht only for tailored types.
+    if (hasReadyMade && hasReadyMadeWaskat) {
+      return withRakhtStep([0, 1, 2, 4]); // Customer, Order Types, Measurements, Billing
+    }
+    if (hasReadyMade) {
+      return withRakhtStep([0, 1, 2, 4]); // Customer, Order Types, Measurements, Billing
+    }
+    if (hasReadyMadeWaskat) {
+      return withRakhtStep([0, 1, 4]); // Customer, Order Types, Billing
+    }
+    // Default: show all steps
+    return withRakhtStep([0, 1, 2, 4]);
   };
 
-  const RAKHT_STEP_INDEX = 3;
+  const visibleStepIndices = getVisibleStepIndices(form.orderTypes);
+  const activeVisibleStepIndex = Math.max(0, visibleStepIndices.indexOf(step));
+
+  // Step skipping helpers for rendering
+  const types = Array.isArray(form.orderTypes)
+    ? form.orderTypes.map((e) => e?.type)
+    : [];
+  const hasReadyMade = types.includes("READY_MADE");
+  const hasReadyMadeWaskat = types.includes("READY_MADE_WASKAT");
+  const hasRakhtSelectionType = types.some((type) =>
+    RAKHT_SELECTION_TYPES.has(type),
+  );
+  const skipMeasurements = hasReadyMadeWaskat && !hasReadyMade;
+  const skipRakht = !hasRakhtSelectionType;
 
   const next = (d) => {
     merge(d);
     const mergedOrderTypes = d?.orderTypes ?? form.orderTypes;
-    const skipRakht = isAllReadyMade(mergedOrderTypes);
+    // If skipping measurements (READY_MADE_WASKAT only), build orderItems
+    const types = Array.isArray(mergedOrderTypes)
+      ? mergedOrderTypes.map((e) => e?.type)
+      : [];
+    const hasReadyMade = types.includes("READY_MADE");
+    const hasReadyMadeWaskat = types.includes("READY_MADE_WASKAT");
+    const skipMeasurements = hasReadyMadeWaskat && !hasReadyMade;
+    if (skipMeasurements) {
+      const builtOrderItems = buildOrderItems(mergedOrderTypes, {});
+      merge({ orderItems: builtOrderItems });
+    }
     setStep((s) => {
-      const candidate = Math.min(s + 1, STEPS.length - 1);
-      if (candidate === RAKHT_STEP_INDEX && skipRakht) {
-        return Math.min(candidate + 1, STEPS.length - 1);
-      }
-      return candidate;
+      const idx = visibleStepIndices.indexOf(s);
+      if (idx === -1 || idx === visibleStepIndices.length - 1) return s;
+      return visibleStepIndices[idx + 1];
     });
   };
+
   const back = () => {
-    const skipRakht = isAllReadyMade(form.orderTypes);
     setStep((s) => {
-      const candidate = Math.max(s - 1, 0);
-      if (candidate === RAKHT_STEP_INDEX && skipRakht) {
-        return Math.max(candidate - 1, 0);
-      }
-      return candidate;
+      const idx = visibleStepIndices.indexOf(s);
+      if (idx <= 0) return 0;
+      return visibleStepIndices[idx - 1];
     });
     setError("");
   };
 
   const checkBoxAvailability = async (orderTypes) => {
     const entries = Array.isArray(orderTypes) ? orderTypes : [];
+    const checkedBoxTypes = new Set();
 
     for (const entry of entries) {
       const type = entry?.type;
-      if (!type || entry?.isForeignOrder || type === "READY_MADE") {
+      if (
+        !type ||
+        entry?.isForeignOrder ||
+        type === "READY_MADE_WASKAT"
+      ) {
         continue;
       }
+      const boxType = type === "READY_MADE" ? "OUTFIT" : type;
+      if (checkedBoxTypes.has(boxType)) continue;
+      checkedBoxTypes.add(boxType);
 
       try {
         const { data: boxes } = await api.get("/boxes", {
-          params: { type },
+          params: { type: boxType },
         });
         if (!boxes?.length) {
           return {
             available: false,
-            error: `No box available for ${getOrderTypeLabel(type, i18n.language)}. Please create a box first.`,
+            error: `No box available for ${getOrderTypeLabel(boxType, i18n.language)}. Please create a box first.`,
             redirectToBox: true,
           };
         }
@@ -282,7 +420,7 @@ export default function CreateOrder() {
         if (!availableBox) {
           return {
             available: false,
-            error: `All boxes are full for ${getOrderTypeLabel(type, i18n.language)}. Please create a new box.`,
+            error: `All boxes are full for ${getOrderTypeLabel(boxType, i18n.language)}. Please create a new box.`,
             redirectToBox: true,
           };
         }
@@ -390,8 +528,9 @@ export default function CreateOrder() {
     );
 
     const payload = {
+      createNewBillNumber: Boolean(prefillData?.orderId),
       customerInfo: {
-        customerId: merged.customerId,
+        customerId: prefillData?.orderId ? "" : merged.customerId,
         firstName: merged.firstName,
         phoneNumber: merged.phoneNumber,
       },
@@ -431,6 +570,12 @@ export default function CreateOrder() {
             item.readyMadeOriginalPrice != null
               ? Number(item.readyMadeOriginalPrice)
               : null,
+          readyMadeWaskatClothingId: item.readyMadeWaskatClothingId || null,
+          readyMadeWaskatClothingCode: item.readyMadeWaskatClothingCode || null,
+          readyMadeWaskatOriginalPrice:
+            item.readyMadeWaskatOriginalPrice != null
+              ? Number(item.readyMadeWaskatOriginalPrice)
+              : null,
         };
       }),
     };
@@ -469,7 +614,9 @@ export default function CreateOrder() {
         navigate("/boxes");
       }
 
-      console.error("Order creation error:", errorData || e);
+      if (import.meta.env.DEV) {
+        console.error("Order creation error:", errorData || e);
+      }
     }
   };
 
@@ -478,57 +625,85 @@ export default function CreateOrder() {
       className="page create-order-shell"
       style={{ maxWidth: 920, margin: "0 auto" }}
     >
+      {/* Prefill notice banner */}
+      {prefillData && (
+        <div
+          className="info-box ib-blue"
+          style={{
+            marginBottom: 20,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            flexWrap: "wrap",
+          }}
+        >
+          <span style={{ flex: 1 }}>
+            {t(
+              "globalSearch.prefillNotice",
+              "Order data has been pre-filled from an existing order. Please review and update before saving.",
+            )}
+          </span>
+        </div>
+      )}
       {/* Step indicator */}
       <div
         className="step-progress-wrap"
         style={{ display: "flex", alignItems: "center", marginBottom: 32 }}
       >
-        {STEPS.map((s, i) => (
-          <div
-            key={i}
-            className="step-progress-node"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              flex: i < STEPS.length - 1 ? 1 : "none",
-            }}
-          >
+        {visibleStepIndices.map((stepIndex, i) => {
+          const s = STEPS[stepIndex];
+          const isDone = i < activeVisibleStepIndex;
+          const isActive = i === activeVisibleStepIndex;
+          return (
             <div
+              key={stepIndex}
+              className="step-progress-node"
               style={{
                 display: "flex",
-                flexDirection: "column",
                 alignItems: "center",
-                gap: 5,
-                flexShrink: 0,
+                flex: i < visibleStepIndices.length - 1 ? 1 : "none",
               }}
             >
               <div
-                className={`step-dot ${i < step ? "done" : i === step ? "active" : "pending"}`}
-              >
-                {i < step ? <LuCheck size={13} /> : <span>{i + 1}</span>}
-              </div>
-              <span
                 style={{
-                  fontSize: 11,
-                  fontWeight: i === step ? 600 : 400,
-                  color: i <= step ? "var(--primary)" : "var(--text3)",
-                  whiteSpace: "nowrap",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 5,
+                  flexShrink: 0,
                 }}
-                className="step-lbl"
               >
-                {t(STEP_I18N[s.label] || s.label, {
-                  defaultValue: STEP_FALLBACKS[s.label] || s.label,
-                })}
-              </span>
+                <div
+                  className={`step-dot ${isDone ? "done" : isActive ? "active" : "pending"}`}
+                >
+                  {isDone ? <LuCheck size={13} /> : <span>{i + 1}</span>}
+                </div>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: isActive ? 600 : 400,
+                    color:
+                      i <= activeVisibleStepIndex
+                        ? "var(--primary)"
+                        : "var(--text3)",
+                    whiteSpace: "nowrap",
+                  }}
+                  className="step-lbl"
+                >
+                  {t(STEP_I18N[s.label] || s.label, {
+                    defaultValue: STEP_FALLBACKS[s.label] || s.label,
+                  })}
+                </span>
+              </div>
+              {i < visibleStepIndices.length - 1 && (
+                <div
+                  className={`step-line ${isDone ? "done" : "pending"}`}
+                  style={{ margin: "0 6px", marginBottom: 18 }}
+                />
+              )}
             </div>
-            {i < STEPS.length - 1 && (
-              <div
-                className={`step-line ${i < step ? "done" : "pending"}`}
-                style={{ margin: "0 6px", marginBottom: 18 }}
-              />
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Card */}
@@ -576,7 +751,7 @@ export default function CreateOrder() {
               initial={form.orderTypes}
             />
           )}
-          {step === 2 && (
+          {step === 2 && !skipMeasurements && (
             <Step3Measurements
               onNext={(d) => {
                 const orderItems = buildOrderItems(
@@ -590,7 +765,7 @@ export default function CreateOrder() {
               initial={form.measurements}
             />
           )}
-          {step === 3 && (
+          {step === 3 && !skipRakht && (
             <Step2RakhtSelection
               onNext={next}
               onBack={back}
@@ -725,6 +900,10 @@ function buildOrderItems(orderTypes, measurements) {
         readyMadeClothingId: entry?.readyMadeClothingId || null,
         readyMadeClothingCode: entry?.readyMadeClothingCode || null,
         readyMadeOriginalPrice: entry?.readyMadeOriginalPrice ?? null,
+        readyMadeWaskatClothingId: entry?.readyMadeWaskatClothingId || null,
+        readyMadeWaskatClothingCode: entry?.readyMadeWaskatClothingCode || null,
+        readyMadeWaskatOriginalPrice:
+          entry?.readyMadeWaskatOriginalPrice ?? null,
       });
     });
   });

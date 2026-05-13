@@ -14,13 +14,13 @@ const router = Router();
 router.use(authenticate);
 
 // Lookup helpers (any authenticated user)
-router.get('/account-types',      listAccountTypes);
-router.get('/users/:accountType', listUsersByType);
-router.get('/me/summary',         getMyTransactionSummary);
+router.get('/account-types',      authorize('ADMIN'), listAccountTypes);
+router.get('/users/:accountType', authorize('ADMIN'), listUsersByType);
+router.get('/me/summary',         authorize('ADMIN', 'DOKHT', 'QICHIKAR'), getMyTransactionSummary);
 
-// CRUD — ADMIN and DOKAN only
-router.get('/report/pdf', authorize('ADMIN', 'DOKAN'), listTransactionsPdf);
-router.get('/',  authorize('ADMIN', 'DOKAN'), listTransactions);
-router.post('/', authorize('ADMIN', 'DOKAN'), createTransaction);
+// CRUD
+router.get('/report/pdf', authorize('ADMIN'), listTransactionsPdf);
+router.get('/',  authorize('ADMIN'), listTransactions);
+router.post('/', authorize('ADMIN'), createTransaction);
 
 export default router;

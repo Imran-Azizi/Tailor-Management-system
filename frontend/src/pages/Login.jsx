@@ -21,9 +21,9 @@ function LangBtn() {
   const { i18n, t } = useTranslation();
   const [open, setOpen] = useState(false);
   const langs = [
-    { code: "en", label: "English", flag: "EN" },
-    { code: "dari", label: "دری", flag: "DR" },
-    { code: "pashto", label: "پښتو", flag: "PS" },
+    { code: "en", label: t("common.english"), flag: "EN" },
+    { code: "dari", label: t("common.dari"), flag: "DR" },
+    { code: "pashto", label: t("common.pashto"), flag: "PS" },
   ];
   const current = i18n.resolvedLanguage || "en";
   return (
@@ -125,8 +125,12 @@ export default function Login() {
       } else if (["ADMIN", "DOKAN", "FINANCE"].includes(user.accountType)) {
         toast.success(t("auth.welcomeBack", { name: user.name }));
         const dest =
-          user.accountType === "FINANCE"
-            ? "/orders"
+          user.accountType === "DOKAN"
+            ? "/orders/create"
+            : user.accountType === "FINANCE"
+            ? from === "/login" || from === "/dashboard"
+              ? "/orders"
+              : from
             : from === "/login"
               ? "/dashboard"
               : from;

@@ -1,5 +1,4 @@
 import "dotenv/config";
-import { execSync } from "child_process";
 import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
@@ -20,9 +19,25 @@ import backupRoutes from "./routes/backup.routes.js";
 import damagedClothesRoutes from "./routes/damagedClothes.routes.js";
 import { startCronJobs } from "./cron/notifications.cron.js";
 import { startBackupCron } from "./cron/backup.cron.js";
+import { itemRoutes } from "./routes/item.routes.js";
+import { itemSaleRoutes } from "./routes/itemSale.routes.js";
 
 const app = express();
-const PORT = process.env.PORT || 8000;
+const parsePort = (value) => {
+  const port = Number(value || 8000);
+  return Number.isInteger(port) && port > 0 ? port : 8000;
+};
+
+const PORT = parsePort(process.env.PORT);
+const parseTrustProxy = (value) => {
+  if (value === undefined || value === null || value === "") return 1;
+  if (String(value).toLowerCase() === "true") return true;
+  if (String(value).toLowerCase() === "false") return false;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 1;
+};
+
+app.set("trust proxy", parseTrustProxy(process.env.TRUST_PROXY));
 
 const normalizeOrigin = (value) => {
   const raw = String(value || "").trim();
@@ -95,8 +110,13 @@ app.use(
     credentials: true,
   }),
 );
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || "1mb" }));
+app.use(
+  express.urlencoded({
+    extended: true,
+    limit: process.env.FORM_BODY_LIMIT || "1mb",
+  }),
+);
 app.use(normalizeDigitsMiddleware);
 
 app.use(
@@ -121,75 +141,28 @@ app.use("/api/daily-tasks", dailyTaskRoutes);
 app.use("/api/rakhts", rakhtRoutes);
 app.use("/api/backups", backupRoutes);
 app.use("/api/damaged-clothes", damagedClothesRoutes);
+app.use("/api/items", itemRoutes);
+app.use("/api/item-sales", itemSaleRoutes);
 
 // Health check
 app.get("/api/health", (req, res) =>
   res.json({ status: "ok", time: new Date() }),
 );
 
+app.use("/api", (req, res) => {
+  res.status(404).json({ error: "API route not found." });
+});
+
 app.use(errorHandler);
 
 startCronJobs();
 startBackupCron();
 
-/**
- * Kill any external process holding the given port.
- * Silently ignores errors (port already free, PID already dead, etc.).
- */
-function freePort(port) {
-  try {
-    if (process.platform === "win32") {
-      const out = execSync(
-        `netstat -ano | findstr :${port} | findstr LISTENING`,
-        { encoding: "utf8" },
-      ).trim();
-      const lines = out.split("\n").filter(Boolean);
-      const pids = [
-        ...new Set(
-          lines.map((l) => l.trim().split(/\s+/).at(-1)).filter(Boolean),
-        ),
-      ];
-      for (const pid of pids) {
-        if (pid !== String(process.pid)) {
-          try {
-            execSync(`taskkill /PID ${pid} /F`, { stdio: "ignore" });
-            console.log(`🔧 Freed port ${port} (killed PID ${pid})`);
-          } catch {
-            /* already dead */
-          }
-        }
-      }
-    } else {
-      execSync(`fuser -k ${port}/tcp 2>/dev/null || true`, { stdio: "ignore" });
-    }
-  } catch {
-    /* port already free */
-  }
-}
+const server = app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
 
-/**
- * Try to start the HTTP server. On EADDRINUSE, kill the holder and retry
- * up to `retries` times with a 700ms gap between attempts.
- */
-function startServer(retries = 5) {
-  app
-    .listen(PORT, () => {
-      console.log(`✅ Server running on http://localhost:${PORT}`);
-    })
-    .on("error", (err) => {
-      if (err.code === "EADDRINUSE" && retries > 0) {
-        console.warn(
-          `⚠️  Port ${PORT} busy — freeing and retrying (${retries} attempts left)...`,
-        );
-        freePort(PORT);
-        setTimeout(() => startServer(retries - 1), 700);
-      } else {
-        console.error(
-          `❌ Cannot bind port ${PORT}. Set a different PORT in backend/.env.`,
-        );
-        process.exit(1);
-      }
-    });
-}
-
-startServer();
+server.on("error", (error) => {
+  console.error(`Server failed to start on port ${PORT}:`, error.message);
+  process.exit(1);
+});

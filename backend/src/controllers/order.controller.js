@@ -26,6 +26,41 @@ const COMPLETED_REASSIGN_BLOCK_MESSAGE =
   "This order completed, you can not assign it again";
 const WORKER_PAYMENT_EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+const FINANCE_ORDER_ACCESS_ERROR =
+  "You do not have permission to access this order.";
+
+const financeCanAccessOrder = (order, user) =>
+  user?.accountType !== "FINANCE" ||
+  service.isFinanceCreatedOrder(order, user.id);
+
+const assertFinanceOrderAccess = async (orderId, user) => {
+  if (user?.accountType !== "FINANCE") return null;
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: {
+      id: true,
+      createdByFinanceId: true,
+      createdById: true,
+      createdByRole: true,
+    },
+  });
+
+  if (!order) {
+    const error = new Error("Order not found.");
+    error.status = 404;
+    throw error;
+  }
+
+  if (!service.isFinanceCreatedOrder(order, user.id)) {
+    const error = new Error(FINANCE_ORDER_ACCESS_ERROR);
+    error.status = 403;
+    throw error;
+  }
+
+  return order;
+};
+
 const getRoleFieldKeys = (accountType) => {
   if (accountType === "QICHIKAR") {
     return {
@@ -146,7 +181,23 @@ export const getAll = async (req, res, next) => {
     if (user && user.accountType === "FINANCE") {
       query.financeUserId = user.id;
     }
+    // Dokan users only see orders they personally created.
+    if (user && user.accountType === "DOKAN") {
+      query.creatorUserId = user.id;
+    }
     res.json(await service.getAllOrders(query));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getFinanceCreatedOrderStats = async (req, res, next) => {
+  try {
+    const totalCreated = await service.countOrdersCreatedByFinanceUser(
+      req.user.id,
+    );
+
+    res.json({ totalCreated });
   } catch (error) {
     next(error);
   }
@@ -157,12 +208,13 @@ export const getOne = async (req, res, next) => {
     const data = await service.getOrderById(req.params.id);
     if (!data) return res.status(404).json({ error: "Order not found" });
     // Finance users may only access orders they created
-    if (req.user?.accountType === "FINANCE") {
-      if (data.createdByFinanceId !== req.user.id) {
-        return res
-          .status(403)
-          .json({ error: "You do not have permission to access this order." });
-      }
+    if (!financeCanAccessOrder(data, req.user)) {
+      return res.status(403).json({ error: FINANCE_ORDER_ACCESS_ERROR });
+    }
+    if (req.user?.accountType === "DOKAN" && data.createdById !== req.user.id) {
+      return res
+        .status(403)
+        .json({ error: "You do not have permission to access this order." });
     }
     const benefitDetails = await service.getOrderBenefitDetails(req.params.id);
     res.json({
@@ -196,6 +248,21 @@ export const lookup = async (req, res, next) => {
     });
     if (!result)
       return res.status(404).json({ error: "No matching record found" });
+
+    if (user?.accountType === "FINANCE") {
+      const visibleOrders = (result.orders || []).filter((order) =>
+        service.isFinanceCreatedOrder(order, user.id),
+      );
+
+      if (!visibleOrders.length) {
+        return res
+          .status(404)
+          .json({ error: "No matching record found" });
+      }
+
+      res.json({ ...result, orders: visibleOrders });
+      return;
+    }
 
     if (!isWorker) {
       res.json(result);
@@ -279,9 +346,20 @@ export const create = async (req, res, next) => {
     const body = createOrderSchema.parse(req.body);
     const createdByFinanceId =
       req.user?.accountType === "FINANCE" ? req.user.id : null;
+    const createdById = req.user?.id || null;
+    const createdByName = req.user?.name || null;
+    const createdByRole = req.user?.accountType || null;
     res
       .status(201)
-      .json(await service.createOrder({ ...body, createdByFinanceId }));
+      .json(
+        await service.createOrder({
+          ...body,
+          createdByFinanceId,
+          createdById,
+          createdByName,
+          createdByRole,
+        }),
+      );
   } catch (error) {
     next(error);
   }
@@ -289,6 +367,7 @@ export const create = async (req, res, next) => {
 
 export const update = async (req, res, next) => {
   try {
+    await assertFinanceOrderAccess(req.params.id, req.user);
     const body = updateOrderSchema.parse(req.body);
     res.json(await service.updateOrder(req.params.id, body));
   } catch (error) {
@@ -322,6 +401,9 @@ export const markComplete = async (req, res, next) => {
       },
     });
     if (!order) return res.status(404).json({ error: "Order not found." });
+    if (!financeCanAccessOrder(order, user)) {
+      return res.status(403).json({ error: FINANCE_ORDER_ACCESS_ERROR });
+    }
 
     const isWorker = WORKER_ACCOUNT_TYPES.includes(user.accountType);
     const isQichikar = user.accountType === "QICHIKAR";
@@ -1245,6 +1327,33 @@ export const assign = async (req, res, next) => {
     }
 
     res.json(normalizedOrder);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const globalSearch = async (req, res, next) => {
+  try {
+    const { q = "", page = 1, limit = 20 } = req.query;
+    const result = await service.globalSearchOrders({
+      query: q,
+      page: Number(page) || 1,
+      limit: Number(limit) || 20,
+      financeUserId:
+        req.user?.accountType === "FINANCE" ? req.user.id : null,
+    });
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getOrderPrefillData = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    await assertFinanceOrderAccess(id, req.user);
+    const result = await service.getOrderPrefillData(id);
+    res.json(result);
   } catch (error) {
     next(error);
   }

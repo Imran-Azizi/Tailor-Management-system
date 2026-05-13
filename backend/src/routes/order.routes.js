@@ -1,7 +1,11 @@
 import { Router } from "express";
 import * as ctrl from "../controllers/order.controller.js";
 import * as draftCtrl from "../controllers/orderDraft.controller.js";
-import { authenticate, authorize } from "../middleware/auth.middleware.js";
+import {
+  authenticate,
+  authorize,
+  authorizeDokanOrderOwner,
+} from "../middleware/auth.middleware.js";
 const router = Router();
 router.use(authenticate);
 
@@ -18,11 +22,25 @@ router.post(
 );
 router.delete("/drafts/:id", authorize("ADMIN", "DOKAN"), draftCtrl.remove);
 
-router.get("/", ctrl.getAll);
+router.get(
+  "/",
+  authorize("ADMIN", "DOKAN", "QICHIKAR", "DOKHT", "FINANCE"),
+  ctrl.getAll,
+);
 router.get("/report/monthly", authorize("ADMIN"), ctrl.getMonthlyReport);
 router.get(
+  "/global-search",
+  authorize("ADMIN", "FINANCE"),
+  ctrl.globalSearch,
+);
+router.get(
+  "/stats/finance-created",
+  authorize("FINANCE"),
+  ctrl.getFinanceCreatedOrderStats,
+);
+router.get(
   "/lookup",
-  authorize("ADMIN", "DOKAN", "QICHIKAR", "DOKHT", "FINANCE"),
+  authorize("ADMIN", "QICHIKAR", "DOKHT", "FINANCE"),
   ctrl.lookup,
 );
 router.get(
@@ -35,19 +53,34 @@ router.get(
   authorize("ADMIN"),
   ctrl.getCompletedWorkerReceipts,
 );
-router.get("/:id", ctrl.getOne);
-router.get("/:id/bill", authorize("ADMIN", "DOKAN"), ctrl.getBill);
+router.get(
+  "/:id",
+  authorize("ADMIN", "DOKAN", "QICHIKAR", "DOKHT", "FINANCE"),
+  authorizeDokanOrderOwner("id"),
+  ctrl.getOne,
+);
+router.get(
+  "/:id/bill",
+  authorize("ADMIN", "DOKAN"),
+  authorizeDokanOrderOwner("id"),
+  ctrl.getBill,
+);
+router.get(
+  "/:id/prefill",
+  authorize("ADMIN", "FINANCE"),
+  ctrl.getOrderPrefillData,
+);
 router.post("/", authorize("ADMIN", "DOKAN", "FINANCE"), ctrl.create);
-router.put("/:id", authorize("ADMIN", "DOKAN", "FINANCE"), ctrl.update);
-router.put("/:id/bill", authorize("ADMIN", "DOKAN"), ctrl.updateBill);
+router.put("/:id", authorize("ADMIN", "FINANCE"), ctrl.update);
+router.put("/:id/bill", authorize("ADMIN"), ctrl.updateBill);
 router.patch(
   "/:id/complete",
-  authorize("ADMIN", "DOKAN", "QICHIKAR", "DOKHT", "FINANCE"),
+  authorize("ADMIN", "QICHIKAR", "DOKHT", "FINANCE"),
   ctrl.markComplete,
 );
 router.patch(
   "/:id/progress",
-  authorize("ADMIN", "DOKAN", "QICHIKAR", "DOKHT"),
+  authorize("ADMIN", "QICHIKAR", "DOKHT"),
   ctrl.markInProgress,
 );
 router.patch("/:id/receive", authorize("QICHIKAR", "DOKHT"), ctrl.markReceived);

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { LuChevronDown } from "react-icons/lu";
 import { useNavigate } from "react-router-dom";
 import SidebarItem from "./SidebarItem.jsx";
@@ -9,7 +10,7 @@ function hasChildActive(children, pathname) {
   );
 }
 
-export default function SidebarGroup({
+function SidebarGroup({
   group,
   pathname,
   collapsed,
@@ -151,3 +152,5 @@ export default function SidebarGroup({
     </section>
   );
 }
+
+export default memo(SidebarGroup);

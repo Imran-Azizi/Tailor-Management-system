@@ -30,6 +30,13 @@ const emptySelection = {
   priceForCustomer: "",
 };
 
+const RAKHT_SELECTION_TYPES = new Set([
+  "OUTFIT",
+  "WASKAT",
+  "KORTY",
+  "YAKHANQAQ",
+]);
+
 const getTonRemainingMeters = (ton) => {
   return maxScaled(
     subScaled(ton?.totalMeters || 0, ton?.usedMeters || 0, METER_SCALE),
@@ -65,35 +72,39 @@ export default function Step2RakhtSelection({
 
   const selectionItems = useMemo(() => {
     if (Array.isArray(orderItems) && orderItems.length > 0) {
-      return withOrderTypeSequenceMeta(orderItems).map((item, index) => {
-        const key = String(
-          item?.billingKey ?? `${item?.type || "ITEM"}-${index}`,
-        );
-        const type = item?.type;
-        const fallbackLabel = getOrderDisplayName(
+      return withOrderTypeSequenceMeta(orderItems)
+        .filter((item) => RAKHT_SELECTION_TYPES.has(item?.type))
+        .map((item, index) => {
+          const key = String(
+            item?.billingKey ?? `${item?.type || "ITEM"}-${index}`,
+          );
+          const type = item?.type;
+          const fallbackLabel = getOrderDisplayName(
+            {
+              ...item,
+              orderName: item?.name?.trim() || item?.orderName?.trim() || "",
+            },
+            language,
+          );
+          const label = item?.displayName?.trim() || fallbackLabel;
+          return { key, type, label, orderId: item?.orderId || "" };
+        });
+    }
+
+    return withOrderTypeSequenceMeta(orderTypes || [])
+      .filter((entry) => RAKHT_SELECTION_TYPES.has(entry?.type))
+      .map((entry, index) => {
+        const type = entry?.type;
+        const key = `${type || "ITEM"}-${index}`;
+        const label = getOrderDisplayName(
           {
-            ...item,
-            orderName: item?.name?.trim() || item?.orderName?.trim() || "",
+            ...entry,
+            orderName: entry?.name?.trim() || entry?.orderName?.trim() || "",
           },
           language,
         );
-        const label = item?.displayName?.trim() || fallbackLabel;
-        return { key, type, label, orderId: item?.orderId || "" };
+        return { key, type, label, orderId: entry?.orderId || "" };
       });
-    }
-
-    return withOrderTypeSequenceMeta(orderTypes || []).map((entry, index) => {
-      const type = entry?.type;
-      const key = `${type || "ITEM"}-${index}`;
-      const label = getOrderDisplayName(
-        {
-          ...entry,
-          orderName: entry?.name?.trim() || entry?.orderName?.trim() || "",
-        },
-        language,
-      );
-      return { key, type, label, orderId: entry?.orderId || "" };
-    });
   }, [orderItems, orderTypes, language]);
 
   const [selections, setSelections] = useState({});

@@ -312,6 +312,10 @@ export const REPORT_TEXT = {
       stats: {
         totalRakhtRevenue: "Total Rakht Revenue",
         totalOrderBenefit: "Total Order Benefit",
+        totalReadyMadeProfitAfterExpenses:
+          "Total Ready-Made Profit (After Expenses)",
+        totalReadyMadeWaskatProfitAfterExpenses:
+          "Total Ready-Made Waskat Profit (After Expenses)",
         netBenefit: "Net Benefit",
         totalOrders: "Total Orders",
         totalAmount: "Total Amount",
@@ -398,6 +402,10 @@ export const REPORT_TEXT = {
       stats: {
         totalRakhtRevenue: "مجموع عاید رخت",
         totalOrderBenefit: "مجموع فایده سفارش‌ها",
+        totalReadyMadeProfitAfterExpenses:
+          "مجموع فایده لباس آماده (بعد از مصارف)",
+        totalReadyMadeWaskatProfitAfterExpenses:
+          "مجموع فایده واسکت آماده (بعد از مصارف)",
         netBenefit: "درآمد خالص",
         totalOrders: "مجموع سفارش‌ها",
         totalAmount: "مجموع مبلغ",
@@ -484,6 +492,10 @@ export const REPORT_TEXT = {
       stats: {
         totalRakhtRevenue: "د رخت ټول عاید",
         totalOrderBenefit: "د فرمایشونو ټول ګټه",
+        totalReadyMadeProfitAfterExpenses:
+          "د تیار لباس ټوله ګټه (له مصارفو وروسته)",
+        totalReadyMadeWaskatProfitAfterExpenses:
+          "د تیار واسکټ ټوله ګټه (له مصارفو وروسته)",
         netBenefit: "خالص عاید",
         totalOrders: "ټول فرمایشونه",
         totalAmount: "ټول مقدار",

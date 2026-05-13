@@ -8,5 +8,5 @@ router.get("/:id", ctrl.getOne);
 router.post("/", authorize("ADMIN", "FINANCE"), ctrl.create);
 router.put("/:id", authorize("ADMIN"), ctrl.update);
 router.delete("/:id", authorize("ADMIN"), ctrl.remove);
-router.post("/:id/assign", authorize("ADMIN", "DOKAN"), ctrl.assignOrder);
+router.post("/:id/assign", authorize("ADMIN"), ctrl.assignOrder);
 export default router;

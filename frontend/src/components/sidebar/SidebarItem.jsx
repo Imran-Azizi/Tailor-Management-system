@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { NavLink } from "react-router-dom";
 import { LuDot } from "react-icons/lu";
 import { isRouteActive } from "./routeMatch.js";
@@ -7,7 +8,7 @@ function badgeText(value) {
   return value > 99 ? "99+" : String(value);
 }
 
-export default function SidebarItem({
+function SidebarItem({
   item,
   pathname,
   collapsed,
@@ -114,3 +115,5 @@ export default function SidebarItem({
     </NavLink>
   );
 }
+
+export default memo(SidebarItem);

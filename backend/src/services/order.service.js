@@ -93,6 +93,7 @@ const REQUIRED_MEASUREMENT_FIELDS = {
     "chest",
   ],
   READY_MADE: [], // all fields optional for ready-made
+  READY_MADE_WASKAT: [], // all fields optional for ready-made waskat
 };
 
 const ALLOWED_MEASUREMENT_FIELDS = {
@@ -143,6 +144,34 @@ const ALLOWED_MEASUREMENT_FIELDS = {
     "arm",
     "calf",
     "sorain",
+    "neckStyle",
+    "sleeveStyle",
+    "sleeveSize",
+    "skirtStyle",
+    "frontPocket",
+    "sidePocket",
+    "underPocket",
+    "outfitDesign",
+    "outfitStyle",
+    "buttonStyle",
+    "pantStyle",
+    "additionalStyleInfo",
+    "additionalNotes",
+  ]),
+  READY_MADE_WASKAT: new Set([
+    "height",
+    "chest",
+    "waist",
+    "shoulder",
+    "sleeve",
+    "neck",
+    "armpit",
+    "skirt",
+    "tenban",
+    "pantLeg",
+    "arm",
+    "calf",
+    "sorain",
     "additionalNotes",
   ]),
 };
@@ -177,6 +206,7 @@ const ORDER_TYPE_LABELS_EN = {
   KORTY: "Korty",
   YAKHANQAQ: "YakhanQaq",
   READY_MADE: "Ready-Made",
+  READY_MADE_WASKAT: "Ready-Made Waskat",
 };
 const SUPPORTED_ORDER_TYPES = new Set(Object.keys(ORDER_TYPE_LABELS_EN));
 
@@ -348,12 +378,28 @@ const enrichOrderListAssignment = (orders = []) =>
 const toPhoneDigits = (value) =>
   (normalizePhone(value || "") || "").replace(/[^0-9]/g, "");
 
+const INT4_MAX = 2147483647;
+
+const isSafeBillNumber = (value) =>
+  Number.isFinite(value) && value > 0 && value <= INT4_MAX;
+
 const generateFallbackPhoneNumber = () => {
   const ts = Date.now();
   const suffix = Math.floor(Math.random() * 1_000_000)
     .toString()
     .padStart(6, "0");
   return `700${ts}${suffix}`;
+};
+
+const isPhoneNumberConflictError = (error) => {
+  const target = error?.meta?.target;
+  const entries = Array.isArray(target) ? target : [target];
+  const hasPhoneTarget = entries.some((entry) =>
+    String(entry || "")
+      .toLowerCase()
+      .includes("phonenumber"),
+  );
+  return error?.code === "P2002" && hasPhoneTarget;
 };
 
 const getPhoneLookupTokens = (digits) => {
@@ -458,12 +504,15 @@ const ORDER_LIST_INCLUDE_BASE = {
   yakhanQaq: true,
   readyMadeOrder: true,
   readyMadeClothing: true,
+  readyMadeWaskatOrder: true,
+  readyMadeWaskatClothing: true,
   damagedClothesPenalties: { select: { id: true }, take: 1 },
   notifications: { orderBy: { createdAt: "desc" }, take: 1 },
   assignedTo: { select: { id: true, name: true, accountType: true } },
   qichikarAssignedTo: { select: { id: true, name: true, accountType: true } },
   dokhtAssignedTo: { select: { id: true, name: true, accountType: true } },
   assignedBy: { select: { id: true, name: true } },
+  createdBy: { select: { id: true, name: true, accountType: true } },
   workerPaidBy: { select: { id: true, name: true } },
   qichikarPaidBy: { select: { id: true, name: true } },
   dokhtPaidBy: { select: { id: true, name: true } },
@@ -479,12 +528,15 @@ const ORDER_DETAIL_INCLUDE_BASE = {
   yakhanQaq: true,
   readyMadeOrder: true,
   readyMadeClothing: true,
+  readyMadeWaskatOrder: true,
+  readyMadeWaskatClothing: true,
   damagedClothesPenalties: { select: { id: true }, take: 1 },
   notifications: true,
   assignedTo: { select: { id: true, name: true, accountType: true } },
   qichikarAssignedTo: { select: { id: true, name: true, accountType: true } },
   dokhtAssignedTo: { select: { id: true, name: true, accountType: true } },
   assignedBy: { select: { id: true, name: true } },
+  createdBy: { select: { id: true, name: true, accountType: true } },
   workerPaidBy: { select: { id: true, name: true } },
   qichikarPaidBy: { select: { id: true, name: true } },
   dokhtPaidBy: { select: { id: true, name: true } },
@@ -586,7 +638,11 @@ const buildExpenseRow = ({
   date,
 });
 
-const buildOrderBenefitDetails = ({ order, linkedDailyExpenses = [] }) => {
+const buildOrderBenefitDetails = ({
+  order,
+  linkedDailyExpenses = [],
+  includeReadyMadeOriginalExpense = false,
+}) => {
   const rows = [];
 
   const purchaseTotal = mulScaled(
@@ -669,6 +725,37 @@ const buildOrderBenefitDetails = ({ order, linkedDailyExpenses = [] }) => {
     );
   }
 
+  if (includeReadyMadeOriginalExpense) {
+    const readyMadeOriginalExpense =
+      order?.type === "READY_MADE"
+        ? toPositiveMoney(order?.readyMadeOriginalPrice)
+        : order?.type === "READY_MADE_WASKAT"
+          ? toPositiveMoney(order?.readyMadeWaskatOriginalPrice)
+          : 0;
+
+    if (readyMadeOriginalExpense > 0) {
+      rows.push(
+        buildExpenseRow({
+          key: "ready-made-original-price",
+          label:
+            order?.type === "READY_MADE"
+              ? "Ready-Made Original Price"
+              : "Ready-Made Waskat Original Price",
+          labelKey:
+            order?.type === "READY_MADE"
+              ? "orders.readyMadeOriginalPrice"
+              : "orders.readyMadeWaskatOriginalPrice",
+          amount: readyMadeOriginalExpense,
+          userName: "-",
+          userRole: "CATALOG_COST",
+          orderType: order?.type || null,
+          source: "Order",
+          date: order?.createdAt || null,
+        }),
+      );
+    }
+  }
+
   for (const expense of linkedDailyExpenses) {
     const amount = toPositiveMoney(expense?.amount);
     if (amount <= 0) {
@@ -706,7 +793,11 @@ const buildOrderBenefitDetails = ({ order, linkedDailyExpenses = [] }) => {
   };
 };
 
-export const getOrderBenefitDetails = async (orderId, tx = prisma) => {
+export const getOrderBenefitDetails = async (
+  orderId,
+  tx = prisma,
+  { includeReadyMadeOriginalExpense = true } = {},
+) => {
   const order = await tx.order.findUnique({
     where: { id: orderId },
     include: ORDER_BENEFIT_INCLUDE_BASE,
@@ -721,7 +812,11 @@ export const getOrderBenefitDetails = async (orderId, tx = prisma) => {
     },
   });
 
-  const details = buildOrderBenefitDetails({ order, linkedDailyExpenses });
+  const details = buildOrderBenefitDetails({
+    order,
+    linkedDailyExpenses,
+    includeReadyMadeOriginalExpense,
+  });
 
   return {
     ...details,
@@ -730,7 +825,9 @@ export const getOrderBenefitDetails = async (orderId, tx = prisma) => {
 };
 
 export const recalculateOrderBenefit = async (orderId, tx = prisma) => {
-  const details = await getOrderBenefitDetails(orderId, tx);
+  const details = await getOrderBenefitDetails(orderId, tx, {
+    includeReadyMadeOriginalExpense: false,
+  });
   if (!details) return null;
 
   await tx.order.update({
@@ -924,6 +1021,29 @@ const findUniqueOrderSafe = async ({
   }
 };
 
+export const buildFinanceCreatedOrderWhere = (financeUserId) => ({
+  OR: [
+    { createdByFinanceId: String(financeUserId) },
+    {
+      createdById: String(financeUserId),
+      createdByRole: "FINANCE",
+    },
+  ],
+});
+
+export const isFinanceCreatedOrder = (order, financeUserId) => {
+  if (!order || !financeUserId) return false;
+  return (
+    order.createdByFinanceId === financeUserId ||
+    (order.createdById === financeUserId && order.createdByRole === "FINANCE")
+  );
+};
+
+export const countOrdersCreatedByFinanceUser = async (financeUserId) =>
+  prisma.order.count({
+    where: buildFinanceCreatedOrderWhere(financeUserId),
+  });
+
 export const getAllOrders = async ({
   status,
   type,
@@ -944,6 +1064,7 @@ export const getAllOrders = async ({
   month,
   year,
   financeUserId,
+  creatorUserId,
 } = {}) => {
   const skip = (Number(page) - 1) * Number(limit);
   const where = {};
@@ -1013,7 +1134,14 @@ export const getAllOrders = async ({
 
   // Finance user data isolation — scope orders to the Finance user who created them
   if (financeUserId) {
-    where.createdByFinanceId = String(financeUserId);
+    where.AND = [
+      ...(where.AND || []),
+      buildFinanceCreatedOrderWhere(financeUserId),
+    ];
+  }
+
+  if (creatorUserId) {
+    where.createdById = String(creatorUserId);
   }
 
   if (normalizedSearch)
@@ -1177,9 +1305,11 @@ export const getAllOrders = async ({
     const readyMadeOriginalPrice =
       order?.type === "READY_MADE"
         ? toPositiveMoney(order?.readyMadeOriginalPrice)
-        : 0;
+        : order?.type === "READY_MADE_WASKAT"
+          ? toPositiveMoney(order?.readyMadeWaskatOriginalPrice)
+          : 0;
     const finalTotalBenefit =
-      order?.type === "READY_MADE"
+      order?.type === "READY_MADE" || order?.type === "READY_MADE_WASKAT"
         ? subScaled(computed.totalBenefit, readyMadeOriginalPrice, MONEY_SCALE)
         : computed.totalBenefit;
 
@@ -1276,6 +1406,13 @@ export const lookupOrdersByBillOrPhone = async ({
       }
     } else {
       parsedBillNumber = Math.trunc(n);
+      if (!isSafeBillNumber(parsedBillNumber)) {
+        if (hasPhone) {
+          parsedBillNumber = null;
+        } else {
+          parsedBillNumber = null;
+        }
+      }
     }
   }
 
@@ -1291,6 +1428,15 @@ export const lookupOrdersByBillOrPhone = async ({
     customer = await findExistingCustomerByPhone(prisma, normalizedPhoneNumber);
   }
 
+  if (
+    !customer &&
+    !hasPhone &&
+    hasBill &&
+    !isSafeBillNumber(parsedBillNumber)
+  ) {
+    customer = await findExistingCustomerByPhone(prisma, normalizedBillNumber);
+  }
+
   if (!customer) return null;
 
   const orders = await findManyOrdersSafe(
@@ -1298,13 +1444,7 @@ export const lookupOrdersByBillOrPhone = async ({
       where: { customerId: customer.id },
       orderBy: { createdAt: "desc" },
     },
-    {
-      customer: true,
-      box: { select: { id: true, boxName: true } },
-      damagedClothesPenalties: { select: { id: true }, take: 1 },
-      assignedTo: { select: { id: true, name: true, accountType: true } },
-      assignedBy: { select: { id: true, name: true } },
-    },
+    ORDER_DETAIL_INCLUDE_BASE,
   );
 
   if (!orders.length) return null;
@@ -1383,15 +1523,14 @@ export const getCompletedOrdersFromWorkers = async ({
   if (normalizedSearch) {
     const q = normalizedSearch;
     const maybeBill = Math.trunc(parseNumberLocale(toAsciiDigits(q)));
+    const hasSafeBillNumber = isSafeBillNumber(maybeBill);
     where.AND.push({
       OR: [
         { customer: { firstName: { contains: q, mode: "insensitive" } } },
         { assignedTo: { name: { contains: q, mode: "insensitive" } } },
         { qichikarAssignedTo: { name: { contains: q, mode: "insensitive" } } },
         { dokhtAssignedTo: { name: { contains: q, mode: "insensitive" } } },
-        ...(Number.isFinite(maybeBill)
-          ? [{ customer: { billNumber: maybeBill } }]
-          : []),
+        ...(hasSafeBillNumber ? [{ customer: { billNumber: maybeBill } }] : []),
       ],
     });
   }
@@ -1828,7 +1967,7 @@ export const getCompletedWorkerOrderReceipts = async ({
           },
         },
       },
-      ...(Number.isFinite(maybeBill)
+      ...(isSafeBillNumber(maybeBill)
         ? [
             {
               order: {
@@ -1990,8 +2129,12 @@ const buildOrderUpdateData = (existingOrder, body) => {
 };
 
 const resolveAutoBoxForNewOrder = async (tx, orderType) => {
+  if (orderType === "READY_MADE_WASKAT") {
+    return null;
+  }
+  const resolvedType = orderType === "READY_MADE" ? "OUTFIT" : orderType;
   const boxes = await tx.box.findMany({
-    where: { boxType: orderType },
+    where: { boxType: resolvedType },
     orderBy: { createdAt: "asc" },
     include: { _count: { select: { orders: true } } },
   });
@@ -2171,12 +2314,16 @@ const reserveRakhtStock = async (tx, selection) => {
 };
 
 export const createOrder = async ({
+  createNewBillNumber = false,
   customerInfo,
   rakhtSelections,
   orders: orderItems,
   entryMonth,
   entryYear,
   createdByFinanceId,
+  createdById,
+  createdByName,
+  createdByRole,
 }) => {
   return prisma.$transaction(async (tx) => {
     const monthPolicy = await getMonthPolicy({ tx });
@@ -2215,9 +2362,40 @@ export const createOrder = async ({
     const normalizedFirstName = safeCustomerInfo.firstName
       ? normalizeText(safeCustomerInfo.firstName)
       : "";
+    const shouldCreateNewBillNumber = Boolean(createNewBillNumber);
     let customer;
 
-    if (safeCustomerInfo.customerId) {
+    if (shouldCreateNewBillNumber) {
+      const fallbackName = normalizedFirstName || "Walk-in Customer";
+      let candidatePhone = normalizedPhone || generateFallbackPhoneNumber();
+
+      // Customer phone is unique, so copied orders may need a generated phone
+      // to guarantee a brand-new bill/customer record.
+      if (candidatePhone) {
+        const existingExactPhone = await tx.customer.findUnique({
+          where: { phoneNumber: candidatePhone },
+          select: { id: true },
+        });
+        if (existingExactPhone) {
+          candidatePhone = generateFallbackPhoneNumber();
+        }
+      }
+
+      try {
+        customer = await createCustomerWithSequentialBill(tx, {
+          firstName: fallbackName,
+          phoneNumber: candidatePhone,
+        });
+      } catch (error) {
+        if (!isPhoneNumberConflictError(error)) {
+          throw error;
+        }
+        customer = await createCustomerWithSequentialBill(tx, {
+          firstName: fallbackName,
+          phoneNumber: generateFallbackPhoneNumber(),
+        });
+      }
+    } else if (safeCustomerInfo.customerId) {
       customer = await tx.customer.findUnique({
         where: { id: safeCustomerInfo.customerId },
       });
@@ -2325,6 +2503,9 @@ export const createOrder = async ({
         readyMadeClothingId,
         readyMadeClothingCode,
         readyMadeOriginalPrice,
+        readyMadeWaskatClothingId,
+        readyMadeWaskatClothingCode,
+        readyMadeWaskatOriginalPrice,
       } = item;
       if (!SUPPORTED_ORDER_TYPES.has(type)) {
         continue;
@@ -2378,8 +2559,8 @@ export const createOrder = async ({
         }
 
         foreignBoxId = foreignBox.id;
-      } else if (type === "READY_MADE") {
-        // Ready-made clothes don't go through the box/tailoring workflow
+      } else if (type === "READY_MADE_WASKAT") {
+        // Ready-made Waskat does not use a tailoring box.
         boxId = null;
         foreignBoxId = null;
       } else {
@@ -2443,12 +2624,21 @@ export const createOrder = async ({
           foreignBoxId,
           entryMonth: resolvedEntryMonth,
           entryYear: resolvedEntryYear,
+          createdById: createdById || createdByFinanceId || null,
+          createdByName: createdByName || null,
+          createdByRole: createdByRole || null,
           createdByFinanceId: createdByFinanceId || null,
           readyMadeClothingId: item.readyMadeClothingId || null,
           readyMadeClothingCode: item.readyMadeClothingCode || null,
           readyMadeOriginalPrice:
             item.readyMadeOriginalPrice != null
               ? Number(item.readyMadeOriginalPrice)
+              : null,
+          readyMadeWaskatClothingId: item.readyMadeWaskatClothingId || null,
+          readyMadeWaskatClothingCode: item.readyMadeWaskatClothingCode || null,
+          readyMadeWaskatOriginalPrice:
+            item.readyMadeWaskatOriginalPrice != null
+              ? Number(item.readyMadeWaskatOriginalPrice)
               : null,
         },
         include: { box: true, foreignBox: true },
@@ -2480,6 +2670,21 @@ export const createOrder = async ({
           await tx.readyMadeClothing.updateMany({
             where: {
               id: item.readyMadeClothingId,
+              quantity: { gt: 0 },
+            },
+            data: {
+              quantity: { decrement: 1 },
+            },
+          });
+        }
+      } else if (type === "READY_MADE_WASKAT") {
+        await tx.readyMadeWaskatOrder.create({
+          data: { orderId: order.id, ...persistedMeasurements },
+        });
+        if (item.readyMadeWaskatClothingId) {
+          await tx.readyMadeWaskatClothing.updateMany({
+            where: {
+              id: item.readyMadeWaskatClothingId,
               quantity: { gt: 0 },
             },
             data: {
@@ -2719,6 +2924,12 @@ const upsertMeasurementsForType = async (tx, type, orderId, measurements) => {
     });
   } else if (type === "READY_MADE") {
     await tx.readyMadeOrder.upsert({
+      where: { orderId },
+      update: normalized,
+      create: { orderId, ...normalized },
+    });
+  } else if (type === "READY_MADE_WASKAT") {
+    await tx.readyMadeWaskatOrder.upsert({
       where: { orderId },
       update: normalized,
       create: { orderId, ...normalized },
@@ -3040,6 +3251,10 @@ export const updateOrderBill = async (
           isEmergency,
           emergencyExpiry: normalizedExpiry ? new Date(normalizedExpiry) : null,
           boxId: autoBox.boxId,
+          createdById: seed.createdById || null,
+          createdByName: seed.createdByName || null,
+          createdByRole: seed.createdByRole || null,
+          createdByFinanceId: seed.createdByFinanceId || null,
         },
       });
 
@@ -3074,6 +3289,8 @@ export const updateOrderBill = async (
 };
 
 const resolveCompletionBox = async (tx, order) => {
+  const expectedBoxType = order.type === "READY_MADE" ? "OUTFIT" : order.type;
+
   if (order.boxId) {
     const existingBox = await tx.box.findUnique({
       where: { id: order.boxId },
@@ -3086,7 +3303,7 @@ const resolveCompletionBox = async (tx, order) => {
       });
     }
 
-    if (existingBox.boxType !== order.type) {
+    if (existingBox.boxType !== expectedBoxType) {
       throw Object.assign(
         new Error("Assigned box type does not match this order type."),
         { status: 400 },
@@ -3097,7 +3314,7 @@ const resolveCompletionBox = async (tx, order) => {
   }
 
   const boxes = await tx.box.findMany({
-    where: { boxType: order.type },
+    where: { boxType: expectedBoxType },
     orderBy: { createdAt: "asc" },
     include: { _count: { select: { orders: true } } },
   });
@@ -3106,7 +3323,7 @@ const resolveCompletionBox = async (tx, order) => {
     throw Object.assign(new Error("No box found for this order type."), {
       status: 400,
       code: "BOX_NOT_FOUND_FOR_TYPE",
-      orderType: order.type,
+      orderType: expectedBoxType,
     });
   }
 
@@ -3115,7 +3332,7 @@ const resolveCompletionBox = async (tx, order) => {
     throw Object.assign(new Error("capacity of this box is full"), {
       status: 400,
       code: "BOX_CAPACITY_FULL",
-      orderType: order.type,
+      orderType: expectedBoxType,
       boxId: boxes[0]?.id || null,
       boxName: boxes[0]?.boxName || null,
     });
@@ -3387,5 +3604,194 @@ export const rollbackRakhtInventoryForDeletedOrder = async (tx, order) => {
       0,
       METER_SCALE,
     ),
+  };
+};
+
+// ─── Global Order Search (no month restriction) ──────────────────────────────
+
+export const globalSearchOrders = async ({
+  query = "",
+  page = 1,
+  limit = 20,
+  financeUserId = null,
+} = {}) => {
+  const q = String(normalizeText(query || "") || "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!q) {
+    throw Object.assign(new Error("Search query is required."), {
+      status: 400,
+    });
+  }
+
+  const digitsOnly = toAsciiDigits(q).replace(/\D/g, "");
+  const maybeBill = Number.parseInt(digitsOnly, 10);
+  const isNumericQuery =
+    digitsOnly.length > 0 && digitsOnly.length === q.length;
+  const isBillLikeQuery = isNumericQuery && digitsOnly.length <= 8;
+  const hasBillNumber = isBillLikeQuery && isSafeBillNumber(maybeBill);
+
+  const customerWhere = hasBillNumber
+    ? { billNumber: maybeBill }
+    : {
+        OR: [
+          { firstName: { contains: q, mode: "insensitive" } },
+          { phoneNumber: { contains: q, mode: "insensitive" } },
+          ...(isNumericQuery ? [{ phoneNumber: { equals: q } }] : []),
+        ],
+      };
+
+  const matchingCustomers = await prisma.customer.findMany({
+    where: customerWhere,
+    select: { id: true },
+    take: 500,
+  });
+
+  const customerIds = matchingCustomers.map((c) => c.id);
+
+  const customerOrderWhere = customerIds.length
+    ? { customerId: { in: customerIds } }
+    : { id: "NOMATCH" };
+
+  const where = financeUserId
+    ? {
+        AND: [
+          customerOrderWhere,
+          buildFinanceCreatedOrderWhere(financeUserId),
+        ],
+      }
+    : customerOrderWhere;
+
+  const skip = (Math.max(1, Number(page)) - 1) * Math.max(1, Number(limit));
+  const take = Math.min(50, Math.max(1, Number(limit)));
+
+  const [total, orders] = await Promise.all([
+    prisma.order.count({ where }),
+    prisma.order.findMany({
+      where,
+      skip,
+      take,
+      orderBy: [
+        { entryYear: "desc" },
+        { entryMonth: "desc" },
+        { createdAt: "desc" },
+      ],
+      include: {
+        customer: true,
+        assignedTo: { select: { id: true, name: true, accountType: true } },
+        createdBy: { select: { id: true, name: true, accountType: true } },
+        box: { select: { id: true, boxName: true } },
+      },
+    }),
+  ]);
+
+  const enriched = await enrichOrdersWithDisplayMeta(
+    enrichOrderListAssignment(orders),
+  );
+
+  return {
+    data: enriched,
+    total,
+    page: Math.max(1, Number(page)),
+    limit: take,
+    totalPages: Math.ceil(total / take),
+  };
+};
+
+// ─── Get Order Prefill Data (for copying an order) ──────────────────────────
+
+export const getOrderPrefillData = async (id) => {
+  const order = await findUniqueOrderSafe({
+    where: { id },
+    includeBase: ORDER_DETAIL_INCLUDE_BASE,
+  });
+
+  if (!order) {
+    throw Object.assign(new Error("Order not found."), { status: 404 });
+  }
+
+  // Extract measurement data from the type-specific relation
+  const typeRelationMap = {
+    OUTFIT: "outfit",
+    WASKAT: "waskat",
+    KORTY: "korty",
+    YAKHANQAQ: "yakhanQaq",
+    READY_MADE: "readyMadeOrder",
+    READY_MADE_WASKAT: "readyMadeWaskatOrder",
+  };
+
+  const relationKey = typeRelationMap[order.type];
+  const typeSpecificData = relationKey ? order[relationKey] || {} : {};
+
+  // Build measurements object merging order.measurements + type-specific data
+  const rawMeasurements =
+    order.measurements && typeof order.measurements === "object"
+      ? order.measurements
+      : {};
+  const measurements = { ...rawMeasurements, ...typeSpecificData };
+
+  // Strip internal DB fields
+  const {
+    id: _id,
+    orderId: _orderId,
+    createdAt: _ca,
+    updatedAt: _ua,
+    ...cleanMeasurements
+  } = measurements;
+
+  return {
+    orderId: order.id,
+    customer: {
+      customerId: order.customer?.id || null,
+      firstName: order.customer?.firstName || "",
+      phoneNumber: order.customer?.phoneNumber || "",
+    },
+    orderType: order.type,
+    isForeignOrder: order.isForeignOrder || false,
+    isEmergency: order.isEmergency || false,
+    emergencyExpiry: order.emergencyExpiry || null,
+    emergencyHour:
+      order.emergencyExpiry instanceof Date
+        ? order.emergencyExpiry.getHours()
+        : null,
+    measurements: cleanMeasurements,
+    billing: {
+      totalPrice: toMoney(order.totalPrice),
+      discount: toMoney(order.discount),
+      paidAmount: toMoney(order.paidAmount),
+    },
+    rakhtSelection:
+      order.rakhtId && order.rakhtTonId
+        ? {
+            orderId: order.id,
+            type: order.type,
+            orderItemKey: "0-0",
+            rakhtId: order.rakhtId,
+            rakhtTonId: order.rakhtTonId,
+            rakhtCompanyName: order.rakhtCompanyName || "",
+            rakhtBrandName: order.rakhtBrandName || "",
+            requiredMeters: toNumberScaled(
+              order.rakhtRequiredMeters || 0,
+              METER_SCALE,
+            ),
+            piecePrice: toMoney(order.rakhtPiecePrice || 0),
+            priceForCustomer: toMoney(order.rakhtCustomerPricePerMeter || 0),
+            totalPriceForCustomer: toMoney(order.rakhtTotalCustomerPrice || 0),
+          }
+        : null,
+    readyMadeClothingId: order.readyMadeClothingId || null,
+    readyMadeClothingCode: order.readyMadeClothingCode || null,
+    readyMadeOriginalPrice:
+      order.readyMadeOriginalPrice != null
+        ? toMoney(order.readyMadeOriginalPrice)
+        : null,
+    readyMadeWaskatClothingId: order.readyMadeWaskatClothingId || null,
+    readyMadeWaskatClothingCode: order.readyMadeWaskatClothingCode || null,
+    readyMadeWaskatOriginalPrice:
+      order.readyMadeWaskatOriginalPrice != null
+        ? toMoney(order.readyMadeWaskatOriginalPrice)
+        : null,
+    orderName: order.orderName || null,
   };
 };

@@ -8,6 +8,7 @@ const ORDER_TYPE_LABELS = {
     YAKHANQAQ: "YakhanQaq",
     FOREIGN_SHIPPING: "Send to Foreign Country",
     READY_MADE: "Ready-Made Clothes",
+    READY_MADE_WASKAT: "Ready-Made Waskat",
   },
   dari: {
     OUTFIT: "پیراهن تنبان",
@@ -16,6 +17,7 @@ const ORDER_TYPE_LABELS = {
     YAKHANQAQ: "یخن قاق",
     FOREIGN_SHIPPING: "ارسال به کشور خارجی",
     READY_MADE: "لباس آماده",
+    READY_MADE_WASKAT: "واسکت آماده",
   },
   pashto: {
     OUTFIT: "پیرهن تنبان",
@@ -24,6 +26,7 @@ const ORDER_TYPE_LABELS = {
     YAKHANQAQ: "یخن قاق",
     FOREIGN_SHIPPING: "بهر ته لیږل",
     READY_MADE: "چمتو جامې",
+    READY_MADE_WASKAT: "چمتو واسکټ",
   },
 };
 
@@ -34,6 +37,7 @@ export const ORDER_TYPE_VALUES = [
   "YAKHANQAQ",
   "FOREIGN_SHIPPING",
   "READY_MADE",
+  "READY_MADE_WASKAT",
 ];
 
 export function getOrderTypeLabel(type, language = "en") {

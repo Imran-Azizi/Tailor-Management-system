@@ -12,7 +12,14 @@ const optionalText = z.preprocess((value) => {
 const orderItemSchema = z.object({
   orderItemKey: optionalText,
   type: z
-    .enum(["OUTFIT", "WASKAT", "KORTY", "YAKHANQAQ", "READY_MADE"])
+    .enum([
+      "OUTFIT",
+      "WASKAT",
+      "KORTY",
+      "YAKHANQAQ",
+      "READY_MADE",
+      "READY_MADE_WASKAT",
+    ])
     .optional(),
   orderName: optionalText,
   totalPrice: z.number().min(0).optional().default(0),
@@ -27,6 +34,9 @@ const orderItemSchema = z.object({
   readyMadeClothingId: optionalText,
   readyMadeClothingCode: optionalText,
   readyMadeOriginalPrice: z.number().min(0).optional().nullable(),
+  readyMadeWaskatClothingId: optionalText,
+  readyMadeWaskatClothingCode: optionalText,
+  readyMadeWaskatOriginalPrice: z.number().min(0).optional().nullable(),
 });
 
 const orderBillItemSchema = orderItemSchema.extend({
@@ -37,7 +47,14 @@ const rakhtSelectionSchema = z.object({
   orderId: optionalText,
   orderItemKey: optionalText,
   type: z
-    .enum(["OUTFIT", "WASKAT", "KORTY", "YAKHANQAQ", "READY_MADE"])
+    .enum([
+      "OUTFIT",
+      "WASKAT",
+      "KORTY",
+      "YAKHANQAQ",
+      "READY_MADE",
+      "READY_MADE_WASKAT",
+    ])
     .optional(),
   rakhtId: optionalText,
   rakhtTonId: optionalText,
@@ -48,6 +65,7 @@ const rakhtSelectionSchema = z.object({
 });
 
 export const createOrderSchema = z.object({
+  createNewBillNumber: z.boolean().optional().default(false),
   customerInfo: z
     .object({
       customerId: optionalText,

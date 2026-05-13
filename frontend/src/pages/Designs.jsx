@@ -13,6 +13,7 @@ import {
   Modal,
   ConfirmDeleteModal,
 } from "../components/ui/index.jsx";
+import ItemsTab from "../components/design/ItemsTab.jsx";
 
 const MODELS = [
   { key: "yakhan", label: "شیپ یخن", color: "#2563EB" },
@@ -34,6 +35,7 @@ const MODELS = [
   { key: "yakhanqaqdesign", label: "دیزاین", color: "#7C3AED" },
   { key: "yakhanqaqbutton", label: "شیپ دکمه", color: "#F97316" },
   { key: "yakhanqaqpant", label: "شیپ پتی", color: "#0E7490" },
+  { key: "items", label: "Items", color: "#F59E0B" },
 ];
 
 const TAB_GROUPS = {
@@ -62,7 +64,9 @@ const PAGE_TABS = [
   "WASKAT",
   "YAKHANQAQ",
   "READY_MADE",
+  "READY_MADE_WASKAT",
   "CONTRIBUTOR",
+  "ITEMS", // New tab for Items Management
 ];
 
 function ContributorSection() {
@@ -518,7 +522,8 @@ function ContributorSection() {
           <strong>{formatCurrency(netBenefit, language)}</strong>
           <span>
             {t("dashboardPage.netBenefitSub", {
-              defaultValue: "Total Rakht Revenue + Total Order Benefit",
+              defaultValue:
+                "Total Rakht Revenue + Total Order Benefit + Total Ready-Made Profit + Total Ready-Made Waskat Profit",
             })}
           </span>
         </div>
@@ -1571,6 +1576,386 @@ function ReadyMadeClothingSection() {
   );
 }
 
+function ReadyMadeWaskatSection() {
+  const { t, i18n } = useTranslation();
+  const qc = useQueryClient();
+  const language = i18n.resolvedLanguage || i18n.language;
+  const { isAdmin } = useAuth();
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [deleteItem, setDeleteItem] = useState(null);
+  const [formError, setFormError] = useState("");
+  const [form, setForm] = useState({
+    waskatCode: "",
+    originalPrice: "",
+    description: "",
+    quantity: "1",
+  });
+
+  const { data: items = [], isLoading } = useQuery({
+    queryKey: ["ready-made-waskat-clothing"],
+    queryFn: () =>
+      api.get("/designs/ready-made-waskat-clothing").then((r) => r.data),
+  });
+
+  const createMut = useMutation({
+    mutationFn: (payload) =>
+      api.post("/designs/ready-made-waskat-clothing", payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ready-made-waskat-clothing"] });
+      setModalOpen(false);
+      setEditing(null);
+      setForm({
+        waskatCode: "",
+        originalPrice: "",
+        description: "",
+        quantity: "1",
+      });
+      toast.success(
+        t("designs.readyMadeWaskat.created", {
+          defaultValue: "Ready-made waskat created.",
+        }),
+      );
+    },
+    onError: (err) => {
+      setFormError(getApiErrorMessage(err));
+    },
+  });
+
+  const updateMut = useMutation({
+    mutationFn: (payload) =>
+      api.put(`/designs/ready-made-waskat-clothing/${editing.id}`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ready-made-waskat-clothing"] });
+      setModalOpen(false);
+      setEditing(null);
+      setForm({
+        waskatCode: "",
+        originalPrice: "",
+        description: "",
+        quantity: "1",
+      });
+      toast.success(
+        t("designs.readyMadeWaskat.updated", {
+          defaultValue: "Ready-made waskat updated.",
+        }),
+      );
+    },
+    onError: (err) => {
+      setFormError(getApiErrorMessage(err));
+    },
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: () =>
+      api.delete(`/designs/ready-made-waskat-clothing/${deleteItem.id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ready-made-waskat-clothing"] });
+      setDeleteItem(null);
+      toast.success(
+        t("designs.readyMadeWaskat.deleted", {
+          defaultValue: "Ready-made waskat deleted.",
+        }),
+      );
+    },
+    onError: (err) => {
+      toast.error(getApiErrorMessage(err));
+    },
+  });
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm({
+      waskatCode: "",
+      originalPrice: "",
+      description: "",
+      quantity: "1",
+    });
+    setFormError("");
+    setModalOpen(true);
+  };
+
+  const openEdit = (item) => {
+    setEditing(item);
+    setForm({
+      waskatCode: item.waskatCode,
+      originalPrice: String(item.originalPrice),
+      description: item.description || "",
+      quantity: String(item.quantity ?? 1),
+    });
+    setFormError("");
+    setModalOpen(true);
+  };
+
+  const handleSubmit = () => {
+    if (!form.waskatCode.trim()) {
+      setFormError(
+        t("designs.readyMadeWaskat.codeRequired", {
+          defaultValue: "Waskat code is required.",
+        }),
+      );
+      return;
+    }
+    const price = parseFloat(form.originalPrice);
+    if (!form.originalPrice || isNaN(price) || price < 0) {
+      setFormError(
+        t("designs.readyMadeWaskat.priceRequired", {
+          defaultValue: "Valid original price is required.",
+        }),
+      );
+      return;
+    }
+    const quantity = Number(form.quantity);
+    if (!Number.isInteger(quantity) || quantity < 0) {
+      setFormError(
+        t("designs.readyMadeWaskat.quantityRequired", {
+          defaultValue: "Valid quantity is required.",
+        }),
+      );
+      return;
+    }
+    const payload = {
+      waskatCode: form.waskatCode.trim(),
+      originalPrice: price,
+      description: form.description.trim() || undefined,
+      quantity,
+    };
+    if (editing) updateMut.mutate(payload);
+    else createMut.mutate(payload);
+  };
+
+  const isPending = createMut.isPending || updateMut.isPending;
+
+  return (
+    <div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          marginBottom: 16,
+        }}
+      >
+        <button type="button" className="btn btn-gold" onClick={openCreate}>
+          <LuPlus size={15} />
+          {t("designs.readyMadeWaskat.addNew", {
+            defaultValue: "Add Waskat",
+          })}
+        </button>
+      </div>
+
+      {isLoading && (
+        <p style={{ fontSize: 13, color: "var(--text3)" }}>
+          {t("common.loading", { defaultValue: "Loading..." })}
+        </p>
+      )}
+
+      {!isLoading && items.length === 0 && (
+        <p style={{ fontSize: 13, color: "var(--text3)", fontStyle: "italic" }}>
+          {t("designs.readyMadeWaskat.empty", {
+            defaultValue: "No ready-made waskat records yet.",
+          })}
+        </p>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {items.map((item) => (
+          <div
+            key={item.id}
+            style={{
+              border: "1px solid var(--border2)",
+              borderRadius: 10,
+              padding: "12px 16px",
+              background: "var(--surface2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontWeight: 700, fontSize: 14 }}>
+                {item.waskatCode}
+              </span>
+              <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                {t("designs.readyMadeWaskat.quantity", {
+                  defaultValue: "Quantity",
+                })}
+                : {item.quantity ?? 0}
+              </span>
+              {item.description && (
+                <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                  {item.description}
+                </span>
+              )}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span
+                style={{
+                  fontWeight: 700,
+                  fontSize: 15,
+                  color: "var(--primary)",
+                }}
+              >
+                {formatCurrency(item.originalPrice, language)}
+              </span>
+              <button
+                type="button"
+                className="btn btn-outline"
+                style={{ padding: "5px 10px" }}
+                onClick={() => openEdit(item)}
+              >
+                <LuPencil size={13} />
+              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  style={{
+                    padding: "5px 10px",
+                    color: "#dc2626",
+                    borderColor: "#dc2626",
+                  }}
+                  onClick={() => setDeleteItem(item)}
+                >
+                  <LuTrash2 size={13} />
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <Modal
+        open={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          setEditing(null);
+        }}
+        title={
+          editing
+            ? t("designs.readyMadeWaskat.editTitle", {
+                defaultValue: "Edit Waskat",
+              })
+            : t("designs.readyMadeWaskat.addTitle", {
+                defaultValue: "Add Ready-Made Waskat",
+              })
+        }
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {formError && <div className="info-box ib-red">{formError}</div>}
+          <div>
+            <label className="lbl">
+              {t("designs.readyMadeWaskat.waskatCode", {
+                defaultValue: "Waskat Code",
+              })}
+            </label>
+            <input
+              className="inp"
+              value={form.waskatCode}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, waskatCode: e.target.value }));
+                setFormError("");
+              }}
+              placeholder="e.g. RMW-001"
+            />
+          </div>
+          <div>
+            <label className="lbl">
+              {t("designs.readyMadeWaskat.originalPrice", {
+                defaultValue: "Original Price",
+              })}
+            </label>
+            <input
+              className="inp"
+              type="number"
+              min="0"
+              value={form.originalPrice}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, originalPrice: e.target.value }));
+                setFormError("");
+              }}
+              placeholder="0"
+            />
+          </div>
+          <div>
+            <label className="lbl">
+              {t("designs.readyMadeWaskat.quantity", {
+                defaultValue: "Quantity",
+              })}
+            </label>
+            <input
+              className="inp"
+              type="number"
+              min="0"
+              step="1"
+              value={form.quantity}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, quantity: e.target.value }));
+                setFormError("");
+              }}
+              placeholder="1"
+            />
+          </div>
+          <div>
+            <label className="lbl">
+              {t("designs.readyMadeWaskat.description", {
+                defaultValue: "Description (optional)",
+              })}
+            </label>
+            <textarea
+              className="inp"
+              rows={3}
+              value={form.description}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, description: e.target.value }))
+              }
+              placeholder={t("designs.readyMadeWaskat.descriptionPlaceholder", {
+                defaultValue: "Brief description...",
+              })}
+              style={{ resize: "vertical", minHeight: 64 }}
+            />
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              type="button"
+              className="btn btn-outline"
+              style={{ flex: 1 }}
+              onClick={() => {
+                setModalOpen(false);
+                setEditing(null);
+              }}
+              disabled={isPending}
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              type="button"
+              className="btn btn-gold"
+              style={{ flex: 1 }}
+              onClick={handleSubmit}
+              disabled={isPending}
+            >
+              {isPending
+                ? t("common.saving", { defaultValue: "Saving..." })
+                : t("common.save")}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <ConfirmDeleteModal
+        open={!!deleteItem}
+        onClose={() => setDeleteItem(null)}
+        onConfirm={() => deleteMut.mutate()}
+        itemName={deleteItem?.waskatCode || ""}
+        isPending={deleteMut.isPending}
+      />
+    </div>
+  );
+}
+
 export default function Designs() {
   const { t } = useTranslation();
   const { isAdmin, isFinance } = useAuth();
@@ -1579,7 +1964,9 @@ export default function Designs() {
     () =>
       PAGE_TABS.filter((tab) => {
         if (tab === "CONTRIBUTOR") return isAdmin;
-        if (tab === "READY_MADE") return isAdmin || isFinance;
+        if (tab === "READY_MADE" || tab === "READY_MADE_WASKAT") {
+          return isAdmin || isFinance;
+        }
         return true;
       }),
     [isAdmin, isFinance],
@@ -1597,6 +1984,10 @@ export default function Designs() {
     CONTRIBUTOR: t("designs.tabs.contributor", { defaultValue: "Contributor" }),
     YAKHANQAQ: t("designs.tabs.yakhanaqq", { defaultValue: "یخن قاق" }),
     READY_MADE: t("designs.tabs.readyMade", { defaultValue: "Ready-Made" }),
+    READY_MADE_WASKAT: t("designs.tabs.readyMadeWaskat", {
+      defaultValue: "Ready-Made Waskat",
+    }),
+    ITEMS: t("designs.tabs.items", { defaultValue: "Items" }),
   };
 
   const modelsToShow = (TAB_GROUPS[activeTab] || [])
@@ -1633,6 +2024,10 @@ export default function Designs() {
         <ContributorSection />
       ) : activeTab === "READY_MADE" ? (
         <ReadyMadeClothingSection />
+      ) : activeTab === "READY_MADE_WASKAT" ? (
+        <ReadyMadeWaskatSection />
+      ) : activeTab === "ITEMS" ? (
+        <ItemsTab />
       ) : (
         <div className="g-designs designs-grid">
           {modelsToShow.length === 0 ? (

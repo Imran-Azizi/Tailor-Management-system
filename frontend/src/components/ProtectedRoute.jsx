@@ -96,7 +96,13 @@ export function WorkerProtectedRoute({ children }) {
 export function RoleRoute({ children, roles }) {
   const { user } = useAuth();
   if (roles && !roles.includes(user?.accountType)) {
-    return <Navigate to="/dashboard" replace />;
+    const fallback =
+      user?.accountType === "DOKAN"
+        ? "/orders/create"
+        : user?.accountType === "FINANCE"
+          ? "/orders"
+          : "/dashboard";
+    return <Navigate to={fallback} replace />;
   }
   return children;
 }

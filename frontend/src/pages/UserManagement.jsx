@@ -67,13 +67,12 @@ function UserModal({ user, onClose, onSaved }) {
   });
   const [showPw, setShowPw] = useState(false);
   const [saving, setSaving] = useState(false);
-  const isDokan = form.accountType === "DOKAN";
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!isDokan && form.password && form.password.length < 6) {
+    if (form.password && form.password.length < 6) {
       toast.error(t("users.passwordMin"));
       return;
     }
@@ -85,7 +84,7 @@ function UserModal({ user, onClose, onSaved }) {
         accountType: form.accountType,
         isActive: form.isActive,
       };
-      if (!isDokan && form.password) payload.password = form.password;
+      if (form.password) payload.password = form.password;
       if (user) {
         const { data } = await api.put(`/users/${user.id}`, payload);
         onSaved(data);
@@ -247,14 +246,7 @@ function UserModal({ user, onClose, onSaved }) {
             <select
               style={inputStyle}
               value={form.accountType}
-              onChange={(e) => {
-                const nextRole = e.target.value;
-                set("accountType", nextRole);
-                if (nextRole === "DOKAN") {
-                  set("password", "");
-                  setShowPw(false);
-                }
-              }}
+              onChange={(e) => set("accountType", e.target.value)}
             >
               {ROLES.map((r) => (
                 <option key={r} value={r}>
@@ -264,8 +256,7 @@ function UserModal({ user, onClose, onSaved }) {
             </select>
           </div>
           {/* Password */}
-          {!isDokan && (
-            <div>
+          <div>
               <label
                 style={{
                   fontSize: 13,
@@ -303,7 +294,7 @@ function UserModal({ user, onClose, onSaved }) {
                   type={showPw ? "text" : "password"}
                   value={form.password}
                   onChange={(e) => set("password", e.target.value)}
-                  placeholder="••••••"
+                  placeholder="******"
                 />
                 <button
                   type="button"
@@ -330,8 +321,7 @@ function UserModal({ user, onClose, onSaved }) {
                   {t("users.passwordMin")}
                 </p>
               )}
-            </div>
-          )}
+          </div>
           {/* Active toggle */}
           {user && (
             <label

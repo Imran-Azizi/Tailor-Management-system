@@ -32,7 +32,14 @@ import {
 } from "../components/ui/index.jsx";
 import { formatDateLocale } from "../lib/locale.js";
 
-const BOX_TYPE_VALUES = [...ORDER_TYPE_VALUES, "FOREIGN_COUNTRY"];
+// Only allow box types that are real boxes (no READY_MADE, READY_MADE_WASKAT)
+const BOX_TYPE_VALUES = [
+  "OUTFIT",
+  "WASKAT",
+  "KORTY",
+  "YAKHANQAQ",
+  "FOREIGN_COUNTRY",
+];
 const TC = {
   OUTFIT: "#2563EB",
   WASKAT: "#0891B2",
@@ -450,7 +457,13 @@ export default function Boxes() {
               className="inp"
             >
               <option value="">{t("boxesPage.selectType")}</option>
-              {BOX_TYPE_VALUES.map((type) => (
+              {/* Remove duplicate and invalid box types */}
+              {BOX_TYPE_VALUES.filter(
+                (type, idx, arr) =>
+                  type !== "READY_MADE" &&
+                  type !== "READY_MADE_WASKAT" &&
+                  arr.indexOf(type) === idx,
+              ).map((type) => (
                 <option key={type} value={type}>
                   {type === "FOREIGN_COUNTRY"
                     ? t("createOrder.sendToForeignCountry", {
