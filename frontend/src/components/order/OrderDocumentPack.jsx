@@ -16,6 +16,7 @@ import {
 } from "../../config/shopConfig.js";
 import { toAsciiDigits } from "../../lib/normalize.js";
 import { formatCurrency } from "../../lib/currency.js";
+import { formatMeters } from "../../lib/meters.js";
 import { resolveRakhtColorHex } from "../../lib/rakhtColors.js";
 import {
   getMeasurementFieldLabel,
@@ -266,6 +267,11 @@ function formatMeasurementValue(value) {
     return formatNumber(numeric);
   }
   return toEnglishDigits(value);
+}
+
+function formatMetersWithUnit(value) {
+  const formatted = formatMeters(value);
+  return formatted === "-" ? "-" : `${formatted}m`;
 }
 
 function formatDateWithEnglishDigits(dateInput, settings, timeZone) {
@@ -690,7 +696,7 @@ export function CustomerBill({ customer, order }) {
                     <p className="mt-0.5 text-[8px] text-slate-600 [direction:ltr] [unicode-bidi:embed]">
                       {rakhtBrandName} -{" "}
                       {rakhtMeters != null
-                        ? `${formatNumber(rakhtMeters)}m`
+                        ? formatMetersWithUnit(rakhtMeters)
                         : "-"}
                     </p>
                   </>
@@ -1098,7 +1104,7 @@ export function CustomerCombinedBill({ customer, orders = [] }) {
                         <p className="mt-0.5 text-[8px] text-slate-600 [direction:ltr] [unicode-bidi:embed]">
                           {row.rakhtBrandName} -{" "}
                           {row.rakhtMeters != null
-                            ? `${formatNumber(row.rakhtMeters)}m`
+                            ? formatMetersWithUnit(row.rakhtMeters)
                             : "-"}
                         </p>
                       </>
@@ -1351,7 +1357,7 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
   const rakhtBrandName = order?.rakhtBrandName || "-";
   const rakhtMetersDisplay =
     order?.rakhtRequiredMeters != null
-      ? `${formatMeasurementValue(order.rakhtRequiredMeters)}m`
+      ? formatMetersWithUnit(order.rakhtRequiredMeters)
       : "-";
   const swatchHex = resolveRakhtColorHex(rakhtColor, rakhtColorHex);
 

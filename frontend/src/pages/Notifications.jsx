@@ -12,7 +12,10 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
-import { formatSystemNotificationMessage } from "../lib/notifications.js";
+import {
+  formatSystemNotificationMessage,
+  formatUserNotificationMessage,
+} from "../lib/notifications.js";
 import { formatDateTimeLocale, formatDateLocale } from "../lib/locale.js";
 import {
   getNotificationSummary,
@@ -40,7 +43,7 @@ export default function Notifications() {
   const qc = useQueryClient();
   const [deleteNotifTarget, setDeleteNotifTarget] = useState(null);
 
-  const { data: notifs = [], isLoading } = useQuery({
+  const { data: systemNotifs = [], isLoading: systemLoading } = useQuery({
     queryKey: ["notifications", viewMonth, viewYear],
     queryFn: () =>
       api
@@ -51,11 +54,36 @@ export default function Notifications() {
     refetchInterval: 30_000,
   });
 
-  const readMut = useMutation({
+  const { data: userNotifs = [], isLoading: userLoading } = useQuery({
+    queryKey: ["admin-worker-notifications", viewMonth, viewYear],
+    queryFn: () =>
+      api
+        .get("/users/me/notifications", {
+          params: { unread: false, month: viewMonth, year: viewYear },
+        })
+        .then((r) => r.data),
+    refetchInterval: 30_000,
+  });
+
+  const readSystemMut = useMutation({
     mutationFn: (id) => api.patch(`/notifications/${id}/read`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["notifications"] });
       qc.invalidateQueries({ queryKey: ["notifs-count"] });
+      qc.invalidateQueries({ queryKey: ["notifs-nav"] });
+    },
+    onError: (error) =>
+      toast.error(
+        getApiErrorMessage(error, t("notificationsPage.markReadFailed")),
+      ),
+  });
+
+  const readUserMut = useMutation({
+    mutationFn: (id) => api.patch(`/users/me/notifications/${id}/read`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-worker-notifications"] });
+      qc.invalidateQueries({ queryKey: ["admin-worker-notifs-count"] });
+      qc.invalidateQueries({ queryKey: ["admin-worker-notifs-nav"] });
     },
     onError: (error) =>
       toast.error(
@@ -64,10 +92,18 @@ export default function Notifications() {
   });
 
   const readAllMut = useMutation({
-    mutationFn: () => api.patch("/notifications/read-all"),
+    mutationFn: () =>
+      Promise.all([
+        api.patch("/notifications/read-all"),
+        api.patch("/users/me/notifications/read-all"),
+      ]),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["notifications"] });
       qc.invalidateQueries({ queryKey: ["notifs-count"] });
+      qc.invalidateQueries({ queryKey: ["notifs-nav"] });
+      qc.invalidateQueries({ queryKey: ["admin-worker-notifications"] });
+      qc.invalidateQueries({ queryKey: ["admin-worker-notifs-count"] });
+      qc.invalidateQueries({ queryKey: ["admin-worker-notifs-nav"] });
       toast.success(t("notificationsPage.markedAllRead"));
     },
     onError: (error) =>
@@ -80,6 +116,8 @@ export default function Notifications() {
     mutationFn: (id) => api.delete(`/notifications/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["notifications"] });
+      qc.invalidateQueries({ queryKey: ["notifs-count"] });
+      qc.invalidateQueries({ queryKey: ["notifs-nav"] });
       toast.success(t("notificationsPage.deleted"));
     },
     onError: (error) =>
@@ -88,15 +126,26 @@ export default function Notifications() {
       ),
   });
 
-  const unread = notifs.filter((n) => !n.isRead).length;
-  const groupedNotifs = groupNotificationsByDay(notifs, {
+  const systemItems = Array.isArray(systemNotifs) ? systemNotifs : [];
+  const userItems = Array.isArray(userNotifs) ? userNotifs : [];
+  const mergedNotifs = [
+    ...systemItems.map((entry) => ({ kind: "emergency", entry })),
+    ...userItems.map((entry) => ({ kind: "worker", entry })),
+  ].sort(
+    (a, b) =>
+      new Date(b.entry?.createdAt || 0).getTime() -
+      new Date(a.entry?.createdAt || 0).getTime(),
+  );
+  const unread = mergedNotifs.filter((item) => !item.entry?.isRead).length;
+  const groupedNotifs = groupNotificationsByDay(mergedNotifs, {
     language,
     t,
-    getDate: (item) => item?.createdAt,
+    getDate: (item) => item?.entry?.createdAt,
   });
+  const isLoading = systemLoading || userLoading;
 
   useEffect(() => {
-    if (!Array.isArray(notifs) || notifs.length === 0) return;
+    if (!Array.isArray(systemItems) || systemItems.length === 0) return;
 
     let muted = false;
     try {
@@ -107,11 +156,11 @@ export default function Notifications() {
 
     if (muted) return;
 
-    const unreadEmergency = notifs.filter((item) => !item?.isRead);
+    const unreadEmergency = systemItems.filter((item) => !item?.isRead);
     if (shouldPlayEmergencyAlertCycle(unreadEmergency)) {
       playEmergencyAlertSound();
     }
-  }, [notifs]);
+  }, [systemItems]);
 
   return (
     <div className="page">
@@ -133,7 +182,7 @@ export default function Notifications() {
 
       {isLoading ? (
         <Spinner />
-      ) : !notifs.length ? (
+      ) : !mergedNotifs.length ? (
         <div className="card" style={{ padding: 40 }}>
           <EmptyState message={t("notificationsPage.empty")} Icon={LuBell} />
         </div>
@@ -145,12 +194,11 @@ export default function Notifications() {
                 {group.heading}
               </header>
               <div className="notifications-day-list">
-                {group.items.map((n) => {
-                  const message = formatSystemNotificationMessage(
-                    n,
-                    t,
-                    language,
-                  );
+                {group.items.map(({ kind, entry: n }) => {
+                  const isEmergency = kind === "emergency";
+                  const message = isEmergency
+                    ? formatSystemNotificationMessage(n, t, language)
+                    : formatUserNotificationMessage(n, t, language);
                   const summary = getNotificationSummary(message);
                   const fallbackTitle = n.order?.customer?.firstName
                     ? `${n.order.customer.firstName}${
@@ -158,31 +206,65 @@ export default function Notifications() {
                           ? ` #${n.order.customer.billNumber}`
                           : ""
                       }`
-                    : t("createOrder.emergencyOrder", "Emergency");
+                    : isEmergency
+                      ? t("createOrder.emergencyOrder", "Emergency")
+                      : t("navbar.workUpdates", "Work Updates");
+                  const isActionableWorker =
+                    !isEmergency &&
+                    n.orderId &&
+                    (n.type === "WORK_COMPLETED" ||
+                      n.type === "QICHIKAR_READY_FOR_DOKHT");
 
                   return (
                     <article
-                      key={n.id}
+                      key={`${kind}-${n.id}`}
                       className={`notif-feed-item notif-feed-item--page ${
                         !n.isRead ? "notif-feed-item--unread" : ""
                       }`}
                       onClick={() => {
                         if (!n?.orderId) return;
-                        if (!n.isRead) readMut.mutate(n.id);
-                        navigate(`/orders/${n.orderId}/edit`);
+                        if (isEmergency) {
+                          if (!n.isRead) readSystemMut.mutate(n.id);
+                          navigate(`/orders/${n.orderId}/edit`);
+                          return;
+                        }
+                        if (isActionableWorker) {
+                          if (!n.isRead) readUserMut.mutate(n.id);
+                          navigate(
+                            `/orders/completed-workers?orderId=${encodeURIComponent(n.orderId)}`,
+                          );
+                        }
                       }}
-                      style={{ cursor: n?.orderId ? "pointer" : "default" }}
+                      style={{
+                        cursor:
+                          isEmergency || isActionableWorker
+                            ? "pointer"
+                            : "default",
+                      }}
                     >
                       <span
                         className="notif-feed-item__icon"
                         aria-hidden="true"
                       >
-                        <LuTriangleAlert
-                          size={15}
-                          style={{
-                            color: n.isRead ? "var(--text3)" : "var(--danger)",
-                          }}
-                        />
+                        {isEmergency ? (
+                          <LuTriangleAlert
+                            size={15}
+                            style={{
+                              color: n.isRead
+                                ? "var(--text3)"
+                                : "var(--danger)",
+                            }}
+                          />
+                        ) : (
+                          <LuBell
+                            size={15}
+                            style={{
+                              color: n.isRead
+                                ? "var(--text3)"
+                                : "var(--primary)",
+                            }}
+                          />
+                        )}
                       </span>
                       <div className="notif-feed-item__copy">
                         <div className="notif-feed-item__topline">
@@ -190,10 +272,12 @@ export default function Notifications() {
                             <span className="notif-feed-item__dot" />
                           )}
                           <span
-                            className="badge bg-red"
+                            className={`badge ${isEmergency ? "bg-red" : "bg-teal"}`}
                             style={{ fontSize: 10 }}
                           >
-                            {t("createOrder.emergencyOrder", "Emergency")}
+                            {isEmergency
+                              ? t("createOrder.emergencyOrder", "Emergency")
+                              : t("navbar.workUpdates", "Work Updates")}
                           </span>
                           <p className="notif-feed-item__title">
                             {summary.title || fallbackTitle}
@@ -229,7 +313,11 @@ export default function Notifications() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              readMut.mutate(n.id);
+                              if (isEmergency) {
+                                readSystemMut.mutate(n.id);
+                              } else {
+                                readUserMut.mutate(n.id);
+                              }
                             }}
                             className="btn btn-outline btn-sm"
                             style={{
@@ -241,16 +329,18 @@ export default function Notifications() {
                             <LuCheck size={12} /> {t("notificationsPage.read")}
                           </button>
                         )}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleteNotifTarget(n);
-                          }}
-                          className="notif-feed-item__delete"
-                          title={t("common.delete")}
-                        >
-                          <LuTrash2 size={12} />
-                        </button>
+                        {isEmergency && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteNotifTarget(n);
+                            }}
+                            className="notif-feed-item__delete"
+                            title={t("common.delete")}
+                          >
+                            <LuTrash2 size={12} />
+                          </button>
+                        )}
                       </div>
                     </article>
                   );

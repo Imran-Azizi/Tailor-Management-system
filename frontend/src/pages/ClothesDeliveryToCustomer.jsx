@@ -375,16 +375,27 @@ export default function ClothesDeliveryToCustomer() {
                 </div>
               </div>
 
-              <div className="tbl-wrap delivery-results-table">
+              <div className="tbl-wrap delivery-results-table" dir="ltr">
                 <table
-                  className="min-w-full border-separate border-spacing-0"
-                  style={{ minWidth: 640 }}
+                  className="delivery-results-grid-table min-w-full border-separate border-spacing-0"
+                  style={{ minWidth: 1180 }}
                 >
+                  <colgroup>
+                    <col style={{ width: "10%" }} />
+                    <col style={{ width: "12%" }} />
+                    <col style={{ width: "13%" }} />
+                    <col style={{ width: "10%" }} />
+                    <col style={{ width: "10%" }} />
+                    <col style={{ width: "11%" }} />
+                    <col style={{ width: "11%" }} />
+                    <col style={{ width: "12%" }} />
+                    <col style={{ width: "21%" }} />
+                  </colgroup>
                   <thead>
                     <tr
-                      className={`text-xs font-semibold text-slate-500 dark:text-slate-400 ${
+                      className={`delivery-results-head-row text-xs font-semibold text-slate-500 dark:text-slate-400 ${
                         isRtl
-                          ? "tracking-normal text-right"
+                          ? "tracking-normal"
                           : "uppercase tracking-wide text-left"
                       }`}
                     >
@@ -435,21 +446,21 @@ export default function ClothesDeliveryToCustomer() {
                           className="hover:bg-amber-50/70 dark:hover:bg-slate-800"
                         >
                           <td
-                            className={`border-b border-amber-100 px-4 py-3 text-sm font-semibold text-gray-900 dark:border-slate-700 dark:text-slate-100 ${
+                            className={`delivery-results-text-cell border-b border-amber-100 px-4 py-3 text-sm font-semibold text-gray-900 dark:border-slate-700 dark:text-slate-100 ${
                               isRtl ? "text-right" : "text-left"
                             }`}
                           >
                             {t("delivery.orderLabel", { number: idx + 1 })}
                           </td>
                           <td
-                            className={`border-b border-slate-100 px-4 py-3 text-sm font-semibold text-gray-900 dark:border-slate-700 dark:text-slate-100 ${
+                            className={`delivery-results-text-cell border-b border-slate-100 px-4 py-3 text-sm font-semibold text-gray-900 dark:border-slate-700 dark:text-slate-100 ${
                               isRtl ? "text-right" : "text-left"
                             }`}
                           >
                             {itemDisplayName}
                           </td>
                           <td
-                            className={`border-b border-slate-100 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200 ${
+                            className={`delivery-results-text-cell border-b border-slate-100 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200 ${
                               isRtl ? "text-right" : "text-left"
                             }`}
                           >
@@ -467,7 +478,7 @@ export default function ClothesDeliveryToCustomer() {
                           <td className="border-b border-amber-100 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-slate-700 dark:text-rose-300 [direction:ltr] [unicode-bidi:embed]">
                             {formatMoney(o.remaining, language)}
                           </td>
-                          <td className="border-b border-amber-100 px-4 py-3 dark:border-slate-700">
+                          <td className="delivery-results-status-cell border-b border-amber-100 px-4 py-3 dark:border-slate-700">
                             {isCompleted ? (
                               <span className="inline-flex items-center rounded-full bg-rose-100 px-3 py-1 text-xs font-bold text-rose-700">
                                 {completedStatusText}
@@ -488,9 +499,11 @@ export default function ClothesDeliveryToCustomer() {
                               </span>
                             )}
                           </td>
-                          <td className="border-b border-amber-100 px-4 py-3 dark:border-slate-700">
-                            <div className="flex flex-col gap-2">
-                              <p className="text-xs text-slate-500 dark:text-slate-400">
+                          <td className="delivery-results-payment-cell border-b border-amber-100 px-4 py-3 dark:border-slate-700">
+                            <div
+                              className={`delivery-payment-cell ${isRtl ? "delivery-payment-cell--rtl" : ""}`}
+                            >
+                              <p className="delivery-payment-person text-xs text-slate-500 dark:text-slate-400">
                                 {itemDisplayName}
                               </p>
                               {isCompleted ? (
@@ -500,22 +513,16 @@ export default function ClothesDeliveryToCustomer() {
                               ) : readyToReceive ? (
                                 <button
                                   type="button"
-                                  className="inline-flex h-10 items-center justify-center rounded-lg bg-amber-500 px-4 text-sm font-semibold text-white hover:bg-amber-600 dark:bg-amber-500 dark:hover:bg-amber-400 disabled:opacity-50"
+                                  className="delivery-receive-button inline-flex h-10 items-center justify-center rounded-lg bg-amber-500 px-4 text-sm font-semibold text-white hover:bg-amber-600 dark:bg-amber-500 dark:hover:bg-amber-400 disabled:opacity-50"
                                   onClick={() => submitPayment(o)}
                                   disabled={paying}
                                 >
                                   {receiveButtonText}
                                 </button>
                               ) : (
-                                <div
-                                  className={`flex flex-col gap-2 md:items-center ${
-                                    isRtl
-                                      ? "md:flex-row-reverse"
-                                      : "md:flex-row"
-                                  }`}
-                                >
+                                <div className="delivery-payment-controls">
                                   <input
-                                    className="h-10 w-full rounded-lg border border-amber-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-amber-400 dark:focus:ring-amber-500/20 md:w-40"
+                                    className="delivery-payment-input h-10 w-full rounded-lg border border-amber-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-amber-400 dark:focus:ring-amber-500/20"
                                     value={payments[o.id] ?? ""}
                                     onChange={(e) =>
                                       setPayments((p) => ({
@@ -529,7 +536,7 @@ export default function ClothesDeliveryToCustomer() {
                                   />
                                   <button
                                     type="button"
-                                    className="inline-flex h-10 items-center justify-center rounded-lg bg-amber-500 px-4 text-sm font-semibold text-white hover:bg-amber-600 dark:bg-amber-500 dark:hover:bg-amber-400 disabled:opacity-50"
+                                    className="delivery-receive-button inline-flex h-10 items-center justify-center rounded-lg bg-amber-500 px-4 text-sm font-semibold text-white hover:bg-amber-600 dark:bg-amber-500 dark:hover:bg-amber-400 disabled:opacity-50"
                                     onClick={() => submitPayment(o)}
                                     disabled={paying}
                                   >

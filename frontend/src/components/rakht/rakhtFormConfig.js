@@ -47,7 +47,7 @@ export const rakhtSchema = z
   .object({
     companyName: z.string().trim().min(1),
     brandName: z.string().trim().min(1),
-    tonQuantity: z.number().int().min(1).max(30),
+    tonQuantity: z.number().int().min(1).max(500),
     tons: z.array(rakhtTonSchema),
     totalPrice: z.coerce.number().int().min(0),
     givenMoney: z.coerce.number().int().min(0),
@@ -67,6 +67,31 @@ export function emptyForm() {
     givenMoney: "",
   };
 }
+
+export function emptyAddMoreTonsForm() {
+  return {
+    tonQuantity: null,
+    tons: [],
+    totalPrice: "",
+    givenMoney: "",
+  };
+}
+
+export const addMoreTonsSchema = z
+  .object({
+    tonQuantity: z.number().int().min(1).max(30),
+    tons: z.array(rakhtTonSchema).min(1).max(30),
+    totalPrice: z.coerce.number().int().min(0),
+    givenMoney: z.coerce.number().int().min(0),
+  })
+  .refine((d) => d.tons.length === d.tonQuantity, {
+    message: "Ton items count must match Ton Quantity",
+    path: ["tons"],
+  })
+  .refine((d) => d.givenMoney <= d.totalPrice, {
+    message: "Given money cannot exceed total price",
+    path: ["givenMoney"],
+  });
 
 export function sanitizeIntegerInput(value) {
   if (value === undefined || value === null) return "";

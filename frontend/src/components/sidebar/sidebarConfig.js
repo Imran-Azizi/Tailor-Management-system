@@ -275,7 +275,7 @@ const ADMIN_SECTIONS = [
       },
       {
         key: "backupManagement",
-        label: "backup.title",
+        label: "sidebar.backupManagement",
         fallback: "Backup Management",
         path: "/backups",
         icon: LuDatabaseBackup,

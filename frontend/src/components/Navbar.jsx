@@ -157,20 +157,23 @@ function SystemNotifPanel({
     },
   });
 
-  const merged = [...workerNotifs, ...emergency]
+  const merged = [
+    ...workerNotifs.map((entry) => ({ kind: "worker", entry })),
+    ...emergency.map((entry) => ({ kind: "emergency", entry })),
+  ]
     .sort(
       (a, b) =>
-        new Date(b.createdAt || 0).getTime() -
-        new Date(a.createdAt || 0).getTime(),
+        new Date(b.entry?.createdAt || 0).getTime() -
+        new Date(a.entry?.createdAt || 0).getTime(),
     )
     .slice(0, 14)
-    .map((entry) => {
-      const isEmergency = Boolean(entry?.orderId);
-      const message = isEmergency
+    .map(({ kind, entry }) => {
+      const message =
+        kind === "emergency"
         ? formatSystemNotificationMessage(entry, t, language)
         : formatUserNotificationMessage(entry, t, language);
       return {
-        kind: isEmergency ? "emergency" : "worker",
+        kind,
         entry,
         message,
         summary: getNotificationSummary(message),
@@ -264,7 +267,7 @@ function SystemNotifPanel({
 
                 return (
                   <article
-                    key={entry.id}
+                    key={`${kind}-${entry.id}`}
                     className={`notif-feed-item notif-feed-item--drawer ${
                       isEmergency ? "notif-feed-item--emergency" : ""
                     }`}

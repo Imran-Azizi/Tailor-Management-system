@@ -539,6 +539,9 @@ export const getRakhtDetailById = async (id) => {
     byTon.set(tonKey, current);
   }
 
+  const rakhtCreatedAtMs = new Date(rakhtWithComputed.createdAt).getTime();
+  const originalTonWindowMs = 5000;
+
   const tonsDetailed = (rakhtWithComputed.tons || []).map((ton, index) => {
     const tonPrice = round2(
       safeDivide(rakhtWithComputed.totalPrice, rakhtWithComputed.tonQuantity),
@@ -546,6 +549,11 @@ export const getRakhtDetailById = async (id) => {
     const consumedMeters = toNonNegativeInt(ton.usedMeters);
     const totalMeters = toNonNegativeInt(ton.totalMeters);
     const remainingMeters = Math.max(0, totalMeters - consumedMeters);
+    const tonCreatedAtMs = new Date(ton.createdAt).getTime();
+    const isAddedTon =
+      Number.isFinite(rakhtCreatedAtMs) &&
+      Number.isFinite(tonCreatedAtMs) &&
+      tonCreatedAtMs - rakhtCreatedAtMs > originalTonWindowMs;
     const sales = byTon.get(ton.id) || {
       profitGenerated: 0,
       metersSold: 0,
@@ -556,6 +564,8 @@ export const getRakhtDetailById = async (id) => {
       ...ton,
       tonIdentifier: `Ton ${index + 1}`,
       tonIndex: index + 1,
+      isAddedTon,
+      status: remainingMeters <= 0 ? "FINISHED" : "AVAILABLE",
       tonPrice,
       pricePerMeter: round2(
         safeDivide(tonPrice, toPositiveNumber(totalMeters)),
@@ -570,6 +580,10 @@ export const getRakhtDetailById = async (id) => {
 
   const totalConsumedMeters = tonsDetailed.reduce(
     (sum, ton) => sum + Number(ton.consumedMeters || 0),
+    0,
+  );
+  const totalMeters = tonsDetailed.reduce(
+    (sum, ton) => sum + Number(ton.totalMeters || 0),
     0,
   );
   const totalRemainingMeters = tonsDetailed.reduce(
@@ -590,6 +604,7 @@ export const getRakhtDetailById = async (id) => {
     updatedAt: rakhtWithComputed.updatedAt,
     tons: tonsDetailed,
     summary: {
+      totalMeters,
       totalConsumedMeters,
       totalRemainingMeters,
       totalProfitGenerated: round2(totalProfitGenerated),
@@ -833,6 +848,74 @@ export const updateRakht = async (id, payload) => {
     data: updateData,
     include: { tons: { orderBy: { createdAt: "asc" } } },
   });
+  return withComputedFields(updated);
+};
+
+export const addRakhtTons = async (id, payload) => {
+  const existing = await prisma.rakht.findUnique({
+    where: { id },
+    include: { tons: true },
+  });
+
+  if (!existing) {
+    throw Object.assign(new Error("Rakht not found"), { status: 404 });
+  }
+
+  const incomingTons = Array.isArray(payload?.tons) ? payload.tons : [];
+  if (!incomingTons.length) {
+    throw Object.assign(new Error("At least one ton is required."), {
+      status: 400,
+    });
+  }
+
+  const additionalTotalPrice = toNonNegativeInt(payload.totalPrice || 0);
+  const additionalGivenMoney = toNonNegativeInt(payload.givenMoney || 0);
+
+  if (additionalGivenMoney > additionalTotalPrice) {
+    throw Object.assign(
+      new Error("Given money cannot exceed total price."),
+      { status: 400 },
+    );
+  }
+
+  const nextTotalPrice = addScaled(
+    existing.totalPrice || 0,
+    additionalTotalPrice,
+    MONEY_SCALE,
+  );
+  const nextGivenMoney = addScaled(
+    existing.givenMoney || 0,
+    additionalGivenMoney,
+    MONEY_SCALE,
+  );
+  const nextTonQuantity = toPositiveInt(existing.tonQuantity) + incomingTons.length;
+
+  const updated = await prisma.rakht.update({
+    where: { id },
+    data: {
+      tonQuantity: nextTonQuantity,
+      totalPrice: nextTotalPrice,
+      givenMoney: nextGivenMoney,
+      remainingMoney: maxScaled(
+        subScaled(nextTotalPrice, nextGivenMoney, MONEY_SCALE),
+        0,
+        MONEY_SCALE,
+      ),
+      tons: {
+        create: incomingTons.map((ton) => ({
+          name: normalizeText(ton.name),
+          colorHex: normalizeHexColor(ton.colorHex),
+          totalMeters: maxScaled(
+            toPositiveNumber(ton.totalMeters),
+            0.01,
+            METER_SCALE,
+          ),
+        })),
+      },
+    },
+    include: { tons: { orderBy: { createdAt: "asc" } } },
+  });
+
   return withComputedFields(updated);
 };
 

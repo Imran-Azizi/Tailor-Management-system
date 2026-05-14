@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
@@ -28,6 +28,7 @@ import {
   groupNotificationsByDay,
 } from "../lib/notificationGrouping.js";
 import { formatCurrency } from "../lib/currency.js";
+import { formatMeters } from "../lib/meters.js";
 
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
@@ -57,6 +58,52 @@ const TYPE_COLORS = {
   KORTY: "#B45309",
   YAKHANQAQ: "#DC2626",
 };
+
+function ReceiveSuccessState({ t, isRtl }) {
+  return (
+    <div
+      dir={isRtl ? "rtl" : "ltr"}
+      className="relative flex min-h-11 w-full items-center justify-center overflow-hidden rounded-xl border border-emerald-300 bg-gradient-to-r from-emerald-50 via-white to-teal-50 px-3 py-2 text-emerald-800 shadow-sm ring-1 ring-emerald-200/70 transition-all duration-300 ease-out dark:border-emerald-700 dark:from-emerald-950/50 dark:via-slate-900 dark:to-teal-950/40 dark:text-emerald-200 dark:ring-emerald-800/60"
+    >
+      <span className="absolute inset-0 bg-emerald-400/10 animate-pulse" />
+      <span
+        className={`relative z-10 flex items-center gap-2 ${isRtl ? "flex-row-reverse" : ""}`}
+      >
+        <span className="relative grid h-7 w-7 place-items-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/30">
+          <span className="absolute inset-0 rounded-full bg-emerald-400 opacity-30 animate-ping" />
+          <svg
+            viewBox="0 0 24 24"
+            className="relative h-4 w-4"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M5 12.5l4.1 4L19 7"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{
+                strokeDasharray: 24,
+                strokeDashoffset: 24,
+                animation:
+                  "workerPanelCheckDraw 0.45s 0.12s cubic-bezier(.2,.9,.2,1) forwards",
+              }}
+            />
+          </svg>
+        </span>
+        <span className="text-xs font-extrabold tracking-normal sm:text-sm">
+          {t("workerPanel.receivedSuccess", "Order received")}
+        </span>
+      </span>
+      <style>{`
+        @keyframes workerPanelCheckDraw {
+          to { stroke-dashoffset: 0; }
+        }
+      `}</style>
+    </div>
+  );
+}
 
 const NUM_LABEL_KEYS = {
   height: "createOrder.fields.height",
@@ -282,9 +329,29 @@ function upsertOrderInWorkerPayload(previousPayload, nextOrder) {
 function ConfirmActionModal({ config, pending, onClose, onConfirm }) {
   if (!config) return null;
 
+  // RTL support for modal
+  let language = undefined;
+  if (typeof window !== "undefined" && window.i18next) {
+    language = window.i18next.language;
+  }
+  const isRtl = ["fa", "ps", "prs", "uz-Arab", "ar", "ur"].includes(
+    (language || "").split("-")[0],
+  );
+
   return (
     <div
       className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-3 sm:p-4"
+      dir={isRtl ? "rtl" : "ltr"}
+      style={
+        isRtl
+          ? {
+              direction: "rtl",
+              textAlign: "right",
+              fontFamily:
+                "'Noto Naskh Arabic', 'Noto Sans Arabic', Tahoma, Arial, sans-serif",
+            }
+          : {}
+      }
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className="card w-full max-w-[520px] rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-lg sm:p-5">
@@ -309,9 +376,27 @@ function ConfirmActionModal({ config, pending, onClose, onConfirm }) {
           </button>
           <button
             className="btn btn-gold"
+            style={{
+              background: "#FFD700",
+              borderColor: "#FFD700",
+              boxShadow:
+                "0 2px 8px 0 rgba(0,0,0,0.08), 0 1.5px 4px 0 #FFD70033",
+              fontWeight: 700,
+              fontSize: 16,
+              padding: "10px 28px",
+              borderRadius: 8,
+              color: "#fff",
+              letterSpacing: ".01em",
+              transition: "all 0.15s cubic-bezier(.4,0,.2,1)",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              justifyContent: "center",
+            }}
             onClick={onConfirm}
             disabled={pending}
           >
+            <LuCheck style={{ fontSize: 18, verticalAlign: "middle" }} />
             {pending ? config.pendingLabel : config.confirmLabel}
           </button>
         </div>
@@ -371,228 +456,206 @@ function OrderDetailsModal({ order, language, t, onClose }) {
     borderBottom: "1px solid var(--border)",
   };
 
+  // RTL support
+  const isRtl = ["fa", "ps", "prs", "uz-Arab", "ar", "ur"].includes(
+    (language || "").split("-")[0],
+  );
   return (
     <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-3 sm:p-4"
+      className={`fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-3 sm:p-4`}
+      dir={isRtl ? "rtl" : "ltr"}
+      style={
+        isRtl
+          ? {
+              direction: "rtl",
+              textAlign: "right",
+              fontFamily:
+                "'Noto Naskh Arabic', 'Noto Sans Arabic', Tahoma, Arial, sans-serif",
+            }
+          : {}
+      }
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="w-full max-h-[90vh] max-w-[760px] overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-lg sm:p-5">
-        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+      <div className="w-full max-h-[90vh] max-w-[800px] overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-0 shadow-2xl">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 px-6 pt-6 pb-2 border-b border-[var(--border)] bg-gradient-to-br from-sky-50 via-cyan-50 to-white dark:from-slate-800 dark:via-slate-800 dark:to-slate-900">
           <div>
-            <h3 className="m-0 text-lg font-extrabold sm:text-xl">
+            <h2 className="m-0 text-2xl font-extrabold text-sky-900 dark:text-slate-100">
               {orderPrimaryName}
-            </h3>
-            <p className="mt-1.5 text-xs text-[var(--text3)] sm:text-sm">
-              #{order.customer?.billNumber || "-"} -{" "}
+            </h2>
+            <div className="mt-1 text-sm text-[var(--text3)] font-medium">
+              #{order.customer?.billNumber || "-"} &bull;{" "}
               {orderLabel.typeWithSequenceLabel}
-            </p>
+            </div>
             <div className="mt-2">
               <OrderCreatorBadge order={order} compact />
             </div>
           </div>
-          <button className="btn btn-outline btn-sm" onClick={onClose}>
+          <button
+            className="btn btn-outline btn-sm mt-2 sm:mt-0"
+            onClick={onClose}
+          >
             {t("common.close", "Close")}
           </button>
         </div>
-
-        <div className="mt-4">
-          <div style={tableWrapStyle}>
-            <div className="overflow-x-auto">
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr>
-                    <th style={thStyle}>{t("workerPanel.price", "Price")}</th>
-                    <th style={thStyle}>
-                      {t("workerPanel.updatedOn", "Updated")}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td style={{ ...tdStyle, borderBottom: "none" }}>
-                      {formatCurrency(priceValue, language)}
-                    </td>
-                    <td style={{ ...tdStyle, borderBottom: "none" }}>
-                      {fmtDate(payment.paidAt || order.updatedAt, language)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+        {/* Price & Updated */}
+        <div className="px-6 pt-5 pb-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="rounded-xl bg-sky-50 dark:bg-slate-800/70 p-4 border border-sky-100 dark:border-slate-700">
+              <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold mb-1">
+                {t("workerPanel.price", "Price")}
+              </div>
+              <div className="text-lg font-bold text-sky-900 dark:text-slate-100">
+                {formatCurrency(priceValue, language)}
+              </div>
+            </div>
+            <div className="rounded-xl bg-cyan-50 dark:bg-slate-800/70 p-4 border border-cyan-100 dark:border-slate-700">
+              <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold mb-1">
+                {t("workerPanel.updatedOn", "Updated")}
+              </div>
+              <div className="text-lg font-bold text-sky-900 dark:text-slate-100">
+                {fmtDate(payment.paidAt || order.updatedAt, language)}
+              </div>
             </div>
           </div>
         </div>
-
-        <div className="mt-3.5">
-          <p
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              color: "var(--text3)",
-              marginBottom: 8,
-            }}
-          >
+        {/* Rakht Section */}
+        <div className="px-6 pt-5 pb-2">
+          <div className="text-base font-bold text-sky-800 dark:text-slate-200 mb-2 border-b border-sky-100 dark:border-slate-700 pb-1">
             {t("createOrder.rakhtSelection", {
               defaultValue: "Rakht Selection",
             })}
-          </p>
-          <div style={tableWrapStyle}>
-            <div className="overflow-x-auto">
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr>
-                    <th style={thStyle}>{t("common.field", "Field")}</th>
-                    <th style={thStyle}>{t("common.value", "Value")}</th>
+          </div>
+          <div className="overflow-x-auto rounded-xl border border-sky-100 dark:border-slate-700 bg-white dark:bg-slate-900">
+            <table className="min-w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-3 py-2 bg-sky-50 dark:bg-slate-800/70 border-b border-sky-100 dark:border-slate-700">
+                    {t("common.field", "Field")}
+                  </th>
+                  <th className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-3 py-2 bg-sky-50 dark:bg-slate-800/70 border-b border-sky-100 dark:border-slate-700">
+                    {t("common.value", "Value")}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  [
+                    t("rakht.brandName", { defaultValue: "Brand" }),
+                    order?.rakhtBrandName || "-",
+                  ],
+                  [
+                    t("rakht.color", { defaultValue: "Color" }),
+                    order?.rakhtColor || "-",
+                  ],
+                  [
+                    t("rakht.requiredMeters", {
+                      defaultValue: "Required Meters",
+                    }),
+                    order?.rakhtRequiredMeters != null
+                      ? formatMeters(order.rakhtRequiredMeters)
+                      : "-",
+                  ],
+                ].map(([field, value]) => (
+                  <tr key={field}>
+                    <td className="px-3 py-2 text-sm text-sky-900 dark:text-slate-100 border-b border-sky-100 dark:border-slate-700">
+                      {field}
+                    </td>
+                    <td className="px-3 py-2 text-sm text-sky-900 dark:text-slate-100 border-b border-sky-100 dark:border-slate-700">
+                      {value}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {[
-                    [
-                      t("rakht.brandName", { defaultValue: "Brand" }),
-                      order?.rakhtBrandName || "-",
-                    ],
-                    [
-                      t("rakht.color", { defaultValue: "Color" }),
-                      order?.rakhtColor || "-",
-                    ],
-                    [
-                      t("rakht.requiredMeters", {
-                        defaultValue: "Required Meters",
-                      }),
-                      order?.rakhtRequiredMeters != null
-                        ? formatTrimmedNumber(order.rakhtRequiredMeters, 2)
-                        : "-",
-                    ],
-                  ].map(([field, value], index, arr) => (
-                    <tr key={field}>
-                      <td style={tdStyle}>{field}</td>
-                      <td
-                        style={{
-                          ...tdStyle,
-                          borderBottom:
-                            index === arr.length - 1
-                              ? "none"
-                              : tdStyle.borderBottom,
-                        }}
-                      >
-                        {value}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
-
-        <div className="mt-3.5">
-          <p
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              color: "var(--text3)",
-              marginBottom: 8,
-            }}
-          >
+        {/* Measurements Section */}
+        <div className="px-6 pt-5 pb-2">
+          <div className="text-base font-bold text-sky-800 dark:text-slate-200 mb-2 border-b border-sky-100 dark:border-slate-700 pb-1">
             {t("createOrder.measurements", "Measurements")}
-          </p>
-          <div style={tableWrapStyle}>
-            <div className="overflow-x-auto">
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr>
-                    <th style={thStyle}>{t("common.field", "Field")}</th>
-                    <th style={thStyle}>{t("common.value", "Value")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {measurementRows.length ? (
-                    measurementRows.map(([key, tKey], index) => (
-                      <tr key={key}>
-                        <td style={tdStyle}>{t(tKey)}</td>
-                        <td
-                          style={{
-                            ...tdStyle,
-                            borderBottom:
-                              index === measurementRows.length - 1
-                                ? "none"
-                                : tdStyle.borderBottom,
-                          }}
-                        >
-                          {measure[key]}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td
-                        style={{ ...tdStyle, borderBottom: "none" }}
-                        colSpan={2}
-                      >
-                        -
+          </div>
+          <div className="overflow-x-auto rounded-xl border border-sky-100 dark:border-slate-700 bg-white dark:bg-slate-900">
+            <table className="min-w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-3 py-2 bg-sky-50 dark:bg-slate-800/70 border-b border-sky-100 dark:border-slate-700">
+                    {t("common.field", "Field")}
+                  </th>
+                  <th className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-3 py-2 bg-sky-50 dark:bg-slate-800/70 border-b border-sky-100 dark:border-slate-700">
+                    {t("common.value", "Value")}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {measurementRows.length ? (
+                  measurementRows.map(([key, tKey]) => (
+                    <tr key={key}>
+                      <td className="px-3 py-2 text-sm text-sky-900 dark:text-slate-100 border-b border-sky-100 dark:border-slate-700">
+                        {t(tKey)}
+                      </td>
+                      <td className="px-3 py-2 text-sm text-sky-900 dark:text-slate-100 border-b border-sky-100 dark:border-slate-700">
+                        {measure[key]}
                       </td>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                  ))
+                ) : (
+                  <tr>
+                    <td
+                      className="px-3 py-2 text-sm text-sky-900 dark:text-slate-100 border-b-0"
+                      colSpan={2}
+                    >
+                      -
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-
-        <div className="mt-3.5">
-          <p
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              color: "var(--text3)",
-              marginBottom: 8,
-            }}
-          >
+        {/* Styling Details Section */}
+        <div className="px-6 pt-5 pb-6">
+          <div className="text-base font-bold text-sky-800 dark:text-slate-200 mb-2 border-b border-sky-100 dark:border-slate-700 pb-1">
             {t("createOrder.styleOptions", "Styling Details")}
-          </p>
-          <div style={tableWrapStyle}>
-            <div className="overflow-x-auto">
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr>
-                    <th style={thStyle}>{t("common.field", "Field")}</th>
-                    <th style={thStyle}>{t("common.value", "Value")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...styleRows, ...booleanRows].length ? (
-                    [...styleRows, ...booleanRows].map(
-                      ([key, tKey], index, arr) => (
-                        <tr key={key}>
-                          <td style={tdStyle}>{t(tKey)}</td>
-                          <td
-                            style={{
-                              ...tdStyle,
-                              borderBottom:
-                                index === arr.length - 1
-                                  ? "none"
-                                  : tdStyle.borderBottom,
-                            }}
-                          >
-                            {measure[key] === true
-                              ? t("common.yes", "Yes")
-                              : measure[key]}
-                          </td>
-                        </tr>
-                      ),
-                    )
-                  ) : (
-                    <tr>
-                      <td
-                        style={{ ...tdStyle, borderBottom: "none" }}
-                        colSpan={2}
-                      >
-                        -
+          </div>
+          <div className="overflow-x-auto rounded-xl border border-sky-100 dark:border-slate-700 bg-white dark:bg-slate-900">
+            <table className="min-w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-3 py-2 bg-sky-50 dark:bg-slate-800/70 border-b border-sky-100 dark:border-slate-700">
+                    {t("common.field", "Field")}
+                  </th>
+                  <th className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-3 py-2 bg-sky-50 dark:bg-slate-800/70 border-b border-sky-100 dark:border-slate-700">
+                    {t("common.value", "Value")}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...styleRows, ...booleanRows].length ? (
+                  [...styleRows, ...booleanRows].map(([key, tKey]) => (
+                    <tr key={key}>
+                      <td className="px-3 py-2 text-sm text-sky-900 dark:text-slate-100 border-b border-sky-100 dark:border-slate-700">
+                        {t(tKey)}
+                      </td>
+                      <td className="px-3 py-2 text-sm text-sky-900 dark:text-slate-100 border-b border-sky-100 dark:border-slate-700">
+                        {measure[key] === true
+                          ? t("common.yes", "Yes")
+                          : measure[key]}
                       </td>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                  ))
+                ) : (
+                  <tr>
+                    <td
+                      className="px-3 py-2 text-sm text-sky-900 dark:text-slate-100 border-b-0"
+                      colSpan={2}
+                    >
+                      -
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -905,56 +968,84 @@ function PenaltyDetailModal({ penalty, language, t, onClose }) {
                 </tr>
               </thead>
               <tbody>
-                {[
-                  [
-                    t("damagedClothes.details.rakhtExpense"),
-                    penalty.rakhtExpense,
-                    undefined,
-                  ],
-                  [
-                    t("damagedClothes.details.dokhtExpense"),
-                    penalty.dokhtExpense,
-                    undefined,
-                  ],
-                  [
-                    t("damagedClothes.details.qichikarExpense"),
-                    penalty.qichikarExpense,
-                    undefined,
-                  ],
-                  [
-                    t("damagedClothes.details.dailyTaskExpense"),
-                    penalty.dailyTaskExpense,
-                    undefined,
-                  ],
-                  ...(penalty.extraExpense > 0
-                    ? [
-                        [
-                          t("workerPanel.extraExpenses", "Other Expenses"),
-                          penalty.extraExpense,
-                          undefined,
-                        ],
-                      ]
-                    : []),
-                ].map(([label, value, accent], i, arr) => (
-                  <tr key={label}>
-                    <td
-                      style={{
-                        ...tdLabelStyle,
-                        borderBottom: "1px solid var(--border)",
-                      }}
-                    >
-                      {label}
-                    </td>
-                    <td
-                      style={{
-                        ...tdValueStyle,
-                        borderBottom: "1px solid var(--border)",
-                      }}
-                    >
-                      <CurrencyCell value={value} accent={accent} />
-                    </td>
-                  </tr>
-                ))}
+                <tr>
+                  <td
+                    style={{
+                      ...tdLabelStyle,
+                      borderBottom: "1px solid var(--border)",
+                    }}
+                  >
+                    {t("damagedClothes.details.rakhtExpense", "Rakht Expense")}
+                  </td>
+                  <td
+                    style={{
+                      ...tdValueStyle,
+                      borderBottom: "1px solid var(--border)",
+                    }}
+                  >
+                    {penalty.rakhtExpense}
+                  </td>
+                </tr>
+                <tr>
+                  <td
+                    style={{
+                      ...tdLabelStyle,
+                      borderBottom: "1px solid var(--border)",
+                    }}
+                  >
+                    {t("damagedClothes.details.dokhtExpense", "Dokht Expense")}
+                  </td>
+                  <td
+                    style={{
+                      ...tdValueStyle,
+                      borderBottom: "1px solid var(--border)",
+                    }}
+                  >
+                    {penalty.dokhtExpense}
+                  </td>
+                </tr>
+                <tr>
+                  <td
+                    style={{
+                      ...tdLabelStyle,
+                      borderBottom: "1px solid var(--border)",
+                    }}
+                  >
+                    {t(
+                      "damagedClothes.details.qichikarExpense",
+                      "Qichikar Expense",
+                    )}
+                  </td>
+                  <td
+                    style={{
+                      ...tdValueStyle,
+                      borderBottom: "1px solid var(--border)",
+                    }}
+                  >
+                    {penalty.qichikarExpense}
+                  </td>
+                </tr>
+                <tr>
+                  <td
+                    style={{
+                      ...tdLabelStyle,
+                      borderBottom: "1px solid var(--border)",
+                    }}
+                  >
+                    {t(
+                      "damagedClothes.details.dailyTaskExpense",
+                      "Daily Task Expense",
+                    )}
+                  </td>
+                  <td
+                    style={{
+                      ...tdValueStyle,
+                      borderBottom: "1px solid var(--border)",
+                    }}
+                  >
+                    {penalty.dailyTaskExpense}
+                  </td>
+                </tr>
                 <tr>
                   <td
                     style={{
@@ -964,7 +1055,7 @@ function PenaltyDetailModal({ penalty, language, t, onClose }) {
                       color: "#92400E",
                     }}
                   >
-                    {t("damagedClothes.details.totalPenalty")}
+                    {t("damagedClothes.details.totalPenalty", "Total Penalty")}
                   </td>
                   <td style={{ ...tdValueStyle, borderBottom: "none" }}>
                     <CurrencyCell
@@ -1014,6 +1105,16 @@ export default function WorkerPanel() {
   const [confirmAction, setConfirmAction] = useState(null);
   const [optimisticInProgressIds, setOptimisticInProgressIds] = useState([]);
   const [optimisticCompletedIds, setOptimisticCompletedIds] = useState([]);
+  const [receiveSuccessIds, setReceiveSuccessIds] = useState([]);
+  const receiveSuccessTimersRef = useRef({});
+
+  useEffect(() => {
+    return () => {
+      Object.values(receiveSuccessTimersRef.current).forEach((timerId) => {
+        clearTimeout(timerId);
+      });
+    };
+  }, []);
 
   const { data: orderPayload, isLoading } = useQuery({
     queryKey: ["worker-panel-orders", ...workerScope, viewMonth, viewYear],
@@ -1111,6 +1212,7 @@ export default function WorkerPanel() {
   const receiveMut = useMutation({
     mutationFn: (id) => api.patch(`/orders/${id}/receive`).then((r) => r.data),
     onSuccess: (updatedOrder) => {
+      const orderId = updatedOrder?.id;
       const receivedOrderMonth = Number(updatedOrder?.entryMonth);
       const receivedOrderYear = Number(updatedOrder?.entryYear);
       const hasOrderMonthContext =
@@ -1128,30 +1230,48 @@ export default function WorkerPanel() {
         setViewYear(receivedOrderYear);
       }
 
-      qc.setQueryData(
-        ["worker-panel-orders", ...workerScope, viewMonth, viewYear],
-        (prev) => upsertOrderInWorkerPayload(prev, updatedOrder),
-      );
-      qc.setQueryData(["worker-panel-notifs", ...workerScope], (prev = []) =>
-        Array.isArray(prev)
-          ? prev.map((notif) =>
-              notif?.orderId === updatedOrder?.id
-                ? { ...notif, isRead: true }
-                : notif,
-            )
-          : prev,
-      );
-      qc.setQueryData(
-        ["worker-notifs-dropdown", ...workerScope],
-        (prev = []) =>
+      const finishReceiveUpdate = () => {
+        qc.setQueryData(
+          ["worker-panel-orders", ...workerScope, viewMonth, viewYear],
+          (prev) => upsertOrderInWorkerPayload(prev, updatedOrder),
+        );
+        qc.setQueryData(["worker-panel-notifs", ...workerScope], (prev = []) =>
           Array.isArray(prev)
-            ? prev.filter((notif) => notif?.orderId !== updatedOrder?.id)
+            ? prev.map((notif) =>
+                notif?.orderId === updatedOrder?.id
+                  ? { ...notif, isRead: true }
+                  : notif,
+              )
             : prev,
-      );
-      qc.invalidateQueries({ queryKey: ["worker-panel-orders"] });
-      qc.invalidateQueries({ queryKey: ["worker-panel-notifs"] });
-      qc.invalidateQueries({ queryKey: ["worker-notifs-count"] });
-      qc.invalidateQueries({ queryKey: ["worker-notifs-dropdown"] });
+        );
+        qc.setQueryData(
+          ["worker-notifs-dropdown", ...workerScope],
+          (prev = []) =>
+            Array.isArray(prev)
+              ? prev.filter((notif) => notif?.orderId !== updatedOrder?.id)
+              : prev,
+        );
+        qc.invalidateQueries({ queryKey: ["worker-panel-orders"] });
+        qc.invalidateQueries({ queryKey: ["worker-panel-notifs"] });
+        qc.invalidateQueries({ queryKey: ["worker-notifs-count"] });
+        qc.invalidateQueries({ queryKey: ["worker-notifs-dropdown"] });
+        refreshSearchResult();
+      };
+
+      if (orderId) {
+        setReceiveSuccessIds((ids) =>
+          ids.includes(orderId) ? ids : [...ids, orderId],
+        );
+        clearTimeout(receiveSuccessTimersRef.current[orderId]);
+        receiveSuccessTimersRef.current[orderId] = setTimeout(() => {
+          setReceiveSuccessIds((ids) => ids.filter((id) => id !== orderId));
+          delete receiveSuccessTimersRef.current[orderId];
+          finishReceiveUpdate();
+        }, 1500);
+      } else {
+        finishReceiveUpdate();
+      }
+
       setActiveTab("assigned");
       toast.success(
         t(
@@ -1159,7 +1279,6 @@ export default function WorkerPanel() {
           "Order received - Admin notified",
         ),
       );
-      refreshSearchResult();
       setConfirmAction(null);
     },
     onError: (error) => {
@@ -1299,6 +1418,10 @@ export default function WorkerPanel() {
   const optimisticCompletedIdSet = useMemo(
     () => new Set(optimisticCompletedIds),
     [optimisticCompletedIds],
+  );
+  const receiveSuccessIdSet = useMemo(
+    () => new Set(receiveSuccessIds),
+    [receiveSuccessIds],
   );
 
   const filteredOrders = useMemo(() => {
@@ -1678,7 +1801,7 @@ export default function WorkerPanel() {
             </span>
             {order?.rakhtRequiredMeters != null && (
               <span className="order-rakht-chip order-rakht-chip--meters">
-                {formatTrimmedNumber(order.rakhtRequiredMeters, 2)}m
+                {formatMeters(order.rakhtRequiredMeters)}m
               </span>
             )}
           </div>
@@ -1819,6 +1942,7 @@ export default function WorkerPanel() {
     const receivedByCurrentUser =
       getRoleOrderState(order, user?.accountType).receivedById === user?.id;
     const canReceive = canOrderBeReceived(order);
+    const showReceiveSuccess = receiveSuccessIdSet.has(order.id);
 
     return (
       <div
@@ -1854,14 +1978,16 @@ export default function WorkerPanel() {
               </span>
               {order?.rakhtRequiredMeters != null && (
                 <span className="order-rakht-chip order-rakht-chip--meters">
-                  {formatTrimmedNumber(order.rakhtRequiredMeters, 2)}m
+                  {formatMeters(order.rakhtRequiredMeters)}m
                 </span>
               )}
             </div>
           )}
         </div>
 
-        {receivedByCurrentUser ? (
+        {showReceiveSuccess ? (
+          <ReceiveSuccessState t={t} isRtl={isRtl} />
+        ) : receivedByCurrentUser ? (
           <div className="rounded-lg border border-emerald-300 bg-emerald-100 px-2.5 py-2 text-xs font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
             {t(
               "workerPanel.searchOrderReceivedHint",
@@ -1934,87 +2060,127 @@ export default function WorkerPanel() {
         </div>
 
         {/* Stat Cards Section - Dokht/Qichikar only */}
-        <div className="mt-3.5 grid gap-2.5">
-          {/* Current Money - full width, visually prominent */}
+        <div className="mt-4 grid gap-3" dir={isRtl ? "rtl" : "ltr"}>
           <div
-            className={`w-full rounded-[12px] border-2 px-4 py-4 shadow-sm transition-all
-              ${
-                currentMoney >= 0
-                  ? "border-emerald-400 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950/40"
-                  : "border-rose-400 bg-rose-50 dark:border-rose-700 dark:bg-rose-950/40"
-              }
-              flex flex-col items-${isRtl ? "end" : "start"} justify-center
-            `}
-            style={{
-              gridColumn: "1 / -1",
-              direction: isRtl ? "rtl" : "ltr",
-              boxShadow: "0 2px 12px 0 rgba(16,185,129,0.08)",
-            }}
+            className={`min-h-[118px] rounded-xl border-2 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+              currentMoney >= 0
+                ? "border-emerald-300 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-800 dark:from-emerald-950/40 dark:to-slate-900"
+                : "border-rose-300 bg-gradient-to-br from-rose-50 to-white dark:border-rose-800 dark:from-rose-950/40 dark:to-slate-900"
+            }`}
           >
-            <div className="text-base font-bold text-slate-600 dark:text-slate-300 mb-1">
-              {t("workerPanel.currentMoney", "Current Money")}
-            </div>
-            <div
-              className={`flex items-center gap-2 text-2xl font-extrabold ${
-                currentMoney >= 0
-                  ? "text-emerald-700 dark:text-emerald-300"
-                  : "text-rose-700 dark:text-rose-300"
-              }`}
-              style={{ fontFamily: "inherit" }}
-            >
-              <AfCurrencyIcon size={22} />
-              {formatCurrency(currentMoney, language)}
+            <div className="flex h-full items-start justify-between gap-3">
+              <div className="grid min-w-0 content-between gap-3">
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    {t("workerPanel.currentMoney", "Current Money")}
+                  </div>
+                  <div
+                    className={`mt-2 flex flex-wrap items-center gap-2 text-3xl font-extrabold ${
+                      currentMoney >= 0
+                        ? "text-emerald-700 dark:text-emerald-300"
+                        : "text-rose-700 dark:text-rose-300"
+                    }`}
+                  >
+                    <AfCurrencyIcon size={22} />
+                    {formatCurrency(currentMoney, language)}
+                  </div>
+                </div>
+              </div>
+              <div
+                className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl ring-1 ${
+                  currentMoney >= 0
+                    ? "bg-emerald-100 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:ring-emerald-900"
+                    : "bg-rose-100 text-rose-700 ring-rose-200 dark:bg-rose-950/70 dark:text-rose-300 dark:ring-rose-900"
+                }`}
+              >
+                <AfCurrencyIcon size={24} />
+              </div>
             </div>
           </div>
 
-          {/* Other stat cards in responsive grid */}
-          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="grid gap-1 rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/60">
-              <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                {t(
-                  "workerPanel.totalCompletedPayments",
-                  "Total Money from Completed Orders",
-                )}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="min-h-[118px] rounded-xl border border-rose-200 bg-gradient-to-br from-rose-50 to-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-rose-900/70 dark:from-rose-950/35 dark:to-slate-900">
+            <div className="flex h-full items-start justify-between gap-3">
+              <div className="grid min-w-0 content-between gap-3">
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    {t("workerPanel.totalPenaltyAmount", "Total Damage Penalty")}
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-2xl font-extrabold text-rose-700 dark:text-rose-300">
+                    <AfCurrencyIcon size={20} />
+                    {formatCurrency(totalDamagePenaltyAmount, language)}
+                  </div>
+                </div>
+                <div className="text-xs font-semibold text-rose-700 dark:text-rose-300">
+                  {damagedPenaltyPayload?.total || 0}{" "}
+                  {t("workerPanel.totalPenalties", "penalties")}
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-xl font-extrabold text-blue-600 dark:text-blue-400">
-                <AfCurrencyIcon size={18} />
-                {formatCurrency(totalCompletedPayments, language)}
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-rose-100 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-950/70 dark:text-rose-300 dark:ring-rose-900">
+                <LuCircleAlert size={22} />
               </div>
             </div>
+          </div>
 
-            <div className="grid gap-1 rounded-[10px] border border-emerald-200 bg-emerald-50 px-3 py-2.5 dark:border-emerald-800 dark:bg-emerald-950/30">
-              <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                {t("workerPanel.moneyReceipt", "Money Receipt")}
+          <div className="min-h-[118px] rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-amber-900/70 dark:from-amber-950/35 dark:to-slate-900">
+            <div className="flex h-full items-start justify-between gap-3">
+              <div className="grid min-w-0 content-between gap-3">
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    {t("workerPanel.loanTotal", "Loan Total")}
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-2xl font-extrabold text-amber-700 dark:text-amber-300">
+                    <AfCurrencyIcon size={20} />
+                    {formatCurrency(totalLoanAmount, language)}
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-xl font-extrabold text-emerald-700 dark:text-emerald-400">
-                <AfCurrencyIcon size={18} />
-                {formatCurrency(moneyReceiptTotal, language)}
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950/70 dark:text-amber-300 dark:ring-amber-900">
+                <LuHash size={22} />
               </div>
             </div>
+          </div>
 
-            <div className="grid gap-1 rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/60">
-              <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                {t("workerPanel.loanTotal", "Loan Total")}
+          <div className="min-h-[118px] rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-blue-900/70 dark:from-blue-950/35 dark:to-slate-900">
+            <div className="flex h-full items-start justify-between gap-3">
+              <div className="grid min-w-0 content-between gap-3">
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    {t(
+                      "workerPanel.totalCompletedPayments",
+                      "Total Money from Completed Orders",
+                    )}
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-2xl font-extrabold text-blue-700 dark:text-blue-300">
+                    <AfCurrencyIcon size={20} />
+                    {formatCurrency(totalCompletedPayments, language)}
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-xl font-extrabold text-amber-700 dark:text-amber-400">
-                <AfCurrencyIcon size={18} />
-                {formatCurrency(totalLoanAmount, language)}
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-blue-100 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-950/70 dark:text-blue-300 dark:ring-blue-900">
+                <LuSquareCheck size={22} />
               </div>
             </div>
+          </div>
 
-            <div className="grid gap-1 rounded-[10px] border border-amber-300 bg-amber-50 px-3 py-2.5 dark:border-amber-800 dark:bg-amber-950/30">
-              <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                {t("workerPanel.totalPenaltyAmount", "Total Damage Penalty")}
+          <div className="min-h-[118px] rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-emerald-900/70 dark:from-emerald-950/35 dark:to-slate-900">
+            <div className="flex h-full items-start justify-between gap-3">
+              <div className="grid min-w-0 content-between gap-3">
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    {t("workerPanel.moneyReceipt", "Money Receipt")}
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-2xl font-extrabold text-emerald-700 dark:text-emerald-300">
+                    <AfCurrencyIcon size={20} />
+                    {formatCurrency(moneyReceiptTotal, language)}
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-xl font-extrabold text-amber-700 dark:text-amber-400">
-                <AfCurrencyIcon size={18} />
-                {formatCurrency(totalDamagePenaltyAmount, language)}
-              </div>
-              <div className="text-[11px] text-amber-800 dark:text-amber-300">
-                {damagedPenaltyPayload?.total || 0}{" "}
-                {t("workerPanel.totalPenalties", "penalties")}
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:ring-emerald-900">
+                <AfCurrencyIcon size={22} />
               </div>
             </div>
+          </div>
           </div>
         </div>
       </div>
@@ -2110,6 +2276,7 @@ export default function WorkerPanel() {
               {newAssignedOrders.slice(0, 6).map((order) => {
                 const orderLabel = getOrderLabelParts(order, language);
                 const canReceive = canOrderBeReceived(order);
+                const showReceiveSuccess = receiveSuccessIdSet.has(order.id);
 
                 return (
                   <div
@@ -2153,23 +2320,29 @@ export default function WorkerPanel() {
                       )}
                     </div>
 
-                    <button
-                      className="btn btn-gold btn-sm"
-                      onClick={() => openConfirm("receive", order)}
-                      disabled={pendingAction || !canReceive}
-                      title={
-                        canReceive
-                          ? ""
-                          : getAssignmentBlockReason(order) ||
-                            t(
-                              "workerPanel.cannotReceiveOrder",
-                              "You cannot receive this order.",
-                            )
-                      }
-                    >
-                      <LuCheck size={13} />{" "}
-                      {t("workerPanel.receive", "Receive")}
-                    </button>
+                    <div className="w-full sm:w-40">
+                      {showReceiveSuccess ? (
+                        <ReceiveSuccessState t={t} isRtl={isRtl} />
+                      ) : (
+                        <button
+                          className="btn btn-gold btn-sm w-full transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md"
+                          onClick={() => openConfirm("receive", order)}
+                          disabled={pendingAction || !canReceive}
+                          title={
+                            canReceive
+                              ? ""
+                              : getAssignmentBlockReason(order) ||
+                                t(
+                                  "workerPanel.cannotReceiveOrder",
+                                  "You cannot receive this order.",
+                                )
+                          }
+                        >
+                          <LuCheck size={13} />{" "}
+                          {t("workerPanel.receive", "Receive")}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -2319,7 +2492,7 @@ export default function WorkerPanel() {
               </div>
             ) : (
               <div className="grid gap-2.5">
-                {damagedPenalties.map((penalty) => {
+                {damagedPenaltyPayload?.data?.map((penalty) => {
                   const statusCfg = {
                     DAMAGE_ORDER: {
                       label: t("orders.damageOrderStatus", "Damage Order"),

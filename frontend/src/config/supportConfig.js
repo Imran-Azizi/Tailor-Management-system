@@ -26,10 +26,5 @@ export const SUPPORT_TEAM_CONFIG = {
       labelKey: "supportTeam.facebook",
       href: "https://www.facebook.com/share/1DxnRwLhjy/?mibextid=wwXIfr",
     },
-    {
-      key: "instagram",
-      labelKey: "supportTeam.instagram",
-      href: "https://instagram.com/hoshmandsafi",
-    },
   ],
 };

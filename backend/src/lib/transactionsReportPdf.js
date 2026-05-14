@@ -102,6 +102,8 @@ const TEXT = {
       ADMIN: "ادمین",
       DOKAN: "دکان",
       DOKHT: "دخت",
+        DOKAN: "دوکان",
+        DOKHT: "دوخت",
       QICHIKAR: "قیچی‌کار",
     },
     kinds: {
@@ -136,6 +138,8 @@ const TEXT = {
       ADMIN: "اډمین",
       DOKAN: "دوکان",
       DOKHT: "دخت",
+        DOKAN: "دوکان",
+        DOKHT: "دوخت",
       QICHIKAR: "قیچي‌کار",
     },
     kinds: {

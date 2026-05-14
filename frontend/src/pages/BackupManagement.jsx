@@ -29,7 +29,7 @@ import {
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 function formatBytes(bytes) {
-  if (!bytes || bytes <= 0) return "—";
+  if (!bytes || bytes <= 0) return "-";
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   if (bytes < 1024 * 1024 * 1024)
@@ -38,10 +38,77 @@ function formatBytes(bytes) {
 }
 
 function formatDate(iso, language = "en") {
-  if (!iso) return "—";
+  if (!iso) return "-";
   return formatSystemDateTime(iso, language, {
     month: "short",
   });
+}
+
+function readableKey(value) {
+  return String(value || "")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function translateBackupStatus(t, status) {
+  if (!status) return "-";
+  const key = String(status).toLowerCase();
+  return t(`backup.status.${key}`, { defaultValue: readableKey(status) });
+}
+
+function translateBackupType(t, type) {
+  if (!type) return "-";
+  const key = String(type).toLowerCase();
+  return t(`backup.types.${key}`, { defaultValue: readableKey(type) });
+}
+
+function translateBackupMessage(t, message) {
+  if (!message) return "";
+
+  if (message === "No backups have run yet.") {
+    return t("backup.messages.none", {
+      defaultValue: "No backups have run yet.",
+    });
+  }
+
+  const started = message.match(/^Backup started \(([^)]+)\)\.$/);
+  if (started) {
+    return t("backup.messages.started", {
+      trigger: translateBackupType(t, started[1]),
+      defaultValue: "Backup started ({{trigger}}).",
+    });
+  }
+
+  const completed = message.match(/^Backup completed successfully \(([^)]+)\)\.$/);
+  if (completed) {
+    const types = completed[1]
+      .split(",")
+      .map((type) => translateBackupType(t, type.trim()))
+      .join(", ");
+    return t("backup.messages.completed", {
+      types,
+      defaultValue: "Backup completed successfully ({{types}}).",
+    });
+  }
+
+  return message;
+}
+
+function translateRestoreChecks(t, checks) {
+  if (!checks) return null;
+  return Object.entries(checks)
+    .map(([key, passed]) => {
+      const label = t(`backup.checks.${key}`, {
+        defaultValue: readableKey(key),
+      });
+      const result = passed
+        ? t("backup.checkPassed", { defaultValue: "Passed" })
+        : t("backup.checkFailed", { defaultValue: "Failed" });
+      return `${label}: ${result}`;
+    })
+    .join("  ");
 }
 
 function StatusDot({ status }) {
@@ -63,6 +130,7 @@ function StatusDot({ status }) {
 }
 
 function TypeBadge({ type }) {
+  const { t } = useTranslation();
   const colors = {
     daily: { bg: "#EFF6FF", color: "#2563EB", border: "#BFDBFE" },
     weekly: { bg: "#F0FDF4", color: "#16A34A", border: "#BBF7D0" },
@@ -84,10 +152,9 @@ function TypeBadge({ type }) {
         background: c.bg,
         color: c.color,
         border: `1px solid ${c.border}`,
-        textTransform: "capitalize",
       }}
     >
-      {type || "—"}
+      {translateBackupType(t, type)}
     </span>
   );
 }
@@ -101,6 +168,7 @@ function StatusCard({
   running,
   testing,
   language = "en",
+  isRtl = false,
 }) {
   const { t } = useTranslation();
 
@@ -123,12 +191,13 @@ function StatusCard({
                 display: "flex",
                 alignItems: "center",
                 gap: 6,
+                flexDirection: isRtl ? "row-reverse" : "row",
                 fontWeight: 600,
                 fontSize: 14,
               }}
             >
               <StatusDot status={status?.latestStatus} />
-              {status?.latestStatus || "—"}
+              {translateBackupStatus(t, status?.latestStatus)}
             </span>
           </div>
           <div style={infoBlock}>
@@ -150,23 +219,35 @@ function StatusCard({
               {t("backup.totalBackups", "Total Backups")}
             </span>
             <span style={{ fontWeight: 600, fontSize: 14 }}>
-              {status?.totalBackups ?? "—"}
+              {status?.totalBackups ?? "-"}
             </span>
           </div>
         </div>
 
         {status?.latestMessage && (
           <p style={{ fontSize: 13, color: "var(--text2)", margin: 0 }}>
-            {status.latestMessage}
+            {translateBackupMessage(t, status.latestMessage)}
           </p>
         )}
 
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            flexWrap: "wrap",
+            justifyContent: isRtl ? "flex-end" : "flex-start",
+          }}
+        >
           <button
             className="btn btn-gold"
             onClick={onRunBackup}
             disabled={running}
-            style={{ display: "flex", alignItems: "center", gap: 6 }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              flexDirection: isRtl ? "row-reverse" : "row",
+            }}
           >
             {running ? (
               <LuRefreshCw
@@ -184,7 +265,12 @@ function StatusCard({
             className="btn btn-outline"
             onClick={onRunRestoreTest}
             disabled={testing}
-            style={{ display: "flex", alignItems: "center", gap: 6 }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              flexDirection: isRtl ? "row-reverse" : "row",
+            }}
           >
             {testing ? (
               <LuRefreshCw
@@ -212,7 +298,10 @@ function RestoreTestsCard({ tests, language = "en", isRtl = false }) {
   return (
     <Card title={t("backup.restoreTestsTitle", "Recent Restore Tests")}>
       <div style={{ overflowX: "auto" }}>
-        <table className="tbl">
+        <table
+          className="tbl"
+          style={{ direction: isRtl ? "rtl" : "ltr", textAlign: "start" }}
+        >
           <thead>
             <tr>
               <th>{t("backup.colStatus", "Status")}</th>
@@ -227,12 +316,15 @@ function RestoreTestsCard({ tests, language = "en", isRtl = false }) {
               <tr key={test.id}>
                 <td>
                   <span
-                    style={{ display: "flex", alignItems: "center", gap: 5 }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 5,
+                      flexDirection: isRtl ? "row-reverse" : "row",
+                    }}
                   >
                     <StatusDot status={test.status} />
-                    <span style={{ textTransform: "capitalize" }}>
-                      {test.status}
-                    </span>
+                    <span>{translateBackupStatus(t, test.status)}</span>
                   </span>
                 </td>
                 <td style={{ fontSize: 12 }}>
@@ -241,13 +333,9 @@ function RestoreTestsCard({ tests, language = "en", isRtl = false }) {
                 <td style={{ fontSize: 12 }}>
                   {formatDate(test.finishedAt, language)}
                 </td>
-                <td style={{ fontSize: 12 }}>{test.initiatedBy || "—"}</td>
+                <td style={{ fontSize: 12 }}>{test.initiatedBy || "-"}</td>
                 <td style={{ fontSize: 11 }}>
-                  {test.checks
-                    ? Object.entries(test.checks)
-                        .map(([k, v]) => `${k}: ${v ? "✓" : "✗"}`)
-                        .join("  ")
-                    : test.error || "—"}
+                  {translateRestoreChecks(t, test.checks) || test.error || "-"}
                 </td>
               </tr>
             ))}
@@ -288,7 +376,10 @@ function BackupListCard({
         title={`${t("backup.listTitle", "All Backups")} (${backups.length})`}
       >
         <div style={{ overflowX: "auto" }}>
-          <table className="tbl">
+          <table
+            className="tbl"
+            style={{ direction: isRtl ? "rtl" : "ltr", textAlign: "start" }}
+          >
             <thead>
               <tr>
                 <th>{t("backup.colFilename", "Filename")}</th>
@@ -334,6 +425,7 @@ function BackupListCard({
                         display: "flex",
                         gap: 6,
                         justifyContent: isRtl ? "flex-end" : "flex-start",
+                        flexDirection: isRtl ? "row-reverse" : "row",
                       }}
                     >
                       <button
@@ -506,7 +598,10 @@ export default function BackupManagement() {
   }
 
   return (
-    <div className="page" style={{ direction: isRtl ? "rtl" : "ltr" }}>
+    <div
+      className="page backup-management-page"
+      style={{ direction: isRtl ? "rtl" : "ltr" }}
+    >
       <PageHeader
         title={t("backup.title", "Backup Management")}
         subtitle={t(
@@ -519,6 +614,7 @@ export default function BackupManagement() {
               display: "flex",
               alignItems: "center",
               justifyContent: isRtl ? "flex-end" : "flex-start",
+              flexDirection: isRtl ? "row-reverse" : "row",
               gap: 6,
               fontSize: 12,
               color: "var(--text2)",

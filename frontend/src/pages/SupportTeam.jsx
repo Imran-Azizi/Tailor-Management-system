@@ -11,14 +11,13 @@ import {
   LuPhone,
   LuShieldCheck,
 } from "react-icons/lu";
-import { FaFacebookF, FaInstagram, FaWhatsapp } from "react-icons/fa";
+import { FaFacebookF, FaWhatsapp } from "react-icons/fa";
 import { PageHeader } from "../components/ui/index.jsx";
 import { getLocalizedShopValue } from "../config/shopConfig.js";
 import { SUPPORT_TEAM_CONFIG } from "../config/supportConfig.js";
 
 const SOCIAL_ICONS = {
   facebook: FaFacebookF,
-  instagram: FaInstagram,
   whatsapp: FaWhatsapp,
 };
 
@@ -86,9 +85,9 @@ function IconAction({ label, children, href, onClick }) {
 
 function PhoneLinks({ phones }) {
   return (
-    <div className="support-phone-list" dir="ltr">
+    <div className="support-phone-list">
       {phones.map((phone) => (
-        <a key={phone.label} href={phone.href}>
+        <a key={phone.label} href={phone.href} dir="ltr" lang="en">
           <LuPhone size={14} />
           <span>{phone.label}</span>
         </a>
@@ -154,7 +153,7 @@ function InfoGroup({ title, subtitle, children }) {
   return (
     <section className="support-info-group">
       <div className="support-group-title">
-        <span />
+        <span aria-hidden="true" />
         <div>
           <h4>{title}</h4>
           <p>{subtitle}</p>
@@ -203,14 +202,13 @@ export default function SupportTeam() {
   };
 
   const isRtl = dir === "rtl";
-  const rtlTextAlign = isRtl ? { textAlign: "right" } : {};
+  const pageAlignClass = isRtl ? "text-right" : "text-left";
 
   return (
-    <div className="support-page" dir={dir}>
+    <div className={`support-page ${pageAlignClass}`} dir={dir} lang={language}>
       <PageHeader
         title={t("supportTeam.title")}
         subtitle={t("supportTeam.subtitle")}
-        style={rtlTextAlign}
       />
 
       <section className="support-hero">
@@ -219,33 +217,16 @@ export default function SupportTeam() {
             <LuHeadphones size={18} />
             <span>{t("supportTeam.badge")}</span>
           </div>
-          <h2 style={rtlTextAlign}>{t("supportTeam.heroTitle")}</h2>
-          <p style={rtlTextAlign}>{t("supportTeam.heroCopy")}</p>
+          <h2>{t("supportTeam.heroTitle")}</h2>
+          <p>{t("supportTeam.heroCopy")}</p>
         </div>
       </section>
 
       <article className="support-details-card">
-        <header className="support-details-head">
-          <span className="support-details-icon">
-            <LuShieldCheck size={22} />
-          </span>
-          <div>
-            <h3 style={rtlTextAlign}>{t("supportTeam.combinedInfoTitle")}</h3>
-            <p style={rtlTextAlign}>{t("supportTeam.combinedInfoSubtitle")}</p>
-          </div>
-        </header>
         <div className="support-details-grid">
           <InfoGroup
-            title={
-              <span style={rtlTextAlign}>
-                {t("supportTeam.companyInfoTitle")}
-              </span>
-            }
-            subtitle={
-              <span style={rtlTextAlign}>
-                {t("supportTeam.companyInfoSubtitle")}
-              </span>
-            }
+            title={t("supportTeam.companyInfoTitle")}
+            subtitle={t("supportTeam.companyInfoSubtitle")}
           >
             <InfoRow
               Icon={LuShieldCheck}
@@ -319,6 +300,7 @@ export default function SupportTeam() {
                       target="_blank"
                       rel="noreferrer"
                       title={t("supportTeam.openLink")}
+                      dir={isRtl ? "rtl" : "ltr"}
                     >
                       <SocialIcon size={16} />
                       <span>{t(item.labelKey)}</span>
@@ -333,6 +315,7 @@ export default function SupportTeam() {
 
       <style>{`
         .support-page {
+          width: 100%;
           max-width: 1180px;
           margin: 0 auto;
           padding: 1rem clamp(.75rem, 2vw, 1.25rem) 2rem;
@@ -368,6 +351,7 @@ export default function SupportTeam() {
 
         .support-hero__content {
           max-width: 720px;
+          width: 100%;
         }
 
         .support-hero__badge,
@@ -426,16 +410,6 @@ export default function SupportTeam() {
           transform: translateY(-2px);
         }
 
-        .support-details-head {
-          display: flex;
-          align-items: flex-start;
-          gap: .85rem;
-          padding: 1.1rem;
-          border-bottom: 1px solid var(--border, #e2e8f0);
-          background: color-mix(in srgb, var(--primary, #2563eb) 5%, transparent);
-        }
-
-        .support-details-icon,
         .support-row-icon {
           display: grid;
           place-items: center;
@@ -443,25 +417,12 @@ export default function SupportTeam() {
           border-radius: 13px;
         }
 
-        .support-details-icon {
-          width: 44px;
-          height: 44px;
-          color: var(--primary, #2563eb);
-          background: color-mix(in srgb, var(--primary, #2563eb) 12%, transparent);
-        }
-
-          const isRtl = dir === "rtl";
         .support-group-title h4 {
           margin: 0;
           color: var(--text1, #0f172a);
           line-height: 1.35;
         }
 
-        .support-details-head h3 {
-          font-size: 1.08rem;
-        }
-
-        .support-details-head p,
         .support-group-title p {
           margin: .25rem 0 0;
           font-size: .86rem;
@@ -469,13 +430,15 @@ export default function SupportTeam() {
 
         .support-details-grid {
           display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+          grid-template-columns: minmax(0, 1fr);
           gap: 1rem;
           padding: 1rem;
+          width: 100%;
         }
 
         .support-info-group {
           min-width: 0;
+          width: 100%;
           border: 1px solid color-mix(in srgb, var(--border, #e2e8f0) 76%, transparent);
           border-radius: 14px;
           background: color-mix(in srgb, var(--surface2, #f8fafc) 42%, transparent);
@@ -503,20 +466,26 @@ export default function SupportTeam() {
         }
 
         .support-group-body {
-          padding: .25rem .95rem .95rem;
+          display: grid;
+          grid-template-columns: minmax(0, 1fr);
+          gap: .75rem;
+          padding: .95rem;
         }
 
         .support-info-row {
           display: flex;
           align-items: flex-start;
           gap: .85rem;
-          padding: .85rem 0;
-          border-bottom: 1px solid color-mix(in srgb, var(--border, #e2e8f0) 72%, transparent);
+          width: 100%;
+          min-width: 0;
+          padding: .9rem;
+          border: 1px solid color-mix(in srgb, var(--border, #e2e8f0) 76%, transparent);
+          border-radius: 12px;
+          background: var(--surface, #ffffff);
         }
 
         .support-info-row:last-child {
-          border-bottom: 0;
-          padding-bottom: 0;
+          padding-bottom: .9rem;
         }
 
         .support-row-icon {
@@ -537,6 +506,7 @@ export default function SupportTeam() {
           justify-content: space-between;
           gap: .75rem;
           min-height: 30px;
+          width: 100%;
         }
 
         .support-row-label {
@@ -581,6 +551,7 @@ export default function SupportTeam() {
           font-weight: 800;
           line-height: 1.6;
           overflow-wrap: anywhere;
+          word-break: break-word;
           unicode-bidi: plaintext;
         }
 
@@ -589,16 +560,20 @@ export default function SupportTeam() {
           display: flex;
           flex-wrap: wrap;
           gap: .5rem;
+          min-width: 0;
         }
 
         .support-phone-list a,
         .support-social-link {
+          max-width: 100%;
           min-height: 34px;
           padding: .4rem .65rem;
           border-radius: 999px;
           font-size: .84rem;
           font-weight: 800;
           text-decoration: none;
+          overflow-wrap: anywhere;
+          unicode-bidi: isolate;
           transition:
             transform .16s ease,
             background .16s ease,
@@ -638,12 +613,6 @@ export default function SupportTeam() {
           background: rgba(37, 99, 235, .08);
         }
 
-        .support-social-link--instagram {
-          color: #be185d;
-          border-color: rgba(190, 24, 93, .24);
-          background: rgba(190, 24, 93, .08);
-        }
-
         .support-social-link--whatsapp:hover {
           background: rgba(5, 150, 105, .14);
         }
@@ -652,41 +621,51 @@ export default function SupportTeam() {
           background: rgba(37, 99, 235, .14);
         }
 
-        .support-social-link--instagram:hover {
-          background: rgba(190, 24, 93, .14);
-        }
-
-        .support-page[dir="rtl"] .support-hero,
-        .support-page[dir="rtl"] .support-details-head,
-        .support-page[dir="rtl"] .support-group-title,
-        .support-page[dir="rtl"] .support-info-row {
-          flex-direction: row-reverse;
-        }
-
-        .support-page[dir="rtl"] .support-hero__badge,
-        .support-page[dir="rtl"] .support-phone-list a,
-        .support-page[dir="rtl"] .support-social-link {
-          flex-direction: row-reverse;
-        }
-
+        .support-page[dir="rtl"] .page-hd,
         .support-page[dir="rtl"] .support-details-card,
         .support-page[dir="rtl"] .support-hero__content,
         .support-page[dir="rtl"] .support-info-group,
-        .support-page[dir="rtl"] .support-row-body {
+        .support-page[dir="rtl"] .support-row-body,
+        .support-page[dir="rtl"] .support-row-label,
+        .support-page[dir="rtl"] .support-row-value,
+        .support-page[dir="rtl"] .support-group-title h4,
+        .support-page[dir="rtl"] .support-group-title p {
           text-align: right;
         }
 
+        .support-page[dir="rtl"] .page-hd {
+          direction: rtl;
+        }
+
+        .support-page[dir="rtl"] .support-hero,
+        .support-page[dir="rtl"] .support-group-title,
+        .support-page[dir="rtl"] .support-info-row,
+        .support-page[dir="rtl"] .support-hero__badge,
+        .support-page[dir="rtl"] .support-social-link {
+          direction: rtl;
+        }
+
         .support-page[dir="rtl"] .support-row-head {
-          flex-direction: row-reverse;
+          justify-content: flex-start;
         }
 
         .support-page[dir="rtl"] .support-row-actions {
-          flex-direction: row-reverse;
+          direction: rtl;
+          margin-inline-start: 0;
         }
 
         .support-page[dir="rtl"] .support-phone-list,
         .support-page[dir="rtl"] .support-social-list {
           justify-content: flex-end;
+          direction: rtl;
+        }
+
+        .support-page[dir="rtl"] .support-phone-list a {
+          direction: ltr;
+        }
+
+        .support-page[dir="rtl"] .support-icon-action {
+          direction: rtl;
         }
 
         @media (max-width: 980px) {
@@ -705,11 +684,6 @@ export default function SupportTeam() {
             align-items: flex-start;
           }
 
-          .support-details-head,
-          .support-page[dir="rtl"] .support-details-head {
-            flex-direction: column;
-          }
-
           .support-info-row,
           .support-page[dir="rtl"] .support-info-row {
             gap: .75rem;
@@ -718,6 +692,15 @@ export default function SupportTeam() {
           .support-phone-list,
           .support-social-list {
             width: 100%;
+          }
+
+          .support-row-head {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .support-page[dir="rtl"] .support-row-head {
+            align-items: flex-end;
           }
         }
       `}</style>

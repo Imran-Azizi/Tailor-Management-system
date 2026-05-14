@@ -118,7 +118,9 @@
     "roles": {
       "admin": "ادمین",
       "dokan": "دکان",
+    "dokan": "دوکان",
       "dokht": "دخت",
+    "dokht": "دوخت",
       "qichikar": "قیچی‌کار",
       "finance": "مالی"
     }

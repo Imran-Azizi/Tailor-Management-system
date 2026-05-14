@@ -72,8 +72,12 @@ export default function AssignOrders() {
     [workers, workerType],
   );
 
+  // Remove READY_MADE_WASKAT from clothes type dropdown
   const orderTypeOptions = useMemo(
-    () => getOrderTypeOptions(language),
+    () =>
+      getOrderTypeOptions(language).filter(
+        (opt) => opt.value !== "READY_MADE_WASKAT",
+      ),
     [language],
   );
 
@@ -466,8 +470,11 @@ export default function AssignOrders() {
                               - {orderLabel.typeWithSequenceLabel}
                             </p>
                             <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                              {orderLabel.customName ||
-                                t("assignment.noOrderName", "No custom name")}
+                              {/* Show only custom name if provided, else real customer name */}
+                              {orderLabel.customName
+                                ? orderLabel.customName
+                                : order.customer?.firstName ||
+                                  t("assignment.noOrderName", "No custom name")}
                             </p>
                           </div>
                           <div className="text-right">

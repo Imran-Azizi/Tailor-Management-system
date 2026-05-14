@@ -45,12 +45,16 @@ const getTonRemainingMeters = (ton) => {
   );
 };
 
-const sanitizeDecimalInput = (raw) => {
+const sanitizeDecimalInput = (raw, { maxFractionDigits } = {}) => {
   const normalized = String(raw ?? "").replace(/,/g, ".");
   const cleaned = normalized.replace(/[^\d.]/g, "");
   const parts = cleaned.split(".");
   if (parts.length <= 1) return cleaned;
-  return `${parts[0]}.${parts.slice(1).join("")}`;
+  const fraction = parts.slice(1).join("");
+  const safeFraction = Number.isInteger(maxFractionDigits)
+    ? fraction.slice(0, maxFractionDigits)
+    : fraction;
+  return `${parts[0]}.${safeFraction}`;
 };
 
 export default function Step2RakhtSelection({
@@ -366,11 +370,16 @@ export default function Step2RakhtSelection({
                 item.brandName === brandName,
             );
 
-            const tonOptions = (selectedRakht?.tons || []).map((ton, idx) => ({
-              value: ton.id,
-              label: `#${idx + 1} ${ton.name}`,
-              ton,
-            }));
+            const tonOptions = (selectedRakht?.tons || [])
+              .filter((ton) => {
+                if (ton.id === rakhtTonId) return true;
+                return getTonRemainingMeters(ton) > 0;
+              })
+              .map((ton, idx) => ({
+                value: ton.id,
+                label: `#${idx + 1} ${ton.name}`,
+                ton,
+              }));
 
             const selectedTon = (selectedRakht?.tons || []).find(
               (entry) => entry.id === rakhtTonId,
@@ -624,14 +633,18 @@ export default function Step2RakhtSelection({
                         onChange={(event) => {
                           const sanitized = sanitizeDecimalInput(
                             event.target.value,
+                            { maxFractionDigits: METER_SCALE },
                           );
                           if (sanitized === "") {
                             updateSelection(item.key, { requiredMeters: "" });
                             return;
                           }
+                          const displayValue = sanitized.startsWith(".")
+                            ? `0${sanitized}`
+                            : sanitized;
 
                           const parsedMeters = toScaledNumber(
-                            sanitized,
+                            displayValue,
                             METER_SCALE,
                           );
                           if (!Number.isFinite(parsedMeters)) {
@@ -644,9 +657,12 @@ export default function Step2RakhtSelection({
                             : parsedMeters;
 
                           updateSelection(item.key, {
-                            requiredMeters: formatScaled(clampedMeters, {
-                              scale: METER_SCALE,
-                            }),
+                            requiredMeters:
+                              clampedMeters < parsedMeters
+                                ? formatScaled(clampedMeters, {
+                                    scale: METER_SCALE,
+                                  })
+                                : displayValue,
                           });
                         }}
                       />
@@ -838,7 +854,10 @@ export default function Step2RakhtSelection({
                                 background: selectedTon.colorHex || "#94A3B8",
                               }}
                             />
-                            {t("rakht.tonName", { defaultValue: "Name" })}:{" "}
+                            {t("rakht.tonName", {
+                              defaultValue: "Ton Color Name",
+                            })}
+                            :{" "}
                             {selectedTon.name}
                           </span>
                           {computedTotalPriceForCustomer > 0 && (

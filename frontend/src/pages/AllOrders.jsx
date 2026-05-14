@@ -22,6 +22,7 @@ import { getApiErrorMessage } from "../lib/feedback.js";
 import { parseNumberLocale, toAsciiDigits } from "../lib/normalize.js";
 import { formatCurrency } from "../lib/currency.js";
 import { MONEY_SCALE } from "../lib/decimal.js";
+import { formatMeters } from "../lib/meters.js";
 import {
   getOrderDisplayName,
   getOrderLabelParts,
@@ -684,7 +685,7 @@ function OrderViewModal({ orderId, open, onClose }) {
                   <div className="order-details-info-card">
                     <span>{t("rakht.requiredMeters", "Meters Used")}</span>
                     <strong>
-                      {Number(data.rakhtRequiredMeters).toFixed(2)}{" "}
+                      {formatMeters(data.rakhtRequiredMeters)}{" "}
                       {t("common.meterUnit", "m")}
                     </strong>
                   </div>
@@ -1142,8 +1143,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
   const { data: financeCreatedStats } = useQuery({
     queryKey: ["orders", "finance-created-stats", user?.id],
     enabled: isFinance && Boolean(user?.id),
-    queryFn: () =>
-      api.get("/orders/stats/finance-created").then((r) => r.data),
+    queryFn: () => api.get("/orders/stats/finance-created").then((r) => r.data),
   });
 
   const refreshOrders = () => {
@@ -1211,7 +1211,10 @@ export default function AllOrders({ filter, mode = "orders" }) {
     };
   };
 
-  const orders = data?.data || [];
+  // Always show newest orders at the top
+  const orders = (data?.data || [])
+    .slice()
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   const totalPages = Math.max(1, Math.ceil((data?.total || 0) / 20));
   const subtitle = data
     ? t("ui.pageSummary", {

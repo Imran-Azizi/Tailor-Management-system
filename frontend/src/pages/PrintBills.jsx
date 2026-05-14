@@ -22,6 +22,7 @@ import {
   normalizePhone,
   toAsciiDigits,
 } from "../lib/normalize.js";
+import { formatMeters } from "../lib/meters.js";
 import { resolveRakhtColorHex } from "../lib/rakhtColors.js";
 
 export default function PrintBills() {
@@ -630,9 +631,7 @@ export default function PrintBills() {
                                       color: "var(--text1)",
                                     }}
                                   >
-                                    {Number(order.rakhtRequiredMeters).toFixed(
-                                      2,
-                                    )}
+                                    {formatMeters(order.rakhtRequiredMeters)}
                                     m
                                   </span>
                                 )}

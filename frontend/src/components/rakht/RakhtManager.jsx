@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -13,6 +13,7 @@ import {
   LuBuilding2,
   LuHistory,
   LuEye,
+  LuPlus,
 } from "react-icons/lu";
 import AfCurrencyIcon from "../ui/AfCurrencyIcon.jsx";
 import Select from "react-select";
@@ -25,6 +26,7 @@ import {
   formatSystemDateTime,
 } from "../../lib/locale.js";
 import { formatCurrency } from "../../lib/currency.js";
+import { formatMeters } from "../../lib/meters.js";
 import { Modal, ConfirmDeleteModal, StatCard } from "../ui/index.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useMonth } from "../../context/MonthContext.jsx";
@@ -32,7 +34,9 @@ import {
   TON_QTY_OPTIONS,
   buildTonsForQuantity,
   rakhtSchema,
+  addMoreTonsSchema,
   emptyForm,
+  emptyAddMoreTonsForm,
   sanitizeIntegerInput,
 } from "./rakhtFormConfig.js";
 
@@ -49,6 +53,8 @@ export default function RakhtManager() {
   const [paymentCompany, setPaymentCompany] = useState(null);
   const [payAmount, setPayAmount] = useState("");
   const [viewItemId, setViewItemId] = useState(null);
+  const [addMoreItem, setAddMoreItem] = useState(null);
+  const [addMoreForm, setAddMoreForm] = useState(emptyAddMoreTonsForm());
   const [filterCompany, setFilterCompany] = useState(null);
   const [filterBrand, setFilterBrand] = useState(null);
   const [filterStatus, setFilterStatus] = useState({
@@ -93,6 +99,31 @@ export default function RakhtManager() {
         getApiErrorMessage(
           error,
           t("rakht.saveFailed", { defaultValue: "Unable to save Rakht." }),
+        ),
+      ),
+  });
+
+  const addMoreMut = useMutation({
+    mutationFn: ({ id, payload }) => api.post(`/rakhts/${id}/tons`, payload),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["rakht-list"] });
+      qc.invalidateQueries({ queryKey: ["rakht-detail", addMoreItem?.id] });
+      setAddMoreItem(null);
+      setAddMoreForm(emptyAddMoreTonsForm());
+      toast.success(
+        t("rakht.addMoreTonsSuccess", {
+          defaultValue: "More tons added successfully.",
+        }),
+      );
+      if (res?.data?.id) setViewItemId(res.data.id);
+    },
+    onError: (error) =>
+      toast.error(
+        getApiErrorMessage(
+          error,
+          t("rakht.addMoreTonsFailed", {
+            defaultValue: "Unable to add more tons.",
+          }),
         ),
       ),
   });
@@ -184,11 +215,40 @@ export default function RakhtManager() {
     });
   };
 
+  const openAddMoreTons = (item) => {
+    setAddMoreItem(item);
+    setAddMoreForm(emptyAddMoreTonsForm());
+  };
+
+  const handleAddMoreTonQtyChange = (option) => {
+    const qty = option?.value || 0;
+    setAddMoreForm((prev) => ({
+      ...prev,
+      tonQuantity: qty,
+      tons: buildTonsForQuantity(prev.tons || [], qty),
+    }));
+  };
+
+  const updateAddMoreTon = (tonId, field, value) => {
+    setAddMoreForm((prev) => ({
+      ...prev,
+      tons: (prev.tons || []).map((ton) =>
+        ton.id === tonId ? { ...ton, [field]: value } : ton,
+      ),
+    }));
+  };
+
   const remainingMoney = useMemo(() => {
     const total = parseInt(form.totalPrice, 10) || 0;
     const given = parseInt(form.givenMoney, 10) || 0;
     return Math.max(0, total - given);
   }, [form.totalPrice, form.givenMoney]);
+
+  const addMoreRemainingMoney = useMemo(() => {
+    const total = parseInt(addMoreForm.totalPrice, 10) || 0;
+    const given = parseInt(addMoreForm.givenMoney, 10) || 0;
+    return Math.max(0, total - given);
+  }, [addMoreForm.totalPrice, addMoreForm.givenMoney]);
 
   const pricePerTon = useMemo(() => {
     const total = Number(form.totalPrice || 0);
@@ -196,6 +256,13 @@ export default function RakhtManager() {
     if (!Number.isFinite(total) || !Number.isFinite(qty) || qty <= 0) return 0;
     return total / qty;
   }, [form.totalPrice, form.tonQuantity]);
+
+  const addMorePricePerTon = useMemo(() => {
+    const total = Number(addMoreForm.totalPrice || 0);
+    const qty = Number(addMoreForm.tonQuantity || 0);
+    if (!Number.isFinite(total) || !Number.isFinite(qty) || qty <= 0) return 0;
+    return total / qty;
+  }, [addMoreForm.totalPrice, addMoreForm.tonQuantity]);
 
   const todayDisplay = formatSystemDate(new Date(), language);
 
@@ -368,87 +435,66 @@ export default function RakhtManager() {
     saveMut.mutate(parsed.data);
   };
 
+  const submitAddMoreTons = () => {
+    if (!addMoreItem?.id) return;
+    const parsed = addMoreTonsSchema.safeParse({
+      ...addMoreForm,
+      tonQuantity: addMoreForm.tonQuantity,
+    });
+    if (!parsed.success) {
+      toast.error(
+        t("rakht.addMoreTonsValidationError", {
+          defaultValue:
+            "Please fill all new ton fields and payment values correctly.",
+        }),
+      );
+      return;
+    }
+
+    addMoreMut.mutate({
+      id: addMoreItem.id,
+      payload: {
+        tons: parsed.data.tons,
+        totalPrice: parsed.data.totalPrice,
+        givenMoney: parsed.data.givenMoney,
+      },
+    });
+  };
+
   return (
     <div className="card" style={{ padding: 18 }}>
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 12,
-          marginBottom: 16,
-        }}
-      >
-        <div
-          style={{
-            flex: "0.78 1 150px",
-            minWidth: 136,
-            display: "flex",
-          }}
-        >
-          <StatCard
-            label={t("rakht.totalRecords", { defaultValue: "Total Records" })}
-            value={stats.totalEntries}
-            Icon={LuChartColumn}
-            accent="#2563EB"
-          />
-        </div>
-        <div
-          style={{
-            flex: "0.78 1 150px",
-            minWidth: 136,
-            display: "flex",
-          }}
-        >
-          <StatCard
-            label={t("rakht.totalTons", { defaultValue: "Total Tons" })}
-            value={stats.totalTons}
-            Icon={LuBoxes}
-            accent="#0F766E"
-          />
-        </div>
-        <div
-          style={{
-            flex: "1.28 1 260px",
-            minWidth: 235,
-            display: "flex",
-          }}
-        >
-          <StatCard
-            label={t("rakht.totalPrice", { defaultValue: "Total Price" })}
-            value={formatCurrency(Math.round(stats.totalPrice), language)}
-            Icon={AfCurrencyIcon}
-            accent="#7C3AED"
-          />
-        </div>
-        <div
-          style={{
-            flex: "1.28 1 260px",
-            minWidth: 235,
-            display: "flex",
-          }}
-        >
-          <StatCard
-            label={t("rakht.givenMoney", { defaultValue: "Given Money" })}
-            value={formatCurrency(Math.round(stats.totalPaid), language)}
-            Icon={AfCurrencyIcon}
-            accent="#15803D"
-          />
-        </div>
-        <div
-          style={{
-            flex: "1.28 1 260px",
-            minWidth: 235,
-            display: "flex",
-          }}
-        >
-          <StatCard
-            label={t("rakht.remainingMoney", { defaultValue: "Remaining" })}
-            value={formatCurrency(Math.round(stats.totalRemaining), language)}
-            Icon={AfCurrencyIcon}
-            accent="#B45309"
-          />
-        </div>
-      </div>
+      <section className="all-rakht-stats-grid">
+        <StatCard
+          label={t("rakht.totalRecords", { defaultValue: "Total Records" })}
+          value={stats.totalEntries}
+          Icon={LuChartColumn}
+          accent="#2563EB"
+        />
+        <StatCard
+          label={t("rakht.totalTons", { defaultValue: "Total Tons" })}
+          value={stats.totalTons}
+          Icon={LuBoxes}
+          accent="#0F766E"
+        />
+        <StatCard
+          label={t("rakht.totalPrice", { defaultValue: "Total Price" })}
+          value={formatCurrency(Math.round(stats.totalPrice), language)}
+          Icon={AfCurrencyIcon}
+          accent="#7C3AED"
+        />
+        <StatCard
+          label={t("rakht.givenMoney", { defaultValue: "Given Money" })}
+          value={formatCurrency(Math.round(stats.totalPaid), language)}
+          Icon={AfCurrencyIcon}
+          accent="#15803D"
+        />
+        <StatCard
+          label={t("rakht.remainingMoney", { defaultValue: "Remaining" })}
+          value={formatCurrency(Math.round(stats.totalRemaining), language)}
+          Icon={AfCurrencyIcon}
+          accent="#B45309"
+        />
+      </section>
 
       <div
         style={{
@@ -634,6 +680,22 @@ export default function RakhtManager() {
                       >
                         <LuPencil size={12} />
                       </button>
+                      {isAdmin && (
+                        <button
+                          className="btn btn-outline btn-sm"
+                          onClick={() => openAddMoreTons(item)}
+                          title={t("rakht.addMoreTons", {
+                            defaultValue: "Add More Tons",
+                          })}
+                        >
+                          <LuPlus size={12} />
+                          <span>
+                            {t("rakht.addMoreTons", {
+                              defaultValue: "Add More Tons",
+                            })}
+                          </span>
+                        </button>
+                      )}
                       <button
                         className="btn btn-outline btn-sm"
                         style={{ color: "#DC2626", borderColor: "#fecaca" }}
@@ -821,7 +883,9 @@ export default function RakhtManager() {
                     <tr>
                       <th>{t("rakht.ton", { defaultValue: "Ton" })}</th>
                       <th>
-                        {t("rakht.tonName", { defaultValue: "Ton Name" })}
+                        {t("rakht.tonName", {
+                          defaultValue: "Ton Color Name",
+                        })}
                       </th>
                       <th>
                         {t("rakht.tonTotalMeters", {
@@ -848,6 +912,7 @@ export default function RakhtManager() {
                           defaultValue: "Remaining Meters",
                         })}
                       </th>
+                      <th>{t("common.status", { defaultValue: "Status" })}</th>
                       <th>
                         {t("rakht.totalProfit", {
                           defaultValue: "Profit Per Ton",
@@ -856,37 +921,86 @@ export default function RakhtManager() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(viewDetails.tons || []).map((ton) => (
-                      <tr key={ton.id}>
-                        <td>{ton.tonIdentifier}</td>
-                        <td>
-                          <span
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 6,
-                            }}
-                          >
-                            <span
+                    {[
+                      {
+                        key: "original",
+                        title: t("rakht.originalTons", {
+                          defaultValue: "Original Tons",
+                        }),
+                        tons: (viewDetails.tons || []).filter(
+                          (ton) => !ton.isAddedTon,
+                        ),
+                      },
+                      {
+                        key: "added",
+                        title: t("rakht.addedTons", {
+                          defaultValue: "Added Tons",
+                        }),
+                        tons: (viewDetails.tons || []).filter(
+                          (ton) => ton.isAddedTon,
+                        ),
+                      },
+                    ]
+                      .filter((group) => group.tons.length > 0)
+                      .map((group) => (
+                        <Fragment key={group.key}>
+                          <tr>
+                            <td
+                              colSpan={9}
                               style={{
-                                width: 10,
-                                height: 10,
-                                borderRadius: "50%",
-                                background: ton.colorHex || "#94A3B8",
-                                border: "1px solid rgba(0,0,0,.12)",
+                                background: "var(--surface2)",
+                                fontWeight: 700,
                               }}
-                            />
-                            {ton.name || "-"}
-                          </span>
-                        </td>
-                        <td>{formatAmount(ton.totalMeters)}</td>
-                        <td>{formatAmount(ton.tonPrice)}</td>
-                        <td>{formatAmount(ton.pricePerMeter)}</td>
-                        <td>{formatAmount(ton.consumedMeters)}</td>
-                        <td>{formatAmount(ton.remainingMeters)}</td>
-                        <td>{formatAmount(ton.profitGenerated)}</td>
-                      </tr>
-                    ))}
+                            >
+                              {group.title}
+                            </td>
+                          </tr>
+                          {group.tons.map((ton) => (
+                            <tr key={ton.id}>
+                              <td>{ton.tonIdentifier}</td>
+                              <td>
+                                <span
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 6,
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      width: 10,
+                                      height: 10,
+                                      borderRadius: "50%",
+                                      background: ton.colorHex || "#94A3B8",
+                                      border: "1px solid rgba(0,0,0,.12)",
+                                    }}
+                                  />
+                                  {ton.name || "-"}
+                                </span>
+                              </td>
+                              <td>{formatMeters(ton.totalMeters)}</td>
+                              <td>{formatAmount(ton.tonPrice)}</td>
+                              <td>{formatAmount(ton.pricePerMeter)}</td>
+                              <td>{formatMeters(ton.consumedMeters)}</td>
+                              <td>{formatMeters(ton.remainingMeters)}</td>
+                              <td>
+                                <span
+                                  className={`badge ${ton.status === "FINISHED" ? "bg-red" : "bg-green"}`}
+                                >
+                                  {ton.status === "FINISHED"
+                                    ? t("rakht.finished", {
+                                        defaultValue: "Finished",
+                                      })
+                                    : t("rakht.available", {
+                                        defaultValue: "Available",
+                                      })}
+                                </span>
+                              </td>
+                              <td>{formatAmount(ton.profitGenerated)}</td>
+                            </tr>
+                          ))}
+                        </Fragment>
+                      ))}
                   </tbody>
                 </table>
               </div>
@@ -914,12 +1028,35 @@ export default function RakhtManager() {
                     marginBottom: 4,
                   }}
                 >
+                  {t("rakht.totalMeters", {
+                    defaultValue: "Total Meters",
+                  })}
+                </p>
+                <p style={{ fontSize: 15, fontWeight: 700 }}>
+                  {formatMeters(viewDetails.summary?.totalMeters)}
+                </p>
+              </div>
+              <div
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 10,
+                  padding: 12,
+                  background: "var(--surface2)",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: "var(--text3)",
+                    marginBottom: 4,
+                  }}
+                >
                   {t("rakht.totalConsumedMeters", {
                     defaultValue: "Total Consumed Meters",
                   })}
                 </p>
                 <p style={{ fontSize: 15, fontWeight: 700 }}>
-                  {formatAmount(viewDetails.summary?.totalConsumedMeters)}
+                  {formatMeters(viewDetails.summary?.totalConsumedMeters)}
                 </p>
               </div>
               <div
@@ -942,7 +1079,7 @@ export default function RakhtManager() {
                   })}
                 </p>
                 <p style={{ fontSize: 15, fontWeight: 700 }}>
-                  {formatAmount(viewDetails.summary?.totalRemainingMeters)}
+                  {formatMeters(viewDetails.summary?.totalRemainingMeters)}
                 </p>
               </div>
               <div
@@ -1100,6 +1237,300 @@ export default function RakhtManager() {
       </Modal>
 
       <Modal
+        open={!!addMoreItem}
+        onClose={() => {
+          setAddMoreItem(null);
+          setAddMoreForm(emptyAddMoreTonsForm());
+        }}
+        title={t("rakht.addMoreTons", { defaultValue: "Add More Tons" })}
+        maxW={760}
+      >
+        <div style={{ display: "grid", gap: 14 }}>
+          <div className="info-box ib-gold">
+            <strong>{addMoreItem?.companyName || "-"}</strong>
+            {" - "}
+            {addMoreItem?.brandName || "-"}
+          </div>
+
+          <div>
+            <label className="lbl">
+              {t("rakht.tonQuantity", { defaultValue: "Ton Quantity" })}
+            </label>
+            <Select
+              classNamePrefix="rs"
+              options={TON_QTY_OPTIONS}
+              value={
+                addMoreForm.tonQuantity
+                  ? {
+                      value: addMoreForm.tonQuantity,
+                      label: String(addMoreForm.tonQuantity),
+                    }
+                  : null
+              }
+              onChange={handleAddMoreTonQtyChange}
+              placeholder={t("common.select", { defaultValue: "Select" })}
+              styles={{
+                control: (base, state) => ({
+                  ...base,
+                  minHeight: 40,
+                  borderRadius: 10,
+                  borderColor: state.isFocused
+                    ? "var(--primary)"
+                    : "var(--border)",
+                  boxShadow: "none",
+                }),
+                menu: (base) => ({ ...base, zIndex: 20 }),
+              }}
+            />
+          </div>
+
+          {addMoreForm.tons.length > 0 && (
+            <div style={{ display: "grid", gap: 12 }}>
+              <p
+                style={{ fontSize: 13, fontWeight: 600, color: "var(--text2)" }}
+              >
+                {t("rakht.newTons", { defaultValue: "New Tons" })}
+              </p>
+              {addMoreForm.tons.map((ton, idx) => (
+                <div
+                  key={ton.id}
+                  style={{
+                    border: "1px solid var(--border)",
+                    borderRadius: 10,
+                    padding: "12px 14px",
+                    display: "grid",
+                    gap: 10,
+                    background: "var(--surface2)",
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: "var(--text3)",
+                    }}
+                  >
+                    {t("rakht.newTon", { defaultValue: "New Ton" })} #{idx + 1}
+                  </p>
+
+                  <div>
+                    <label className="lbl">
+                      {t("rakht.tonName", {
+                        defaultValue: "Ton Color Name",
+                      })}
+                    </label>
+                    <div className="iw">
+                      <input
+                        className="inp"
+                        value={ton.name}
+                        onChange={(e) =>
+                          updateAddMoreTon(ton.id, "name", e.target.value)
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "auto 1fr",
+                      gap: 10,
+                      alignItems: "end",
+                    }}
+                  >
+                    <div>
+                      <label className="lbl">
+                        {t("rakht.tonColor", { defaultValue: "Color" })}
+                      </label>
+                      <input
+                        type="color"
+                        aria-label={t("rakht.tonColor", {
+                          defaultValue: "Color",
+                        })}
+                        value={ton.colorHex}
+                        onChange={(e) =>
+                          updateAddMoreTon(
+                            ton.id,
+                            "colorHex",
+                            e.target.value,
+                          )
+                        }
+                        style={{
+                          display: "block",
+                          width: 48,
+                          height: 40,
+                          border: "1px solid var(--border)",
+                          borderRadius: 10,
+                          padding: 4,
+                          cursor: "pointer",
+                          background: "transparent",
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="lbl">
+                        {t("rakht.tonTotalMeters", {
+                          defaultValue: "Total Meters",
+                        })}
+                      </label>
+                      <div className="iw">
+                        <input
+                          className="inp"
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          value={ton.totalMeters}
+                          onChange={(e) =>
+                            updateAddMoreTon(
+                              ton.id,
+                              "totalMeters",
+                              sanitizeIntegerInput(e.target.value),
+                            )
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    className="info-box ib-gold"
+                    style={{
+                      marginTop: 2,
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fit, minmax(180px, 1fr))",
+                      gap: 8,
+                    }}
+                  >
+                    <span>
+                      {t("rakht.remainingMeters", {
+                        defaultValue: "Remaining Meters",
+                      })}
+                      : {formatMeters(ton.totalMeters)}
+                    </span>
+                    <span>
+                      {t("rakht.tonTotalPrice", {
+                        defaultValue: "Ton Price",
+                      })}
+                      :{" "}
+                      {addMorePricePerTon > 0
+                        ? formatCurrency(addMorePricePerTon, language)
+                        : "-"}
+                    </span>
+                    <span>
+                      {t("rakht.pricePerMeter", {
+                        defaultValue: "Price / Meter",
+                      })}
+                      :{" "}
+                      {addMorePricePerTon > 0 &&
+                      Number(ton.totalMeters || 0) > 0
+                        ? formatCurrency(
+                            addMorePricePerTon /
+                              Number(ton.totalMeters || 1),
+                            language,
+                            {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            },
+                          )
+                        : "-"}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 12,
+            }}
+          >
+            <div>
+              <label className="lbl">
+                {t("rakht.additionalTotalPrice", {
+                  defaultValue: "Additional Total Price",
+                })}
+              </label>
+              <div className="iw">
+                <AfCurrencyIcon size={14} className="ico" />
+                <input
+                  className="inp"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={addMoreForm.totalPrice}
+                  onChange={(e) =>
+                    setAddMoreForm((prev) => ({
+                      ...prev,
+                      totalPrice: sanitizeIntegerInput(e.target.value),
+                    }))
+                  }
+                />
+              </div>
+            </div>
+            <div>
+              <label className="lbl">
+                {t("rakht.additionalGivenMoney", {
+                  defaultValue: "Additional Given Money",
+                })}
+              </label>
+              <div className="iw">
+                <AfCurrencyIcon size={14} className="ico" />
+                <input
+                  className="inp"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={addMoreForm.givenMoney}
+                  onChange={(e) =>
+                    setAddMoreForm((prev) => ({
+                      ...prev,
+                      givenMoney: sanitizeIntegerInput(e.target.value),
+                    }))
+                  }
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="info-box ib-gold">
+            {t("rakht.additionalRemainingMoney", {
+              defaultValue: "Additional Remaining Money",
+            })}
+            : {formatCurrency(addMoreRemainingMoney, language)}
+          </div>
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              type="button"
+              onClick={() => {
+                setAddMoreItem(null);
+                setAddMoreForm(emptyAddMoreTonsForm());
+              }}
+              className="btn btn-outline"
+              style={{ flex: 1 }}
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              type="button"
+              onClick={submitAddMoreTons}
+              className="btn btn-gold"
+              style={{ flex: 1 }}
+              disabled={addMoreMut.isPending}
+            >
+              {addMoreMut.isPending
+                ? t("common.loading", { defaultValue: "Loading..." })
+                : t("rakht.addMoreTons", { defaultValue: "Add More Tons" })}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
         open={modal}
         onClose={() => {
           setModal(false);
@@ -1200,7 +1631,9 @@ export default function RakhtManager() {
 
                   <div>
                     <label className="lbl">
-                      {t("rakht.tonName", { defaultValue: "Name" })}
+                      {t("rakht.tonName", {
+                        defaultValue: "Ton Color Name",
+                      })}
                     </label>
                     <div className="iw">
                       <input

@@ -69,6 +69,28 @@ const PAGE_TABS = [
   "ITEMS", // New tab for Items Management
 ];
 
+const DESIGN_MODELS = [
+  { key: "yakhan", labelKey: "designs.models.yakhan", fallback: "Neck Style", color: "#2563EB" },
+  { key: "neckoutfit", labelKey: "designs.models.neckoutfit", fallback: "Neck Style (Outfit)", color: "#0EA5A4" },
+  { key: "astin", labelKey: "designs.models.astin", fallback: "Sleeve", color: "#0891B2" },
+  { key: "daman", labelKey: "designs.models.daman", fallback: "Skirt Style", color: "#7C3AED" },
+  { key: "shoulderstate", labelKey: "designs.models.shoulderstate", fallback: "Shoulder State", color: "#F97316" },
+  { key: "neckwaskat", labelKey: "designs.models.neckwaskat", fallback: "Neck Style (Waskat)", color: "#F59E0B" },
+  { key: "jibrow", labelKey: "designs.models.jibrow", fallback: "Front Pocket", color: "#2563EB" },
+  { key: "jibbaghle", labelKey: "designs.models.jibbaghle", fallback: "Side Pocket", color: "#DC2626" },
+  { key: "jibtenban", labelKey: "designs.models.jibtenban", fallback: "Tenban Pocket", color: "#16A34A" },
+  { key: "patyship", labelKey: "designs.models.patyship", fallback: "Pant Style", color: "#0E7490" },
+  { key: "buttonship", labelKey: "designs.models.buttonship", fallback: "Button Style", color: "#7C3AED" },
+  { key: "tenbanship", labelKey: "designs.models.tenbanship", fallback: "Tenban Style", color: "#DB2777" },
+  { key: "outfitdesign", labelKey: "designs.models.outfitdesign", fallback: "Outfit Design", color: "#7C3AED" },
+  { key: "yakhanqaqneck", labelKey: "designs.models.yakhanqaqneck", fallback: "Yakhan Qaq Neck", color: "#2563EB" },
+  { key: "yakhanqaqsleeve", labelKey: "designs.models.yakhanqaqsleeve", fallback: "Yakhan Qaq Sleeve", color: "#0891B2" },
+  { key: "yakhanqaqskirt", labelKey: "designs.models.yakhanqaqskirt", fallback: "Yakhan Qaq Skirt", color: "#DB2777" },
+  { key: "yakhanqaqdesign", labelKey: "designs.models.yakhanqaqdesign", fallback: "Yakhan Qaq Design", color: "#7C3AED" },
+  { key: "yakhanqaqbutton", labelKey: "designs.models.yakhanqaqbutton", fallback: "Yakhan Qaq Button", color: "#F97316" },
+  { key: "yakhanqaqpant", labelKey: "designs.models.yakhanqaqpant", fallback: "Yakhan Qaq Pant", color: "#0E7490" },
+];
+
 function ContributorSection() {
   const { t, i18n } = useTranslation();
   const qc = useQueryClient();
@@ -1991,7 +2013,15 @@ export default function Designs() {
   };
 
   const modelsToShow = (TAB_GROUPS[activeTab] || [])
-    .map((k) => MODELS.find((m) => m.key === k))
+    .map((k) => DESIGN_MODELS.find((m) => m.key === k))
+    .map((model) =>
+      model
+        ? {
+            ...model,
+            label: t(model.labelKey, { defaultValue: model.fallback }),
+          }
+        : model,
+    )
     .filter(Boolean);
 
   return (
@@ -1999,7 +2029,7 @@ export default function Designs() {
       <PageHeader
         title={t("designs.title", { defaultValue: "Design Management" })}
         subtitle={t("designs.subtitle", {
-          defaultValue: "Manage style options used in order forms",
+          defaultValue: "Manage outfit styles, designs, and contributors.",
         })}
       />
 

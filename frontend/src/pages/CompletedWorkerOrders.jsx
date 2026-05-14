@@ -605,7 +605,7 @@ export default function CompletedWorkerOrders() {
         </div>
       )}
 
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(210px,1fr))] gap-3">
+      <section className="completed-worker-stats-grid">
         <StatCard
           label={t("completedWorkerOrders.totalOrders", "Matching Orders")}
           value={stats.totalOrders}
@@ -654,7 +654,7 @@ export default function CompletedWorkerOrders() {
           Icon={AfCurrencyIcon}
           accent="#B45309"
         />
-      </div>
+      </section>
 
       <Card>
         <form

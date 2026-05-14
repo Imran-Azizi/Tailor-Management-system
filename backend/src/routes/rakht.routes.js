@@ -25,6 +25,7 @@ router.get("/:id", ctrl.getOne);
 router.delete("/company/:companyName", authorize("ADMIN"), ctrl.removeCompany);
 router.post("/pay-remaining", authorize("ADMIN"), ctrl.payRemaining);
 router.post("/", authorize("ADMIN"), ctrl.create);
+router.post("/:id/tons", authorize("ADMIN"), ctrl.addTons);
 router.put("/:id", authorize("ADMIN"), ctrl.update);
 router.delete("/:id", authorize("ADMIN"), ctrl.remove);
 

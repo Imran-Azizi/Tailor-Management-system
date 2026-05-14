@@ -254,6 +254,29 @@ export default function AllTransactions() {
         </div>
       )}
 
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+          gap: 12,
+        }}
+      >
+        <StatCard
+          label={t("transaction.totalTransactions", "Total Transactions")}
+          value={Number(data?.total || 0)}
+          sub={t("transaction.resultsAcrossPages", "Across all pages")}
+          Icon={LuArrowRightLeft}
+          accent="#2563EB"
+        />
+        <StatCard
+          label={t("transaction.totalAmount", "Total Amount")}
+          value={formatMoney(totalAmount, language)}
+          sub={t("transaction.currentPageTotal", "Current page total")}
+          Icon={AfCurrencyIcon}
+          accent="#0F766E"
+        />
+      </div>
+
       <Card>
         <div style={{ marginBottom: 12 }}>
           <span className="badge bg-gray">
@@ -373,29 +396,6 @@ export default function AllTransactions() {
           ) : null}
         </div>
       </Card>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
-          gap: 12,
-        }}
-      >
-        <StatCard
-          label={t("transaction.totalTransactions", "Total Transactions")}
-          value={Number(data?.total || 0)}
-          sub={t("transaction.resultsAcrossPages", "Across all pages")}
-          Icon={LuArrowRightLeft}
-          accent="#2563EB"
-        />
-        <StatCard
-          label={t("transaction.totalAmount", "Total Amount")}
-          value={formatMoney(totalAmount, language)}
-          sub={t("transaction.currentPageTotal", "Current page total")}
-          Icon={AfCurrencyIcon}
-          accent="#0F766E"
-        />
-      </div>
 
       <Card
         title={t("transaction.allTitle", "All Transactions")}

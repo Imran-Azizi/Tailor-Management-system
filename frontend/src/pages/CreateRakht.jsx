@@ -221,7 +221,9 @@ export default function CreateRakht() {
 
                   <div>
                     <label className="lbl">
-                      {t("rakht.tonName", { defaultValue: "Name" })}
+                      {t("rakht.tonName", {
+                        defaultValue: "Ton Color Name",
+                      })}
                     </label>
                     <div className="iw">
                       <input

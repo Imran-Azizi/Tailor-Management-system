@@ -5,6 +5,7 @@ import { LuFactory, LuFilter, LuRuler, LuShoppingBag } from "react-icons/lu";
 import api from "../lib/api.js";
 import { formatCurrency } from "../lib/currency.js";
 import { formatDateLocale } from "../lib/locale.js";
+import { formatMeters } from "../lib/meters.js";
 import { getOrderTypeLabel } from "../lib/orderType.js";
 import {
   Card,
@@ -15,13 +16,6 @@ import {
 } from "../components/ui/index.jsx";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
-
-function formatMeters(value) {
-  return Number(value || 0).toLocaleString("en-US", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  });
-}
 
 const DEFAULT_FILTERS = {
   search: "",
@@ -259,11 +253,10 @@ export default function RakhtRevenue() {
               <thead>
                 <tr>
                   <th>{t("common.date", "Date")}</th>
-                  <th>{t("orders.orderId", "Order ID")}</th>
                   <th>{t("createOrder.customerInfo", "Customer")}</th>
                   <th>{t("rakht.companyName", "Company")}</th>
                   <th>{t("rakht.brandName", "Brand")}</th>
-                  <th>{t("rakht.tonName", "Ton")}</th>
+                  <th>{t("rakht.tonName", "Ton Color Name")}</th>
                   <th>{t("createOrder.orderTypes", "Type")}</th>
                   <th>{t("rakht.requiredMeters", "Meters")}</th>
                   <th>{t("rakht.piecePrice", "Cost/Meter")}</th>
@@ -281,7 +274,6 @@ export default function RakhtRevenue() {
                         day: "numeric",
                       })}
                     </td>
-                    <td>{row.orderId.slice(0, 8)}</td>
                     <td>{row.customerName}</td>
                     <td>{row.companyName}</td>
                     <td>{row.brandName}</td>

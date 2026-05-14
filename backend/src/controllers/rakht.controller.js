@@ -3,6 +3,7 @@ import { normalizeReportLanguage } from "../lib/reportLocale.js";
 import { buildPaymentHistoryReportPdf } from "../lib/paymentHistoryReportPdf.js";
 import {
   createRakhtSchema,
+  addRakhtTonsSchema,
   payRemainingMoneySchema,
   updateRakhtSchema,
 } from "../validators/rakht.validator.js";
@@ -235,6 +236,15 @@ export const update = async (req, res, next) => {
   try {
     const body = updateRakhtSchema.parse(req.body);
     res.json(await service.updateRakht(req.params.id, body));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const addTons = async (req, res, next) => {
+  try {
+    const body = addRakhtTonsSchema.parse(req.body);
+    res.status(201).json(await service.addRakhtTons(req.params.id, body));
   } catch (error) {
     next(error);
   }
