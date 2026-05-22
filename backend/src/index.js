@@ -106,12 +106,15 @@ const corsOrigin = (origin, callback) => {
   callback(new Error(`CORS blocked for origin: ${normalizedRequestOrigin}`));
 };
 
-app.use(
-  cors({
-    origin: corsOrigin,
-    credentials: true,
-  }),
-);
+const corsOptions = {
+  origin: corsOrigin,
+  credentials: true,
+  optionsSuccessStatus: 200,
+};
+
+// Explicitly handle preflight for all routes first (required for complex CORS requests)
+app.options("*", cors(corsOptions));
+app.use(cors(corsOptions));
 app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || "1mb" }));
 app.use(
   express.urlencoded({
