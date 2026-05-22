@@ -74,6 +74,8 @@ const parseConfiguredOrigins = () => {
 };
 
 const configuredOrigins = parseConfiguredOrigins();
+console.log("[CORS] Configured origins:", configuredOrigins);
+
 const isTrustedVercelDeployment = (origin) =>
   /^https:\/\/tailor-management-system(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(
     origin,
