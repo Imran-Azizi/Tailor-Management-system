@@ -76,10 +76,9 @@ const parseConfiguredOrigins = () => {
 const configuredOrigins = parseConfiguredOrigins();
 console.log("[CORS] Configured origins:", configuredOrigins);
 
+// ✅ Allow any Vercel preview deployment automatically
 const isTrustedVercelDeployment = (origin) =>
-  /^https:\/\/tailor-management-system(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(
-    origin,
-  );
+  /^https:\/\/tailor-management-system(-[a-z0-9-]+)?\.vercel\.app$/i.test(origin);
 
 const corsOrigin = (origin, callback) => {
   // Allow server-to-server and CLI requests that don't send Origin.
@@ -103,6 +102,7 @@ const corsOrigin = (origin, callback) => {
     return;
   }
 
+  // Return error for blocked origins
   callback(new Error(`CORS blocked for origin: ${normalizedRequestOrigin}`));
 };
 
@@ -112,7 +112,7 @@ const corsOptions = {
   optionsSuccessStatus: 200,
 };
 
-// Explicitly handle preflight for all routes first (required for complex CORS requests)
+// ✅ Ensure preflight requests always succeed
 app.options("*", cors(corsOptions));
 app.use(cors(corsOptions));
 app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || "1mb" }));
