@@ -145,16 +145,19 @@ export const POCKET_FIELDS = {
   OUTFIT: [
     ["frontPocket", "frontPocket"],
     ["sidePocket", "sidePocket"],
+    ["doubleSidePocket", "doubleSidePocket"],
     ["underPocket", "underPocket"],
   ],
   READY_MADE: [
     ["frontPocket", "frontPocket"],
     ["sidePocket", "sidePocket"],
+    ["doubleSidePocket", "doubleSidePocket"],
     ["underPocket", "underPocket"],
   ],
   READY_MADE_CLOTHES: [
     ["frontPocket", "frontPocket"],
     ["sidePocket", "sidePocket"],
+    ["doubleSidePocket", "doubleSidePocket"],
     ["underPocket", "underPocket"],
   ],
   YAKHANQAQ: [["frontPocket", "frontPocket"]],

@@ -409,6 +409,7 @@ model Outfit {
   skirtStyle          String?
   frontPocket         Boolean @default(false)
   sidePocket          Boolean @default(false)
+  doubleSidePocket    Boolean @default(false)
   underPocket         Boolean @default(false)
   outfitDesign        String?
   outfitStyle         String?
@@ -519,6 +520,7 @@ model ReadyMadeOrder {
   skirtStyle          String?
   frontPocket         Boolean @default(false)
   sidePocket          Boolean @default(false)
+  doubleSidePocket    Boolean @default(false)
   underPocket         Boolean @default(false)
   outfitDesign        String?
   outfitStyle         String?

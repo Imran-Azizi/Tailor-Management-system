@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import { LuPhone, LuSearch } from "react-icons/lu";
@@ -39,7 +39,7 @@ export default function ClothesDeliveryToCustomer() {
     normalizedLanguage.startsWith("pashto");
   const isRtl = (i18n.dir?.() || "ltr") === "rtl";
   const dir = isRtl ? "rtl" : "ltr";
-  const receiveButtonText = isEnglish ? "Receive" : "رسید";
+  const receiveButtonText = isEnglish ? "Receive" : "\u0631\u0633\u06cc\u062f";
   const completedStatusText = t("orders.done", "Completed");
 
   const [mode, setMode] = useState("bill"); // bill | phone
@@ -49,6 +49,14 @@ export default function ClothesDeliveryToCustomer() {
   const [result, setResult] = useState(null); // { customer, orders }
   const [paying, setPaying] = useState(false);
   const [payments, setPayments] = useState({}); // orderId -> string
+  const resultsTableRef = useRef(null);
+  const resultsScrollbarRef = useRef(null);
+  const [resultScroll, setResultScroll] = useState({
+    hasOverflow: false,
+    scrollWidth: 0,
+    clientWidth: 0,
+    scrollLeft: 0,
+  });
 
   const orders = result?.orders || [];
 
@@ -65,6 +73,80 @@ export default function ClothesDeliveryToCustomer() {
     );
   }, [orders]);
 
+  useEffect(() => {
+    const tableWrap = resultsTableRef.current;
+    if (!tableWrap) {
+      setResultScroll({
+        hasOverflow: false,
+        scrollWidth: 0,
+        clientWidth: 0,
+        scrollLeft: 0,
+      });
+      return undefined;
+    }
+
+    const updateScrollState = () => {
+      const nextScrollWidth = tableWrap.scrollWidth;
+      const nextClientWidth = tableWrap.clientWidth;
+      const nextScrollLeft = tableWrap.scrollLeft;
+      setResultScroll({
+        hasOverflow: nextScrollWidth > nextClientWidth + 2,
+        scrollWidth: nextScrollWidth,
+        clientWidth: nextClientWidth,
+        scrollLeft: nextScrollLeft,
+      });
+      if (resultsScrollbarRef.current) {
+        resultsScrollbarRef.current.scrollLeft = nextScrollLeft;
+      }
+    };
+
+    updateScrollState();
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(updateScrollState)
+        : null;
+    resizeObserver?.observe(tableWrap);
+    window.addEventListener("resize", updateScrollState);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", updateScrollState);
+    };
+  }, [orders.length, result]);
+
+  const syncResultScroll = (source) => {
+    const tableWrap = resultsTableRef.current;
+    const scrollbar = resultsScrollbarRef.current;
+    if (!tableWrap || !scrollbar) return;
+
+    if (source === "table") {
+      scrollbar.scrollLeft = tableWrap.scrollLeft;
+    } else {
+      tableWrap.scrollLeft = scrollbar.scrollLeft;
+    }
+    setResultScroll((current) => ({
+      ...current,
+      scrollLeft: tableWrap.scrollLeft,
+    }));
+  };
+
+  const scrollThumbWidth = resultScroll.hasOverflow
+    ? Math.max(
+        12,
+        Math.min(
+          100,
+          (resultScroll.clientWidth / Math.max(resultScroll.scrollWidth, 1)) *
+            100,
+        ),
+      )
+    : 100;
+  const scrollThumbOffset =
+    resultScroll.hasOverflow &&
+    resultScroll.scrollWidth > resultScroll.clientWidth
+      ? (resultScroll.scrollLeft /
+          (resultScroll.scrollWidth - resultScroll.clientWidth)) *
+        (100 - scrollThumbWidth)
+      : 0;
   const runSearch = async () => {
     const trimmed = query.trim();
     const normalizedBill = toAsciiDigits(trimmed).replace(/\D/g, "");
@@ -147,7 +229,7 @@ export default function ClothesDeliveryToCustomer() {
 
   return (
     <div
-      className={`page ${isRtl ? "[font-family:'Noto_Naskh_Arabic','Noto_Sans_Arabic','Tahoma','Inter',sans-serif]" : ""}`}
+      className={`page clothes-delivery-page ${isRtl ? "clothes-delivery-page--rtl [font-family:'Noto_Naskh_Arabic','Noto_Sans_Arabic','Tahoma','Inter',sans-serif]" : "clothes-delivery-page--ltr"}`}
       dir={dir}
     >
       <PageHeader
@@ -161,7 +243,8 @@ export default function ClothesDeliveryToCustomer() {
             <button
               type="button"
               onClick={() => setMode("bill")}
-              className={`flex items-center justify-between rounded-lg border px-4 py-3 transition ${
+              dir={dir}
+              className={`delivery-mode-button flex items-center justify-between rounded-lg border px-4 py-3 transition ${
                 mode === "bill"
                   ? "border-amber-500 bg-amber-100/70 text-amber-900 dark:border-amber-400 dark:bg-amber-900/20 dark:text-amber-200"
                   : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
@@ -196,7 +279,8 @@ export default function ClothesDeliveryToCustomer() {
             <button
               type="button"
               onClick={() => setMode("phone")}
-              className={`flex items-center justify-between rounded-lg border px-4 py-3 transition ${
+              dir={dir}
+              className={`delivery-mode-button flex items-center justify-between rounded-lg border px-4 py-3 transition ${
                 mode === "phone"
                   ? "border-amber-500 bg-amber-100/70 text-amber-900 dark:border-amber-400 dark:bg-amber-900/20 dark:text-amber-200"
                   : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
@@ -230,7 +314,10 @@ export default function ClothesDeliveryToCustomer() {
           </div>
 
           <div className="grid gap-2">
-            <label htmlFor="delivery-search-input" className="lbl">
+            <label
+              htmlFor="delivery-search-input"
+              className={`lbl ${isRtl ? "text-right" : "text-left"}`}
+            >
               {mode === "bill"
                 ? t("orders.billNumber", "Bill Number")
                 : t("common.phone", "Phone")}
@@ -254,7 +341,7 @@ export default function ClothesDeliveryToCustomer() {
             />
           </div>
 
-          <div className="flex justify-center">
+          <div className="delivery-search-actions flex justify-center">
             <button
               className="btn btn-gold btn-sm"
               onClick={runSearch}
@@ -278,7 +365,7 @@ export default function ClothesDeliveryToCustomer() {
         ) : (
           <div className="grid gap-4">
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <div className="delivery-stat-card rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
                 <div
                   className={`text-xs font-semibold text-slate-500 dark:text-slate-400 ${isRtl ? "tracking-normal" : "uppercase tracking-wide"}`}
                 >
@@ -289,7 +376,7 @@ export default function ClothesDeliveryToCustomer() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <div className="delivery-stat-card rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
                 <div
                   className={`text-xs font-semibold text-slate-500 dark:text-slate-400 ${isRtl ? "tracking-normal" : "uppercase tracking-wide"}`}
                 >
@@ -300,7 +387,7 @@ export default function ClothesDeliveryToCustomer() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <div className="delivery-stat-card rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
                 <div
                   className={`text-xs font-semibold text-slate-500 dark:text-slate-400 ${isRtl ? "tracking-normal" : "uppercase tracking-wide"}`}
                 >
@@ -311,7 +398,7 @@ export default function ClothesDeliveryToCustomer() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <div className="delivery-stat-card rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
                 <div
                   className={`text-xs font-semibold text-slate-500 dark:text-slate-400 ${isRtl ? "tracking-normal" : "uppercase tracking-wide"}`}
                 >
@@ -375,10 +462,16 @@ export default function ClothesDeliveryToCustomer() {
                 </div>
               </div>
 
-              <div className="tbl-wrap delivery-results-table" dir="ltr">
+              <div
+                ref={resultsTableRef}
+                className="tbl-wrap delivery-results-table"
+                dir="ltr"
+                tabIndex={0}
+                onScroll={() => syncResultScroll("table")}
+              >
                 <table
                   className="delivery-results-grid-table min-w-full border-separate border-spacing-0"
-                  style={{ minWidth: 1180 }}
+                  dir={dir}
                 >
                   <colgroup>
                     <col style={{ width: "10%" }} />
@@ -389,7 +482,7 @@ export default function ClothesDeliveryToCustomer() {
                     <col style={{ width: "11%" }} />
                     <col style={{ width: "11%" }} />
                     <col style={{ width: "12%" }} />
-                    <col style={{ width: "21%" }} />
+                    <col style={{ width: "22%" }} />
                   </colgroup>
                   <thead>
                     <tr
@@ -444,6 +537,7 @@ export default function ClothesDeliveryToCustomer() {
                         <tr
                           key={o.id}
                           className="hover:bg-amber-50/70 dark:hover:bg-slate-800"
+                          dir={dir}
                         >
                           <td
                             className={`delivery-results-text-cell border-b border-amber-100 px-4 py-3 text-sm font-semibold text-gray-900 dark:border-slate-700 dark:text-slate-100 ${
@@ -531,6 +625,8 @@ export default function ClothesDeliveryToCustomer() {
                                       }))
                                     }
                                     inputMode="decimal"
+                                    dir="ltr"
+                                    data-field-direction="ltr"
                                     placeholder={String(remaining)}
                                     disabled={paying}
                                   />
@@ -552,6 +648,33 @@ export default function ClothesDeliveryToCustomer() {
                   </tbody>
                 </table>
               </div>
+              <div
+                ref={resultsScrollbarRef}
+                className={`delivery-results-sync-scrollbar ${
+                  resultScroll.hasOverflow ? "" : "delivery-results-sync-scrollbar--hidden"
+                }`}
+                dir="ltr"
+                aria-hidden={!resultScroll.hasOverflow}
+                onScroll={() => syncResultScroll("scrollbar")}
+              >
+                <div style={{ width: resultScroll.scrollWidth || 1 }} />
+              </div>
+              <div
+                className={`delivery-results-visible-scrollbar ${
+                  resultScroll.hasOverflow
+                    ? ""
+                    : "delivery-results-visible-scrollbar--hidden"
+                }`}
+                aria-hidden="true"
+              >
+                <div
+                  className="delivery-results-visible-scrollbar-thumb"
+                  style={{
+                    width: `${scrollThumbWidth}%`,
+                    left: `${scrollThumbOffset}%`,
+                  }}
+                />
+              </div>
 
               <div className="delivery-results-mobile">
                 {orders.map((o, idx) => {
@@ -569,6 +692,7 @@ export default function ClothesDeliveryToCustomer() {
                     <article
                       key={`mobile-${o.id}`}
                       className="delivery-order-card"
+                      dir={dir}
                     >
                       <div className="delivery-order-card-head">
                         <div>
@@ -656,6 +780,8 @@ export default function ClothesDeliveryToCustomer() {
                                 }))
                               }
                               inputMode="decimal"
+                              dir="ltr"
+                              data-field-direction="ltr"
                               placeholder={String(remaining)}
                               disabled={paying}
                             />
@@ -681,3 +807,4 @@ export default function ClothesDeliveryToCustomer() {
     </div>
   );
 }
+

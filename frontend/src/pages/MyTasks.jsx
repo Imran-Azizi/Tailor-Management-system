@@ -91,6 +91,7 @@ const STY_LABEL_KEYS = {
 const BOOL_LABEL_KEYS = {
   frontPocket: "createOrder.fields.frontPocket",
   sidePocket: "createOrder.fields.sidePocket",
+  doubleSidePocket: "createOrder.fields.doubleSidePocket",
   underPocket: "createOrder.fields.underPocket",
 };
 

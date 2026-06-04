@@ -25,6 +25,11 @@ function formatWholeAmount(value) {
   return toWholeAmount(value).toLocaleString("en-US");
 }
 
+function normalizeBillingInput(value) {
+  if (value === undefined || value === null || value === "") return "";
+  return String(toWholeAmount(value));
+}
+
 function sanitizeWholeInput(raw = "") {
   return String(raw).replace(
     /[^\d\u0660-\u0669\u06F0-\u06F9\uFF10-\uFF19]/g,
@@ -79,9 +84,9 @@ function normalizeInitial(entries, initial) {
     normalized[entry.billingKey] = {
       ...DEFAULT_BILLING,
       ...sourceEntry,
-      totalPrice: String(toWholeAmount(sourceEntry?.totalPrice)),
-      discount: String(toWholeAmount(sourceEntry?.discount)),
-      paidAmount: String(toWholeAmount(sourceEntry?.paidAmount)),
+      totalPrice: normalizeBillingInput(sourceEntry?.totalPrice),
+      discount: normalizeBillingInput(sourceEntry?.discount),
+      paidAmount: normalizeBillingInput(sourceEntry?.paidAmount),
       quantity: String(sourceEntry?.quantity ?? "1"),
     };
   });
@@ -201,7 +206,7 @@ function BillingCard({ entry, value, onChange, billingKey }) {
             inputMode="numeric"
             value={value.totalPrice}
             onChange={(e) => setField("totalPrice", e.target.value)}
-            placeholder="0"
+            placeholder={t("createOrder.pricePerItem")}
             style={inputStyle}
           />
         </div>
@@ -239,7 +244,7 @@ function BillingCard({ entry, value, onChange, billingKey }) {
             inputMode="numeric"
             value={value.discount}
             onChange={(e) => setField("discount", e.target.value)}
-            placeholder="0"
+            placeholder={t("createOrder.discount")}
             style={inputStyle}
           />
         </div>
@@ -252,7 +257,7 @@ function BillingCard({ entry, value, onChange, billingKey }) {
             inputMode="numeric"
             value={value.paidAmount}
             onChange={(e) => setField("paidAmount", e.target.value)}
-            placeholder="0"
+            placeholder={t("createOrder.paidAmount")}
             style={inputStyle}
           />
         </div>

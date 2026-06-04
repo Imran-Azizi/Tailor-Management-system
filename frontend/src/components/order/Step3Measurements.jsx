@@ -273,7 +273,7 @@ function MeasureBlock({
                   inputMode="decimal"
                   className={`inp${errors[key] ? " err" : ""}`}
                   style={{ height: 38, fontSize: 13 }}
-                  value={value?.[key] || ""}
+                  value={value?.[key] ?? ""}
                   onChange={(e) => setField(key, e.target.value)}
                   placeholder={getMeasurementFieldLabel(t, label)}
                 />
@@ -316,7 +316,7 @@ function MeasureBlock({
                         type="text"
                         className={`inp${errors[key] ? " err" : ""}`}
                         style={{ height: 38, fontSize: 13 }}
-                        value={value?.[key] || ""}
+                        value={value?.[key] ?? ""}
                         onChange={(e) => setField(key, e.target.value)}
                         placeholder={getStyleFieldLabel(t, label)}
                       />

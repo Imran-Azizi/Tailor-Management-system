@@ -262,11 +262,8 @@ function getPrintDateLocale(settings) {
 }
 
 function formatMeasurementValue(value) {
-  const numeric = Number(value);
-  if (Number.isFinite(numeric)) {
-    return formatNumber(numeric);
-  }
-  return toEnglishDigits(value);
+  if (value === null || value === undefined || value === "") return "-";
+  return toEnglishDigits(String(value).trim());
 }
 
 function formatMetersWithUnit(value) {
@@ -1671,20 +1668,30 @@ export function printElement(id, options = {}) {
         <style>
           *{box-sizing:border-box}
           @page{size:A6 portrait;margin:0}
+          html{
+            width:105mm;
+            min-height:148mm;
+          }
           body{
             margin:0;
             font-family:${bodyFont};
             line-height:1.45;
             background:#fff;
-            padding:4mm;
+            width:105mm;
+            min-height:148mm;
+            padding:2.5mm;
+            display:flex;
+            align-items:center;
+            justify-content:center;
             color:#0f172a;
             direction:${dir};
             text-align:${isRtl ? "right" : "left"};
             -webkit-print-color-adjust:exact;
             print-color-adjust:exact;
             text-rendering:optimizeLegibility;
+            overflow:hidden;
           }
-          .print-a6-sheet{width:100%;max-width:100%;margin:0;box-sizing:border-box}
+          .print-a6-sheet{width:100%;max-width:100%;margin:auto;box-sizing:border-box;transform:scale(var(--print-a6-scale,1));transform-origin:center center}
           .print-bill-header{border-bottom-width:2px !important}
           .print-bill-header .print-shop-meta{line-height:1.35}
           .print-a6-sheet table th,
@@ -1733,7 +1740,7 @@ export function printElement(id, options = {}) {
             body{padding:2.5mm}
             .print-a6-sheet{border-width:1.5px}
           }
-          @media print{*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}body{padding:4mm;margin:0}}
+          @media print{*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}html,body{width:105mm;min-height:148mm}body{padding:2.5mm;margin:0;display:flex;align-items:center;justify-content:center}.print-a6-sheet{margin:auto}}
         </style>
       </head>
       <body dir="${dir}">
@@ -1744,6 +1751,31 @@ export function printElement(id, options = {}) {
   printWindow.document.close();
 
   const printNow = () => {
+    try {
+      const doc = printWindow.document;
+      const sheet = doc.querySelector(".print-a6-sheet");
+      if (sheet) {
+        const probe = doc.createElement("div");
+        probe.style.cssText =
+          "position:absolute;visibility:hidden;pointer-events:none;width:100mm;height:143mm;inset:0";
+        doc.body.appendChild(probe);
+        const available = probe.getBoundingClientRect();
+        probe.remove();
+
+        const sheetRect = sheet.getBoundingClientRect();
+        const heightScale =
+          sheet.scrollHeight > 0 ? available.height / sheet.scrollHeight : 1;
+        const widthScale =
+          sheetRect.width > 0 ? available.width / sheetRect.width : 1;
+        const nextScale = Math.min(1, Math.min(heightScale, widthScale));
+        doc.documentElement.style.setProperty(
+          "--print-a6-scale",
+          String(nextScale),
+        );
+      }
+    } catch {
+      // Measurement is best-effort; static A6 CSS remains in place.
+    }
     printWindow.print();
     printWindow.close();
   };

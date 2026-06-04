@@ -49,6 +49,7 @@ const NUMERIC_MEASUREMENT_FIELDS = new Set([
 const BOOLEAN_MEASUREMENT_FIELDS = new Set([
   "frontPocket",
   "sidePocket",
+  "doubleSidePocket",
   "underPocket",
 ]);
 
@@ -105,6 +106,7 @@ const ALLOWED_MEASUREMENT_FIELDS = {
     "skirtStyle",
     "frontPocket",
     "sidePocket",
+    "doubleSidePocket",
     "underPocket",
     "outfitDesign",
     "outfitStyle",
@@ -150,6 +152,7 @@ const ALLOWED_MEASUREMENT_FIELDS = {
     "skirtStyle",
     "frontPocket",
     "sidePocket",
+    "doubleSidePocket",
     "underPocket",
     "outfitDesign",
     "outfitStyle",

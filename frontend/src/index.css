@@ -1522,7 +1522,84 @@ select.inp{
 }
 
 /* Clothes Delivery search result UX */
-.delivery-results-table{scrollbar-gutter:stable}
+.delivery-results-table{
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-gutter:stable both-edges;
+  scrollbar-width:thin;
+  scrollbar-color:rgba(217,119,6,.72) rgba(148,163,184,.22);
+}
+.delivery-results-table::-webkit-scrollbar{
+  height:10px;
+}
+.delivery-results-table::-webkit-scrollbar-track{
+  background:rgba(148,163,184,.18);
+  border-radius:999px;
+}
+.delivery-results-table::-webkit-scrollbar-thumb{
+  background:linear-gradient(90deg,#f59e0b,#d97706);
+  border:2px solid rgba(255,255,255,.72);
+  border-radius:999px;
+}
+.delivery-results-table::-webkit-scrollbar-thumb:hover{
+  background:linear-gradient(90deg,#d97706,#b45309);
+}
+.delivery-results-sync-scrollbar{
+  height:16px;
+  margin:6px 12px 10px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  direction:ltr;
+  scrollbar-gutter:stable;
+  scrollbar-width:auto;
+  scrollbar-color:rgba(217,119,6,.9) rgba(148,163,184,.24);
+}
+.delivery-results-sync-scrollbar > div{
+  height:1px;
+}
+.delivery-results-sync-scrollbar::-webkit-scrollbar{
+  height:11px;
+}
+.delivery-results-sync-scrollbar::-webkit-scrollbar-track{
+  background:rgba(148,163,184,.22);
+  border-radius:999px;
+}
+.delivery-results-sync-scrollbar::-webkit-scrollbar-thumb{
+  background:linear-gradient(90deg,#fbbf24,#d97706);
+  border:2px solid rgba(255,255,255,.8);
+  border-radius:999px;
+}
+.delivery-results-sync-scrollbar::-webkit-scrollbar-thumb:hover{
+  background:linear-gradient(90deg,#f59e0b,#b45309);
+}
+.delivery-results-sync-scrollbar--hidden{
+  display:none;
+}
+.delivery-results-visible-scrollbar{
+  position:relative;
+  height:12px;
+  margin:2px 12px 12px;
+  border-radius:999px;
+  background:linear-gradient(90deg,rgba(148,163,184,.28),rgba(148,163,184,.46),rgba(148,163,184,.28));
+  box-shadow:inset 0 0 0 1px rgba(148,163,184,.26);
+}
+.delivery-results-visible-scrollbar-thumb{
+  position:absolute;
+  top:2px;
+  bottom:2px;
+  min-width:36px;
+  border-radius:999px;
+  background:linear-gradient(90deg,#fbbf24,#d97706);
+  box-shadow:0 1px 4px rgba(146,64,14,.28);
+}
+.delivery-results-visible-scrollbar--hidden{
+  display:none;
+}
+@media(max-width:1280px){
+  .clothes-delivery-page .delivery-results-visible-scrollbar--hidden{
+    display:block;
+  }
+}
 .delivery-results-grid-table{
   table-layout:fixed;
   direction:ltr;
@@ -1559,7 +1636,7 @@ select.inp{
   gap:8px;
   align-items:center;
   justify-items:stretch;
-  min-width:260px;
+  min-width:220px;
 }
 .delivery-payment-person{
   text-align:center;
@@ -1572,8 +1649,8 @@ select.inp{
 }
 .delivery-payment-controls{
   display:grid;
-  grid-template-columns:minmax(120px,1fr) auto;
-  gap:10px;
+  grid-template-columns:minmax(104px,1fr) auto;
+  gap:8px;
   align-items:center;
 }
 .delivery-payment-input{
@@ -1583,7 +1660,7 @@ select.inp{
   unicode-bidi:embed;
 }
 .delivery-receive-button{
-  min-width:76px;
+  min-width:68px;
   white-space:nowrap;
 }
 .delivery-results-mobile{display:none;padding:12px;gap:10px}
@@ -1619,6 +1696,211 @@ select.inp{
 
 [dir="rtl"] .delivery-order-card-head{flex-direction:row-reverse}
 [dir="rtl"] .delivery-order-card-kicker{letter-spacing:0;text-transform:none}
+
+/* Print Bills page RTL polish */
+.print-bills-page{
+  text-align:start;
+}
+.print-bills-page .card,
+.print-bills-page .info-box{
+  min-width:0;
+}
+.print-bills-page .inp{
+  unicode-bidi:plaintext;
+}
+.print-bills-page--rtl{
+  direction:rtl;
+  text-align:right;
+}
+.print-bills-page--rtl h1,
+.print-bills-page--rtl h2,
+.print-bills-page--rtl h3,
+.print-bills-page--rtl p,
+.print-bills-page--rtl .lbl,
+.print-bills-page--rtl .card,
+.print-bills-page--rtl .info-box{
+  text-align:right;
+}
+.print-bills-page--rtl .form-row,
+.print-bills-page--rtl .vstack,
+.print-bills-page--rtl .info-box,
+.print-bills-page--rtl .print-btn,
+.print-bills-page--rtl .badge{
+  direction:rtl;
+}
+.print-bills-page--rtl .form-row{
+  text-align:right;
+}
+.print-bills-page--rtl .btn{
+  flex-direction:row-reverse;
+}
+.print-bills-page--rtl [data-field-direction="ltr"]{
+  direction:ltr;
+  text-align:left;
+  unicode-bidi:isolate;
+}
+.print-bills-page--rtl [data-field-direction="ltr"]::placeholder{
+  direction:ltr;
+  text-align:left;
+}
+
+/* Clothes Delivery page RTL and overflow polish */
+.clothes-delivery-page{
+  text-align:start;
+}
+.clothes-delivery-page .card,
+.clothes-delivery-page .card-hd,
+.clothes-delivery-page .card-body{
+  min-width:0;
+}
+.clothes-delivery-page--rtl{
+  direction:rtl;
+  text-align:right;
+}
+.clothes-delivery-page--rtl .page-hd,
+.clothes-delivery-page--rtl .card,
+.clothes-delivery-page--rtl .card-hd,
+.clothes-delivery-page--rtl .lbl{
+  direction:rtl;
+  text-align:right;
+}
+.clothes-delivery-page--rtl .page-hd{
+  justify-content:flex-start;
+}
+.clothes-delivery-page--rtl .page-hd > div:first-child{
+  margin-inline-start:auto;
+  max-width:100%;
+  text-align:right;
+}
+.clothes-delivery-page--rtl .page-hd h1,
+.clothes-delivery-page--rtl .page-hd p{
+  text-align:right;
+}
+.clothes-delivery-page--rtl .btn{
+  flex-direction:row-reverse;
+}
+.clothes-delivery-page--rtl .delivery-mode-button,
+.clothes-delivery-page--rtl .delivery-mode-button > div:first-child{
+  flex-direction:row-reverse;
+}
+.clothes-delivery-page--rtl .delivery-mode-button{
+  direction:rtl;
+  text-align:right;
+}
+.clothes-delivery-page--rtl .delivery-search-actions{
+  justify-content:flex-end;
+}
+.clothes-delivery-page--rtl .delivery-stat-card{
+  direction:rtl;
+  text-align:right;
+}
+.clothes-delivery-page--rtl .delivery-stat-card div:last-child{
+  direction:ltr;
+  unicode-bidi:isolate;
+  text-align:right;
+}
+.clothes-delivery-page--rtl .delivery-customer-head{
+  background:linear-gradient(270deg,#f8fafc,#fff,#f1f5f9);
+}
+.clothes-delivery-page--rtl .delivery-results-table{
+  direction:rtl;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scroll-behavior:smooth;
+  scrollbar-gutter:stable both-edges;
+}
+.clothes-delivery-page--rtl .delivery-results-grid-table{
+  direction:rtl;
+}
+.clothes-delivery-page--rtl .delivery-results-grid-table th,
+.clothes-delivery-page--rtl .delivery-results-grid-table td{
+  text-align:right;
+}
+.clothes-delivery-page--rtl .delivery-results-grid-table td[class*="[direction:ltr]"],
+.clothes-delivery-page--rtl .delivery-results-grid-table .delivery-results-status-cell,
+.clothes-delivery-page--rtl .delivery-results-grid-table .delivery-results-payment-cell{
+  text-align:center;
+}
+.clothes-delivery-page--rtl .delivery-results-text-cell{
+  direction:rtl;
+  unicode-bidi:plaintext;
+}
+.clothes-delivery-page--rtl .delivery-payment-cell{
+  direction:rtl;
+  text-align:right;
+}
+.clothes-delivery-page--rtl .delivery-payment-controls{
+  direction:rtl;
+  grid-template-columns:auto minmax(120px,1fr);
+}
+.clothes-delivery-page--rtl .delivery-payment-input,
+.clothes-delivery-page--rtl [data-field-direction="ltr"]{
+  direction:ltr;
+  text-align:left;
+  unicode-bidi:isolate;
+}
+.clothes-delivery-page--rtl .delivery-results-mobile,
+.clothes-delivery-page--rtl .delivery-order-card,
+.clothes-delivery-page--rtl .delivery-order-card-actions,
+.clothes-delivery-page--rtl .delivery-order-card-stat{
+  direction:rtl;
+  text-align:right;
+}
+.clothes-delivery-page--rtl .delivery-order-card-head{
+  flex-direction:row-reverse;
+}
+.clothes-delivery-page--rtl .delivery-order-card-actions{
+  grid-template-columns:auto 1fr;
+}
+.clothes-delivery-page--rtl .delivery-order-card-kicker{
+  letter-spacing:0;
+  text-transform:none;
+}
+.clothes-delivery-page--rtl .delivery-order-card-stat strong,
+.clothes-delivery-page--rtl .delivery-order-card-actions input{
+  direction:ltr;
+  text-align:left;
+  unicode-bidi:isolate;
+}
+.clothes-delivery-page .delivery-results-table{
+  max-width:100%;
+  overflow-x:auto;
+  overflow-y:hidden;
+  border-radius:0 0 12px 12px;
+  scrollbar-width:none;
+}
+.clothes-delivery-page .delivery-results-table::-webkit-scrollbar{
+  display:none;
+  height:0;
+}
+.clothes-delivery-page .delivery-results-grid-table{
+  min-width:1120px;
+  width:100%;
+}
+.clothes-delivery-page .delivery-results-table:focus-visible{
+  outline:2px solid var(--primary);
+  outline-offset:-2px;
+}
+@media(min-width:1280px){
+  .clothes-delivery-page .delivery-results-grid-table{
+    min-width:1180px;
+  }
+}
+@media(min-width:1680px){
+  .clothes-delivery-page .delivery-results-table{
+    overflow-x:hidden;
+    scrollbar-gutter:auto;
+    scrollbar-width:none;
+  }
+  .clothes-delivery-page .delivery-results-table::-webkit-scrollbar{
+    display:none;
+    height:0;
+  }
+  .clothes-delivery-page .delivery-results-grid-table{
+    min-width:0;
+    width:100%;
+  }
+}
 .measure-add-set{
   margin-bottom:14px;
   padding:14px;
@@ -2944,6 +3226,22 @@ select.inp{
 }
 
 @media print{
+  body:has(.print-a6-sheet){
+    min-height:148mm;
+    width:105mm;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:2.5mm;
+    overflow:hidden;
+  }
+  .print-a6-sheet{
+    width:100%;
+    max-width:100mm;
+    margin:auto !important;
+    transform:scale(var(--print-a6-scale,1));
+    transform-origin:center center;
+  }
   .print-bill-header{min-height:76px;padding:10px 12px !important}
   .print-bill-header .h-12{width:50px !important;height:50px !important}
   .print-reference-detail-table{font-size:7.8px}
@@ -3242,8 +3540,9 @@ select.inp{
   .worker-brand{margin-inline-end:0 !important;min-width:0;flex:1 1 220px}
   .worker-month-wrap{order:3;width:100%;justify-content:flex-start}
   .worker-controls{margin-inline-start:auto;justify-content:flex-end}
-  .delivery-results-table{display:none}
-  .delivery-results-mobile{display:grid}
+  .delivery-results-table{display:block}
+  .delivery-results-mobile{display:none}
+  .clothes-delivery-page .delivery-results-grid-table{min-width:1020px}
   .worker-main{padding:20px 14px !important}
 }
 
@@ -3254,6 +3553,23 @@ select.inp{
   .worker-nav-btn{padding:0 8px}
   .delivery-order-card-stats{grid-template-columns:1fr}
   .delivery-order-card-actions{grid-template-columns:1fr}
+  .clothes-delivery-page .delivery-results-table{
+    margin-inline:-1px;
+    border-radius:0 0 10px 10px;
+  }
+  .clothes-delivery-page .delivery-results-grid-table{min-width:900px}
+  .clothes-delivery-page .delivery-results-grid-table th,
+  .clothes-delivery-page .delivery-results-grid-table td{
+    padding-inline:8px;
+  }
+  .clothes-delivery-page .delivery-payment-cell{min-width:190px}
+  .clothes-delivery-page .delivery-payment-controls{
+    grid-template-columns:minmax(92px,1fr) auto;
+    gap:6px;
+  }
+  .clothes-delivery-page--rtl .delivery-payment-controls{
+    grid-template-columns:auto minmax(92px,1fr);
+  }
 }
 
 /* Filter / toolbar rows: flex row that stacks on mobile */

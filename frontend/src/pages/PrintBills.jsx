@@ -275,7 +275,7 @@ export default function PrintBills() {
 
   return (
     <div
-      className="page"
+      className={`page print-bills-page ${isRtl ? "print-bills-page--rtl" : "print-bills-page--ltr"}`}
       lang={billSettings.htmlLang}
       dir={billSettings.dir}
       style={{
@@ -340,6 +340,8 @@ export default function PrintBills() {
                   id="print-bills-bill-number"
                   aria-label={t("orders.billNumber")}
                   className="inp"
+                  dir="ltr"
+                  data-field-direction="ltr"
                   placeholder={t("orders.billNumber")}
                   value={billNumber}
                   onChange={(e) => setBillNumber(e.target.value)}
@@ -357,6 +359,8 @@ export default function PrintBills() {
                   id="print-bills-phone"
                   aria-label={t("common.phone", "Phone")}
                   className="inp"
+                  dir="ltr"
+                  data-field-direction="ltr"
                   placeholder={t("common.phone", "Phone")}
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
@@ -375,6 +379,7 @@ export default function PrintBills() {
                 id="print-bills-first-name"
                 aria-label={t("createOrder.firstName")}
                 className="inp"
+                dir={isRtl ? "rtl" : "ltr"}
                 placeholder={t("createOrder.firstName")}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -479,6 +484,7 @@ export default function PrintBills() {
                           width: "100%",
                           padding: "10px 12px",
                           justifyContent: "flex-start",
+                          textAlign: isRtl ? "right" : "left",
                           borderColor: "#ef4444",
                           background: "#fff1f2",
                         }}
