@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext.jsx";
 
 const WORKER_ROLES = ["DOKHT", "QICHIKAR"];
-const MAIN_PANEL_ROLES = ["ADMIN", "DOKAN", "FINANCE"];
+const MAIN_PANEL_ROLES = ["SUPER_ADMIN", "ADMIN", "DOKAN", "FINANCE"];
 
 function LoadingSpinner({ color = "var(--primary)" }) {
   const { t } = useTranslation();
@@ -81,7 +81,7 @@ export function WorkerProtectedRoute({ children }) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (user.accountType === "ADMIN") {
+  if (user.accountType === "ADMIN" || user.accountType === "SUPER_ADMIN") {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -97,7 +97,9 @@ export function RoleRoute({ children, roles }) {
   const { user } = useAuth();
   if (roles && !roles.includes(user?.accountType)) {
     const fallback =
-      user?.accountType === "DOKAN"
+      user?.accountType === "SUPER_ADMIN"
+        ? "/super-admin"
+        : user?.accountType === "DOKAN"
         ? "/orders/create"
         : user?.accountType === "FINANCE"
           ? "/orders"

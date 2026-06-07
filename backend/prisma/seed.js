@@ -2,9 +2,32 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { getNextSequentialBillNumber } from "../src/lib/billNumber.js";
 const prisma = new PrismaClient();
+const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID || "default-tenant";
 
 async function main() {
   console.log("🌱 Seeding database...");
+
+  const defaultTenant = await prisma.tenant.upsert({
+    where: { id: DEFAULT_TENANT_ID },
+    update: {
+      businessName: process.env.DEFAULT_BUSINESS_NAME || "Default Tailor Shop",
+      systemName: process.env.DEFAULT_SYSTEM_NAME || "Tailoring Management System",
+      subscriptionStatus: "ACTIVE",
+      isActive: true,
+    },
+    create: {
+      id: DEFAULT_TENANT_ID,
+      tenantId: DEFAULT_TENANT_ID,
+      slug: "default",
+      businessName: process.env.DEFAULT_BUSINESS_NAME || "Default Tailor Shop",
+      systemName: process.env.DEFAULT_SYSTEM_NAME || "Tailoring Management System",
+      subscriptionPlan: "TRIAL",
+      subscriptionStatus: "ACTIVE",
+      isActive: true,
+    },
+  });
+
+  console.log("Default tenant ready:", defaultTenant.systemName);
 
   // Seed design options
   const yakhanStyles = [
@@ -58,9 +81,15 @@ async function main() {
   // Seed a sample customer
   const nextBillNumber = await getNextSequentialBillNumber(prisma);
   const customer = await prisma.customer.upsert({
-    where: { phoneNumber: "0700000001" },
-    update: {},
+    where: {
+      tenantId_phoneNumber: {
+        tenantId: defaultTenant.id,
+        phoneNumber: "0700000001",
+      },
+    },
+    update: { tenantId: defaultTenant.id },
     create: {
+      tenantId: defaultTenant.id,
       firstName: "Ahmad",
       phoneNumber: "0700000001",
       billNumber: nextBillNumber,
@@ -73,8 +102,9 @@ async function main() {
   const adminPassword = await bcrypt.hash("admin123", 12);
   const admin = await prisma.user.upsert({
     where: { phoneNumber: "0789577024" },
-    update: {},
+    update: { tenantId: defaultTenant.id },
     create: {
+      tenantId: defaultTenant.id,
       name: "Admin",
       phoneNumber: "0789577024",
       accountType: "ADMIN",
@@ -85,6 +115,30 @@ async function main() {
     "✅ Default admin created:",
     admin.name,
     "/ phone: 0789577024 / password: admin123",
+  );
+
+  const superAdminPhone = process.env.SUPER_ADMIN_PHONE || "0700000000";
+  const superAdminPassword = await bcrypt.hash(
+    process.env.SUPER_ADMIN_PASSWORD || "superadmin123",
+    12,
+  );
+  const superAdmin = await prisma.user.upsert({
+    where: { phoneNumber: superAdminPhone },
+    update: { accountType: "SUPER_ADMIN", tenantId: null },
+    create: {
+      tenantId: null,
+      name: process.env.SUPER_ADMIN_NAME || "Super Admin",
+      phoneNumber: superAdminPhone,
+      accountType: "SUPER_ADMIN",
+      password: superAdminPassword,
+    },
+  });
+  console.log(
+    "Super admin ready:",
+    superAdmin.name,
+    `/ phone: ${superAdmin.phoneNumber} / password: ${
+      process.env.SUPER_ADMIN_PASSWORD ? "[env]" : "superadmin123"
+    }`,
   );
 
   console.log("🎉 Seed complete!");

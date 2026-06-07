@@ -17,25 +17,13 @@ const isBillNumberConflictError = (error) =>
   error?.code === "P2002" && hasBillNumberTarget(error?.meta?.target);
 
 export const getNextSequentialBillNumber = async (db) => {
-  const existing = await db.customer.findMany({
-    select: { billNumber: true },
-    orderBy: { billNumber: "asc" },
+  const result = await db.customer.aggregate({
+    _max: { billNumber: true },
   });
-
-  let next = BILL_NUMBER_START;
-  for (const row of existing) {
-    const current = Number(row?.billNumber || 0);
-    if (!Number.isFinite(current) || current < next) {
-      continue;
-    }
-    if (current === next) {
-      next += 1;
-      continue;
-    }
-    break;
-  }
-
-  return next;
+  const currentMax = Number(result?._max?.billNumber || 0);
+  return Number.isFinite(currentMax) && currentMax >= BILL_NUMBER_START
+    ? currentMax + 1
+    : BILL_NUMBER_START;
 };
 
 export const createCustomerWithSequentialBill = async (
@@ -54,7 +42,11 @@ export const createCustomerWithSequentialBill = async (
         },
       });
     } catch (error) {
-      if (isBillNumberConflictError(error) && attempt < maxRetries) {
+      if (
+        isBillNumberConflictError(error) &&
+        attempt < maxRetries &&
+        typeof db?.$transaction === "function"
+      ) {
         continue;
       }
       throw error;

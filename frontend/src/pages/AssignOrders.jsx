@@ -13,6 +13,7 @@ import {
   getOrderTypeLabel,
   getOrderTypeOptions,
 } from "../lib/orderType.js";
+import { isRtlLanguage } from "../lib/locale.js";
 import {
   Card,
   EmptyState,
@@ -49,6 +50,7 @@ export default function AssignOrders() {
   const { t, i18n } = useTranslation();
   const qc = useQueryClient();
   const language = i18n.resolvedLanguage || i18n.language;
+  const isRtl = isRtlLanguage(language);
 
   const [workerType, setWorkerType] = useState("");
   const [workerId, setWorkerId] = useState("");
@@ -271,7 +273,12 @@ export default function AssignOrders() {
   });
 
   return (
-    <div className="page mx-auto max-w-[1240px] px-4 pb-14 pt-5">
+    <div
+      className={`page assign-orders-page mx-auto max-w-[1240px] px-4 pb-14 pt-5 ${
+        isRtl ? "assign-orders-page--rtl" : ""
+      }`}
+      dir={isRtl ? "rtl" : "ltr"}
+    >
       <PageHeader
         title={t("assignment.assignOrder", "Assign Order")}
         subtitle={t(

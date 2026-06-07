@@ -521,17 +521,21 @@ export default function PaymentHistory() {
         </div>
       </Card>
 
-      <Card
-        title={t("rakht.paymentHistory", { defaultValue: "Payment History" })}
-        action={
-          <div style={{ fontSize: 12, color: "var(--text3)" }}>
-            {isFetching
-              ? t("common.loading", { defaultValue: "Loading..." })
-              : null}
-          </div>
-        }
-        noPad
+      <div
+        className="payment-history-table-section"
+        dir={isRtl ? "rtl" : "ltr"}
       >
+        <Card
+          title={t("rakht.paymentHistory", { defaultValue: "Payment History" })}
+          action={
+            <div style={{ fontSize: 12, color: "var(--text3)" }}>
+              {isFetching
+                ? t("common.loading", { defaultValue: "Loading..." })
+                : null}
+            </div>
+          }
+          noPad
+        >
         {isLoading ? (
           <Spinner />
         ) : rows.length === 0 ? (
@@ -644,8 +648,11 @@ export default function PaymentHistory() {
           }}
         >
           <span style={{ fontSize: 13, color: "var(--text3)" }}>
-            {t("rakht.pageSummary", {
-              defaultValue: `Page ${page} of ${totalPages} • ${total} record(s)`,
+            {t("ui.pageSummary", {
+              page,
+              pages: totalPages,
+              total,
+              defaultValue: "Page {{page}} of {{pages}} · {{total}} total",
             })}
           </span>
           <div style={{ display: "flex", gap: 8 }}>
@@ -669,7 +676,8 @@ export default function PaymentHistory() {
             </button>
           </div>
         </div>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }

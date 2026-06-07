@@ -119,7 +119,10 @@ export default function Login() {
     setLoading(true);
     try {
       const user = await login(phone.trim(), password);
-      if (user.accountType === "DOKHT" || user.accountType === "QICHIKAR") {
+      if (user.accountType === "SUPER_ADMIN") {
+        toast.success(t("auth.welcomeBack", { name: user.name }));
+        navigate("/super-admin", { replace: true });
+      } else if (user.accountType === "DOKHT" || user.accountType === "QICHIKAR") {
         toast.success(t("auth.welcomeBack", { name: user.name }));
         navigate("/panel", { replace: true });
       } else if (["ADMIN", "DOKAN", "FINANCE"].includes(user.accountType)) {
@@ -140,6 +143,10 @@ export default function Login() {
         toast.error(t("auth.adminOnly", "Access denied. Admin accounts only."));
       }
     } catch (err) {
+      if (err?.response?.status === 402) {
+        navigate("/subscription-expired", { replace: true });
+        return;
+      }
       toast.error(getApiErrorMessage(err, t("auth.loginFailed")));
     } finally {
       setLoading(false);

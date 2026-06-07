@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma.js';
+import { runTenantContext } from '../lib/tenantContext.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'tailor-secret-key-change-in-prod';
 
@@ -21,15 +22,57 @@ export async function authenticate(req, res, next) {
 
     const user = await prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, name: true, phoneNumber: true, accountType: true, isActive: true },
+      select: {
+        id: true,
+        tenantId: true,
+        name: true,
+        phoneNumber: true,
+        accountType: true,
+        isActive: true,
+        tenant: {
+          select: {
+            id: true,
+            tenantId: true,
+            slug: true,
+            businessName: true,
+            systemName: true,
+            subscriptionStatus: true,
+            expiryDate: true,
+            isActive: true,
+          },
+        },
+      },
     });
 
     if (!user || !user.isActive) {
       return res.status(401).json({ error: 'Account not found or deactivated.' });
     }
 
+    const isSuperAdmin = user.accountType === 'SUPER_ADMIN';
+    if (!isSuperAdmin) {
+      if (!user.tenantId || !user.tenant) {
+        return res.status(403).json({ error: 'Tenant account is not configured.' });
+      }
+
+      if (!user.tenant.isActive || user.tenant.subscriptionStatus === 'SUSPENDED') {
+        return res.status(403).json({ code: 'TENANT_SUSPENDED', error: 'Tenant account is suspended.' });
+      }
+
+      const isExpired =
+        user.tenant.subscriptionStatus === 'EXPIRED' ||
+        (user.tenant.expiryDate && new Date(user.tenant.expiryDate).getTime() < Date.now());
+
+      if (isExpired) {
+        return res.status(402).json({ code: 'SUBSCRIPTION_EXPIRED', error: 'Subscription expired.' });
+      }
+    }
+
     req.user = user;
-    next();
+    req.tenant = user.tenant || null;
+    runTenantContext(
+      { tenantId: user.tenantId, userId: user.id, isSuperAdmin },
+      () => next(),
+    );
   } catch (err) {
     next(err);
   }
@@ -39,6 +82,7 @@ export async function authenticate(req, res, next) {
 export function authorize(...roles) {
   return (req, res, next) => {
     if (!req.user) return res.status(401).json({ error: 'Authentication required.' });
+    if (req.user.accountType === 'SUPER_ADMIN') return next();
     if (!roles.includes(req.user.accountType)) {
       return res.status(403).json({ error: 'You do not have permission to perform this action.' });
     }

@@ -39,6 +39,7 @@ function roleLabel(role, t) {
 export default function WorkerPaymentReceipts() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language || "en";
+  const isRtl = (i18n.dir?.() || "ltr") === "rtl";
   const { viewMonth, viewYear } = useMonth();
 
   const [searchInput, setSearchInput] = useState("");
@@ -106,12 +107,9 @@ export default function WorkerPaymentReceipts() {
         )}
       />
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: 12,
-        }}
+      <section
+        className="worker-receipts-stats-grid"
+        dir={isRtl ? "rtl" : "ltr"}
       >
         <StatCard
           label={t("workerReceipts.totalReceipts", "Total Receipts")}
@@ -125,7 +123,7 @@ export default function WorkerPaymentReceipts() {
           Icon={AfCurrencyIcon}
           accent="#2563EB"
         />
-      </div>
+      </section>
 
       <Card>
         <form
@@ -269,71 +267,76 @@ export default function WorkerPaymentReceipts() {
         </div>
       </Card>
 
-      <Card
-        title={t("workerReceipts.tableTitle", "Receipt Orders")}
-        action={
-          isFetching ? (
-            <span style={{ fontSize: 12, color: "var(--text3)" }}>
-              {t("common.loading", "Loading...")}
-            </span>
-          ) : null
-        }
+      <div
+        className="worker-payment-receipts-table-section"
+        dir={isRtl ? "rtl" : "ltr"}
       >
-        {isLoading ? (
-          <Spinner />
-        ) : rows.length === 0 ? (
-          <EmptyState
-            Icon={AfCurrencyIcon}
-            message={t("workerReceipts.empty", "No receipt records found.")}
-          />
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>{t("orders.billNumber", "Bill Number")}</th>
-                  <th>
-                    {t("completedWorkerOrders.workerName", "Worker Name")}
-                  </th>
-                  <th>
-                    {t("completedWorkerOrders.workerRole", "Worker Role")}
-                  </th>
-                  <th>{t("workerPanel.orderType", "Order Type")}</th>
-                  <th>{t("workerReceipts.paidAmount", "Paid Amount")}</th>
-                  <th>{t("workerReceipts.receiptDate", "Receipt Date")}</th>
-                  <th>{t("workerReceipts.adminName", "Admin Name")}</th>
-                  <th>{t("common.status", "Status")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id}>
-                    <td>#{row.order?.customer?.billNumber || "-"}</td>
-                    <td>{row.worker?.name || "-"}</td>
-                    <td>{roleLabel(row.workerRole, t)}</td>
-                    <td>{orderTypeLabel(row.order?.type, t)}</td>
-                    <td>{formatCurrency(row.paidAmount || 0, "en")}</td>
-                    <td>{formatDateLocale(row.receiptDate, language)}</td>
-                    <td>{row.receivedByAdmin?.name || "-"}</td>
-                    <td>
-                      <Badge v="green">
-                        {t("workerReceipts.received", "Received")}
-                      </Badge>
-                    </td>
+        <Card
+          title={t("workerReceipts.tableTitle", "Receipt Orders")}
+          action={
+            isFetching ? (
+              <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                {t("common.loading", "Loading...")}
+              </span>
+            ) : null
+          }
+        >
+          {isLoading ? (
+            <Spinner />
+          ) : rows.length === 0 ? (
+            <EmptyState
+              Icon={AfCurrencyIcon}
+              message={t("workerReceipts.empty", "No receipt records found.")}
+            />
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>{t("orders.billNumber", "Bill Number")}</th>
+                    <th>
+                      {t("completedWorkerOrders.workerName", "Worker Name")}
+                    </th>
+                    <th>
+                      {t("completedWorkerOrders.workerRole", "Worker Role")}
+                    </th>
+                    <th>{t("workerPanel.orderType", "Order Type")}</th>
+                    <th>{t("workerReceipts.paidAmount", "Paid Amount")}</th>
+                    <th>{t("workerReceipts.receiptDate", "Receipt Date")}</th>
+                    <th>{t("workerReceipts.adminName", "Admin Name")}</th>
+                    <th>{t("common.status", "Status")}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr key={row.id}>
+                      <td>#{row.order?.customer?.billNumber || "-"}</td>
+                      <td>{row.worker?.name || "-"}</td>
+                      <td>{roleLabel(row.workerRole, t)}</td>
+                      <td>{orderTypeLabel(row.order?.type, t)}</td>
+                      <td>{formatCurrency(row.paidAmount || 0, "en")}</td>
+                      <td>{formatDateLocale(row.receiptDate, language)}</td>
+                      <td>{row.receivedByAdmin?.name || "-"}</td>
+                      <td>
+                        <Badge v="green">
+                          {t("workerReceipts.received", "Received")}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-        <Pagination
-          page={page}
-          total={total}
-          limit={LIMIT}
-          onChange={(nextPage) => setPage(nextPage)}
-        />
-      </Card>
+          <Pagination
+            page={page}
+            total={total}
+            limit={LIMIT}
+            onChange={(nextPage) => setPage(nextPage)}
+          />
+        </Card>
+      </div>
     </div>
   );
 }

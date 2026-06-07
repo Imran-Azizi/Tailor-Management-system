@@ -47,8 +47,16 @@ export function AuthProvider({ children }) {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    document.title =
+      user?.tenant?.systemName || "Tailoring Management System";
+  }, [user?.tenant?.systemName]);
+
   const login = useCallback(async (phoneNumber, password) => {
-    const { data } = await api.post("/auth/login", { phoneNumber, password });
+    const { data } = await api.post("/auth/login", {
+      phoneNumber,
+      password,
+    });
     localStorage.setItem("accessToken", data.accessToken);
     localStorage.setItem("refreshToken", data.refreshToken);
     localStorage.setItem("authUser", JSON.stringify(data.user));
@@ -68,7 +76,17 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
+  const updateTenant = useCallback((tenant) => {
+    setUser((current) => {
+      if (!current) return current;
+      const next = { ...current, tenant };
+      localStorage.setItem("authUser", JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
   const isAdmin = user?.accountType === "ADMIN";
+  const isSuperAdmin = user?.accountType === "SUPER_ADMIN";
   const isDokan = user?.accountType === "DOKAN";
   const isDokht = user?.accountType === "DOKHT";
   const isQichikar = user?.accountType === "QICHIKAR";
@@ -88,7 +106,9 @@ export function AuthProvider({ children }) {
       loading,
       login,
       logout,
+      updateTenant,
       isAdmin,
+      isSuperAdmin,
       isDokan,
       isDokht,
       isQichikar,
@@ -102,7 +122,9 @@ export function AuthProvider({ children }) {
       loading,
       login,
       logout,
+      updateTenant,
       isAdmin,
+      isSuperAdmin,
       isDokan,
       isDokht,
       isQichikar,

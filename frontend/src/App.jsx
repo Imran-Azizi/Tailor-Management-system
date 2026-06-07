@@ -55,9 +55,13 @@ const GlobalOrderSearch = lazy(() => import("./pages/GlobalOrderSearch.jsx"));
 const OtherItems = lazy(() => import("./pages/OtherItems.jsx"));
 const ItemSalesRecords = lazy(() => import("./pages/ItemSalesRecords.jsx"));
 const SupportTeam = lazy(() => import("./pages/SupportTeam.jsx"));
+const SuperAdminDashboard = lazy(() => import("./pages/SuperAdminDashboard.jsx"));
+const TenantSettings = lazy(() => import("./pages/TenantSettings.jsx"));
+const SubscriptionExpired = lazy(() => import("./pages/SubscriptionExpired.jsx"));
 
 function RoleBasedRedirect() {
-  const { isDokan, isFinance } = useAuth();
+  const { isSuperAdmin, isDokan, isFinance } = useAuth();
+  if (isSuperAdmin) return <Navigate to="/super-admin" replace />;
   if (isDokan) return <Navigate to="/orders/create" replace />;
   if (isFinance) return <Navigate to="/orders" replace />;
   return <Navigate to="/dashboard" replace />;
@@ -79,6 +83,7 @@ export default function App() {
               <Routes>
                 {/* Public */}
                 <Route path="/login" element={<Login />} />
+                <Route path="/subscription-expired" element={<SubscriptionExpired />} />
 
                 {/* Admin system — requires ADMIN role */}
                 <Route
@@ -90,6 +95,14 @@ export default function App() {
                   }
                 >
                   <Route index element={<RoleBasedRedirect />} />
+                  <Route
+                    path="super-admin"
+                    element={
+                      <RoleRoute roles={["SUPER_ADMIN"]}>
+                        <SuperAdminDashboard />
+                      </RoleRoute>
+                    }
+                  />
                   <Route
                     path="dashboard"
                     element={
@@ -306,6 +319,14 @@ export default function App() {
                     element={
                       <RoleRoute roles={["ADMIN"]}>
                         <UserManagement />
+                      </RoleRoute>
+                    }
+                  />
+                  <Route
+                    path="tenant-settings"
+                    element={
+                      <RoleRoute roles={["ADMIN"]}>
+                        <TenantSettings />
                       </RoleRoute>
                     }
                   />

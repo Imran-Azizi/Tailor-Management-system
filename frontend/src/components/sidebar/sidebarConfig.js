@@ -22,16 +22,37 @@ import {
   LuSearchCode,
   LuShoppingBag,
   LuChartColumn,
+  LuBuilding2,
+  LuSettings,
 } from "react-icons/lu";
 import AfCurrencyIcon from "../ui/AfCurrencyIcon.jsx";
 
 const ROLE_ACCENT = {
+  SUPER_ADMIN: "#111827",
   ADMIN: "#2563EB",
   DOKAN: "#0D9488",
   QICHIKAR: "#D97706",
   DOKHT: "#DB2777",
   FINANCE: "#059669",
 };
+
+const SUPER_ADMIN_SECTIONS = [
+  {
+    key: "saas",
+    label: "SaaS",
+    fallback: "SaaS",
+    items: [
+      {
+        key: "superAdmin",
+        label: "Super Admin",
+        fallback: "Super Admin",
+        path: "/super-admin",
+        icon: LuBuilding2,
+        end: true,
+      },
+    ],
+  },
+];
 
 const SUPPORT_NAV_ITEM = {
   key: "supportTeam",
@@ -272,6 +293,13 @@ const ADMIN_SECTIONS = [
         fallback: "User Management",
         path: "/users",
         icon: LuShieldCheck,
+      },
+      {
+        key: "tenantSettings",
+        label: "Tenant Settings",
+        fallback: "Tenant Settings",
+        path: "/tenant-settings",
+        icon: LuSettings,
       },
       {
         key: "backupManagement",
@@ -753,6 +781,7 @@ const DOKAN_ALLOWED_SECTIONS = [
 ];
 
 const ROLE_SECTIONS = {
+  SUPER_ADMIN: SUPER_ADMIN_SECTIONS,
   ADMIN: ADMIN_SECTIONS,
   DOKAN: DOKAN_ALLOWED_SECTIONS,
   QICHIKAR: WORKER_SECTIONS,

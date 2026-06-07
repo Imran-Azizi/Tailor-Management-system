@@ -8,6 +8,7 @@ import {
   getMeasurementsFromOrder,
   printElement,
 } from "./OrderDocumentPack.jsx";
+import { useAuth } from "../../context/AuthContext.jsx";
 
 function toPreviewOrder(order, measurements) {
   return {
@@ -20,6 +21,8 @@ function toPreviewOrder(order, measurements) {
 
 export default function Step5PrintCenter({ data }) {
   const { t, i18n } = useTranslation();
+  const { user } = useAuth();
+  const shop = user?.tenant || null;
   const result = data?.result;
   const customer = result?.customer;
   const orders = result?.orders || [];
@@ -273,13 +276,14 @@ export default function Step5PrintCenter({ data }) {
                 }}
               >
                 <div id={customerId}>
-                  <CustomerBill customer={customer} order={previewOrder} />
+                  <CustomerBill customer={customer} order={previewOrder} shop={shop} />
                 </div>
                 <div id={tailorId}>
                   <TailorBill
                     customer={customer}
                     order={previewOrder}
                     measurements={meas}
+                    shop={shop}
                   />
                 </div>
               </div>

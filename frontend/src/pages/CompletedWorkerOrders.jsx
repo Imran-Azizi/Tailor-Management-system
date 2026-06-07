@@ -487,7 +487,7 @@ export default function CompletedWorkerOrders() {
         );
 
   return (
-    <div className="page">
+    <div className="page completed-worker-orders-page">
       <PageHeader
         title={t(
           "completedWorkerOrders.title",
@@ -605,7 +605,10 @@ export default function CompletedWorkerOrders() {
         </div>
       )}
 
-      <section className="completed-worker-stats-grid">
+      <section
+        className="completed-worker-stats-grid"
+        dir={isRtl ? "rtl" : "ltr"}
+      >
         <StatCard
           label={t("completedWorkerOrders.totalOrders", "Matching Orders")}
           value={stats.totalOrders}
@@ -806,28 +809,35 @@ export default function CompletedWorkerOrders() {
         </div>
       </Card>
 
-      <Card
-        title={t("completedWorkerOrders.tableTitle", "Completed Worker Orders")}
-        action={
-          isFetching ? (
-            <span className="text-xs text-[var(--text3)]">
-              {t("common.loading", "Loading...")}
-            </span>
-          ) : null
-        }
+      <div
+        className="completed-worker-orders-table-section"
+        dir={isRtl ? "rtl" : "ltr"}
       >
-        {isLoading ? (
-          <Spinner />
-        ) : rows.length === 0 ? (
-          <EmptyState
-            Icon={LuSquareCheckBig}
-            message={t(
-              "completedWorkerOrders.empty",
-              "No completed worker orders found.",
-            )}
-          />
-        ) : (
-          <>
+        <Card
+          title={t(
+            "completedWorkerOrders.tableTitle",
+            "Completed Worker Orders",
+          )}
+          action={
+            isFetching ? (
+              <span className="text-xs text-[var(--text3)]">
+                {t("common.loading", "Loading...")}
+              </span>
+            ) : null
+          }
+        >
+          {isLoading ? (
+            <Spinner />
+          ) : rows.length === 0 ? (
+            <EmptyState
+              Icon={LuSquareCheckBig}
+              message={t(
+                "completedWorkerOrders.empty",
+                "No completed worker orders found.",
+              )}
+            />
+          ) : (
+            <>
             <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 via-slate-50 to-sky-50 px-4 py-3 shadow-sm dark:border-slate-700 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
               <label className="inline-flex items-center gap-2.5 text-sm font-semibold text-slate-900 dark:text-slate-100">
                 <input
@@ -1055,16 +1065,17 @@ export default function CompletedWorkerOrders() {
                 </tbody>
               </table>
             </div>
-          </>
-        )}
+            </>
+          )}
 
-        <Pagination
-          page={page}
-          total={total}
-          limit={LIMIT}
-          onChange={(nextPage) => setPage(nextPage)}
-        />
-      </Card>
+          <Pagination
+            page={page}
+            total={total}
+            limit={LIMIT}
+            onChange={(nextPage) => setPage(nextPage)}
+          />
+        </Card>
+      </div>
 
       <Modal
         open={confirmReceipt}

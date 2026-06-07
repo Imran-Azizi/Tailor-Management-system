@@ -128,7 +128,7 @@ export default function ItemCategoryCard({ category }) {
 
   return (
     <div
-      className="card designs-card"
+      className="card designs-card items-category-card"
       style={{ overflow: "hidden", direction: isRtl ? "rtl" : "ltr" }}
     >
       <div style={{ height: 3, background: category.color }} />
@@ -165,7 +165,7 @@ export default function ItemCategoryCard({ category }) {
           </div>
           <button
             type="button"
-            className="btn btn-sm"
+            className="btn btn-sm items-category-add-btn"
             style={{
               background: bg,
               color: category.color,

@@ -30,6 +30,7 @@ const DEFAULT_FILTERS = {
 export default function RakhtRevenue() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language || "en";
+  const isRtl = i18n.dir?.(language) === "rtl";
   const meterUnit = t("rakht.meterUnitShort", { defaultValue: "m" });
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const { viewMonth, viewYear } = useMonth();
@@ -241,12 +242,13 @@ export default function RakhtRevenue() {
         </div>
       </Card>
 
-      <Card
-        title={t("rakht.revenueDetails", {
-          defaultValue: "Rakht Revenue Details",
-        })}
-        noPad
-      >
+      <div className="rakht-revenue-details-section" dir={isRtl ? "rtl" : "ltr"}>
+        <Card
+          title={t("rakht.revenueDetails", {
+            defaultValue: "Rakht Revenue Details",
+          })}
+          noPad
+        >
         {summary.details?.length ? (
           <div className="tbl-wrap">
             <table className="tbl" style={{ width: "100%" }}>
@@ -356,7 +358,8 @@ export default function RakhtRevenue() {
             </button>
           </div>
         </div>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }

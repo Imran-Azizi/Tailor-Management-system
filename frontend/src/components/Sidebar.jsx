@@ -110,6 +110,8 @@ export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
   const location = useLocation();
 
   const role = user?.accountType || "ADMIN";
+  const systemName = user?.tenant?.systemName || t("appName");
+  const businessName = user?.tenant?.businessName || t("appSubtitle");
   const accent = getRoleAccent(role);
   const isRtl = (i18n.dir?.() || "ltr") === "rtl";
   const expandedStorageKey = `sidebar:expanded:${role}`;
@@ -225,10 +227,10 @@ export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
         {!collapsed && (
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-sm font-semibold tracking-tight text-[var(--sb-title)]">
-              {t("appName")}
+              {systemName}
             </h1>
             <p className="truncate text-[11px] text-[var(--sb-subtitle)]">
-              {t("appSubtitle")}
+              {businessName}
             </p>
           </div>
         )}

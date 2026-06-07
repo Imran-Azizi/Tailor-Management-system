@@ -24,9 +24,12 @@ import {
 } from "../lib/normalize.js";
 import { formatMeters } from "../lib/meters.js";
 import { resolveRakhtColorHex } from "../lib/rakhtColors.js";
+import { useAuth } from "../context/AuthContext.jsx";
 
 export default function PrintBills() {
   const { t, i18n } = useTranslation();
+  const { user } = useAuth();
+  const shop = user?.tenant || null;
   const location = useLocation();
   const navigate = useNavigate();
   const resolvedLanguage = i18n.resolvedLanguage || i18n.language;
@@ -663,7 +666,7 @@ export default function PrintBills() {
         {customer && orders.length > 0 && (
           <div>
             <PrintSafeSheet id="preview-customer" className="max-w-[148mm]">
-              <CustomerCombinedBill customer={customer} orders={orders} />
+              <CustomerCombinedBill customer={customer} orders={orders} shop={shop} />
             </PrintSafeSheet>
             {orderMeta.map(({ order, index, itemLabel }) => (
               <PrintSafeSheet
@@ -676,6 +679,7 @@ export default function PrintBills() {
                   order={order}
                   measurements={getMeasurementsFromOrder(order)}
                   itemLabel={itemLabel}
+                  shop={shop}
                 />
               </PrintSafeSheet>
             ))}

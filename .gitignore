@@ -1,49 +1,82 @@
-# ─── Dependencies ────────────────────────────────────────────────
+# Dependencies
 node_modules/
-.pnp
-.pnp.js
+**/node_modules/
 
-# ─── Environment / Secrets ───────────────────────────────────────
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# ─── Build Outputs ───────────────────────────────────────────────
+# Build output
 dist/
 build/
-out/
+.next/
+.nuxt/
+.output/
+coverage/
+*.tsbuildinfo
 
-# ─── Prisma ──────────────────────────────────────────────────────
-# migration.sql files must be committed so 'prisma migrate deploy' works in production
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+backend/.env
+backend/.env.*
+!backend/.env.example
+!backend/.env.*.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+!frontend/.env.*.example
 
-# ─── Logs ────────────────────────────────────────────────────────
+# Runtime uploads and storage
+backend/uploads/
+!backend/uploads/.gitkeep
+!backend/uploads/**/.gitkeep
+backend/storage/
+!backend/storage/.gitkeep
+!backend/storage/**/.gitkeep
+
+# Logs
 logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+lerna-debug.log*
 
-# ─── OS / Editor ─────────────────────────────────────────────────
+# Prisma and database local files
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+prisma/dev.db
+backend/prisma/dev.db
+
+# Generated reports and exports
+exports/
+reports/
+*.tmp
+*.temp
+
+# Cache directories
+.cache/
+.parcel-cache/
+.vite/
+.turbo/
+.eslintcache
+
+# OS files
 .DS_Store
 Thumbs.db
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json
+Desktop.ini
+
+# Editor and local tooling
 .idea/
+.history/
+*.swp
+*.swo
 
-# ─── TypeScript ──────────────────────────────────────────────────
-*.tsbuildinfo
+# Local certificates and keys
+*.pem
+*.key
+*.cert
+*.crt
 
-# ─── Coverage ────────────────────────────────────────────────────
-coverage/
-.nyc_output/
-
-# ─── Backup Artifacts ─────────────────────────────────────────────
-backend/tmp/backups/
-backend/storage/backup/
-*.dump
-*.dump.enc
-*.restore-test

@@ -46,7 +46,8 @@
     "optional": "اختیاری",
     "field": "ستون",
     "value": "مقدار",
-    "viewingMonth": "مشاهده داده‌های ماه"
+    "viewingMonth": "مشاهده داده‌های ماه",
+    "notAvailable": "-"
   },
   "sidebar": {
     "dokanPanel": "پنل دوکان",
@@ -641,5 +642,189 @@
     "noOrdersInCategory": "هیچ سفارشی در این دسته‌بندی وجود ندارد.",
     "searchBillPlaceholder": "جستجو با شماره بل",
     "noOrderFoundByBill": "هیچ سفارشی برای این شماره بل یافت نشد."
+  },
+  "ui": {
+    "pageSummary": "صفحه {{page}} از {{pages}} · مجموع {{total}}",
+    "prev": "قبلی",
+    "next": "بعدی"
+  },
+  "globalSearch": {
+    "title": "جستجوی عمومی سفارش‌ها",
+    "description": "سفارش‌ها را در همه ماه‌ها با نام مشتری، شماره تماس یا شماره بل جستجو کنید.",
+    "placeholder": "جستجو با نام، شماره تماس یا شماره بل...",
+    "searchByName": "نام مشتری",
+    "searchByPhone": "شماره تماس",
+    "searchByBill": "شماره بل",
+    "startTyping": "برای جستجو در همه ماه‌ها شروع به تایپ کنید",
+    "resultsCount": "{{count}} سفارش یافت شد",
+    "noResults": "هیچ سفارشی مطابق جستجوی شما یافت نشد.",
+    "searchFailed": "جستجو ناکام شد. دوباره کوشش کنید.",
+    "newOrder": "سفارش جدید",
+    "prefillNotice": "معلومات سفارش از سفارش قبلی آماده شد. پیش از ذخیره آن را بررسی و به‌روزرسانی کنید.",
+    "prefillError": "بارگذاری معلومات سفارش ناکام شد. دوباره کوشش کنید.",
+    "searchHint": "سفارش دیگر را با نام مشتری، شماره تماس یا شماره بل جستجو کنید.",
+    "col": {
+      "bill": "بل #",
+      "billNumber": "شماره بل",
+      "customer": "مشتری",
+      "phone": "شماره تماس",
+      "type": "نوع",
+      "month": "ماه / سال",
+      "price": "قیمت",
+      "status": "وضعیت",
+      "action": "عمل"
+    }
+  },
+  "superAdmin": {
+    "badge": "مرکز کنترول SaaS",
+    "title": "داشبورد سوپر ادمین",
+    "subtitle": "مدیریت حساب‌های مشتریان، اشتراک‌ها، برندینگ و وضعیت عملیاتی هر مستاجر از یک پنل امن.",
+    "createTenant": "ایجاد مستاجر",
+    "editTenant": "ویرایش مستاجر",
+    "saveChanges": "ذخیره تغییرات",
+    "saving": "در حال ذخیره...",
+    "refresh": "تازه‌سازی",
+    "suspend": "تعلیق",
+    "activate": "فعال‌سازی",
+    "tableTitle": "مستاجرها",
+    "tableSubtitle": "جستجو، ویرایش، تعلیق و مدیریت حساب‌های SaaS.",
+    "searchPlaceholder": "جستجوی مستاجرها...",
+    "loadingTenants": "در حال بارگذاری مستاجرها...",
+    "noTenants": "هیچ مستاجری یافت نشد.",
+    "modalCreateSubtitle": "ایجاد فضای کاری جدید برای مشتری",
+    "modalEditSubtitle": "به‌روزرسانی فضای کاری مستاجر",
+    "modalHelp": "هویت تجارتی، دسترسی اشتراک و حساب مالک از این بخش مدیریت می‌شود.",
+    "ownerPasswordPlaceholder": "برای نگهداشتن رمز فعلی خالی بگذارید",
+    "activeHelp": "مستاجرهای غیرفعال نمی‌توانند از سیستم خود استفاده کنند.",
+    "metrics": {
+      "tenants": "مستاجرها",
+      "orders": "سفارش‌ها",
+      "customers": "مشتریان"
+    },
+    "columns": {
+      "tenant": "مستاجر",
+      "plan": "پلن",
+      "status": "وضعیت",
+      "expiry": "تاریخ ختم",
+      "users": "کاربران",
+      "customers": "مشتریان",
+      "orders": "سفارش‌ها"
+    },
+    "groups": {
+      "business": "معلومات تجارت",
+      "owner": "حساب مالک",
+      "localization": "زبان و منطقه",
+      "subscription": "اشتراک"
+    },
+    "fields": {
+      "businessName": "نام تجارت",
+      "systemName": "نام سیستم",
+      "address": "آدرس",
+      "phone": "تلفن",
+      "mobile": "موبایل",
+      "email": "ایمیل",
+      "logoFile": "لوگوی مستاجر",
+      "currency": "واحد پول",
+      "language": "زبان",
+      "timezone": "منطقه زمانی",
+      "ownerName": "نام مالک",
+      "ownerPhone": "شماره مالک",
+      "ownerPassword": "رمز مالک",
+      "subscriptionPlan": "پلن",
+      "subscriptionStatus": "وضعیت",
+      "subscriptionStart": "تاریخ شروع",
+      "expiryDate": "تاریخ ختم",
+      "isActive": "مستاجر فعال"
+    },
+    "logo": {
+      "allowed": "PNG، JPG، JPEG، WEBP یا SVG تا ۲MB.",
+      "current": "لوگوی فعلی",
+      "empty": "لوگو آپلود نشده",
+      "remove": "حذف",
+      "replace": "تبدیل",
+      "upload": "آپلود"
+    },
+    "plan": {
+      "TRIAL": "آزمایشی",
+      "MONTHLY": "ماهوار",
+      "YEARLY": "سالانه",
+      "CUSTOM": "اختصاصی"
+    },
+    "status": {
+      "TRIAL": "آزمایشی",
+      "ACTIVE": "فعال",
+      "EXPIRED": "منقضی",
+      "SUSPENDED": "تعلیق‌شده"
+    },
+    "validation": {
+      "businessName": "نام تجارت ضروری است.",
+      "systemName": "نام سیستم ضروری است.",
+      "ownerName": "نام مالک ضروری است.",
+      "ownerPhone": "شماره مالک ضروری است.",
+      "passwordLength": "رمز باید حداقل ۶ حرف باشد.",
+      "email": "ایمیل معتبر وارد کنید.",
+      "logoType": "لوگو باید PNG، JPG، JPEG، WEBP یا SVG باشد.",
+      "logoSize": "لوگو باید ۲MB یا کمتر باشد."
+    },
+    "toast": {
+      "created": "مستاجر ایجاد شد",
+      "updated": "مستاجر به‌روزرسانی شد",
+      "deleted": "مستاجر حذف شد",
+      "createFailed": "ایجاد ناکام شد",
+      "updateFailed": "به‌روزرسانی ناکام شد",
+      "deleteFailed": "حذف ناکام شد"
+    }
+  },
+  "tenantSettings": {
+    "badge": "تنظیمات فضای کاری",
+    "title": "تنظیمات سیستم",
+    "subtitle": "هویت تجارتی، لوگو و معلومات تماس را برای بل‌ها، گزارش‌ها و سرصفحه‌های سیستم مدیریت کنید.",
+    "loading": "در حال بارگذاری تنظیمات مستاجر...",
+    "errorTitle": "تنظیمات بارگذاری نشد",
+    "refresh": "تازه‌سازی",
+    "save": "ذخیره تنظیمات",
+    "saving": "در حال ذخیره...",
+    "unsaved": "تغییرات ذخیره‌نشده دارید.",
+    "upToDate": "تنظیمات به‌روز است.",
+    "branding": {
+      "title": "برندینگ",
+      "subtitle": "لوگویی را آپلود کنید که در اسناد و صفحات مستاجر نمایش داده می‌شود."
+    },
+    "business": {
+      "title": "معلومات تجارت",
+      "subtitle": "این معلومات در اسناد مشتریان، گزارش‌ها و عنوان‌های فضای کاری نمایش داده می‌شود."
+    },
+    "fields": {
+      "businessName": "نام تجارت",
+      "systemName": "نام سیستم",
+      "address": "آدرس",
+      "phone": "تلفن",
+      "mobile": "موبایل",
+      "email": "ایمیل"
+    },
+    "logo": {
+      "allowed": "PNG، JPG، JPEG، WEBP یا SVG تا ۲MB.",
+      "current": "لوگوی فعلی",
+      "empty": "لوگو آپلود نشده",
+      "remove": "حذف",
+      "replace": "تبدیل",
+      "upload": "آپلود"
+    },
+    "meta": {
+      "currency": "واحد پول",
+      "timezone": "منطقه زمانی"
+    },
+    "validation": {
+      "businessName": "نام تجارت ضروری است.",
+      "systemName": "نام سیستم ضروری است.",
+      "email": "ایمیل معتبر وارد کنید.",
+      "logoType": "لوگو باید PNG، JPG، JPEG، WEBP یا SVG باشد.",
+      "logoSize": "لوگو باید ۲MB یا کمتر باشد."
+    },
+    "toast": {
+      "saved": "تنظیمات ذخیره شد",
+      "loadFailed": "بارگذاری تنظیمات ناکام شد",
+      "saveFailed": "ذخیره ناکام شد"
+    }
   }
 }

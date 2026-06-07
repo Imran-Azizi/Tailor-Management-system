@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import {
   LuCopy,
+  LuClock,
   LuExternalLink,
   LuGlobe,
   LuHeadphones,
@@ -174,6 +175,9 @@ export default function SupportTeam() {
     language,
   );
   const address = getLocalizedShopValue(SUPPORT_TEAM_CONFIG.address, language);
+  const businessHours = t("supportTeam.businessHoursValue", {
+    defaultValue: getLocalizedShopValue(SUPPORT_TEAM_CONFIG.businessHours, language),
+  });
   const websiteLabel = SUPPORT_TEAM_CONFIG.website.replace(/^https?:\/\//, "");
 
   const phones = useMemo(
@@ -219,6 +223,34 @@ export default function SupportTeam() {
           </div>
           <h2>{t("supportTeam.heroTitle")}</h2>
           <p>{t("supportTeam.heroCopy")}</p>
+          <div className="support-hero__actions">
+            {phones[0] ? (
+              <a className="support-hero-action support-hero-action--primary" href={phones[0].href}>
+                <LuPhone size={16} />
+                <span>{t("supportTeam.contactNumbers")}</span>
+              </a>
+            ) : null}
+            {socialLinks.find((item) => item.key === "whatsapp") ? (
+              <a
+                className="support-hero-action support-hero-action--whatsapp"
+                href={socialLinks.find((item) => item.key === "whatsapp").href}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <FaWhatsapp size={16} />
+                <span>{t("supportTeam.whatsapp")}</span>
+              </a>
+            ) : null}
+            <a
+              className="support-hero-action"
+              href={SUPPORT_TEAM_CONFIG.website}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <LuGlobe size={16} />
+              <span>{t("supportTeam.website")}</span>
+            </a>
+          </div>
         </div>
       </section>
 
@@ -272,6 +304,20 @@ export default function SupportTeam() {
             >
               {address}
             </InfoRow>
+            {businessHours ? (
+              <InfoRow
+                Icon={LuClock}
+                label={t("supportTeam.businessHours", {
+                  defaultValue: "Business Hours",
+                })}
+                accent="#D97706"
+                copyValue={businessHours}
+                t={t}
+                onCopy={copyValue}
+              >
+                {businessHours}
+              </InfoRow>
+            ) : null}
             <InfoRow
               Icon={LuPhone}
               label={t("supportTeam.contactNumbers")}
@@ -338,6 +384,7 @@ export default function SupportTeam() {
 
         .support-hero {
           overflow: hidden;
+          position: relative;
           display: flex;
           align-items: center;
           min-height: 150px;
@@ -345,13 +392,25 @@ export default function SupportTeam() {
           padding: clamp(1.15rem, 2.4vw, 1.7rem);
           border-radius: 16px;
           background:
-            linear-gradient(135deg, rgba(37, 99, 235, .09), transparent 52%),
+            linear-gradient(135deg, rgba(37, 99, 235, .1), transparent 46%),
+            linear-gradient(180deg, color-mix(in srgb, var(--surface2, #f8fafc) 44%, transparent), transparent),
             var(--surface, #ffffff);
+        }
+
+        .support-hero::before {
+          content: "";
+          position: absolute;
+          inset-block: 0;
+          inset-inline-start: 0;
+          width: 5px;
+          background: linear-gradient(180deg, #2563eb, #0f766e);
         }
 
         .support-hero__content {
           max-width: 720px;
           width: 100%;
+          position: relative;
+          z-index: 1;
         }
 
         .support-hero__badge,
@@ -393,6 +452,50 @@ export default function SupportTeam() {
           margin: .75rem 0 0;
           max-width: 680px;
           font-size: .96rem;
+        }
+
+        .support-hero__actions {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: .65rem;
+          margin-top: 1.05rem;
+        }
+
+        .support-hero-action {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: .5rem;
+          min-height: 38px;
+          padding: .48rem .8rem;
+          border-radius: 11px;
+          border: 1px solid var(--border, #e2e8f0);
+          background: var(--surface, #fff);
+          color: var(--text1, #0f172a);
+          text-decoration: none;
+          font-size: .84rem;
+          font-weight: 900;
+          box-shadow: 0 12px 24px -20px rgba(15, 23, 42, .3);
+          transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease, background .16s ease;
+        }
+
+        .support-hero-action:hover {
+          transform: translateY(-1px);
+          border-color: color-mix(in srgb, var(--primary, #2563eb) 34%, var(--border, #e2e8f0));
+          box-shadow: 0 16px 30px -22px rgba(15, 23, 42, .36);
+        }
+
+        .support-hero-action--primary {
+          color: #1d4ed8;
+          border-color: rgba(37, 99, 235, .28);
+          background: rgba(37, 99, 235, .08);
+        }
+
+        .support-hero-action--whatsapp {
+          color: #047857;
+          border-color: rgba(5, 150, 105, .28);
+          background: rgba(5, 150, 105, .09);
         }
 
         .support-details-card {
@@ -441,7 +544,9 @@ export default function SupportTeam() {
           width: 100%;
           border: 1px solid color-mix(in srgb, var(--border, #e2e8f0) 76%, transparent);
           border-radius: 14px;
-          background: color-mix(in srgb, var(--surface2, #f8fafc) 42%, transparent);
+          background:
+            linear-gradient(180deg, color-mix(in srgb, var(--surface2, #f8fafc) 54%, transparent), transparent 180px),
+            color-mix(in srgb, var(--surface2, #f8fafc) 42%, transparent);
           overflow: hidden;
         }
 
@@ -482,6 +587,13 @@ export default function SupportTeam() {
           border: 1px solid color-mix(in srgb, var(--border, #e2e8f0) 76%, transparent);
           border-radius: 12px;
           background: var(--surface, #ffffff);
+          transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+        }
+
+        .support-info-row:hover {
+          transform: translateY(-1px);
+          border-color: color-mix(in srgb, var(--support-accent, #2563eb) 28%, var(--border, #e2e8f0));
+          box-shadow: 0 14px 28px -24px rgba(15, 23, 42, .28);
         }
 
         .support-info-row:last-child {
@@ -682,6 +794,14 @@ export default function SupportTeam() {
           .support-hero {
             min-height: auto;
             align-items: flex-start;
+          }
+
+          .support-hero__actions {
+            width: 100%;
+          }
+
+          .support-hero-action {
+            flex: 1 1 160px;
           }
 
           .support-info-row,

@@ -51,7 +51,8 @@
     "select": "Select",
     "refresh": "Refresh",
     "reset": "Reset",
-    "noDataThisMonth": "No data found for this month"
+    "noDataThisMonth": "No data found for this month",
+    "notAvailable": "-"
   },
   "sidebar": {
     "dokanPanel": "Dokan Panel",
@@ -965,5 +966,157 @@
       "action": "Action"
     },
     "searchHint": "Search another order by customer name, phone number, or bill number."
+  },
+  "superAdmin": {
+    "badge": "SaaS Control Center",
+    "title": "Super Admin Dashboard",
+    "subtitle": "Manage tenant workspaces, subscription access, branding, and tenant-level operational health from one secure console.",
+    "createTenant": "Create Tenant",
+    "editTenant": "Edit Tenant",
+    "saveChanges": "Save Changes",
+    "saving": "Saving...",
+    "refresh": "Refresh",
+    "suspend": "Suspend",
+    "activate": "Activate",
+    "tableTitle": "Tenants",
+    "tableSubtitle": "Search, edit, suspend, and maintain SaaS tenant accounts.",
+    "searchPlaceholder": "Search tenants...",
+    "loadingTenants": "Loading tenants...",
+    "noTenants": "No tenants found.",
+    "modalCreateSubtitle": "Provision a new tenant workspace",
+    "modalEditSubtitle": "Update tenant workspace",
+    "modalHelp": "Business identity, subscription access, and owner credentials are managed here.",
+    "ownerPasswordPlaceholder": "Leave blank to keep current password",
+    "activeHelp": "Inactive tenants cannot use their workspace.",
+    "metrics": {
+      "tenants": "Tenants",
+      "orders": "Orders",
+      "customers": "Customers"
+    },
+    "columns": {
+      "tenant": "Tenant",
+      "plan": "Plan",
+      "status": "Status",
+      "expiry": "Expiry",
+      "users": "Users",
+      "customers": "Customers",
+      "orders": "Orders"
+    },
+    "groups": {
+      "business": "Business",
+      "owner": "Owner Account",
+      "localization": "Localization",
+      "subscription": "Subscription"
+    },
+    "fields": {
+      "businessName": "Business Name",
+      "systemName": "System Name",
+      "address": "Address",
+      "phone": "Phone",
+      "mobile": "Mobile",
+      "email": "Email",
+      "logoFile": "Tenant Logo",
+      "currency": "Currency",
+      "language": "Language",
+      "timezone": "Timezone",
+      "ownerName": "Owner Name",
+      "ownerPhone": "Owner Phone",
+      "ownerPassword": "Owner Password",
+      "subscriptionPlan": "Plan",
+      "subscriptionStatus": "Status",
+      "subscriptionStart": "Start Date",
+      "expiryDate": "Expiry Date",
+      "isActive": "Tenant Active"
+    },
+    "logo": {
+      "allowed": "PNG, JPG, JPEG, WEBP, or SVG up to 2MB.",
+      "current": "Current logo",
+      "empty": "No logo uploaded",
+      "remove": "Remove",
+      "replace": "Replace",
+      "upload": "Upload"
+    },
+    "plan": {
+      "TRIAL": "Trial",
+      "MONTHLY": "Monthly",
+      "YEARLY": "Yearly",
+      "CUSTOM": "Custom"
+    },
+    "status": {
+      "TRIAL": "Trial",
+      "ACTIVE": "Active",
+      "EXPIRED": "Expired",
+      "SUSPENDED": "Suspended"
+    },
+    "validation": {
+      "businessName": "Business name is required.",
+      "systemName": "System name is required.",
+      "ownerName": "Owner name is required.",
+      "ownerPhone": "Owner phone is required.",
+      "passwordLength": "Password must be at least 6 characters.",
+      "email": "Enter a valid email address.",
+      "logoType": "Logo must be PNG, JPG, JPEG, WEBP, or SVG.",
+      "logoSize": "Logo must be 2MB or smaller."
+    },
+    "toast": {
+      "created": "Tenant created",
+      "updated": "Tenant updated",
+      "deleted": "Tenant deleted",
+      "createFailed": "Create failed",
+      "updateFailed": "Update failed",
+      "deleteFailed": "Delete failed"
+    }
+  },
+  "tenantSettings": {
+    "badge": "Workspace Settings",
+    "title": "System Settings",
+    "subtitle": "Manage the business identity, logo, and contact details used across bills, reports, and system headers.",
+    "loading": "Loading tenant settings...",
+    "errorTitle": "Could not load settings",
+    "refresh": "Refresh",
+    "save": "Save settings",
+    "saving": "Saving...",
+    "unsaved": "You have unsaved changes.",
+    "upToDate": "Settings are up to date.",
+    "branding": {
+      "title": "Branding",
+      "subtitle": "Upload the logo shown on documents and tenant screens."
+    },
+    "business": {
+      "title": "Business Details",
+      "subtitle": "These details appear on customer documents, reports, and workspace labels."
+    },
+    "fields": {
+      "businessName": "Business Name",
+      "systemName": "System Name",
+      "address": "Address",
+      "phone": "Phone",
+      "mobile": "Mobile",
+      "email": "Email"
+    },
+    "logo": {
+      "allowed": "PNG, JPG, JPEG, WEBP, or SVG up to 2MB.",
+      "current": "Current logo",
+      "empty": "No logo uploaded",
+      "remove": "Remove",
+      "replace": "Replace",
+      "upload": "Upload"
+    },
+    "meta": {
+      "currency": "Currency",
+      "timezone": "Timezone"
+    },
+    "validation": {
+      "businessName": "Business name is required.",
+      "systemName": "System name is required.",
+      "email": "Enter a valid email address.",
+      "logoType": "Logo must be PNG, JPG, JPEG, WEBP, or SVG.",
+      "logoSize": "Logo must be 2MB or smaller."
+    },
+    "toast": {
+      "saved": "Settings saved",
+      "loadFailed": "Failed to load settings",
+      "saveFailed": "Save failed"
+    }
   }
 }

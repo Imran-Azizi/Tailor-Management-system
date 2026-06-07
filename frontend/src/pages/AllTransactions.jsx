@@ -72,6 +72,7 @@ function getAmountColor(kind) {
 export default function AllTransactions() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
+  const isRtl = i18n.dir?.(language) === "rtl";
   const { isAdmin } = useAuth();
   const { viewMonth, viewYear } = useMonth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -397,17 +398,18 @@ export default function AllTransactions() {
         </div>
       </Card>
 
-      <Card
-        title={t("transaction.allTitle", "All Transactions")}
-        action={
-          isFetching ? (
-            <span style={{ fontSize: 12, color: "var(--text3)" }}>
-              {t("common.loading", "Loading...")}
-            </span>
-          ) : null
-        }
-        noPad
-      >
+      <div className="all-transactions-table-section" dir={isRtl ? "rtl" : "ltr"}>
+        <Card
+          title={t("transaction.allTitle", "All Transactions")}
+          action={
+            isFetching ? (
+              <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                {t("common.loading", "Loading...")}
+              </span>
+            ) : null
+          }
+          noPad
+        >
         {isLoading ? (
           <Spinner />
         ) : transactions.length === 0 ? (
@@ -617,7 +619,8 @@ export default function AllTransactions() {
             onChange={setPage}
           />
         </div>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }

@@ -15,12 +15,7 @@ import {
   getOrderLabelParts,
   getOrderPrimaryDisplayName,
 } from "../lib/orderType.js";
-import {
-  Card,
-  EmptyState,
-  PageHeader,
-  Spinner,
-} from "../components/ui/index.jsx";
+import { Card, EmptyState, Spinner } from "../components/ui/index.jsx";
 
 function formatMoney(value, language) {
   return formatCurrency(value, language, {
@@ -37,7 +32,7 @@ export default function ClothesDeliveryToCustomer() {
   const isDariOrPashto =
     normalizedLanguage.startsWith("dari") ||
     normalizedLanguage.startsWith("pashto");
-  const isRtl = (i18n.dir?.() || "ltr") === "rtl";
+  const isRtl = isDariOrPashto || (i18n.dir?.() || "ltr") === "rtl";
   const dir = isRtl ? "rtl" : "ltr";
   const receiveButtonText = isEnglish ? "Receive" : "\u0631\u0633\u06cc\u062f";
   const completedStatusText = t("orders.done", "Completed");
@@ -232,10 +227,31 @@ export default function ClothesDeliveryToCustomer() {
       className={`page clothes-delivery-page ${isRtl ? "clothes-delivery-page--rtl [font-family:'Noto_Naskh_Arabic','Noto_Sans_Arabic','Tahoma','Inter',sans-serif]" : "clothes-delivery-page--ltr"}`}
       dir={dir}
     >
-      <PageHeader
-        title={t("sidebar.clothesDelivery")}
-        subtitle={t("delivery.subtitle")}
-      />
+      <div
+        className="delivery-page-titlebar mb-6 w-full"
+        dir={dir}
+        style={{
+          direction: dir,
+          textAlign: isRtl ? "right" : "left",
+        }}
+      >
+        <div
+          style={{
+            display: "block",
+            maxWidth: isRtl ? 720 : undefined,
+            marginLeft: isRtl ? "auto" : undefined,
+            marginRight: isRtl ? 0 : undefined,
+            textAlign: isRtl ? "right" : "left",
+          }}
+        >
+          <h1 className="m-0 text-[19px] font-bold tracking-normal text-[var(--text1)]">
+            {t("sidebar.clothesDelivery")}
+          </h1>
+          <p className="mt-1 text-[13px] leading-6 text-[var(--text3)]">
+            {t("delivery.subtitle")}
+          </p>
+        </div>
+      </div>
 
       <Card title={t("delivery.searchTitle")}>
         <div className="grid gap-4">
@@ -651,7 +667,9 @@ export default function ClothesDeliveryToCustomer() {
               <div
                 ref={resultsScrollbarRef}
                 className={`delivery-results-sync-scrollbar ${
-                  resultScroll.hasOverflow ? "" : "delivery-results-sync-scrollbar--hidden"
+                  resultScroll.hasOverflow
+                    ? ""
+                    : "delivery-results-sync-scrollbar--hidden"
                 }`}
                 dir="ltr"
                 aria-hidden={!resultScroll.hasOverflow}
@@ -807,4 +825,3 @@ export default function ClothesDeliveryToCustomer() {
     </div>
   );
 }
-

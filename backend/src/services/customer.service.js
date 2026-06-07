@@ -241,7 +241,7 @@ export const findByPhone = async (phoneNumber) => {
   if (!inputDigits) return null;
 
   // Try exact normalized match first
-  const exact = await prisma.customer.findUnique({
+  const exact = await prisma.customer.findFirst({
     where: { phoneNumber: norm },
   });
   if (exact) return exact;

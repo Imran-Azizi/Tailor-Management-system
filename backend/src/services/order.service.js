@@ -472,7 +472,7 @@ const findExistingCustomerByPhone = async (tx, phoneNumber) => {
   const inputDigits = toPhoneDigits(normalizedPhone);
   if (!normalizedPhone || !inputDigits) return null;
 
-  const exact = await tx.customer.findUnique({
+  const exact = await tx.customer.findFirst({
     where: { phoneNumber: normalizedPhone },
   });
   if (exact) return exact;
@@ -1422,7 +1422,7 @@ export const lookupOrdersByBillOrPhone = async ({
   let customer = null;
 
   if (parsedBillNumber !== null) {
-    customer = await prisma.customer.findUnique({
+    customer = await prisma.customer.findFirst({
       where: { billNumber: parsedBillNumber },
     });
   }
@@ -2375,7 +2375,7 @@ export const createOrder = async ({
       // Customer phone is unique, so copied orders may need a generated phone
       // to guarantee a brand-new bill/customer record.
       if (candidatePhone) {
-        const existingExactPhone = await tx.customer.findUnique({
+        const existingExactPhone = await tx.customer.findFirst({
           where: { phoneNumber: candidatePhone },
           select: { id: true },
         });

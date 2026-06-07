@@ -227,16 +227,18 @@ export default function GlobalOrderSearch() {
   );
 
   const dir = isRtl ? "rtl" : "ltr";
+  const emptyValue = t("common.notAvailable", "-");
 
   return (
     <div
       className="page global-order-search"
-      style={{ maxWidth: 900, margin: "0 auto", direction: dir }}
+      dir={dir}
+      style={{ direction: dir }}
     >
       <PageHeader title={t("globalSearch.title", "Global Order Search")} />
 
       {/* Description */}
-      <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 20 }}>
+      <p className="global-order-search__description">
         {t(
           "globalSearch.description",
           "Search orders across all months by customer name, phone number, or bill number.",
@@ -245,16 +247,10 @@ export default function GlobalOrderSearch() {
 
       {/* Search bar */}
       <form
+        className="global-order-search__form"
         onSubmit={handleSearchSubmit}
-        style={{
-          position: "relative",
-          marginBottom: 24,
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-        }}
       >
-        <div style={{ position: "relative", flex: 1 }}>
+        <div className="global-order-search__input-wrap">
           <LuSearch
             size={16}
             style={{
@@ -279,9 +275,6 @@ export default function GlobalOrderSearch() {
             style={{
               paddingInlineStart: 38,
               paddingInlineEnd: inputValue ? 36 : 12,
-              width: "100%",
-              fontSize: 14,
-              height: 42,
             }}
             autoFocus
           />
@@ -312,21 +305,14 @@ export default function GlobalOrderSearch() {
           type="submit"
           className="btn btn-primary btn-sm"
           disabled={!inputValue.trim()}
-          style={{ height: 42, paddingInline: 16, whiteSpace: "nowrap" }}
+          style={{ whiteSpace: "nowrap" }}
         >
           <LuSearch size={14} />
           {t("common.search", "Search")}
         </button>
       </form>
 
-      <p
-        style={{
-          fontSize: 12,
-          color: "var(--text3)",
-          marginTop: -12,
-          marginBottom: 20,
-        }}
-      >
+      <p className="global-order-search__hint">
         {t(
           "globalSearch.searchHint",
           "Search another order by customer name, phone number, or bill number.",
@@ -336,17 +322,10 @@ export default function GlobalOrderSearch() {
       {/* Search hints */}
       {!isQueryReady && (
         <div
-          className="card"
-          style={{ padding: "32px 24px", textAlign: "center" }}
+          className="card global-order-search__empty-card"
         >
           <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              gap: 32,
-              flexWrap: "wrap",
-              marginBottom: 16,
-            }}
+            className="global-order-search__quick-hints"
           >
             {[
               {
@@ -364,13 +343,7 @@ export default function GlobalOrderSearch() {
             ].map(({ icon: Icon, label }) => (
               <div
                 key={label}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  fontSize: 13,
-                  color: "var(--text2)",
-                }}
+                className="global-order-search__quick-hint"
               >
                 <Icon size={15} style={{ color: "var(--primary)" }} />
                 {label}
@@ -416,14 +389,7 @@ export default function GlobalOrderSearch() {
       {orders.length > 0 && (
         <>
           <div
-            style={{
-              fontSize: 12,
-              color: "var(--text3)",
-              marginBottom: 12,
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
+            className="global-order-search__results-meta"
           >
             {isFetching && (
               <LuLoader
@@ -438,7 +404,7 @@ export default function GlobalOrderSearch() {
           </div>
 
           {/* Desktop table */}
-          <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          <div className="card global-order-search__table-card">
             <table
               style={{
                 width: "100%",
@@ -484,7 +450,7 @@ export default function GlobalOrderSearch() {
                 {orders.map((order, idx) => {
                   const monthLabel = order.entryMonth
                     ? `${getMonthLabel(order.entryMonth, language)} ${order.entryYear || ""}`
-                    : "—";
+                    : emptyValue;
                   const isCopying = copyingId === order.id;
                   return (
                     <tr
@@ -521,13 +487,13 @@ export default function GlobalOrderSearch() {
                         }}
                       >
                         {highlightText(
-                          order.customer?.billNumber ?? "—",
+                          order.customer?.billNumber ?? emptyValue,
                           trimmedQuery,
                         )}
                       </td>
                       <td style={{ padding: "10px 14px" }}>
                         {highlightText(
-                          order.customer?.firstName || "—",
+                          order.customer?.firstName || emptyValue,
                           trimmedQuery,
                         )}
                       </td>
@@ -535,7 +501,7 @@ export default function GlobalOrderSearch() {
                         style={{ padding: "10px 14px", color: "var(--text2)" }}
                       >
                         {highlightText(
-                          order.customer?.phoneNumber || "—",
+                          order.customer?.phoneNumber || emptyValue,
                           trimmedQuery,
                         )}
                       </td>
@@ -603,25 +569,19 @@ export default function GlobalOrderSearch() {
           </div>
 
           {/* Mobile cards */}
-          <div className="mobile-order-cards" style={{ display: "none" }}>
+          <div className="global-order-search__mobile-cards">
             {orders.map((order) => {
               const monthLabel = order.entryMonth
                 ? `${getMonthLabel(order.entryMonth, language)} ${order.entryYear || ""}`
-                : "—";
+                : emptyValue;
               const isCopying = copyingId === order.id;
               return (
                 <div
                   key={order.id}
-                  className="card"
-                  style={{ padding: 16, marginBottom: 12 }}
+                  className="card global-order-search__mobile-card"
                 >
                   <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "flex-start",
-                      marginBottom: 10,
-                    }}
+                    className="global-order-search__mobile-head"
                   >
                     <div>
                       <span
@@ -650,38 +610,24 @@ export default function GlobalOrderSearch() {
                     <StatusBadge order={order} t={t} />
                   </div>
                   <div
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: 8,
-                      marginBottom: 12,
-                      fontSize: 12,
-                      color: "var(--text2)",
-                    }}
+                    className="global-order-search__mobile-facts"
                   >
                     <span
-                      style={{ display: "flex", alignItems: "center", gap: 4 }}
+                      className="global-order-search__mobile-fact"
                     >
                       <LuPhone size={11} />{" "}
                       {highlightText(
-                        order.customer?.phoneNumber || "—",
+                        order.customer?.phoneNumber || emptyValue,
                         trimmedQuery,
                       )}
                     </span>
-                    <span>·</span>
                     <OrderTypeBadge type={order.type} language={language} />
-                    <span>·</span>
-                    <span>{monthLabel}</span>
-                    <span>Â·</span>
+                    <span className="global-order-search__mobile-fact">
+                      {monthLabel}
+                    </span>
                     <OrderCreatorBadge order={order} compact />
                   </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
+                  <div className="global-order-search__mobile-actions">
                     <span style={{ fontWeight: 600, fontSize: 13 }}>
                       {formatCurrency(
                         order.totalPrice ?? 0,
@@ -728,17 +674,6 @@ export default function GlobalOrderSearch() {
           </div>
         </>
       )}
-
-      <style>{`
-        @media (max-width: 700px) {
-          .global-order-search table { display: none !important; }
-          .mobile-order-cards { display: block !important; }
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }

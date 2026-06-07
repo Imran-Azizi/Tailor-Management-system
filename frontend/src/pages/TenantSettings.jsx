@@ -1,0 +1,434 @@
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+import toast from "react-hot-toast";
+import {
+  LuBuilding2,
+  LuCircleCheck,
+  LuImage,
+  LuMail,
+  LuMapPin,
+  LuPhone,
+  LuRefreshCw,
+  LuSave,
+  LuUpload,
+  LuX,
+} from "react-icons/lu";
+import api from "../lib/api.js";
+import { assetUrl } from "../lib/assets.js";
+import { getApiErrorMessage } from "../lib/feedback.js";
+import { useAuth } from "../context/AuthContext.jsx";
+
+const emptyForm = {
+  businessName: "",
+  systemName: "",
+  address: "",
+  phone: "",
+  mobile: "",
+  email: "",
+  logoUrl: "",
+  logoFile: null,
+  removeLogo: false,
+};
+
+const logoTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/svg+xml"];
+const logoMaxBytes = 2 * 1024 * 1024;
+
+function cn(...classes) {
+  return classes.filter(Boolean).join(" ");
+}
+
+function fileToLogoUpload(file) {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      resolve(null);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      resolve({
+        fileName: file.name,
+        mimeType: file.type,
+        data: result.includes(",") ? result.split(",").pop() : result,
+      });
+    };
+    reader.onerror = () => reject(new Error("Could not read logo file."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function normalizeForm(settings) {
+  return {
+    ...emptyForm,
+    businessName: settings?.businessName || "",
+    systemName: settings?.systemName || "",
+    address: settings?.address || "",
+    phone: settings?.phone || "",
+    mobile: settings?.mobile || "",
+    email: settings?.email || "",
+    logoUrl: settings?.logoUrl || "",
+  };
+}
+
+function validate(form, t) {
+  const errors = {};
+  if (!form.businessName.trim()) errors.businessName = t("tenantSettings.validation.businessName");
+  if (!form.systemName.trim()) errors.systemName = t("tenantSettings.validation.systemName");
+  if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+    errors.email = t("tenantSettings.validation.email");
+  }
+  if (form.logoFile) {
+    if (!logoTypes.includes(form.logoFile.type)) {
+      errors.logoFile = t("tenantSettings.validation.logoType");
+    } else if (form.logoFile.size > logoMaxBytes) {
+      errors.logoFile = t("tenantSettings.validation.logoSize");
+    }
+  }
+  return errors;
+}
+
+function Field({ icon: Icon, label, error, isRtl, ...inputProps }) {
+  return (
+    <label className="flex min-w-0 flex-col gap-1.5">
+      <span className={cn("text-xs font-bold text-[var(--text2)]", !isRtl && "uppercase tracking-wide")}>
+        {label}
+      </span>
+      <span className="relative block">
+        <Icon
+          size={15}
+          className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-[var(--text3)]"
+          style={{ insetInlineStart: 12 }}
+        />
+        <input
+          className={cn("inp w-full", error && "err")}
+          style={{ paddingInlineStart: 38 }}
+          {...inputProps}
+        />
+      </span>
+      {error ? (
+        <span className="text-xs font-semibold text-red-600 dark:text-red-300">{error}</span>
+      ) : null}
+    </label>
+  );
+}
+
+export default function TenantSettings() {
+  const { t, i18n } = useTranslation();
+  const isRtl = (i18n.dir?.() || "ltr") === "rtl";
+  const qc = useQueryClient();
+  const { user, loading: authLoading, updateTenant } = useAuth();
+  const [form, setForm] = useState(emptyForm);
+  const [errors, setErrors] = useState({});
+  const [logoPreview, setLogoPreview] = useState("");
+
+  const {
+    data: settings,
+    error: loadError,
+    isError,
+    isLoading,
+    isFetching,
+  } = useQuery({
+    queryKey: ["tenant-settings", user?.tenantId],
+    queryFn: () => api.get("/tenants/me/settings").then((r) => r.data),
+    enabled: !authLoading && Boolean(user?.tenantId),
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+  });
+
+  useEffect(() => {
+    if (settings) {
+      setForm(normalizeForm(settings));
+      setErrors({});
+    }
+  }, [settings]);
+
+  useEffect(() => {
+    if (!form.logoFile) {
+      setLogoPreview("");
+      return undefined;
+    }
+    const nextUrl = URL.createObjectURL(form.logoFile);
+    setLogoPreview(nextUrl);
+    return () => URL.revokeObjectURL(nextUrl);
+  }, [form.logoFile]);
+
+  const visibleLogo = logoPreview || (!form.removeLogo ? assetUrl(form.logoUrl) : "");
+  const hasChanges = useMemo(() => {
+    if (!settings) return false;
+    const base = normalizeForm(settings);
+    return (
+      ["businessName", "systemName", "address", "phone", "mobile", "email"].some(
+        (key) => (form[key] || "") !== (base[key] || ""),
+      ) ||
+      Boolean(form.logoFile) ||
+      Boolean(form.removeLogo)
+    );
+  }, [form, settings]);
+
+  const updateMut = useMutation({
+    mutationFn: (payload) => api.put("/tenants/me/settings", payload),
+    onSuccess: ({ data }) => {
+      toast.success(t("tenantSettings.toast.saved"));
+      qc.setQueryData(["tenant-settings", user?.tenantId], data);
+      updateTenant(data);
+      document.title = data.systemName || "Tailoring Management System";
+      setForm(normalizeForm(data));
+      setErrors({});
+    },
+    onError: (error) => toast.error(getApiErrorMessage(error, t("tenantSettings.toast.saveFailed"))),
+  });
+
+  const setValue = (key, value) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    setErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (updateMut.isPending) return;
+    const nextErrors = validate(form, t);
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
+
+    const payload = {
+      businessName: form.businessName.trim(),
+      systemName: form.systemName.trim(),
+      address: form.address.trim(),
+      phone: form.phone.trim(),
+      mobile: form.mobile.trim(),
+      email: form.email.trim(),
+    };
+    if (form.logoFile) {
+      payload.logoUpload = await fileToLogoUpload(form.logoFile);
+    } else if (form.removeLogo) {
+      payload.removeLogo = true;
+    }
+    updateMut.mutate(payload);
+  };
+
+  if (authLoading || isLoading) {
+    return (
+      <div className="page">
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6 text-sm font-semibold text-[var(--text2)]">
+          {t("tenantSettings.loading")}
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="page">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+          <h1 className="text-base font-bold">{t("tenantSettings.errorTitle")}</h1>
+          <p className="mt-1">
+            {getApiErrorMessage(loadError, t("tenantSettings.toast.loadFailed"))}
+          </p>
+          <button
+            type="button"
+            className="btn btn-outline mt-4"
+            onClick={() => qc.invalidateQueries({ queryKey: ["tenant-settings", user?.tenantId] })}
+          >
+            <LuRefreshCw size={15} />
+            {t("tenantSettings.refresh")}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-[calc(100vh-var(--nav-h,0px))] bg-[var(--bg)] px-4 py-5 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-6xl flex-col gap-5">
+        <section className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_18px_45px_-34px_rgba(15,23,42,.65)] sm:p-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <div className={cn("inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200", !isRtl && "uppercase tracking-[0.14em]")}>
+                <LuCircleCheck size={13} />
+                {t("tenantSettings.badge")}
+              </div>
+              <h1 className="mt-4 text-2xl font-bold tracking-tight text-[var(--text1)] sm:text-3xl">
+                {t("tenantSettings.title")}
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text3)]">
+                {t("tenantSettings.subtitle")}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-outline h-10"
+              onClick={() => qc.invalidateQueries({ queryKey: ["tenant-settings", user?.tenantId] })}
+              disabled={isFetching || updateMut.isPending}
+            >
+              <LuRefreshCw size={15} className={isFetching ? "animate-spin" : ""} />
+              {t("tenantSettings.refresh")}
+            </button>
+          </div>
+        </section>
+
+        <form onSubmit={submit} className="grid grid-cols-1 gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
+          <section className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_18px_45px_-34px_rgba(15,23,42,.65)]">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
+                <LuImage size={18} />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-[var(--text1)]">{t("tenantSettings.branding.title")}</h2>
+                <p className="mt-1 text-xs leading-5 text-[var(--text3)]">{t("tenantSettings.branding.subtitle")}</p>
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface2)] p-4">
+              <div className="flex flex-col items-center text-center">
+                <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text3)]">
+                  {visibleLogo ? (
+                    <img src={visibleLogo} alt="" className="h-full w-full object-contain" />
+                  ) : (
+                    <LuBuilding2 size={32} />
+                  )}
+                </div>
+                <p className="mt-3 max-w-full truncate text-sm font-bold text-[var(--text1)]">
+                  {form.logoFile?.name || (visibleLogo ? t("tenantSettings.logo.current") : t("tenantSettings.logo.empty"))}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text3)]">{t("tenantSettings.logo.allowed")}</p>
+              </div>
+
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <label className="btn btn-outline flex-1 cursor-pointer justify-center">
+                  <LuUpload size={15} />
+                  {visibleLogo ? t("tenantSettings.logo.replace") : t("tenantSettings.logo.upload")}
+                  <input
+                    type="file"
+                    className="sr-only"
+                    accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml"
+                    disabled={updateMut.isPending}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] || null;
+                      setValue("logoFile", file);
+                      setValue("removeLogo", false);
+                      event.target.value = "";
+                    }}
+                  />
+                </label>
+                {visibleLogo ? (
+                  <button
+                    type="button"
+                    className="btn btn-outline flex-1 justify-center"
+                    onClick={() => {
+                      setValue("logoFile", null);
+                      setValue("removeLogo", true);
+                    }}
+                    disabled={updateMut.isPending}
+                  >
+                    <LuX size={15} />
+                    {t("tenantSettings.logo.remove")}
+                  </button>
+                ) : null}
+              </div>
+              {errors.logoFile ? (
+                <p className="mt-2 text-xs font-semibold text-red-600 dark:text-red-300">{errors.logoFile}</p>
+              ) : null}
+            </div>
+
+            <div className="mt-4 grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface2)] p-4 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[var(--text3)]">{t("tenantSettings.meta.currency")}</span>
+                <strong className="text-[var(--text1)]">AFN</strong>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[var(--text3)]">{t("tenantSettings.meta.timezone")}</span>
+                <strong className="text-[var(--text1)]">Asia/Kabul</strong>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[0_18px_45px_-34px_rgba(15,23,42,.65)]">
+            <div className="border-b border-[var(--border)] bg-[var(--surface2)] px-5 py-4">
+              <h2 className="text-base font-bold text-[var(--text1)]">{t("tenantSettings.business.title")}</h2>
+              <p className="mt-1 text-xs leading-5 text-[var(--text3)]">{t("tenantSettings.business.subtitle")}</p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
+              <Field
+                icon={LuBuilding2}
+                label={t("tenantSettings.fields.businessName")}
+                value={form.businessName}
+                onChange={(event) => setValue("businessName", event.target.value)}
+                error={errors.businessName}
+                disabled={updateMut.isPending}
+                isRtl={isRtl}
+              />
+              <Field
+                icon={LuBuilding2}
+                label={t("tenantSettings.fields.systemName")}
+                value={form.systemName}
+                onChange={(event) => setValue("systemName", event.target.value)}
+                error={errors.systemName}
+                disabled={updateMut.isPending}
+                isRtl={isRtl}
+              />
+              <Field
+                icon={LuPhone}
+                label={t("tenantSettings.fields.phone")}
+                value={form.phone}
+                onChange={(event) => setValue("phone", event.target.value)}
+                disabled={updateMut.isPending}
+                isRtl={isRtl}
+                inputMode="tel"
+              />
+              <Field
+                icon={LuPhone}
+                label={t("tenantSettings.fields.mobile")}
+                value={form.mobile}
+                onChange={(event) => setValue("mobile", event.target.value)}
+                disabled={updateMut.isPending}
+                isRtl={isRtl}
+                inputMode="tel"
+              />
+              <Field
+                icon={LuMail}
+                label={t("tenantSettings.fields.email")}
+                value={form.email}
+                onChange={(event) => setValue("email", event.target.value)}
+                error={errors.email}
+                disabled={updateMut.isPending}
+                isRtl={isRtl}
+                inputMode="email"
+              />
+              <Field
+                icon={LuMapPin}
+                label={t("tenantSettings.fields.address")}
+                value={form.address}
+                onChange={(event) => setValue("address", event.target.value)}
+                disabled={updateMut.isPending}
+                isRtl={isRtl}
+              />
+            </div>
+
+            <div className="flex flex-col-reverse gap-3 border-t border-[var(--border)] bg-[var(--surface2)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-[var(--text3)]">
+                {hasChanges ? t("tenantSettings.unsaved") : ""}
+              </p>
+              <button
+                className="group inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-600 px-5 text-sm font-semibold text-white shadow-[0_16px_32px_-22px_rgba(5,150,105,0.95)] transition duration-200 hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-[0_18px_36px_-20px_rgba(5,150,105,0.95)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface2)] active:translate-y-0 disabled:translate-y-0 disabled:cursor-not-allowed disabled:border-[var(--border)] disabled:bg-[var(--surface)] disabled:text-[var(--text3)] disabled:shadow-none sm:min-w-44"
+                disabled={updateMut.isPending || !hasChanges}
+              >
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white/15 transition group-hover:bg-white/20 group-disabled:bg-[var(--surface2)]">
+                  <LuSave size={15} className={updateMut.isPending ? "animate-pulse" : ""} />
+                </span>
+                <span>{updateMut.isPending ? t("tenantSettings.saving") : t("tenantSettings.save")}</span>
+              </button>
+            </div>
+          </section>
+        </form>
+      </div>
+    </div>
+  );
+}

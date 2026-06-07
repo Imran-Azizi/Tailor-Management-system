@@ -46,7 +46,8 @@
     "optional": "اختیاري",
     "field": "کالم",
     "value": "ارزښت",
-    "viewingMonth": "د میاښتې ډیټا لیدل"
+    "viewingMonth": "د میاښتې ډیټا لیدل",
+    "notAvailable": "-"
   },
   "sidebar": {
     "dokanPanel": "د دوکان پینل",
@@ -639,5 +640,189 @@
     "noOrdersInCategory": "د دې کټګوړیې کې هیہۍ فرمایښ ونه موندل ښو.",
     "searchBillPlaceholder": "د بل ښمیره سره لټون",
     "noOrderFoundByBill": "د دې بل ښمیرې لپاره فرمایښ ونه موندل ښو."
+  },
+  "ui": {
+    "pageSummary": "صفحه {{page}} از {{pages}} · مجموع {{total}}",
+    "prev": "مخکینی",
+    "next": "بل"
+  },
+  "globalSearch": {
+    "title": "د فرمایشونو عمومي لټون",
+    "description": "فرمایشونه د ټولو میاشتو څخه د مشتری نوم، تلیفون شمېره یا بل شمېرې له لارې ولټوئ.",
+    "placeholder": "د نوم، تلیفون یا بل شمېرې له مخې لټون...",
+    "searchByName": "د مشتری نوم",
+    "searchByPhone": "د تلیفون شمېره",
+    "searchByBill": "د بل شمېره",
+    "startTyping": "په ټولو میاشتو کې د لټون لپاره لیکل پیل کړئ",
+    "resultsCount": "{{count}} فرمایش وموندل شو",
+    "noResults": "ستاسې د لټون مطابق فرمایش ونه موندل شو.",
+    "searchFailed": "لټون ناکام شو. بیا هڅه وکړئ.",
+    "newOrder": "نوی فرمایش",
+    "prefillNotice": "د فرمایش معلومات له پخواني فرمایش څخه چمتو شول. له ثبت مخکې یې وګورئ او تازه یې کړئ.",
+    "prefillError": "د فرمایش معلومات بار نه شول. بیا هڅه وکړئ.",
+    "searchHint": "بل فرمایش د مشتری نوم، تلیفون شمېره یا بل شمېرې له لارې ولټوئ.",
+    "col": {
+      "bill": "بل #",
+      "billNumber": "د بل شمېره",
+      "customer": "مشتری",
+      "phone": "تلیفون",
+      "type": "ډول",
+      "month": "میاشت / کال",
+      "price": "قیمت",
+      "status": "حالت",
+      "action": "عمل"
+    }
+  },
+  "superAdmin": {
+    "badge": "د SaaS کنټرول مرکز",
+    "title": "د سوپر اډمین ډشبورډ",
+    "subtitle": "د کرایه‌دارو حسابونه، ګډونونه، برانډینګ او د هر کاروبار عملیاتي حالت له یو خوندي پینل څخه اداره کړئ.",
+    "createTenant": "کرایه‌دار جوړول",
+    "editTenant": "کرایه‌دار سمول",
+    "saveChanges": "بدلونونه ثبتول",
+    "saving": "ثبتېږي...",
+    "refresh": "تازه کول",
+    "suspend": "ځنډول",
+    "activate": "فعالول",
+    "tableTitle": "کرایه‌داران",
+    "tableSubtitle": "د SaaS حسابونه ولټوئ، سم کړئ، وځنډوئ او اداره یې کړئ.",
+    "searchPlaceholder": "کرایه‌داران ولټوئ...",
+    "loadingTenants": "کرایه‌داران بارېږي...",
+    "noTenants": "هیڅ کرایه‌دار ونه موندل شو.",
+    "modalCreateSubtitle": "د نوي مشتری لپاره کاري ځای جوړول",
+    "modalEditSubtitle": "د کرایه‌دار کاري ځای تازه کول",
+    "modalHelp": "د کاروبار هویت، د ګډون لاسرسی او د مالک حساب دلته اداره کېږي.",
+    "ownerPasswordPlaceholder": "د اوسني رمز ساتلو لپاره تش پرېږدئ",
+    "activeHelp": "غیرفعال کرایه‌داران خپل سیستم نه شي کارولی.",
+    "metrics": {
+      "tenants": "کرایه‌داران",
+      "orders": "فرمایشونه",
+      "customers": "مشتریان"
+    },
+    "columns": {
+      "tenant": "کرایه‌دار",
+      "plan": "پلن",
+      "status": "حالت",
+      "expiry": "د ختم نېټه",
+      "users": "کاروونکي",
+      "customers": "مشتریان",
+      "orders": "فرمایشونه"
+    },
+    "groups": {
+      "business": "د کاروبار معلومات",
+      "owner": "د مالک حساب",
+      "localization": "ژبه او سیمه",
+      "subscription": "ګډون"
+    },
+    "fields": {
+      "businessName": "د کاروبار نوم",
+      "systemName": "د سیستم نوم",
+      "address": "پته",
+      "phone": "تلیفون",
+      "mobile": "موبایل",
+      "email": "ایمیل",
+      "logoFile": "د کرایه‌دار لوګو",
+      "currency": "اسعار",
+      "language": "ژبه",
+      "timezone": "وخت زون",
+      "ownerName": "د مالک نوم",
+      "ownerPhone": "د مالک شمېره",
+      "ownerPassword": "د مالک رمز",
+      "subscriptionPlan": "پلن",
+      "subscriptionStatus": "حالت",
+      "subscriptionStart": "د پیل نېټه",
+      "expiryDate": "د ختم نېټه",
+      "isActive": "کرایه‌دار فعال"
+    },
+    "logo": {
+      "allowed": "PNG، JPG، JPEG، WEBP یا SVG تر ۲MB پورې.",
+      "current": "اوسنی لوګو",
+      "empty": "لوګو نه دی اپلوډ شوی",
+      "remove": "لرې کول",
+      "replace": "بدلول",
+      "upload": "اپلوډ"
+    },
+    "plan": {
+      "TRIAL": "ازمایښتي",
+      "MONTHLY": "میاشتنی",
+      "YEARLY": "کلنی",
+      "CUSTOM": "ځانګړی"
+    },
+    "status": {
+      "TRIAL": "ازمایښتي",
+      "ACTIVE": "فعال",
+      "EXPIRED": "ختم شوی",
+      "SUSPENDED": "ځنډول شوی"
+    },
+    "validation": {
+      "businessName": "د کاروبار نوم اړین دی.",
+      "systemName": "د سیستم نوم اړین دی.",
+      "ownerName": "د مالک نوم اړین دی.",
+      "ownerPhone": "د مالک شمېره اړینه ده.",
+      "passwordLength": "رمز باید لږ تر لږه ۶ توري وي.",
+      "email": "سم ایمیل ولیکئ.",
+      "logoType": "لوګو باید PNG، JPG، JPEG، WEBP یا SVG وي.",
+      "logoSize": "لوګو باید ۲MB یا له هغې کم وي."
+    },
+    "toast": {
+      "created": "کرایه‌دار جوړ شو",
+      "updated": "کرایه‌دار تازه شو",
+      "deleted": "کرایه‌دار حذف شو",
+      "createFailed": "جوړول ناکام شول",
+      "updateFailed": "تازه کول ناکام شول",
+      "deleteFailed": "حذف ناکام شو"
+    }
+  },
+  "tenantSettings": {
+    "badge": "د کاري ځای تنظیمات",
+    "title": "د سیستم تنظیمات",
+    "subtitle": "د کاروبار هویت، لوګو او د تماس معلومات د بلونو، راپورونو او سیستم سرلیکونو لپاره اداره کړئ.",
+    "loading": "د کرایه‌دار تنظیمات بارېږي...",
+    "errorTitle": "تنظیمات بار نه شول",
+    "refresh": "تازه کول",
+    "save": "تنظیمات ثبتول",
+    "saving": "ثبتېږي...",
+    "unsaved": "ناسپمول شوي بدلونونه لرئ.",
+    "upToDate": "تنظیمات تازه دي.",
+    "branding": {
+      "title": "برانډینګ",
+      "subtitle": "هغه لوګو اپلوډ کړئ چې په اسنادو او د کرایه‌دار په پاڼو کې ښکاري."
+    },
+    "business": {
+      "title": "د کاروبار معلومات",
+      "subtitle": "دا معلومات د مشتریانو په اسنادو، راپورونو او د کاري ځای په نومونو کې ښکاري."
+    },
+    "fields": {
+      "businessName": "د کاروبار نوم",
+      "systemName": "د سیستم نوم",
+      "address": "پته",
+      "phone": "تلیفون",
+      "mobile": "موبایل",
+      "email": "ایمیل"
+    },
+    "logo": {
+      "allowed": "PNG، JPG، JPEG، WEBP یا SVG تر ۲MB پورې.",
+      "current": "اوسنی لوګو",
+      "empty": "لوګو نه دی اپلوډ شوی",
+      "remove": "لرې کول",
+      "replace": "بدلول",
+      "upload": "اپلوډ"
+    },
+    "meta": {
+      "currency": "اسعار",
+      "timezone": "وخت زون"
+    },
+    "validation": {
+      "businessName": "د کاروبار نوم اړین دی.",
+      "systemName": "د سیستم نوم اړین دی.",
+      "email": "سم ایمیل ولیکئ.",
+      "logoType": "لوګو باید PNG، JPG، JPEG، WEBP یا SVG وي.",
+      "logoSize": "لوګو باید ۲MB یا له هغې کم وي."
+    },
+    "toast": {
+      "saved": "تنظیمات ثبت شول",
+      "loadFailed": "د تنظیماتو بارول ناکام شول",
+      "saveFailed": "ثبتول ناکام شول"
+    }
   }
 }

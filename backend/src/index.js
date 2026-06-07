@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
+import path from "path";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { normalizeDigitsMiddleware } from "./middleware/normalizeDigits.middleware.js";
 import authRoutes from "./routes/auth.routes.js";
@@ -17,6 +18,7 @@ import dailyTaskRoutes from "./routes/dailyTask.routes.js";
 import rakhtRoutes from "./routes/rakht.routes.js";
 import backupRoutes from "./routes/backup.routes.js";
 import damagedClothesRoutes from "./routes/damagedClothes.routes.js";
+import tenantRoutes from "./routes/tenant.routes.js";
 import { startCronJobs } from "./cron/notifications.cron.js";
 import { startBackupCron } from "./cron/backup.cron.js";
 import { itemRoutes } from "./routes/item.routes.js";
@@ -115,7 +117,7 @@ const corsOptions = {
 // ✅ Ensure preflight requests always succeed
 app.options("*", cors(corsOptions));
 app.use(cors(corsOptions));
-app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || "1mb" }));
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || "5mb" }));
 app.use(
   express.urlencoded({
     extended: true,
@@ -123,6 +125,14 @@ app.use(
   }),
 );
 app.use(normalizeDigitsMiddleware);
+app.use(
+  "/uploads",
+  express.static(path.join(process.cwd(), "uploads"), {
+    fallthrough: false,
+    maxAge: "7d",
+    immutable: true,
+  }),
+);
 
 app.use(
   rateLimit({
@@ -134,6 +144,7 @@ app.use(
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/tenants", tenantRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/orders", orderRoutes);

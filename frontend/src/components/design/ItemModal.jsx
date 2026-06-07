@@ -97,7 +97,10 @@ export default function ItemModal({
           ? t("items.editTitle", { defaultValue: "Edit Item" })
           : t("items.addTitle", { defaultValue: "Add Item" })
       }
-      maxW={720}
+      maxW={640}
+      overlayClassName="item-modal-overlay"
+      boxClassName="item-modal-box"
+      bodyClassName="item-modal-body"
     >
       <div className="items-form">
         {error ? <div className="info-box ib-red">{error}</div> : null}

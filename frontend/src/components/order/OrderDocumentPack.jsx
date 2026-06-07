@@ -14,6 +14,7 @@ import {
   SHOP_CONFIG,
   getLocalizedShopValue,
 } from "../../config/shopConfig.js";
+import { assetUrl } from "../../lib/assets.js";
 import { toAsciiDigits } from "../../lib/normalize.js";
 import { formatCurrency } from "../../lib/currency.js";
 import { formatMeters } from "../../lib/meters.js";
@@ -33,6 +34,7 @@ import {
   getOrderPrimaryDisplayName as getLocalizedOrderPrimaryDisplayName,
   getOrderTypeLabel as getLocalizedOrderTypeLabel,
 } from "../../lib/orderType.js";
+import { useAuth } from "../../context/AuthContext.jsx";
 
 const SKIP_FIELDS = new Set(["id", "orderId", "__name"]);
 
@@ -363,15 +365,18 @@ function getPrintableText(value, settings, fallback = "-") {
   return fallback;
 }
 
-function PrintBillHeader({ settings, title, date, time }) {
+function PrintBillHeader({ settings, title, date, time, shop }) {
   const alignClass = settings.isRtl ? "text-right" : "text-left";
   const rowDirClass = settings.isRtl ? "flex-row-reverse" : "flex-row";
   const shopInfoAlignClass = settings.isRtl
     ? "items-end text-right"
     : "items-start text-left";
-  const logoUrl = SHOP_CONFIG.logoUrl || SHOP_CONFIG.logo || "";
-  const shopAddress = getPrintableText(SHOP_CONFIG.address, settings, "");
-  const shopInitials = String(PRINT_SHOP_HEADER_NAME || "KR")
+  const shopName = shop?.businessName || shop?.systemName || PRINT_SHOP_HEADER_NAME;
+  const logoUrl = assetUrl(shop?.logoUrl || SHOP_CONFIG.logoUrl || SHOP_CONFIG.logo || "");
+  const shopAddress = shop?.address || getPrintableText(SHOP_CONFIG.address, settings, "");
+  const shopPhones = [shop?.phone, shop?.mobile].filter(Boolean);
+  const fallbackPhones = SHOP_CONFIG.phones || [];
+  const shopInitials = String(shopName || "KR")
     .split(" ")
     .map((part) => part[0])
     .join("")
@@ -389,7 +394,7 @@ function PrintBillHeader({ settings, title, date, time }) {
             {logoUrl ? (
               <img
                 src={logoUrl}
-                alt={PRINT_SHOP_HEADER_NAME}
+                alt={shopName}
                 className="h-full w-full object-cover"
               />
             ) : (
@@ -403,7 +408,7 @@ function PrintBillHeader({ settings, title, date, time }) {
             style={{ textAlign: settings.isRtl ? "right" : "left" }}
           >
             <p className="truncate text-[14px] font-black text-white">
-              {PRINT_SHOP_HEADER_NAME}
+              {shopName}
             </p>
             <p className="print-shop-meta truncate text-[10px] text-white/90">
               {shopAddress}
@@ -412,7 +417,7 @@ function PrintBillHeader({ settings, title, date, time }) {
               className="print-shop-meta text-[10px] text-white/90 [direction:ltr] [unicode-bidi:embed]"
               style={{ textAlign: settings.isRtl ? "right" : "left" }}
             >
-              {(SHOP_CONFIG.phones || []).join(" | ")}
+              {(shopPhones.length ? shopPhones : fallbackPhones).join(" | ")}
             </p>
           </div>
         </div>
@@ -503,7 +508,7 @@ export function getMeasurementsFromOrder(order) {
   return {};
 }
 
-export function CustomerBill({ customer, order }) {
+export function CustomerBill({ customer, order, shop }) {
   const { i18n, t } = useTranslation();
   const settings = getBillLanguageSettings(
     i18n.resolvedLanguage || i18n.language,
@@ -568,6 +573,7 @@ export function CustomerBill({ customer, order }) {
         title={safeTxt("customerBill")}
         date={date}
         time={time}
+        shop={shop}
       />
 
       {isEmergency && (
@@ -856,7 +862,7 @@ export function CustomerBill({ customer, order }) {
     </div>
   );
 }
-export function CustomerCombinedBill({ customer, orders = [] }) {
+export function CustomerCombinedBill({ customer, orders = [], shop }) {
   const { i18n, t } = useTranslation();
   const settings = getBillLanguageSettings(
     i18n.resolvedLanguage || i18n.language,
@@ -966,6 +972,7 @@ export function CustomerCombinedBill({ customer, orders = [] }) {
         title={safeTxt("customerBill")}
         date={date}
         time={time}
+        shop={shop}
       />
 
       {billIsEmergency ? (
@@ -1243,7 +1250,7 @@ function renderRakhtColorValue(colorName, colorHex) {
   );
 }
 
-export function TailorBill({ customer, order, measurements, itemLabel }) {
+export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
   const { i18n, t } = useTranslation();
   const settings = getBillLanguageSettings(
     i18n.resolvedLanguage || i18n.language,
@@ -1385,6 +1392,7 @@ export function TailorBill({ customer, order, measurements, itemLabel }) {
         title={safeTxt("tailorCopy")}
         date={date}
         time={time}
+        shop={shop}
       />
 
       {order?.isEmergency && (
@@ -1906,6 +1914,8 @@ function DetailField({ label, value, Icon }) {
 
 export function OrderDocumentPack({ customer, order, previewId }) {
   const { t, i18n } = useTranslation();
+  const { user } = useAuth();
+  const shop = user?.tenant || null;
   const settings = getBillLanguageSettings(
     i18n.resolvedLanguage || i18n.language,
   );
@@ -2047,13 +2057,14 @@ export function OrderDocumentPack({ customer, order, previewId }) {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <PrintSafeSheet id={customerId}>
-          <CustomerBill customer={customer} order={order} />
+          <CustomerBill customer={customer} order={order} shop={shop} />
         </PrintSafeSheet>
         <PrintSafeSheet id={tailorId}>
           <TailorBill
             customer={customer}
             order={order}
             measurements={measurements}
+            shop={shop}
           />
         </PrintSafeSheet>
       </div>

@@ -125,13 +125,12 @@ export default function CreateOrder() {
               pd.emergencyHour != null
                 ? String(Number(pd.emergencyHour)).padStart(2, "0")
                 : "08",
-            readyMadeClothingId: pd.readyMadeClothingId || null,
-            readyMadeClothingCode: pd.readyMadeClothingCode || null,
-            readyMadeOriginalPrice: pd.readyMadeOriginalPrice ?? null,
-            readyMadeWaskatClothingId: pd.readyMadeWaskatClothingId || null,
-            readyMadeWaskatClothingCode: pd.readyMadeWaskatClothingCode || null,
-            readyMadeWaskatOriginalPrice:
-              pd.readyMadeWaskatOriginalPrice ?? null,
+            readyMadeClothingId: null,
+            readyMadeClothingCode: null,
+            readyMadeOriginalPrice: null,
+            readyMadeWaskatClothingId: null,
+            readyMadeWaskatClothingCode: null,
+            readyMadeWaskatOriginalPrice: null,
           },
         ]
       : [];
@@ -142,27 +141,13 @@ export default function CreateOrder() {
     const billing = orderTypes.length
       ? {
           [primaryBillingKey]: {
-            totalPrice: pd.billing?.totalPrice ?? "",
-            discount: pd.billing?.discount ?? "",
-            paidAmount:
-              pd.orderType === "READY_MADE" ||
-              pd.orderType === "READY_MADE_WASKAT"
-                ? ""
-                : (pd.billing?.paidAmount ?? ""),
+            totalPrice: "",
+            discount: "",
+            paidAmount: "",
+            quantity: "1",
           },
         }
       : {};
-
-    const rakhtSelections = pd.rakhtSelection
-      ? [
-          {
-            ...pd.rakhtSelection,
-            orderId: pd.orderId,
-            type: pd.orderType,
-            orderItemKey: primaryBillingKey,
-          },
-        ]
-      : [];
 
     return {
       customerId: pd.customer?.customerId || "",
@@ -171,7 +156,7 @@ export default function CreateOrder() {
       orderTypes,
       measurements: measurementsForForm,
       orderItems,
-      rakhtSelections,
+      rakhtSelections: [],
       billing,
     };
   };

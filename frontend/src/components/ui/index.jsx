@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { LuInbox, LuSearch, LuTriangleAlert, LuTrash2 } from "react-icons/lu";
 import { useTranslation } from "react-i18next";
 import { isRtlLanguage } from "../../lib/locale.js";
@@ -226,28 +228,44 @@ export const Modal = ({
   title,
   children,
   maxW = 480,
+  overlayClassName = "",
   boxClassName = "",
   bodyClassName = "",
 }) => {
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
+
   if (!open) return null;
   const docDir =
     typeof document !== "undefined"
       ? document.documentElement.getAttribute("dir") || "ltr"
       : "ltr";
-  return (
+  const modalMarkup = (
     <div
-      className="modal-bg"
+      className={`modal-bg ${overlayClassName}`.trim()}
       onClick={(e) => e.target === e.currentTarget && onClose()}
+      role="presentation"
     >
       <div
         className={`modal-box w-[95vw] sm:w-full ${boxClassName}`.trim()}
         dir={docDir}
         style={{ maxWidth: maxW }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="app-modal-title"
       >
         <div className="modal-hd">
-          <h2>{title}</h2>
+          <h2 id="app-modal-title">{title}</h2>
           <button
             onClick={onClose}
+            type="button"
+            aria-label="Close dialog"
             style={{
               background: "none",
               border: "none",
@@ -266,6 +284,9 @@ export const Modal = ({
       </div>
     </div>
   );
+
+  if (typeof document === "undefined") return modalMarkup;
+  return createPortal(modalMarkup, document.body);
 };
 
 export const ConfirmDeleteModal = ({

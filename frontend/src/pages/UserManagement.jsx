@@ -120,6 +120,7 @@ function UserModal({ user, onClose, onSaved }) {
     typeof document !== "undefined"
       ? document.documentElement.getAttribute("dir") || "ltr"
       : "ltr";
+  const isRtl = docDir === "rtl";
 
   return (
     <div
@@ -280,7 +281,8 @@ function UserModal({ user, onClose, onSaved }) {
                   size={14}
                   style={{
                     position: "absolute",
-                    insetInlineStart: 10,
+                    left: isRtl ? 10 : 10,
+                    right: "auto",
                     top: "50%",
                     transform: "translateY(-50%)",
                     color: "var(--text3)",
@@ -290,6 +292,8 @@ function UserModal({ user, onClose, onSaved }) {
                   className="inp with-leading-icon with-trailing-icon"
                   style={{
                     ...inputStyle,
+                    paddingLeft: isRtl ? 36 : 36,
+                    paddingRight: isRtl ? 36 : 36,
                   }}
                   type={showPw ? "text" : "password"}
                   value={form.password}
@@ -301,7 +305,8 @@ function UserModal({ user, onClose, onSaved }) {
                   onClick={() => setShowPw((s) => !s)}
                   style={{
                     position: "absolute",
-                    insetInlineEnd: 10,
+                    right: 10,
+                    left: "auto",
                     top: "50%",
                     transform: "translateY(-50%)",
                     background: "none",

@@ -38,6 +38,10 @@ api.interceptors.response.use(
     if (err?.response && !shouldBypassResponseNormalization(err.config)) {
       err.response.data = normalizeApiPayload(err.response.data);
     }
+    if (err.response?.status === 402) {
+      window.location.href = "/subscription-expired";
+      return Promise.reject(err);
+    }
     const original = err.config;
     if (err.response?.status === 401 && !original._retry) {
       original._retry = true;
@@ -50,6 +54,9 @@ api.interceptors.response.use(
           );
           localStorage.setItem("accessToken", data.accessToken);
           localStorage.setItem("refreshToken", data.refreshToken);
+          if (data.user) {
+            localStorage.setItem("authUser", JSON.stringify(data.user));
+          }
           original.headers.Authorization = `Bearer ${data.accessToken}`;
           return api(original);
         }

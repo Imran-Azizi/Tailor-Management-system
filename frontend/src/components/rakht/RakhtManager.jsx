@@ -43,6 +43,7 @@ import {
 export default function RakhtManager() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language || "en";
+  const isRtl = (i18n.dir?.() || "ltr") === "rtl";
   const { isAdmin } = useAuth();
   const { viewMonth, viewYear } = useMonth();
   const qc = useQueryClient();
@@ -463,7 +464,7 @@ export default function RakhtManager() {
 
   return (
     <div className="card" style={{ padding: 18 }}>
-      <section className="all-rakht-stats-grid">
+      <section className="all-rakht-stats-grid" dir={isRtl ? "rtl" : "ltr"}>
         <StatCard
           label={t("rakht.totalRecords", { defaultValue: "Total Records" })}
           value={stats.totalEntries}

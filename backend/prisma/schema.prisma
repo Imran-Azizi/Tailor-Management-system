@@ -10,11 +10,96 @@ datasource db {
 // ─── Auth & Users ─────────────────────────────────────────────────────────────
 
 enum AccountType {
+  SUPER_ADMIN
   ADMIN
   DOKAN
   DOKHT
   QICHIKAR
   FINANCE
+}
+
+enum SubscriptionPlan {
+  TRIAL
+  MONTHLY
+  YEARLY
+  CUSTOM
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  EXPIRED
+  SUSPENDED
+}
+
+model Tenant {
+  id                 String             @id @default(uuid())
+  tenantId           String             @unique
+  slug               String             @unique
+  businessName       String
+  systemName         String
+  address            String?
+  phone              String?
+  mobile             String?
+  email              String?
+  logoUrl            String?
+  currency           String             @default("AFN")
+  language           String             @default("fa")
+  timezone           String             @default("Asia/Kabul")
+  subscriptionPlan   SubscriptionPlan   @default(TRIAL)
+  subscriptionStatus SubscriptionStatus @default(TRIAL)
+  subscriptionStart  DateTime?
+  expiryDate         DateTime?
+  isActive           Boolean            @default(true)
+
+  users                    User[]
+  customers                Customer[]
+  orders                   Order[]
+  workerPaymentReceipts    WorkerPaymentReceipt[]
+  orderDrafts              OrderDraft[]
+  rakhts                   Rakht[]
+  rakhtPaymentHistories    RakhtPaymentHistory[]
+  rakhtTons                RakhtTon[]
+  notifications            Notification[]
+  userNotifications        UserNotification[]
+  boxes                    Box[]
+  readyMadeClothes         ReadyMadeClothing[]
+  readyMadeWaskatClothes   ReadyMadeWaskatClothing[]
+  dailyTasks               DailyTask[]
+  transactions             Transaction[]
+  damagedClothesPenalties  DamagedClothesPenalty[]
+  items                    Item[]
+  itemSales                ItemSale[]
+  contributors             Contributor[]
+  auditLogs                AuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slug])
+  @@index([subscriptionStatus])
+  @@index([expiryDate])
+  @@index([isActive])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([action])
+  @@index([entity, entityId])
 }
 
 enum TransactionKind {
@@ -45,6 +130,8 @@ enum DraftStatus {
 
 model User {
   id           String      @id @default(uuid())
+  tenantId     String?
+  tenant       Tenant?     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name         String
   phoneNumber  String      @unique
   accountType  AccountType
@@ -76,16 +163,21 @@ model User {
   financeCreatedOrders           Order[]                 @relation("FinanceCreatedOrders")
   createdItems                   Item[]
   createdItemSales               ItemSale[]
+  auditLogs                      AuditLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([phoneNumber])
   @@index([accountType])
+  @@index([tenantId])
+  @@index([tenantId, accountType])
 }
 
 model UserNotification {
   id      String  @id @default(uuid())
+  tenantId String  @default("default-tenant")
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userId  String
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   orderId String?
@@ -97,26 +189,35 @@ model UserNotification {
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+  @@index([tenantId])
   @@index([isRead])
   @@index([userId, isRead, createdAt])
+  @@index([tenantId, userId, isRead, createdAt])
 }
 
 // ─── Customers ────────────────────────────────────────────────────────────────
 
 model Customer {
   id          String   @id @default(uuid())
+  tenantId    String   @default("default-tenant")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   firstName   String
-  phoneNumber String   @unique
-  billNumber  Int      @unique
+  phoneNumber String
+  billNumber  Int
   orders      Order[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([phoneNumber])
+  @@index([tenantId])
+  @@unique([tenantId, phoneNumber])
+  @@unique([tenantId, billNumber])
 }
 
 model Order {
   id                         String    @id @default(uuid())
+  tenantId                   String    @default("default-tenant")
+  tenant                     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customerId                 String
   orderName                  String?
   type                       OrderType
@@ -241,6 +342,8 @@ model Order {
   readyMadeWaskatClothing      ReadyMadeWaskatClothing? @relation(fields: [readyMadeWaskatClothingId], references: [id], onDelete: SetNull)
 
   @@index([customerId])
+  @@index([tenantId])
+  @@index([tenantId, customerId])
   @@index([type])
   @@index([rakhtId])
   @@index([rakhtTonId])
@@ -270,10 +373,14 @@ model Order {
   @@index([entryYear, entryMonth])
   @@index([createdByFinanceId, entryYear, entryMonth])
   @@index([isCompleted, createdAt])
+  @@index([tenantId, isCompleted, createdAt])
+  @@index([tenantId, entryYear, entryMonth])
 }
 
 model WorkerPaymentReceipt {
   id                String         @id @default(uuid())
+  tenantId          String         @default("default-tenant")
+  tenant            Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   orderId           String
   workerId          String
   workerRole        WorkerRoleType
@@ -290,6 +397,8 @@ model WorkerPaymentReceipt {
 
   @@unique([orderId, workerRole])
   @@index([orderId])
+  @@index([tenantId])
+  @@index([tenantId, receiptDate])
   @@index([workerId])
   @@index([workerRole])
   @@index([receiptDate])
@@ -298,6 +407,8 @@ model WorkerPaymentReceipt {
 
 model OrderDraft {
   id           String      @id @default(uuid())
+  tenantId     String      @default("default-tenant")
+  tenant       Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userId       String
   user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   clientKey    String
@@ -310,12 +421,16 @@ model OrderDraft {
   updatedAt    DateTime    @updatedAt
 
   @@unique([userId, clientKey])
+  @@index([tenantId])
   @@index([userId, status])
+  @@index([tenantId, userId, status])
   @@index([updatedAt])
 }
 
 model Rakht {
   id             String     @id @default(uuid())
+  tenantId       String     @default("default-tenant")
+  tenant         Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   companyName    String
   brandName      String
   tonQuantity    Int
@@ -329,12 +444,16 @@ model Rakht {
   updatedAt      DateTime   @updatedAt
 
   @@index([companyName])
+  @@index([tenantId])
+  @@index([tenantId, companyName])
   @@index([brandName])
   @@index([date])
 }
 
 model RakhtPaymentHistory {
   id               String   @id @default(uuid())
+  tenantId         String   @default("default-tenant")
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   companyName      String
   paidAmount       Float
   totalPriceBefore Float
@@ -349,12 +468,16 @@ model RakhtPaymentHistory {
   createdAt        DateTime @default(now())
 
   @@index([companyName])
+  @@index([tenantId])
+  @@index([tenantId, companyName])
   @@index([paidAt])
   @@index([paidById])
 }
 
 model RakhtTon {
   id          String   @id @default(uuid())
+  tenantId    String   @default("default-tenant")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   rakhtId     String
   rakht       Rakht    @relation(fields: [rakhtId], references: [id], onDelete: Cascade)
   name        String
@@ -366,6 +489,8 @@ model RakhtTon {
   updatedAt   DateTime @updatedAt
 
   @@index([rakhtId])
+  @@index([tenantId])
+  @@index([tenantId, rakhtId])
 }
 
 enum OrderType {
@@ -484,7 +609,9 @@ model YakhanQaq {
 
 model ReadyMadeClothing {
   id            String   @id @default(uuid())
-  clothingCode  String   @unique
+  tenantId      String   @default("default-tenant")
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clothingCode  String
   originalPrice Float
   quantity      Int      @default(1)
   description   String?
@@ -493,6 +620,8 @@ model ReadyMadeClothing {
   updatedAt     DateTime @updatedAt
 
   @@index([clothingCode])
+  @@index([tenantId])
+  @@unique([tenantId, clothingCode])
 }
 
 model ReadyMadeOrder {
@@ -532,7 +661,9 @@ model ReadyMadeOrder {
 
 model ReadyMadeWaskatClothing {
   id            String   @id @default(uuid())
-  waskatCode    String   @unique
+  tenantId      String   @default("default-tenant")
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  waskatCode    String
   originalPrice Float
   quantity      Int      @default(1)
   description   String?
@@ -541,6 +672,8 @@ model ReadyMadeWaskatClothing {
   updatedAt     DateTime @updatedAt
 
   @@index([waskatCode])
+  @@index([tenantId])
+  @@unique([tenantId, waskatCode])
 }
 
 model ReadyMadeWaskatOrder {
@@ -567,6 +700,8 @@ model ReadyMadeWaskatOrder {
 
 model Notification {
   id        String    @id @default(uuid())
+  tenantId  String    @default("default-tenant")
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   orderId   String
   order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
   message   String
@@ -577,6 +712,8 @@ model Notification {
   updatedAt DateTime  @updatedAt
 
   @@index([orderId])
+  @@index([tenantId])
+  @@index([tenantId, isRead])
   @@index([isRead])
   @@index([nextAlert])
   @@index([expiresAt])
@@ -584,6 +721,8 @@ model Notification {
 
 model Box {
   id            Int      @id @default(autoincrement())
+  tenantId      String   @default("default-tenant")
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   boxName       String
   boxType       BoxType
   capacity      Int
@@ -593,6 +732,8 @@ model Box {
   updatedAt     DateTime @updatedAt
 
   @@index([boxType])
+  @@index([tenantId])
+  @@index([tenantId, boxType])
 }
 
 model Yakhan {
@@ -730,6 +871,8 @@ model YakhanQaqPantShip {
 
 model Contributor {
   id           String   @id @default(uuid())
+  tenantId     String   @default("default-tenant")
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name         String
   fatherName   String
   phoneNumber  String
@@ -739,6 +882,8 @@ model Contributor {
   updatedAt    DateTime @updatedAt
 
   @@index([name])
+  @@index([tenantId])
+  @@index([tenantId, name])
   @@index([phoneNumber])
 }
 
@@ -746,6 +891,8 @@ model Contributor {
 
 model DailyTask {
   id            String   @id @default(uuid())
+  tenantId      String   @default("default-tenant")
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   fromName      String
   recipientName String
   amount        Float
@@ -759,6 +906,8 @@ model DailyTask {
   updatedAt     DateTime @updatedAt
 
   @@index([createdById])
+  @@index([tenantId])
+  @@index([tenantId, taskDate])
   @@index([taskDate])
   @@index([orderId])
 }
@@ -767,6 +916,8 @@ model DailyTask {
 
 model Transaction {
   id                    String                 @id @default(uuid())
+  tenantId              String                 @default("default-tenant")
+  tenant                Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   accountType           AccountType
   userId                String
   user                  User                   @relation("UserTransactions", fields: [userId], references: [id])
@@ -784,6 +935,8 @@ model Transaction {
   updatedAt             DateTime               @updatedAt
 
   @@index([userId])
+  @@index([tenantId])
+  @@index([tenantId, transactionDate])
   @@index([orderId])
   @@index([accountType])
   @@index([kind])
@@ -797,6 +950,8 @@ model Transaction {
 
 model DamagedClothesPenalty {
   id                 String      @id @default(uuid())
+  tenantId           String      @default("default-tenant")
+  tenant             Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   transactionId      String      @unique
   transaction        Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
   userId             String
@@ -824,6 +979,8 @@ model DamagedClothesPenalty {
   updatedAt   DateTime @updatedAt
 
   @@index([userId])
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
   @@index([orderId])
   @@index([createdById])
   @@index([roleType])
@@ -840,10 +997,12 @@ enum ItemType {
 
 model Item {
   id            String     @id @default(uuid())
+  tenantId      String     @default("default-tenant")
+  tenant        Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   type          ItemType
   name          String
   brand         String
-  code          String     @unique
+  code          String
   quantity      Int        @default(0)
   originalPrice Float
   notes         String?
@@ -854,13 +1013,17 @@ model Item {
   updatedAt     DateTime   @updatedAt
 
   @@index([type])
+  @@index([tenantId])
+  @@index([tenantId, type])
   @@index([brand])
   @@index([name])
-  @@index([code])
+  @@unique([tenantId, code])
 }
 
 model ItemSale {
   id            String   @id @default(uuid())
+  tenantId      String   @default("default-tenant")
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   itemId        String
   item          Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
   type          ItemType
@@ -876,6 +1039,8 @@ model ItemSale {
   createdAt     DateTime @default(now())
 
   @@index([itemId])
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
   @@index([type])
   @@index([brand])
   @@index([code])

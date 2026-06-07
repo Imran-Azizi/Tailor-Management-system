@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { normalizeText } from "../lib/normalize.js";
+import { getTenantContext } from "../lib/tenantContext.js";
 import {
   MONEY_SCALE,
   METER_SCALE,
@@ -14,6 +15,11 @@ import {
 import { getAfghanMonthDateRange } from "../lib/afghanistanDate.js";
 
 const DEFAULT_COLOR_HEX = "#94A3B8";
+
+const getActiveTenantId = () => getTenantContext()?.tenantId || null;
+
+const withTenantId = (data, tenantId) =>
+  tenantId ? { ...data, tenantId } : data;
 
 const normalizeHexColor = (value, fallback = DEFAULT_COLOR_HEX) => {
   if (typeof value !== "string") return fallback;
@@ -754,8 +760,10 @@ export const getRakhtPaymentHistory = async ({
 
 export const createRakht = async (payload) => {
   const { tons, ...rest } = payload;
+  const tenantId = getActiveTenantId();
   const created = await prisma.rakht.create({
     data: {
+      ...(tenantId ? { tenantId } : {}),
       companyName: normalizeText(rest.companyName),
       brandName: normalizeText(rest.brandName),
       tonQuantity: toPositiveInt(rest.tonQuantity),
@@ -767,15 +775,20 @@ export const createRakht = async (payload) => {
         MONEY_SCALE,
       ),
       tons: {
-        create: tons.map((ton) => ({
-          name: normalizeText(ton.name),
-          colorHex: normalizeHexColor(ton.colorHex),
-          totalMeters: maxScaled(
-            toPositiveNumber(ton.totalMeters),
-            0.01,
-            METER_SCALE,
+        create: tons.map((ton) =>
+          withTenantId(
+            {
+              name: normalizeText(ton.name),
+              colorHex: normalizeHexColor(ton.colorHex),
+              totalMeters: maxScaled(
+                toPositiveNumber(ton.totalMeters),
+                0.01,
+                METER_SCALE,
+              ),
+            },
+            tenantId,
           ),
-        })),
+        ),
       },
     },
     include: { tons: { orderBy: { createdAt: "asc" } } },
@@ -784,6 +797,7 @@ export const createRakht = async (payload) => {
 };
 
 export const updateRakht = async (id, payload) => {
+  const tenantId = getActiveTenantId();
   const existing = await prisma.rakht.findUnique({
     where: { id },
     include: { tons: true },
@@ -831,15 +845,20 @@ export const updateRakht = async (id, payload) => {
   if (tons !== undefined) {
     await prisma.rakhtTon.deleteMany({ where: { rakhtId: id } });
     updateData.tons = {
-      create: tons.map((ton) => ({
-        name: normalizeText(ton.name),
-        colorHex: normalizeHexColor(ton.colorHex),
-        totalMeters: maxScaled(
-          toPositiveNumber(ton.totalMeters),
-          0.01,
-          METER_SCALE,
+      create: tons.map((ton) =>
+        withTenantId(
+          {
+            name: normalizeText(ton.name),
+            colorHex: normalizeHexColor(ton.colorHex),
+            totalMeters: maxScaled(
+              toPositiveNumber(ton.totalMeters),
+              0.01,
+              METER_SCALE,
+            ),
+          },
+          tenantId || existing.tenantId,
         ),
-      })),
+      ),
     };
   }
 
@@ -852,6 +871,7 @@ export const updateRakht = async (id, payload) => {
 };
 
 export const addRakhtTons = async (id, payload) => {
+  const tenantId = getActiveTenantId();
   const existing = await prisma.rakht.findUnique({
     where: { id },
     include: { tons: true },
@@ -902,15 +922,20 @@ export const addRakhtTons = async (id, payload) => {
         MONEY_SCALE,
       ),
       tons: {
-        create: incomingTons.map((ton) => ({
-          name: normalizeText(ton.name),
-          colorHex: normalizeHexColor(ton.colorHex),
-          totalMeters: maxScaled(
-            toPositiveNumber(ton.totalMeters),
-            0.01,
-            METER_SCALE,
+        create: incomingTons.map((ton) =>
+          withTenantId(
+            {
+              name: normalizeText(ton.name),
+              colorHex: normalizeHexColor(ton.colorHex),
+              totalMeters: maxScaled(
+                toPositiveNumber(ton.totalMeters),
+                0.01,
+                METER_SCALE,
+              ),
+            },
+            tenantId || existing.tenantId,
           ),
-        })),
+        ),
       },
     },
     include: { tons: { orderBy: { createdAt: "asc" } } },
