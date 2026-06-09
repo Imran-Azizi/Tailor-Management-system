@@ -13,6 +13,7 @@ export const createDailyTaskSchema = z.object({
       required_error: "Amount is required",
       invalid_type_error: "Amount must be a number",
     })
+    .finite("Amount must be a valid number")
     .positive("Amount must be greater than 0"),
   taskDate: z
     .string({ required_error: "Date & time is required" })
@@ -44,6 +45,7 @@ export const createDailyTaskBatchSchema = z.object({
             required_error: "Amount is required",
             invalid_type_error: "Amount must be a number",
           })
+          .finite("Amount must be a valid number")
           .positive("Amount must be greater than 0"),
       }),
     )

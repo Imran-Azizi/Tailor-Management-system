@@ -148,7 +148,11 @@
     "searchResult": "د لټون پایله",
     "reportEmpty": "د بل ښمېرې له مخې لټون وکړیت چې وګوړیت دا فرمایښ اوس چېرته دی.",
     "qichikarLabel": "قیچي‌کار",
-    "dokhtLabel": "دوخت"
+    "dokhtLabel": "دوخت",
+    "qichikarWorkerFallback": "قیچي‌کار",
+    "dokhtWorkerFallback": "د دوخت کارګر",
+    "qichikarReceivedStatus": "قیچي‌کار {{name}} دا فرمایش ترلاسه کړی دی.",
+    "dokhtReceivedStatus": "د دوخت کارګر {{name}} دا فرمایش ترلاسه کړی دی."
   },
   "myTasks": {
     "title": "زما دندې",
@@ -372,7 +376,11 @@
   "dashboardPage": {
     "title": "ډښبوړډ",
     "netBenefit": "خالص ګټه",
-    "netBenefitSub": "د رخت ټول عاید + د فرمایښونو ټول ګټه",
+    "netBenefitSub": "ټول عواید - ټول مصارف",
+    "otherItemsTotalProfit": "د نورو توکو ټوله ګټه",
+    "otherItemsTotalProfitSub": "د توکو د پلور له ریکارډونو څخه",
+    "damagedClothes": "خرابې جامې",
+    "damagedClothesSub": "د خرابو جامو ثبت شوي موارد",
     "tooltipOrders": "{{count}} فرمایښونه",
     "totalOrders": "ټول فرمایښونه",
     "today": "نن",
@@ -384,7 +392,14 @@
     "outstanding": "پاتې",
     "remainingBalance": "پاتې موجودي",
     "totalDailyExpenses": "ټول ورږني مصارف",
+    "totalExpenses": "ټول مصارف",
+    "totalExpensesSub": "ورځني مصارف له خالصې ګټې کمېږي",
     "totalRakhtPrice": "د ټولو رختونو قیمت",
+    "totalRakhtRevenue": "د رختونو ټول عاید",
+    "totalOrderBenefit": "د فرمایشونو ټوله ګټه",
+    "totalReadyMadeProfitAfterExpenses": "د تیار جوړو کالو ګټه له مصارفو وروسته",
+    "totalReadyMadeWaskatProfitAfterExpenses": "د تیار جوړ واسکټ ګټه له مصارفو وروسته",
+    "afterAllExpenses": "له ټولو مصارفو وروسته",
     "totalLoan": "ټول پور",
     "totalQichikarUsersMoney": "د قیچي‌کارانو ټوله پیسه",
     "totalDokhtUsersMoney": "د دوختکارانو ټوله پیسه",
@@ -463,6 +478,10 @@
     "transactionSection": "د معاملې جزیات",
     "fromName": "له طرفه",
     "fromNamePlaceholder": "د مثال: احمد رحیمي",
+    "senderPlaceholder": "لېږونکی وټاکئ یا نوم ولیکئ",
+    "createSenderOption": "«{{name}}» وکاروئ",
+    "noSendersCustom": "د لېږونکي خپل نوم ولیکئ",
+    "senderTooLong": "د لېږونکي نوم باید ۱۰۰ توري یا تر دې کم وي",
     "recipientName": "د ترلاسه کوونکي نوم",
     "recipientNamePlaceholder": "د مثال: محمد کریمي",
     "amount": "مقدار",
@@ -540,7 +559,15 @@
     "createSuccess": "د خرابو جامو جریمه په بریالیتوب ثبت شوه ({{amount}}).",
     "createFailed": "د خرابو جامو جریمه ثبت نه شوه.",
     "duplicateError": "دا فرمایش مخکې له دې کارونکي ته د جریمې په توګه ثبت شوی دی.",
+    "duplicateAssignedMessage": "دا خراب فرمایش مخکې {{worker}} ({{role}}) ته سپارل شوی دی او بل کارګر ته یې نه شئ سپارلی.",
     "duplicateWarning": "د دې کارګر او فرمایش لپاره مخکې جریمه شته.",
+    "recordsTitle": "د خرابو جامو ثبت شوي ریکارډونه",
+    "recordsSearchPlaceholder": "د بل، کارګر، مشتری یا دلیل له مخې لټون",
+    "filterByRole": "د رول له مخې فلټر",
+    "paymentStatus": "د پیسو حالت",
+    "createdBy": "جوړونکی",
+    "noRecords": "د خرابو جامو هېڅ ریکارډ ونه موندل شو.",
+    "totalRecords": "{{count}} ریکارډونه",
     "auditTitle": "د جریمې د حساب ورکونې معلومات",
     "auditText": "د خرابو جامو هره جریمه د بشپړو معلوماتو سره ثبتېږي او د کارګر په ټول پور کې شاملیږي.",
     "auditItemPenaltyAmount": "د جریمې اندازه",
@@ -552,6 +579,11 @@
     "roles": {
       "dokht": "خیاط / دوخت",
       "qichikar": "قیچي کار"
+    },
+    "paymentStatuses": {
+      "PAID_TO_WORKER": "کارګر ته ورکړل شوې",
+      "UNPAID": "نه ده ورکړل شوې",
+      "UNKNOWN": "نامعلوم"
     },
     "details": {
       "billNumber": "بل نمبر",
@@ -640,6 +672,14 @@
     "noOrdersInCategory": "د دې کټګوړیې کې هیہۍ فرمایښ ونه موندل ښو.",
     "searchBillPlaceholder": "د بل ښمیره سره لټون",
     "noOrderFoundByBill": "د دې بل ښمیرې لپاره فرمایښ ونه موندل ښو."
+  },
+  "orderCompletion": {
+    "qichikarFallback": "قیچي‌کار",
+    "dokhtFallback": "د دوخت کارګر",
+    "qichikarCompleted": "قیچي‌کار {{name}} په دې فرمایش کار بشپړ کړی دی.",
+    "dokhtCompleted": "د دوخت کارګر {{name}} په دې فرمایش کار بشپړ کړی دی.",
+    "bothCompleted": "قیچي‌کار {{qichikarName}} او د دوخت کارګر {{dokhtName}} په دې فرمایش کار بشپړ کړ.",
+    "readyForDelivery": "په دې فرمایش کار بشپړ شوی او مشتری ته د سپارلو لپاره چمتو دی."
   },
   "ui": {
     "pageSummary": "صفحه {{page}} از {{pages}} · مجموع {{total}}",

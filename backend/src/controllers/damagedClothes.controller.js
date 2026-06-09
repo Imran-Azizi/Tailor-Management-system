@@ -1,5 +1,6 @@
 import {
   createDamagedPenaltySchema,
+  damagedClothesPenaltyListSchema,
   damagedClothesRoleSchema,
   damagedClothesSearchSchema,
 } from "../validators/damagedClothes.validator.js";
@@ -52,6 +53,7 @@ export const createPenalty = async (req, res, next) => {
       return res.status(409).json({
         error: error.message,
         code: error.code,
+        existingPenalty: error.existingPenalty || null,
       });
     }
     if (error?.code === "WORKER_NOT_ON_ORDER") {
@@ -60,6 +62,16 @@ export const createPenalty = async (req, res, next) => {
         code: error.code,
       });
     }
+    next(error);
+  }
+};
+
+export const listPenalties = async (req, res, next) => {
+  try {
+    const filters = damagedClothesPenaltyListSchema.parse(req.query);
+    const result = await service.getDamagedClothesPenalties(filters);
+    res.json(result);
+  } catch (error) {
     next(error);
   }
 };

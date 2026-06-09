@@ -69,16 +69,6 @@ function withTenantFindUniqueWhere(model, args, tenantId) {
       };
     }
 
-    if (args?.where?.phoneNumber !== undefined) {
-      const { phoneNumber, tenantId: _tenantId, ...rest } = args.where;
-      return {
-        ...args,
-        where: {
-          ...rest,
-          tenantId_phoneNumber: { tenantId, phoneNumber },
-        },
-      };
-    }
   }
 
   if (model === "ReadyMadeClothing" && args?.where?.clothingCode !== undefined) {

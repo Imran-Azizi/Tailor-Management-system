@@ -21,6 +21,7 @@ import { MONEY_SCALE } from "../lib/decimal.js";
 import { getOrderTypeLabel } from "../lib/orderType.js";
 import { getMonthLabel } from "../lib/months.js";
 import { isRtlLanguage } from "../lib/locale.js";
+import { getOrderCompletionStatus } from "../lib/orderCompletionStatus.js";
 import {
   PageHeader,
   Spinner,
@@ -72,13 +73,22 @@ function OrderTypeBadge({ type, language }) {
 }
 
 function StatusBadge({ order, t }) {
-  if (order.isCompleted) {
+  const completionStatus = getOrderCompletionStatus(order, t);
+  if (completionStatus.key !== "pending") {
     return (
-      <span style={{ color: "#16a34a", fontWeight: 600, fontSize: 12 }}>
-        {t("orders.completed", "Completed")}
+      <span
+        style={{
+          color: completionStatus.color,
+          fontWeight: 600,
+          fontSize: 12,
+        }}
+        title={completionStatus.detail || completionStatus.label}
+      >
+        {completionStatus.label}
       </span>
     );
   }
+
   if (order.inProgress || order.qichikarInProgress || order.dokhtInProgress) {
     return (
       <span style={{ color: "#D97706", fontWeight: 600, fontSize: 12 }}>
@@ -404,7 +414,7 @@ export default function GlobalOrderSearch() {
           </div>
 
           {/* Desktop table */}
-          <div className="card global-order-search__table-card">
+          <div className="card global-order-search__table-card order-scroll-x">
             <table
               style={{
                 width: "100%",

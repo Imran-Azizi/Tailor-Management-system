@@ -969,6 +969,9 @@ export default function AllDailyTasks() {
       toast.success(t("dailyTasks.updated", "Task updated successfully."));
       qc.invalidateQueries({ queryKey: ["daily-tasks"] });
       qc.invalidateQueries({ queryKey: ["daily-task", vars.id] });
+      qc.invalidateQueries({ queryKey: ["analytics"] });
+      qc.invalidateQueries({ queryKey: ["analytics-dashboard"] });
+      qc.invalidateQueries({ queryKey: ["design-contributors"] });
       setEditTask(null);
     },
     onError: (err) =>
@@ -985,6 +988,9 @@ export default function AllDailyTasks() {
     onSuccess: () => {
       toast.success(t("dailyTasks.deleted"));
       qc.invalidateQueries({ queryKey: ["daily-tasks"] });
+      qc.invalidateQueries({ queryKey: ["analytics"] });
+      qc.invalidateQueries({ queryKey: ["analytics-dashboard"] });
+      qc.invalidateQueries({ queryKey: ["design-contributors"] });
       setDeleteTask(null);
     },
     onError: (err) =>

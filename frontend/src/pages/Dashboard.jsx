@@ -24,6 +24,7 @@ import {
   LuCalendarCheck,
   LuUsers,
   LuFactory,
+  LuShieldAlert,
 } from "react-icons/lu";
 import { useTranslation } from "react-i18next";
 import api from "../lib/api.js";
@@ -38,6 +39,10 @@ import {
   getOrderPrimaryDisplayName,
   getOrderTypeLabel,
 } from "../lib/orderType.js";
+import {
+  getOrderCompletionBadgeStyle,
+  getOrderCompletionStatus,
+} from "../lib/orderCompletionStatus.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
 import { formatMonthYearLabel } from "../lib/months.js";
@@ -139,21 +144,6 @@ export default function Dashboard() {
     refetchInterval: 60_000,
   });
 
-  // Fetch other items total profit (مجموع مفاد اجناس دیگر)
-  const { data: otherItemsStats } = useQuery({
-    queryKey: ["other-items-stats", viewMonth, viewYear],
-    queryFn: () =>
-      api
-        .get("/item-sales/stats", {
-          params: {
-            month: viewMonth,
-            year: viewYear,
-          },
-        })
-        .then((res) => res.data),
-    refetchInterval: 60_000,
-  });
-
   if (isLoading) {
     return (
       <div className="page">
@@ -184,15 +174,18 @@ export default function Dashboard() {
         totalReadyMadeWaskatProfit,
     ) || 0;
 
-  // Other items total profit (مجموع مفاد اجناس دیگر)
-  const otherItemsTotalProfit = Number(otherItemsStats?.totalProfit ?? 0) || 0;
-
-  const netBenefit =
+  const otherItemsTotalProfit = Number(data.otherItemsTotalProfit ?? 0) || 0;
+  const totalExpenses =
+    Number(data.totalExpenses ?? data.totalDailyExpenses ?? 0) || 0;
+  const fallbackNetBenefit =
     totalRakhtRevenue +
     totalOrderBenefit +
     totalReadyMadeProfitAfterExpenses +
     totalReadyMadeWaskatProfitAfterExpenses +
-    otherItemsTotalProfit;
+    otherItemsTotalProfit -
+    totalExpenses;
+  const netBenefit =
+    Number(data.netProfit ?? data.netBenefit ?? fallbackNetBenefit) || 0;
   const netBenefitIsPositive = netBenefit >= 0;
   const monthLabel = formatMonthYearLabel(viewMonth, viewYear, language);
   const generatedAtLabel = formatAfghanistanReportDate(new Date(), language);
@@ -216,8 +209,8 @@ export default function Dashboard() {
       accent: "#F59E42",
       adminOnly: true,
       onClick: () => navigate("/item-sales/records"),
-      ltrOrder: 8.7,
-      rtlOrder: 8.7,
+      ltrOrder: 22,
+      rtlOrder: 22,
     },
     {
       key: "totalOrders",
@@ -237,8 +230,8 @@ export default function Dashboard() {
       Icon: LuCircleCheck,
       accent: "#16A34A",
       onClick: () => navigate("/orders/completed"),
-      ltrOrder: 14,
-      rtlOrder: 14,
+      ltrOrder: 2,
+      rtlOrder: 2,
     },
     {
       key: "pendingOrders",
@@ -248,8 +241,8 @@ export default function Dashboard() {
       Icon: LuClock,
       accent: "#D97706",
       onClick: () => navigate("/orders/pending"),
-      ltrOrder: 15,
-      rtlOrder: 15,
+      ltrOrder: 3,
+      rtlOrder: 3,
     },
     {
       key: "totalAmount",
@@ -290,16 +283,15 @@ export default function Dashboard() {
         defaultValue: "Total Rakht Revenue",
       }),
       value: formatMoney(totalRakhtRevenue, language),
-      sub: t("dashboardPage.netBenefitSub", {
-        defaultValue:
-          "Total Rakht Revenue + Total Order Benefit + Total Ready-Made Profit + Total Ready-Made Waskat Profit",
+      sub: t("rakht.totalRevenueSubtitle", {
+        defaultValue: "Revenue from fabric sales to customers",
       }),
       Icon: AfCurrencyIcon,
       accent: "#0F766E",
       adminOnly: true,
       onClick: () => navigate("/rakhts/revenue"),
-      ltrOrder: 7,
-      rtlOrder: 7,
+      ltrOrder: 20,
+      rtlOrder: 20,
     },
     {
       key: "orderBenefit",
@@ -312,8 +304,8 @@ export default function Dashboard() {
       accent: "#7C3AED",
       adminOnly: true,
       onClick: () => navigate("/orders/completed"),
-      ltrOrder: 8,
-      rtlOrder: 8,
+      ltrOrder: 21,
+      rtlOrder: 21,
     },
     {
       key: "readyMadeProfit",
@@ -328,8 +320,8 @@ export default function Dashboard() {
       accent: "#059669",
       adminOnly: true,
       onClick: () => navigate("/orders/completed?type=READY_MADE"),
-      ltrOrder: 8.5,
-      rtlOrder: 8.5,
+      ltrOrder: 23,
+      rtlOrder: 23,
     },
     {
       key: "readyMadeWaskatProfit",
@@ -344,22 +336,24 @@ export default function Dashboard() {
       accent: "#0284C7",
       adminOnly: true,
       onClick: () => navigate("/orders/completed?type=READY_MADE_WASKAT"),
-      ltrOrder: 8.6,
-      rtlOrder: 8.6,
+      ltrOrder: 24,
+      rtlOrder: 24,
     },
     {
       key: "dailyExpenses",
       label: t(
-        "dashboardPage.totalDailyExpenses",
-        "Total Amount of All Daily Expenses",
+        "dashboardPage.totalExpenses",
+        "Total Expenses",
       ),
-      value: formatMoney(data.totalDailyExpenses ?? 0, language),
-      sub: t("sidebar.dailyTasks", "Daily Expenses"),
+      value: formatMoney(totalExpenses, language),
+      sub: t("dashboardPage.totalExpensesSub", {
+        defaultValue: "Daily expenses deducted from net profit",
+      }),
       Icon: AfCurrencyIcon,
       accent: "#2563EB",
       onClick: () => navigate("/daily-tasks/all"),
-      ltrOrder: 9,
-      rtlOrder: 9,
+      ltrOrder: 30,
+      rtlOrder: 30,
     },
     {
       key: "totalLoan",
@@ -369,8 +363,8 @@ export default function Dashboard() {
       Icon: AfCurrencyIcon,
       accent: "#D97706",
       onClick: () => navigate("/transactions?kind=LOAN"),
-      ltrOrder: 10,
-      rtlOrder: 10,
+      ltrOrder: 31,
+      rtlOrder: 31,
     },
     {
       key: "qichikarMoney",
@@ -383,8 +377,8 @@ export default function Dashboard() {
       Icon: AfCurrencyIcon,
       accent: "#DB2777",
       onClick: () => navigate("/orders/completed-workers?workerRole=QICHIKAR"),
-      ltrOrder: 11,
-      rtlOrder: 11,
+      ltrOrder: 40,
+      rtlOrder: 40,
     },
     {
       key: "dokhtMoney",
@@ -397,8 +391,8 @@ export default function Dashboard() {
       Icon: AfCurrencyIcon,
       accent: "#7C3AED",
       onClick: () => navigate("/orders/completed-workers?workerRole=DOKHT"),
-      ltrOrder: 12,
-      rtlOrder: 12,
+      ltrOrder: 41,
+      rtlOrder: 41,
     },
     {
       key: "emergency",
@@ -408,8 +402,22 @@ export default function Dashboard() {
       Icon: LuTriangleAlert,
       accent: "#DC2626",
       hideWhenZero: true,
-      ltrOrder: 13,
-      rtlOrder: 13,
+      ltrOrder: 7,
+      rtlOrder: 7,
+    },
+    {
+      key: "damagedClothes",
+      label: t("dashboardPage.damagedClothes", "Damaged Clothes"),
+      value: formatNumberLocale(data.damagedClothesTotal || 0, language),
+      sub: t("dashboardPage.damagedClothesSub", {
+        defaultValue: "Recorded damaged clothes cases",
+      }),
+      Icon: LuShieldAlert,
+      accent: "#B91C1C",
+      adminOnly: true,
+      onClick: () => navigate("/damaged-clothes"),
+      ltrOrder: 8,
+      rtlOrder: 8,
     },
   ];
 
@@ -420,16 +428,10 @@ export default function Dashboard() {
       const numericValue = Number(String(card.value).replace(/[^0-9.-]/g, ""));
       return Number.isFinite(numericValue) ? numericValue !== 0 : true;
     })
-    .sort((a, b) =>
-      isRtl
-        ? (a.rtlOrder ?? 99) - (b.rtlOrder ?? 99)
-        : (a.ltrOrder ?? 99) - (b.ltrOrder ?? 99),
-    );
+    .sort((a, b) => (a.ltrOrder ?? 99) - (b.ltrOrder ?? 99));
 
-  const orderStatusClassName = (isCompleted) =>
-    isCompleted
-      ? "inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-900/30 dark:text-emerald-300"
-      : "inline-flex rounded-full border border-amber-200 bg-amber-50/70 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:border-amber-700/60 dark:bg-amber-900/25 dark:text-amber-300";
+  const orderStatusClassName =
+    "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold";
 
   const tableColumns = [
     {
@@ -528,11 +530,18 @@ export default function Dashboard() {
               !
             </span>
           ) : null}
-          <span className={orderStatusClassName(order.isCompleted)}>
-            {order.isCompleted
-              ? t("dashboardPage.statusDone")
-              : t("dashboardPage.statusPending")}
-          </span>
+          {(() => {
+            const status = getOrderCompletionStatus(order, t);
+            return (
+              <span
+                className={orderStatusClassName}
+                style={getOrderCompletionBadgeStyle(status)}
+                title={status.detail || status.label}
+              >
+                {status.label}
+              </span>
+            );
+          })()}
         </div>
       ),
     },
@@ -550,7 +559,6 @@ export default function Dashboard() {
         }),
     },
   ];
-
   return (
     <div
       className={`page report-root dashboard-shell leading-relaxed tracking-normal ${
@@ -581,16 +589,16 @@ export default function Dashboard() {
       </section>
 
       <div
-        className="dashboard-stats-grid mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
-        dir={isRtl ? "rtl" : "ltr"}
+        className="dashboard-stats-grid mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
+        dir="ltr"
       >
         <StatCard
-          className="md:col-span-2 xl:col-span-3 2xl:col-span-4"
+          className="md:col-span-2 xl:col-span-3"
           label={t("dashboardPage.netBenefit", "Net Benefit")}
           value={formatMoney(netBenefit, language)}
           sub={t(
             "dashboardPage.netBenefitSub",
-            "Total Rakht Revenue + Total Order Benefit",
+            "Total Revenue - Total Expenses",
           )}
           Icon={AfCurrencyIcon}
           accent={netBenefitIsPositive ? "#16A34A" : "#DC2626"}
@@ -771,6 +779,7 @@ export default function Dashboard() {
 
         <ReportTable
           isRtl={isRtl}
+          columnFlow={isRtl ? "rtl" : "ltr"}
           columns={tableColumns}
           rows={data.recentOrders || []}
           emptyText={t("common.noData", { defaultValue: "No data found" })}

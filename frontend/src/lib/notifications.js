@@ -37,6 +37,8 @@ const BOX_NOT_FOUND_CREATE_REGEX =
 const BOX_FULL_CREATE_REGEX =
   /^(Box capacity is now full|All boxes are full)(?: \((.+?)\))? for (.+?)\. Please create another box for this order type\. (.+?) - Bill #(\d+) - (.+?)\.?$/i;
 const BOX_AVAILABLE_REGEX = /^Capacity available in (.+?) \((.+?)\)\.?$/i;
+const DAMAGED_CLOTHES_ASSIGNED_REGEX =
+  /^Damaged clothes assigned\s*\|\s*Bill Number:\s*(.+?)\s*\|\s*Role:\s*(.+?)\s*\|\s*Date:\s*(.+?)\s*\|\s*Note:\s*(.+?)\.?$/i;
 
 const normalizeOrderTypeFromText = (typeText) => {
   const raw = String(typeText || "")
@@ -351,6 +353,17 @@ const parseKnownUserNotification = (notification) => {
     };
   }
 
+  matched = msg.match(DAMAGED_CLOTHES_ASSIGNED_REGEX);
+  if (matched) {
+    return {
+      kind: "DAMAGED_CLOTHES_ASSIGNED",
+      billNumber: matched[1],
+      workerRole: matched[2],
+      date: matched[3],
+      note: matched[4],
+    };
+  }
+
   return null;
 };
 
@@ -582,6 +595,21 @@ export function formatUserNotificationMessage(
       [
         buildLine(labels.box, parsed.boxName || "-"),
         buildLine(labels.orderType, orderTypeLabel || "-"),
+      ],
+    );
+  }
+
+  if (parsed.kind === "DAMAGED_CLOTHES_ASSIGNED") {
+    return buildNotificationBody(
+      t("notificationMessages.damagedClothesAssignedTitle", "Damaged clothes assigned"),
+      [
+        buildLine(
+          labels.billNumber,
+          isolateLtr(`#${parsed.billNumber || "-"}`),
+        ),
+        buildLine(labels.role, getWorkerRoleLabel(parsed.workerRole, t)),
+        buildLine(labels.date, formatSystemDate(parsed.date, language) || "-"),
+        buildLine(labels.note, parsed.note || "-"),
       ],
     );
   }

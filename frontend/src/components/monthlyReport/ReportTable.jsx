@@ -17,15 +17,29 @@ export default function ReportTable({
   rowKey = "id",
   emptyText = "-",
   isRtl = false,
+  columnFlow,
 }) {
   if (!Array.isArray(columns) || columns.length === 0) return null;
 
+  const tableDirection =
+    columnFlow === "ltr" || columnFlow === "rtl"
+      ? columnFlow
+      : isRtl
+        ? "rtl"
+        : "ltr";
+
   return (
-    <div className="report-table-wrap overflow-x-auto">
+    <div
+      className="report-table-wrap enterprise-scroll-x order-scroll-x overflow-x-auto"
+      dir={tableDirection}
+      data-report-dir={isRtl ? "rtl" : "ltr"}
+      data-column-flow={tableDirection}
+    >
       <table
         className="report-table report-table--shared min-w-[980px] w-full border-separate border-spacing-0"
-        dir={isRtl ? "rtl" : "ltr"}
+        dir={tableDirection}
         data-report-dir={isRtl ? "rtl" : "ltr"}
+        data-column-flow={tableDirection}
       >
         <thead>
           <tr>

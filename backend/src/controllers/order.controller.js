@@ -396,6 +396,12 @@ export const markComplete = async (req, res, next) => {
         },
         receivedBy: { select: { id: true, name: true, accountType: true } },
         assignedTo: { select: { id: true, name: true, accountType: true } },
+        qichikarAssignedTo: {
+          select: { id: true, name: true, accountType: true },
+        },
+        dokhtAssignedTo: {
+          select: { id: true, name: true, accountType: true },
+        },
         assignedBy: { select: { id: true, name: true } },
         box: { select: { id: true, boxName: true } },
       },
@@ -502,6 +508,12 @@ export const markComplete = async (req, res, next) => {
             customer: true,
             box: true,
             assignedTo: { select: { id: true, name: true, accountType: true } },
+            qichikarAssignedTo: {
+              select: { id: true, name: true, accountType: true },
+            },
+            dokhtAssignedTo: {
+              select: { id: true, name: true, accountType: true },
+            },
             assignedBy: { select: { id: true, name: true } },
             receivedBy: { select: { id: true, name: true, accountType: true } },
           },
@@ -509,7 +521,8 @@ export const markComplete = async (req, res, next) => {
 
         await service.recalculateOrderBenefit(req.params.id);
 
-        const msg = `Qichikar Name: ${user.name} | Bill Number: ${order.customer.billNumber} | Order Type: ${order.type} | Customer Name: ${order.customer.firstName} | Cutting completed successfully and ready for Dokht.`;
+        const billNumber = order.billNumber ?? order.customer.billNumber;
+        const msg = `Qichikar Name: ${user.name} | Bill Number: ${billNumber} | Order Type: ${order.type} | Customer Name: ${order.customer.firstName} | Cutting completed successfully and ready for Dokht.`;
         await Promise.all(
           admins.map((admin) =>
             prisma.userNotification.create({
@@ -561,6 +574,12 @@ export const markComplete = async (req, res, next) => {
           customer: true,
           box: true,
           assignedTo: { select: { id: true, name: true, accountType: true } },
+          qichikarAssignedTo: {
+            select: { id: true, name: true, accountType: true },
+          },
+          dokhtAssignedTo: {
+            select: { id: true, name: true, accountType: true },
+          },
           assignedBy: { select: { id: true, name: true } },
           receivedBy: { select: { id: true, name: true, accountType: true } },
         },
@@ -568,7 +587,8 @@ export const markComplete = async (req, res, next) => {
 
       await service.recalculateOrderBenefit(req.params.id);
 
-      const msg = `Worker Name: ${user.name} | Bill Number: ${order.customer.billNumber} | Order Type: ${order.type} | Customer Name: ${order.customer.firstName} | This order has been completed successfully.`;
+      const billNumber = order.billNumber ?? order.customer.billNumber;
+      const msg = `Worker Name: ${user.name} | Bill Number: ${billNumber} | Order Type: ${order.type} | Customer Name: ${order.customer.firstName} | This order has been completed successfully.`;
       await Promise.all(
         admins.map((admin) =>
           prisma.userNotification.create({
@@ -597,7 +617,8 @@ export const markComplete = async (req, res, next) => {
           error.code === "BOX_CAPACITY_FULL"
             ? `capacity of this box is full${boxSuffix}`
             : `No box found for ${order.type} orders`;
-        const detailMessage = `${baseMessage} - ${order.customer.firstName} - Bill #${order.customer.billNumber} - ${order.type}.`;
+        const billNumber = order.billNumber ?? order.customer.billNumber;
+        const detailMessage = `${baseMessage} - ${order.customer.firstName} - Bill #${billNumber} - ${order.type}.`;
 
         await Promise.all(
           admins.map((admin) =>
@@ -619,7 +640,8 @@ export const markComplete = async (req, res, next) => {
       throw error;
     }
 
-    const msg = `Order completed - ${order.type} - Bill #${order.customer.billNumber} (${order.customer.firstName}) by ${user.name}.`;
+    const billNumber = order.billNumber ?? order.customer.billNumber;
+    const msg = `Order completed - ${order.type} - Bill #${billNumber} (${order.customer.firstName}) by ${user.name}.`;
     await Promise.all(
       admins.map((admin) =>
         prisma.userNotification.create({
@@ -694,7 +716,8 @@ export const markInProgress = async (req, res, next) => {
         where: { accountType: "ADMIN" },
         select: { id: true },
       });
-      const msg = `${user.name} started working on order for ${order.customer.firstName} - Bill #${order.customer.billNumber} (${order.type})`;
+      const billNumber = order.billNumber ?? order.customer.billNumber;
+      const msg = `${user.name} started working on order for ${order.customer.firstName} - Bill #${billNumber} (${order.type})`;
       await Promise.all(
         admins.map((admin) =>
           prisma.userNotification.create({
@@ -819,6 +842,12 @@ export const markReceived = async (req, res, next) => {
           customer: true,
           box: true,
           assignedTo: { select: { id: true, name: true, accountType: true } },
+          qichikarAssignedTo: {
+            select: { id: true, name: true, accountType: true },
+          },
+          dokhtAssignedTo: {
+            select: { id: true, name: true, accountType: true },
+          },
           assignedBy: { select: { id: true, name: true } },
           receivedBy: { select: { id: true, name: true, accountType: true } },
         },
@@ -876,8 +905,8 @@ export const markReceived = async (req, res, next) => {
         select: { id: true },
       });
       const msg = claim.shouldAssignToSelf
-        ? `${user.name} accepted and self-assigned order - ${claim.type} - Bill #${claim.customer.billNumber} (${claim.customer.firstName}).`
-        : `${user.name} accepted order - ${claim.type} - Bill #${claim.customer.billNumber} (${claim.customer.firstName}).`;
+        ? `${user.name} accepted and self-assigned order - ${claim.type} - Bill #${claim.billNumber ?? claim.customer.billNumber} (${claim.customer.firstName}).`
+        : `${user.name} accepted order - ${claim.type} - Bill #${claim.billNumber ?? claim.customer.billNumber} (${claim.customer.firstName}).`;
       await Promise.all(
         admins.map((admin) =>
           prisma.userNotification.create({
@@ -1032,8 +1061,8 @@ export const payWorkerForCompletedOrder = async (req, res, next) => {
 
     const roleLabel = paymentRole === "DOKHT" ? "Dokht" : "Qichikar";
     const payoutMsg = isPaidAlready
-      ? `Admin updated your completed ${roleLabel} payment - Bill #${order.customer.billNumber} (${order.customer.firstName}) - New Amount: ${Number(paymentAmount).toLocaleString("en-US")} AF.`
-      : `Admin paid your completed ${roleLabel} order - Bill #${order.customer.billNumber} (${order.customer.firstName}) - Amount: ${Number(paymentAmount).toLocaleString("en-US")} AF.`;
+      ? `Admin updated your completed ${roleLabel} payment - Bill #${order.billNumber ?? order.customer.billNumber} (${order.customer.firstName}) - New Amount: ${Number(paymentAmount).toLocaleString("en-US")} AF.`
+      : `Admin paid your completed ${roleLabel} order - Bill #${order.billNumber ?? order.customer.billNumber} (${order.customer.firstName}) - Amount: ${Number(paymentAmount).toLocaleString("en-US")} AF.`;
 
     await prisma.userNotification.create({
       data: {
@@ -1315,7 +1344,8 @@ export const assign = async (req, res, next) => {
     const normalizedOrder = service.enrichOrderAssignment(order);
 
     if (assignedToId) {
-      const msg = `New order assigned by ${req.user.name}: ${order.customer.firstName} - Bill #${order.customer.billNumber} (${order.type}) - Price: ${Number(normalizedAssignmentPrice || 0).toLocaleString("en-US")} AF${normalizedOrder.assignmentNote ? `. Note: ${normalizedOrder.assignmentNote}` : ""}`;
+      const billNumber = order.billNumber ?? order.customer.billNumber;
+      const msg = `New order assigned by ${req.user.name}: ${order.customer.firstName} - Bill #${billNumber} (${order.type}) - Price: ${Number(normalizedAssignmentPrice || 0).toLocaleString("en-US")} AF${normalizedOrder.assignmentNote ? `. Note: ${normalizedOrder.assignmentNote}` : ""}`;
       await prisma.userNotification.create({
         data: {
           userId: assignedToId,

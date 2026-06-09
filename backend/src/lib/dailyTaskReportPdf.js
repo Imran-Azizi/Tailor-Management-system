@@ -43,6 +43,16 @@ function drawDashboardStatsCards(
           accent: "#16A34A",
         },
         {
+          label: statLabels.netBenefit || "Net Profit",
+          value: `${formatReportNumber(
+            stats.netProfit ?? stats.netBenefit ?? 0,
+            language,
+          )} AF`,
+          accent: Number(stats.netProfit ?? stats.netBenefit ?? 0) >= 0
+            ? "#16A34A"
+            : "#DC2626",
+        },
+        {
           label: statLabels.collected,
           value: `${formatReportNumber(stats.totalPaid || 0, language)} AF`,
           accent: "#0891B2",

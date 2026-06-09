@@ -29,6 +29,10 @@ import {
 } from "../lib/notificationGrouping.js";
 import { formatCurrency } from "../lib/currency.js";
 import { formatMeters } from "../lib/meters.js";
+import {
+  getOrderCompletionBadgeStyle,
+  getOrderCompletionStatus,
+} from "../lib/orderCompletionStatus.js";
 
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
@@ -212,33 +216,6 @@ function isWorkerCompletedForRole(order, accountType) {
   return Boolean(order?.dokhtCompletedAt || order?.qichikarCompletedAt);
 }
 
-function getStatus(order, accountType) {
-  if (order?.isDamageOrder) return "damageOrder";
-  if (isWorkerCompletedForRole(order, accountType)) return "completed";
-  if (getRoleOrderState(order, accountType).inProgress) return "inProgress";
-  return "assigned";
-}
-
-function statusColor(status) {
-  if (status === "damageOrder") return "#B91C1C";
-  if (status === "completed") return "#DC2626";
-  if (status === "inProgress") return "#2563EB";
-  return "#D97706";
-}
-
-function statusLabel(status, t) {
-  if (status === "damageOrder") {
-    return t("orders.damageOrderStatus", "Damage Order");
-  }
-  if (status === "completed") {
-    return t("workerPanel.statusCompleted", "Completed");
-  }
-  if (status === "inProgress") {
-    return t("workerPanel.statusInProgress", "In Progress");
-  }
-  return t("workerPanel.statusAssigned", "Assigned");
-}
-
 function fmtDate(value, language) {
   if (!value) return "-";
   return formatSystemDate(value, language);
@@ -415,6 +392,7 @@ function OrderDetailsModal({ order, language, t, onClose }) {
     language,
   );
   const payment = getRolePaymentState(order, order?.assignedTo?.accountType);
+  const completionStatus = getOrderCompletionStatus(order, t);
   const measure = getMeasure(order);
   const paidToWorker = payment.status === "PAID_TO_WORKER";
   const priceValue = paidToWorker
@@ -491,6 +469,20 @@ function OrderDetailsModal({ order, language, t, onClose }) {
             <div className="mt-2">
               <OrderCreatorBadge order={order} compact />
             </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <span
+                className="badge"
+                style={getOrderCompletionBadgeStyle(completionStatus)}
+                title={completionStatus.detail || completionStatus.label}
+              >
+                {completionStatus.label}
+              </span>
+              {completionStatus.detail ? (
+                <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                  {completionStatus.detail}
+                </span>
+              ) : null}
+            </div>
           </div>
           <button
             className="btn btn-outline btn-sm mt-2 sm:mt-0"
@@ -527,7 +519,7 @@ function OrderDetailsModal({ order, language, t, onClose }) {
               defaultValue: "Rakht Selection",
             })}
           </div>
-          <div className="overflow-x-auto rounded-xl border border-sky-100 dark:border-slate-700 bg-white dark:bg-slate-900">
+          <div className="order-scroll-x overflow-x-auto rounded-xl border border-sky-100 dark:border-slate-700 bg-white dark:bg-slate-900">
             <table className="min-w-full border-collapse">
               <thead>
                 <tr>
@@ -576,7 +568,7 @@ function OrderDetailsModal({ order, language, t, onClose }) {
           <div className="text-base font-bold text-sky-800 dark:text-slate-200 mb-2 border-b border-sky-100 dark:border-slate-700 pb-1">
             {t("createOrder.measurements", "Measurements")}
           </div>
-          <div className="overflow-x-auto rounded-xl border border-sky-100 dark:border-slate-700 bg-white dark:bg-slate-900">
+          <div className="order-scroll-x overflow-x-auto rounded-xl border border-sky-100 dark:border-slate-700 bg-white dark:bg-slate-900">
             <table className="min-w-full border-collapse">
               <thead>
                 <tr>
@@ -619,7 +611,7 @@ function OrderDetailsModal({ order, language, t, onClose }) {
           <div className="text-base font-bold text-sky-800 dark:text-slate-200 mb-2 border-b border-sky-100 dark:border-slate-700 pb-1">
             {t("createOrder.styleOptions", "Styling Details")}
           </div>
-          <div className="overflow-x-auto rounded-xl border border-sky-100 dark:border-slate-700 bg-white dark:bg-slate-900">
+          <div className="order-scroll-x overflow-x-auto rounded-xl border border-sky-100 dark:border-slate-700 bg-white dark:bg-slate-900">
             <table className="min-w-full border-collapse">
               <thead>
                 <tr>
@@ -678,6 +670,25 @@ function PenaltyDetailModal({ penalty, language, t, onClose }) {
       label: t("workerPanel.statusCompleted"),
       bg: "var(--green-bg, #DCFCE7)",
       color: "var(--green-fg, #15803D)",
+    },
+    READY_FOR_DELIVERY: {
+      label: t("orderCompletion.readyForDelivery"),
+      bg: "var(--green-bg, #DCFCE7)",
+      color: "var(--green-fg, #15803D)",
+    },
+    QICHIKAR_COMPLETED: {
+      label: t("orderCompletion.qichikarCompleted", {
+        name: t("orderCompletion.qichikarFallback", "Qichikar"),
+      }),
+      bg: "#DBEAFE",
+      color: "#2563EB",
+    },
+    DOKHT_COMPLETED: {
+      label: t("orderCompletion.dokhtCompleted", {
+        name: t("orderCompletion.dokhtFallback", "Dokht worker"),
+      }),
+      bg: "#FEF3C7",
+      color: "#D97706",
     },
     IN_PROGRESS: {
       label: t("workerPanel.statusInProgress"),
@@ -783,7 +794,7 @@ function PenaltyDetailModal({ penalty, language, t, onClose }) {
           {t("workerPanel.orderInfoSection", "Order Information")}
         </p>
         <div style={tableWrapStyle}>
-          <div className="overflow-x-auto">
+          <div className="order-scroll-x overflow-x-auto">
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <tbody>
                 {[
@@ -884,7 +895,7 @@ function PenaltyDetailModal({ penalty, language, t, onClose }) {
           {t("workerPanel.billingInfoSection", "Billing Information")}
         </p>
         <div style={tableWrapStyle}>
-          <div className="overflow-x-auto">
+          <div className="order-scroll-x overflow-x-auto">
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
@@ -958,7 +969,7 @@ function PenaltyDetailModal({ penalty, language, t, onClose }) {
           {t("workerPanel.expenseInfoSection", "Expense Information")}
         </p>
         <div style={tableWrapStyle}>
-          <div className="overflow-x-auto">
+          <div className="order-scroll-x overflow-x-auto">
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
@@ -1719,14 +1730,13 @@ export default function WorkerPanel() {
 
   const renderOrderCard = (order, source = "list") => {
     const orderLabel = getOrderLabelParts(order, language);
-    const status = getStatus(order, user?.accountType);
+    const completionStatus = getOrderCompletionStatus(order, t);
     const isCompleted =
       isWorkerCompletedForRole(order, user?.accountType) ||
       optimisticCompletedIds.includes(order.id);
     const roleState = getRoleOrderState(order, user?.accountType);
     const isInProgress =
       roleState.inProgress || optimisticInProgressIds.includes(order.id);
-    const sColor = statusColor(status);
     const receivedByCurrentUser = roleState.receivedById === user?.id;
     const canReceive = canOrderBeReceived(order);
     const canStart = !isCompleted && receivedByCurrentUser && !isInProgress;
@@ -1750,17 +1760,26 @@ export default function WorkerPanel() {
             alignItems: "flex-start",
           }}
         >
-          <span
-            className="badge"
-            style={{
-              background: `${typeColor}18`,
-              color: typeColor,
-              border: `1px solid ${typeColor}40`,
-              flexShrink: 0,
-            }}
-          >
-            {orderLabel.typeWithSequenceLabel}
-          </span>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            <span
+              className="badge"
+              style={{
+                background: `${typeColor}18`,
+                color: typeColor,
+                border: `1px solid ${typeColor}40`,
+                flexShrink: 0,
+              }}
+            >
+              {orderLabel.typeWithSequenceLabel}
+            </span>
+            <span
+              className="badge"
+              style={getOrderCompletionBadgeStyle(completionStatus)}
+              title={completionStatus.detail || completionStatus.label}
+            >
+              {completionStatus.label}
+            </span>
+          </div>
         </div>
 
         {/* ── Customer identity block ── */}
@@ -2504,6 +2523,28 @@ export default function WorkerPanel() {
                       label: t("workerPanel.statusCompleted"),
                       bg: "#DCFCE7",
                       color: "#15803D",
+                    },
+                    READY_FOR_DELIVERY: {
+                      label: t("orderCompletion.readyForDelivery"),
+                      bg: "#DCFCE7",
+                      color: "#15803D",
+                    },
+                    QICHIKAR_COMPLETED: {
+                      label: t("orderCompletion.qichikarCompleted", {
+                        name: t("orderCompletion.qichikarFallback", "Qichikar"),
+                      }),
+                      bg: "#DBEAFE",
+                      color: "#2563EB",
+                    },
+                    DOKHT_COMPLETED: {
+                      label: t("orderCompletion.dokhtCompleted", {
+                        name: t(
+                          "orderCompletion.dokhtFallback",
+                          "Dokht worker",
+                        ),
+                      }),
+                      bg: "#FEF3C7",
+                      color: "#D97706",
                     },
                     IN_PROGRESS: {
                       label: t("workerPanel.statusInProgress"),

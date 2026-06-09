@@ -52,6 +52,7 @@ import {
   formatNumberLocale,
   isRtlLanguage,
 } from "../lib/locale.js";
+import { getOrderCompletionStatus } from "../lib/orderCompletionStatus.js";
 
 const ROLE_COLORS = { QICHIKAR: "#D97706", DOKHT: "#DB2777" };
 
@@ -799,7 +800,7 @@ function OrderViewModal({ orderId, open, onClose }) {
             </div>
 
             <div
-              className="tbl-wrap order-details-expenses-table"
+              className="tbl-wrap order-details-expenses-table order-scroll-x"
               style={{ overflowX: "auto" }}
             >
               <table className="tbl" style={{ minWidth: 620 }}>
@@ -1190,26 +1191,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
           : statusFilter === "completed"
             ? t("orders.titleCompleted")
             : t("orders.titleAll");
-  const completedStatusLabel = t(
-    "common.completed",
-    t("sidebar.completed", "Completed"),
-  );
-  const damageOrderStatusLabel = t("orders.damageOrderStatus", "Damage Order");
-
-  const getStatusBadgeMeta = (order) => {
-    if (order?.isDamageOrder) {
-      return { variant: "red", label: damageOrderStatusLabel };
-    }
-
-    const isCompletedStatus =
-      statusFilter === "completed" || order?.isCompleted;
-    return {
-      variant: isCompletedStatus ? "red" : "amber",
-      label: isCompletedStatus
-        ? completedStatusLabel
-        : t("delivery.notFullyPaidBadge", "Not Completed"),
-    };
-  };
+  const getStatusBadgeMeta = (order) => getOrderCompletionStatus(order, t);
 
   // Always show newest orders at the top
   const orders = (data?.data || [])
@@ -1446,7 +1428,10 @@ export default function AllOrders({ filter, mode = "orders" }) {
         ) : (
           <>
             <div className="all-orders-desktop">
-              <div className="tbl-wrap all-orders-table-wrap">
+              <div
+                className="tbl-wrap all-orders-table-wrap order-scroll-x"
+                tabIndex={0}
+              >
                 <table className="tbl all-orders-table">
                   <thead>
                     <tr>
@@ -1550,9 +1535,16 @@ export default function AllOrders({ filter, mode = "orders" }) {
                                   const statusMeta = getStatusBadgeMeta(o);
 
                                   return (
-                                    <Badge v={statusMeta.variant}>
-                                      {statusMeta.label}
-                                    </Badge>
+                                    <>
+                                      <Badge v={statusMeta.tone}>
+                                        {statusMeta.label}
+                                      </Badge>
+                                      {statusMeta.detail ? (
+                                        <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+                                          {statusMeta.detail}
+                                        </span>
+                                      ) : null}
+                                    </>
                                   );
                                 })()}
                               </div>
@@ -1695,9 +1687,16 @@ export default function AllOrders({ filter, mode = "orders" }) {
                           const statusMeta = getStatusBadgeMeta(o);
 
                           return (
-                            <Badge v={statusMeta.variant}>
-                              {statusMeta.label}
-                            </Badge>
+                            <>
+                              <Badge v={statusMeta.tone}>
+                                {statusMeta.label}
+                              </Badge>
+                              {statusMeta.detail ? (
+                                <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+                                  {statusMeta.detail}
+                                </span>
+                              ) : null}
+                            </>
                           );
                         })()}
                       </div>

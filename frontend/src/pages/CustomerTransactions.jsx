@@ -11,6 +11,7 @@ import api from "../lib/api.js";
 import { getOrderLabelParts } from "../lib/orderType.js";
 import { formatSystemDate } from "../lib/locale.js";
 import { formatCurrency } from "../lib/currency.js";
+import { getOrderCompletionStatus } from "../lib/orderCompletionStatus.js";
 import {
   Spinner,
   EmptyState,
@@ -190,6 +191,7 @@ function CustomerRow({ customer, expanded, onToggle }) {
               <tbody>
                 {orders.map((o, i) => {
                   const orderLabel = getOrderLabelParts(o, language);
+                  const completionStatus = getOrderCompletionStatus(o, t);
                   return (
                     <tr
                       key={o.id}
@@ -240,11 +242,21 @@ function CustomerRow({ customer, expanded, onToggle }) {
                         {formatMoney(o.remaining, language)}
                       </td>
                       <td style={{ padding: "8px 10px" }}>
-                        <Badge v={o.isCompleted ? "green" : "amber"}>
-                          {o.isCompleted
-                            ? t("orders.done")
-                            : t("orders.pending")}
+                        <Badge v={completionStatus.tone}>
+                          {completionStatus.label}
                         </Badge>
+                        {completionStatus.detail ? (
+                          <div
+                            style={{
+                              marginTop: 4,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: completionStatus.color,
+                            }}
+                          >
+                            {completionStatus.detail}
+                          </div>
+                        ) : null}
                       </td>
                       <td
                         style={{ padding: "8px 10px", color: "var(--text3)" }}

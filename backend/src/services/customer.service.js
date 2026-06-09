@@ -313,6 +313,13 @@ export const getCustomerById = async (id) => {
           readyMadeWaskatOrder: true,
           box: true,
           foreignBox: true,
+          assignedTo: { select: { id: true, name: true, accountType: true } },
+          qichikarAssignedTo: {
+            select: { id: true, name: true, accountType: true },
+          },
+          dokhtAssignedTo: {
+            select: { id: true, name: true, accountType: true },
+          },
         },
         orderBy: { createdAt: "desc" },
       },

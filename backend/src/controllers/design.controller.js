@@ -73,12 +73,7 @@ const getNetBenefit = async (req) => {
     financeUserId: isFinance ? req.user?.id : null,
   });
 
-  return (
-    Number(stats.totalRakhtRevenue || 0) +
-    Number(stats.totalOrderBenefit || 0) +
-    Number(stats.totalReadyMadeProfitAfterExpenses || 0) +
-    Number(stats.totalReadyMadeWaskatProfitAfterExpenses || 0)
-  );
+  return Number(stats.netProfit ?? stats.netBenefit ?? 0);
 };
 
 const getCurrentTotalPercentage = async (excludeId = null) => {

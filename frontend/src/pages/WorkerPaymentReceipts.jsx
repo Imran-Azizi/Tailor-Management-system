@@ -289,7 +289,7 @@ export default function WorkerPaymentReceipts() {
               message={t("workerReceipts.empty", "No receipt records found.")}
             />
           ) : (
-            <div style={{ overflowX: "auto" }}>
+            <div className="tbl-wrap order-scroll-x">
               <table className="tbl">
                 <thead>
                   <tr>

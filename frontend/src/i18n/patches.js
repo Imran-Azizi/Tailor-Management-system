@@ -215,6 +215,7 @@
       invalidOrderTypeAmount:
         "Enter a valid amount for each selected order type.",
       senderRequired: "Sender is required",
+      senderTooLong: "Sender name must be 100 characters or less",
       recipientRequired: "Recipient name is required",
       taskDateRequired: "Date and time is required",
       amountPositive: "Amount must be a positive number",
@@ -232,7 +233,9 @@
       deleted: "Expense deleted.",
       updateTitle: "Update Daily Expense",
       editExpired: "Editing time expired",
-      senderPlaceholder: "Select a Dokan sender",
+      senderPlaceholder: "Select or type sender name",
+      createSenderOption: 'Use "{{name}}"',
+      noSendersCustom: "Type a custom sender name",
       report: "Report",
       reportDailyFull: "Daily Report",
       reportWeeklyFull: "Weekly Report",
@@ -257,12 +260,14 @@
       title: "Dashboard",
       netBenefit: "Net Benefit",
       netBenefitSub:
-        "Total Rakht Revenue + Total Order Benefit + Total Ready-Made Profit + Total Ready-Made Waskat Profit",
+        "Total Revenue - Total Expenses",
       totalOrders: "Total Orders",
       totalAmount: "Total Amount",
       totalRakhtRevenue: "Total Rakht Revenue",
       totalOrderBenefit: "Total Order Benefit",
       totalDailyExpenses: "Total Amount of All Daily Expenses",
+      totalExpenses: "Total Expenses",
+      totalExpensesSub: "Daily expenses deducted from net profit",
       totalRakhtPrice: "Total Price of All Rakhts",
       totalLoan: "Total Loan",
       totalQichikarUsersMoney: "Total Money for Qichikar Workers",
@@ -545,6 +550,12 @@
       orderNotFoundSystem: "Order not found in the system",
       statusWithQichikar: "With Qichikar {{name}}",
       statusWithDokht: "With Dokht {{name}}",
+      qichikarWorkerFallback: "Qichikar",
+      dokhtWorkerFallback: "Dokht worker",
+      qichikarReceivedStatus:
+        "Qichikar {{name}} has received this order.",
+      dokhtReceivedStatus:
+        "Dokht worker {{name}} has received this order.",
       statusCompleted: "Order completed",
       statusPending: "Order is pending",
       noOrdersFound: "No orders found for this bill.",
@@ -741,6 +752,16 @@
       appliedBy: "Applied By",
       noDamagedPenaltyHistory: "No penalty record found.",
       viewDetails: "View Details",
+    },
+    orderCompletion: {
+      qichikarFallback: "Qichikar",
+      dokhtFallback: "Dokht worker",
+      qichikarCompleted: "Qichikar {{name}} completed work on this order.",
+      dokhtCompleted: "Dokht worker {{name}} completed work on this order.",
+      bothCompleted:
+        "Qichikar {{qichikarName}} and Dokht worker {{dokhtName}} completed work on this order.",
+      readyForDelivery:
+        "Work on this order is complete and ready for delivery to the customer.",
     },
     navbar: {
       notifications: "Notifications",
@@ -1205,6 +1226,7 @@
       invalidOrderTypeAmount:
         "برای هر نوع سفارش انتخاب‌شده مقدار درست وارد کنید.",
       senderRequired: "فرستنده ضروری است",
+      senderTooLong: "نام فرستنده باید حداکثر ۱۰۰ حرف باشد",
       recipientRequired: "نام گیرنده ضروری است",
       taskDateRequired: "تاریخ و زمان ضروری است",
       amountPositive: "مقدار باید یک عدد مثبت باشد",
@@ -1221,7 +1243,9 @@
       deleted: "مصرف حذف شد.",
       updateTitle: "به‌روزرسانی مصرف روزانه",
       editExpired: "زمان ویرایش تمام شده است",
-      senderPlaceholder: "فرستنده دکان را انتخاب کنید",
+      senderPlaceholder: "فرستنده را انتخاب کنید یا نام را بنویسید",
+      createSenderOption: "استفاده از «{{name}}»",
+      noSendersCustom: "نام دلخواه فرستنده را بنویسید",
       report: "گزارش",
       reportDailyFull: "گزارش روزانه",
       reportWeeklyFull: "گزارش هفته‌وار",
@@ -1239,12 +1263,15 @@
     dashboardPage: {
       title: "داشبورد",
       netBenefit: "درآمد خالص",
-      netBenefitSub: "مجموع عاید رخت + مجموع فایده سفارش‌ها",
+      netBenefitSub:
+        "مجموع عواید - مجموع مصارف",
       totalOrders: "مجموع سفارشات",
       totalAmount: "مقدار کل",
       totalRakhtRevenue: "مجموع عاید رخت",
       totalOrderBenefit: "مجموع فایده سفارش‌ها",
       totalDailyExpenses: "مجموع مقدار تمام مصارف روزانه",
+      totalExpenses: "مجموع مصارف",
+      totalExpensesSub: "مصارف روزانه از درآمد خالص کم می‌شود",
       totalRakhtPrice: "مجموع قیمت تمام رخت‌ها",
       totalLoan: "مجموع قرضه",
       totalQichikarUsersMoney: "مجموع پول برای کارگران قیچی‌کار",
@@ -1526,6 +1553,12 @@
       orderNotFoundSystem: "فرمایش در سیستم موجود نیست",
       statusWithQichikar: "با قیچی‌کار است: {{name}}",
       statusWithDokht: "با دوخت است: {{name}}",
+      qichikarWorkerFallback: "قیچیکار",
+      dokhtWorkerFallback: "کارگر دوخت",
+      qichikarReceivedStatus:
+        "قیچیکار {{name}} این سفارش را دریافت کرده است.",
+      dokhtReceivedStatus:
+        "کارگر دوخت {{name}} این سفارش را دریافت کرده است.",
       statusCompleted: "فرمایش تکمیل شده است",
       statusPending: "در حال انتظار است",
       noOrdersFound: "برای این بل سفارشی یافت نشد.",
@@ -1776,6 +1809,18 @@
       appliedBy: "ثبت‌شده توسط",
       noDamagedPenaltyHistory: "هیچ سابقه جریمه‌ای یافت نشد.",
       viewDetails: "دیدن جزئیات",
+    },
+    orderCompletion: {
+      qichikarFallback: "قیچی‌کار",
+      dokhtFallback: "کارگر دوخت",
+      qichikarCompleted:
+        "قیچیکار {{name}} کار روی این سفارش را تکمیل کرده است.",
+      dokhtCompleted:
+        "کارگر دوخت {{name}} کار روی این سفارش را تکمیل کرده است.",
+      bothCompleted:
+        "قیچیکار {{qichikarName}} و کارگر دوخت {{dokhtName}} کار روی این سفارش را تکمیل کردند.",
+      readyForDelivery:
+        "کار روی این سفارش تکمیل شده و آماده برای تحویل به مشتری است.",
     },
     workerReceipts: {
       title: "تاریخچه رسید پرداخت کارگران",
@@ -2207,6 +2252,7 @@
       selectAtLeastOneOrderType: "مهرباني وکړئ لږ تر لږه یو ډول فرمایش وټاکئ.",
       invalidOrderTypeAmount: "د هر ټاکل شوي فرمایش ډول لپاره سم مقدار ولیکئ.",
       senderRequired: "لېږونکی اړین دی",
+      senderTooLong: "د لېږونکي نوم باید ۱۰۰ توري یا تر دې کم وي",
       recipientRequired: "د اخیستونکي نوم اړین دی",
       taskDateRequired: "نېټه او وخت اړین دي",
       amountPositive: "مقدار باید مثبت عدد وي",
@@ -2222,7 +2268,9 @@
       deleted: "مصرف حذف شو.",
       updateTitle: "د ورځني مصرف تازه کول",
       editExpired: "د سمون وخت پای ته رسېدلی",
-      senderPlaceholder: "د دوکان لېږونکی وټاکئ",
+      senderPlaceholder: "لېږونکی وټاکئ یا نوم ولیکئ",
+      createSenderOption: "«{{name}}» وکاروئ",
+      noSendersCustom: "د لېږونکي خپل نوم ولیکئ",
       report: "راپور",
       reportDailyFull: "ورځنی راپور",
       reportWeeklyFull: "اوونیز راپور",
@@ -2240,12 +2288,15 @@
     dashboardPage: {
       title: "ډشبورډ",
       netBenefit: "خالص ګټه",
-      netBenefitSub: "د رخت ټول عاید + د فرمایشونو ټول ګټه",
+      netBenefitSub:
+        "ټول عواید - ټول مصارف",
       totalOrders: "ټول فرمایشونه",
       totalAmount: "ټول مقدار",
       totalRakhtRevenue: "د رختونو ټول عاید",
       totalOrderBenefit: "د فرمایشونو ټوله ګټه",
       totalDailyExpenses: "د ټولو ورځنیو لګښتونو ټول مقدار",
+      totalExpenses: "ټول مصارف",
+      totalExpensesSub: "ورځني مصارف له خالصې ګټې کمېږي",
       totalRakhtPrice: "د ټولو رختونو ټول قیمت",
       totalLoan: "ټوله قرضه",
       totalQichikarUsersMoney: "د قیچي‌کار کارګرانو لپاره ټولې پیسې",
@@ -2525,6 +2576,12 @@
       orderNotFoundSystem: "فرمایش په سیستم کې نشته",
       statusWithQichikar: "له قیچي‌کار سره ده: {{name}}",
       statusWithDokht: "له دخت سره ده: {{name}}",
+      qichikarWorkerFallback: "قیچي‌کار",
+      dokhtWorkerFallback: "د دوخت کارګر",
+      qichikarReceivedStatus:
+        "قیچي‌کار {{name}} دا فرمایش ترلاسه کړی دی.",
+      dokhtReceivedStatus:
+        "د دوخت کارګر {{name}} دا فرمایش ترلاسه کړی دی.",
       statusCompleted: "فرمایش تکمیل شوی دی",
       statusPending: "د انتظار په حالت کې دی",
       noOrdersFound: "د دې بل لپاره فرمایش ونه موندل شو.",
@@ -2786,6 +2843,18 @@
       appliedBy: "ثبت کړی",
       noDamagedPenaltyHistory: "د جریمې هېڅ سابقه ونه موندل شوه.",
       viewDetails: "تفصیل وګورئ",
+    },
+    orderCompletion: {
+      qichikarFallback: "قیچي‌کار",
+      dokhtFallback: "د دوخت کارګر",
+      qichikarCompleted:
+        "قیچي‌کار {{name}} په دې فرمایش کار بشپړ کړی دی.",
+      dokhtCompleted:
+        "د دوخت کارګر {{name}} په دې فرمایش کار بشپړ کړی دی.",
+      bothCompleted:
+        "قیچي‌کار {{qichikarName}} او د دوخت کارګر {{dokhtName}} په دې فرمایش کار بشپړ کړ.",
+      readyForDelivery:
+        "په دې فرمایش کار بشپړ شوی او مشتری ته د سپارلو لپاره چمتو دی.",
     },
     workerReceipts: {
       title: "د کارکوونکو د ورکړې رسید تاریخچه",
@@ -3086,6 +3155,8 @@ const LOCALIZATION_COMPLETION_PATCHES = {
     dashboardPage: {
       otherItemsTotalProfit: "Other Items Total Profit",
       otherItemsTotalProfitSub: "From item sales records",
+      damagedClothes: "Damaged Clothes",
+      damagedClothesSub: "Recorded damaged clothes cases",
       totalReadyMadeProfitAfterExpenses: "Total Ready-Made Profit (After Expenses)",
       totalReadyMadeWaskatProfitAfterExpenses:
         "Total Ready-Made Waskat Profit (After Expenses)",
@@ -3316,6 +3387,8 @@ const LOCALIZATION_COMPLETION_PATCHES = {
     dashboardPage: {
       otherItemsTotalProfit: "مجموع فایده اجناس دیگر",
       otherItemsTotalProfitSub: "از سوابق فروش اجناس",
+      damagedClothes: "لباس‌های خراب",
+      damagedClothesSub: "تعداد سوابق ثبت‌شده لباس‌های خراب",
       totalReadyMadeProfitAfterExpenses: "فایده لباس آماده پس از مصارف",
       totalReadyMadeWaskatProfitAfterExpenses:
         "فایده واسکت آماده پس از مصارف",
@@ -3547,6 +3620,8 @@ const LOCALIZATION_COMPLETION_PATCHES = {
     dashboardPage: {
       otherItemsTotalProfit: "د نورو توکو ټوله ګټه",
       otherItemsTotalProfitSub: "د توکو د پلور له ریکارډونو څخه",
+      damagedClothes: "خرابې جامې",
+      damagedClothesSub: "د خرابو جامو ثبت شوي موارد",
       totalReadyMadeProfitAfterExpenses: "د تیار جوړو کالو ګټه له مصارفو وروسته",
       totalReadyMadeWaskatProfitAfterExpenses:
         "د تیار جوړ واسکټ ګټه له مصارفو وروسته",

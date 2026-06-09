@@ -154,9 +154,11 @@
   "dashboardPage": {
     "title": "Dashboard",
     "netBenefit": "Net Benefit",
-    "netBenefitSub": "Total Rakht Revenue + Total Order Benefit + Total Ready-Made Profit + Total Ready-Made Waskat Profit",
+    "netBenefitSub": "Total Revenue - Total Expenses",
     "otherItemsTotalProfit": "Other Items Total Profit",
     "otherItemsTotalProfitSub": "From item sales records",
+    "damagedClothes": "Damaged Clothes",
+    "damagedClothesSub": "Recorded damaged clothes cases",
     "tooltipOrders": "{{count}} orders",
     "totalOrders": "Total Orders",
     "today": "Today",
@@ -168,6 +170,8 @@
     "outstanding": "Outstanding",
     "remainingBalance": "Remaining balance",
     "totalDailyExpenses": "Total Daily Expenses",
+    "totalExpenses": "Total Expenses",
+    "totalExpensesSub": "Daily expenses deducted from net profit",
     "totalRakhtPrice": "Total Rakht Price",
     "totalLoan": "Total Loan",
     "totalQichikarUsersMoney": "Total Qichikar Earnings",
@@ -217,6 +221,10 @@
     "reportEmpty": "Search by bill number to see where this order is currently assigned.",
     "qichikarLabel": "Qichikar",
     "dokhtLabel": "Dokht",
+    "qichikarWorkerFallback": "Qichikar",
+    "dokhtWorkerFallback": "Dokht worker",
+    "qichikarReceivedStatus": "Qichikar {{name}} has received this order.",
+    "dokhtReceivedStatus": "Dokht worker {{name}} has received this order.",
     "completedReassignBlocked": "This order is completed. You cannot assign it again."
   },
   "myTasks": {
@@ -525,6 +533,14 @@
     "readyMadeOriginalPrice": "Ready-Made Original Price",
     "readyMadeWaskatOriginalPrice": "Ready-Made Waskat Original Price"
   },
+  "orderCompletion": {
+    "qichikarFallback": "Qichikar",
+    "dokhtFallback": "Dokht worker",
+    "qichikarCompleted": "Qichikar {{name}} completed work on this order.",
+    "dokhtCompleted": "Dokht worker {{name}} completed work on this order.",
+    "bothCompleted": "Qichikar {{qichikarName}} and Dokht worker {{dokhtName}} completed work on this order.",
+    "readyForDelivery": "Work on this order is complete and ready for delivery to the customer."
+  },
   "dailyTasks": {
     "title": "Daily Expenses",
     "subtitle": "Create and manage daily financial expenses",
@@ -542,6 +558,10 @@
     "transactionSection": "Transaction Details",
     "fromName": "From",
     "fromNamePlaceholder": "e.g. Ahmad Rahimi",
+    "senderPlaceholder": "Select or type sender name",
+    "createSenderOption": "Use \"{{name}}\"",
+    "noSendersCustom": "Type a custom sender name",
+    "senderTooLong": "Sender name must be 100 characters or less",
     "recipientName": "Recipient Name",
     "recipientNamePlaceholder": "e.g. Mohammad Karimi",
     "amount": "Amount",
@@ -619,7 +639,15 @@
     "createSuccess": "Damaged clothes penalty created successfully ({{amount}}).",
     "createFailed": "Failed to create damaged clothes penalty.",
     "duplicateError": "This order has already been applied as a penalty to this user.",
+    "duplicateAssignedMessage": "This damaged order was already assigned to {{worker}} ({{role}}) and cannot be assigned to another worker.",
     "duplicateWarning": "Penalty already exists for this worker and order.",
+    "recordsTitle": "Saved damaged clothes records",
+    "recordsSearchPlaceholder": "Search bill, worker, customer, or reason",
+    "filterByRole": "Filter by role",
+    "paymentStatus": "Payment status",
+    "createdBy": "Created by",
+    "noRecords": "No damaged clothes records found.",
+    "totalRecords": "{{count}} records",
     "auditTitle": "Penalty Audit Information",
     "auditText": "Every damaged clothes penalty stores complete details and contributes to worker loan balance.",
     "auditItemPenaltyAmount": "Penalty amount",
@@ -631,6 +659,11 @@
     "roles": {
       "dokht": "Tailor / Dokht",
       "qichikar": "Cutter / Qichikar"
+    },
+    "paymentStatuses": {
+      "PAID_TO_WORKER": "Paid to worker",
+      "UNPAID": "Unpaid",
+      "UNKNOWN": "Unknown"
     },
     "details": {
       "billNumber": "Bill Number",

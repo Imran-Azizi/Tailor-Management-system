@@ -150,7 +150,11 @@
   "dashboardPage": {
     "title": "داشبورد",
     "netBenefit": "درآمد خالص",
-    "netBenefitSub": "مجموع عاید رخت + مجموع فایده سفارش‌ها",
+    "netBenefitSub": "مجموع عواید - مجموع مصارف",
+    "otherItemsTotalProfit": "مجموع فایده اجناس دیگر",
+    "otherItemsTotalProfitSub": "از سوابق فروش اجناس",
+    "damagedClothes": "لباس‌های خراب",
+    "damagedClothesSub": "تعداد سوابق ثبت‌شده لباس‌های خراب",
     "tooltipOrders": "{{count}} سفارش",
     "totalOrders": "مجموع سفارش‌ها",
     "today": "امروز",
@@ -162,7 +166,14 @@
     "outstanding": "باقی‌مانده",
     "remainingBalance": "موجودی باقی‌مانده",
     "totalDailyExpenses": "مجموع مصارف روزانه",
+    "totalExpenses": "مجموع مصارف",
+    "totalExpensesSub": "مصارف روزانه از درآمد خالص کم می‌شود",
     "totalRakhtPrice": "قیمت مجموعی رخت‌ها",
+    "totalRakhtRevenue": "مجموع عاید رخت",
+    "totalOrderBenefit": "مجموع فایده سفارش‌ها",
+    "totalReadyMadeProfitAfterExpenses": "فایده لباس آماده پس از مصارف",
+    "totalReadyMadeWaskatProfitAfterExpenses": "فایده واسکت آماده پس از مصارف",
+    "afterAllExpenses": "پس از همه مصارف",
     "totalLoan": "مجموع قرض",
     "totalQichikarUsersMoney": "مجموع عاید قیچی‌کاران",
     "totalDokhtUsersMoney": "مجموع عاید دخت‌کاران",
@@ -203,7 +214,11 @@
     "searchResult": "نتیجه جستجو",
     "reportEmpty": "با شماره بل جستجو کنید تا ببینید این سفارش در کجا قرار دارد.",
     "qichikarLabel": "قیچی‌کار",
-    "dokhtLabel": "دخت"
+    "dokhtLabel": "دخت",
+    "qichikarWorkerFallback": "قیچیکار",
+    "dokhtWorkerFallback": "کارگر دوخت",
+    "qichikarReceivedStatus": "قیچیکار {{name}} این سفارش را دریافت کرده است.",
+    "dokhtReceivedStatus": "کارگر دوخت {{name}} این سفارش را دریافت کرده است."
   },
   "myTasks": {
     "title": "وظایف من",
@@ -465,6 +480,10 @@
     "transactionSection": "جزئیات تراکنش",
     "fromName": "از طرف",
     "fromNamePlaceholder": "مثلاً: احمد رحیمی",
+    "senderPlaceholder": "فرستنده را انتخاب کنید یا نام را بنویسید",
+    "createSenderOption": "استفاده از «{{name}}»",
+    "noSendersCustom": "نام دلخواه فرستنده را بنویسید",
+    "senderTooLong": "نام فرستنده باید حداکثر ۱۰۰ حرف باشد",
     "recipientName": "نام گیرنده",
     "recipientNamePlaceholder": "مثلاً: محمد کریمی",
     "amount": "مبلغ",
@@ -542,7 +561,15 @@
     "createSuccess": "جریمه لباس‌های خراب با موفقیت ثبت شد ({{amount}}).",
     "createFailed": "ثبت جریمه لباس‌های خراب انجام نشد.",
     "duplicateError": "این سفارش قبلاً برای این کاربر به عنوان جریمه ثبت شده است.",
+    "duplicateAssignedMessage": "این سفارش خراب قبلاً به {{worker}} ({{role}}) سپرده شده است و نمی‌توانید آن را به کارگر دیگری بسپارید.",
     "duplicateWarning": "برای این کارگر و سفارش قبلاً جریمه ثبت شده است.",
+    "recordsTitle": "سوابق ثبت‌شده لباس‌های خراب",
+    "recordsSearchPlaceholder": "جستجو با بل، کارگر، مشتری یا دلیل",
+    "filterByRole": "فیلتر بر اساس نقش",
+    "paymentStatus": "وضعیت پرداخت",
+    "createdBy": "ثبت‌شده توسط",
+    "noRecords": "هیچ سابقه لباس خراب یافت نشد.",
+    "totalRecords": "{{count}} سابقه",
     "auditTitle": "معلومات حسابرسی جریمه",
     "auditText": "هر جریمه لباس‌های خراب با جزئیات کامل ذخیره می‌شود و در مجموع قرض کارگر حساب می‌گردد.",
     "auditItemPenaltyAmount": "مبلغ جریمه",
@@ -554,6 +581,11 @@
     "roles": {
       "dokht": "خیاط / دخت",
       "qichikar": "قیچی‌کار"
+    },
+    "paymentStatuses": {
+      "PAID_TO_WORKER": "پرداخت‌شده به کارگر",
+      "UNPAID": "پرداخت‌نشده",
+      "UNKNOWN": "نامشخص"
     },
     "details": {
       "billNumber": "شماره بل",
@@ -642,6 +674,14 @@
     "noOrdersInCategory": "هیچ سفارشی در این دسته‌بندی وجود ندارد.",
     "searchBillPlaceholder": "جستجو با شماره بل",
     "noOrderFoundByBill": "هیچ سفارشی برای این شماره بل یافت نشد."
+  },
+  "orderCompletion": {
+    "qichikarFallback": "قیچی‌کار",
+    "dokhtFallback": "کارگر دوخت",
+    "qichikarCompleted": "قیچیکار {{name}} کار روی این سفارش را تکمیل کرده است.",
+    "dokhtCompleted": "کارگر دوخت {{name}} کار روی این سفارش را تکمیل کرده است.",
+    "bothCompleted": "قیچیکار {{qichikarName}} و کارگر دوخت {{dokhtName}} کار روی این سفارش را تکمیل کردند.",
+    "readyForDelivery": "کار روی این سفارش تکمیل شده و آماده برای تحویل به مشتری است."
   },
   "ui": {
     "pageSummary": "صفحه {{page}} از {{pages}} · مجموع {{total}}",

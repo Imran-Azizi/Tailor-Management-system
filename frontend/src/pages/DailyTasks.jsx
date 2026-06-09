@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import Select from "react-select";
+import CreatableSelect from "react-select/creatable";
 import { LuClipboardList, LuFileText, LuList, LuSend } from "react-icons/lu";
 import api from "../lib/api.js";
 import { buildSelectStyles } from "../lib/dailyTasks.js";
@@ -19,16 +20,34 @@ import {
 import { Field, PageHeader } from "../components/ui/index.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 
+const MAX_SENDER_NAME_LENGTH = 100;
+
+const normalizeSenderName = (option) =>
+  String(option?.value || option?.label || "").trim();
+
+const normalizeSenderOption = (option) => {
+  const name = normalizeSenderName(option);
+  return name ? { ...option, value: name, label: name } : null;
+};
+
 // ─── Zod schema ───────────────────────────────────────────────────────────────
 const createSchema = (t) =>
   z
     .object({
       fromName: z
         .object({ value: z.string(), label: z.string() })
+        .passthrough()
         .nullable()
-        .refine((value) => value !== null, {
+        .refine((value) => normalizeSenderName(value).length > 0, {
           message: t("dailyTasks.senderRequired"),
-        }),
+        })
+        .refine(
+          (value) =>
+            normalizeSenderName(value).length <= MAX_SENDER_NAME_LENGTH,
+          {
+            message: t("dailyTasks.senderTooLong"),
+          },
+        ),
       recipientName: z.string().min(1, t("dailyTasks.recipientRequired")),
       amount: z.string().optional(),
       taskDate: z.string().min(1, t("dailyTasks.taskDateRequired")),
@@ -135,6 +154,14 @@ function DailyTaskForm({ onSuccess }) {
     label: user.name,
   }));
 
+  const senderExists = (inputValue) => {
+    const normalized = inputValue.trim().toLocaleLowerCase();
+    return senderOptions.some(
+      (option) =>
+        normalizeSenderName(option).toLocaleLowerCase() === normalized,
+    );
+  };
+
   const defaultSender =
     isAdmin && user?.name
       ? senderOptions.find((option) => option.value === user.name) || null
@@ -156,6 +183,9 @@ function DailyTaskForm({ onSuccess }) {
     onSuccess: () => {
       toast.success(t("dailyTasks.created"));
       qc.invalidateQueries({ queryKey: ["daily-tasks"] });
+      qc.invalidateQueries({ queryKey: ["analytics"] });
+      qc.invalidateQueries({ queryKey: ["analytics-dashboard"] });
+      qc.invalidateQueries({ queryKey: ["design-contributors"] });
       reset({
         fromName: null,
         recipientName: "",
@@ -276,7 +306,7 @@ function DailyTaskForm({ onSuccess }) {
       }));
 
       mutation.mutate({
-        fromName: data.fromName.value,
+        fromName: normalizeSenderName(data.fromName),
         recipientName: data.recipientName.trim(),
         taskDate: new Date(data.taskDate).toISOString(),
         allocations,
@@ -286,7 +316,7 @@ function DailyTaskForm({ onSuccess }) {
     }
 
     mutation.mutate({
-      fromName: data.fromName.value,
+      fromName: normalizeSenderName(data.fromName),
       recipientName: data.recipientName.trim(),
       amount: parseNumberLocale(data.amount || 0),
       taskDate: new Date(data.taskDate).toISOString(),
@@ -313,7 +343,7 @@ function DailyTaskForm({ onSuccess }) {
             name="fromName"
             control={control}
             render={({ field }) => (
-              <Select
+              <CreatableSelect
                 {...field}
                 classNamePrefix="rs"
                 isRtl={isRtl}
@@ -322,7 +352,28 @@ function DailyTaskForm({ onSuccess }) {
                 isClearable
                 isLoading={loadingDokanUsers}
                 placeholder={t("dailyTasks.senderPlaceholder")}
-                noOptionsMessage={() => t("dailyTasks.noSenders")}
+                noOptionsMessage={() => t("dailyTasks.noSendersCustom")}
+                formatCreateLabel={(inputValue) =>
+                  t("dailyTasks.createSenderOption", {
+                    name: inputValue.trim(),
+                  })
+                }
+                isValidNewOption={(inputValue) => {
+                  const name = inputValue.trim();
+                  return (
+                    name.length > 0 &&
+                    name.length <= MAX_SENDER_NAME_LENGTH &&
+                    !senderExists(name)
+                  );
+                }}
+                onChange={(option) =>
+                  field.onChange(normalizeSenderOption(option))
+                }
+                onCreateOption={(inputValue) => {
+                  const name = inputValue.trim();
+                  if (!name || name.length > MAX_SENDER_NAME_LENGTH) return;
+                  field.onChange({ value: name, label: name });
+                }}
                 styles={buildSelectStyles({
                   hasError: Boolean(errors.fromName),
                   isRtl,

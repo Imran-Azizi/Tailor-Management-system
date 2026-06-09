@@ -177,6 +177,7 @@ export const getDashboardStats = async ({
     remainingData,
     recentOrders,
     ordersByType,
+    damagedClothesTotal,
   ] = await Promise.all([
     prisma.order.count({ where: monthWhere }),
     prisma.order.count({ where: { ...monthWhere, isCompleted: true } }),
@@ -209,24 +210,41 @@ export const getDashboardStats = async ({
       where: recentOrdersWhere,
       take: 10,
       orderBy: { createdAt: "desc" },
-      include: { customer: true },
+      include: {
+        customer: true,
+        assignedTo: { select: { id: true, name: true, accountType: true } },
+        qichikarAssignedTo: {
+          select: { id: true, name: true, accountType: true },
+        },
+        dokhtAssignedTo: {
+          select: { id: true, name: true, accountType: true },
+        },
+      },
     }),
     prisma.order.groupBy({
       by: ["type"],
       where: monthWhere,
       _count: { type: true },
     }),
+    prisma.damagedClothesPenalty.count({
+      where: hasMonthFilter
+        ? { createdAt: { gte: monthStart, lte: monthEnd } }
+        : {},
+    }),
   ]);
 
   // Daily expense and rakht totals are month-scoped when filters are active.
-  const dailyTaskWhere = hasMonthFilter
-    ? {
-        taskDate: {
-          gte: monthStart,
-          lte: monthEnd,
-        },
-      }
-    : {};
+  const dailyTaskWhere = {
+    ...(financeUserId ? { createdById: String(financeUserId) } : {}),
+    ...(hasMonthFilter
+      ? {
+          taskDate: {
+            gte: monthStart,
+            lte: monthEnd,
+          },
+        }
+      : {}),
+  };
 
   const rakhtWhere = hasMonthFilter
     ? {
@@ -268,6 +286,8 @@ export const getDashboardStats = async ({
       }),
     ]);
 
+  const dailyTaskExpenseTotal = Number(dailyTaskAmount._sum?.amount || 0);
+
   const paidDateRange = hasMonthFilter
     ? {
         gte: monthStart,
@@ -286,6 +306,8 @@ export const getDashboardStats = async ({
     readyMadeWaskatBenefitAggregate,
     readyMadeWaskatFinalProfitAggregate,
     totalRakhtRevenue,
+    linkedDailyExpenseAggregate,
+    otherItemsProfitAggregate,
   ] = await Promise.all([
     prisma.order.aggregate({
       where: {
@@ -359,7 +381,62 @@ export const getDashboardStats = async ({
       _sum: { totalBenefit: true, readyMadeWaskatOriginalPrice: true },
     }),
     computeRakhtBenefitRevenue(monthWhere),
+    prisma.dailyTask.aggregate({
+      where: {
+        ...dailyTaskWhere,
+        orderId: { not: null },
+      },
+      _sum: { amount: true },
+    }),
+    prisma.itemSale.aggregate({
+      where: {
+        ...(financeUserId ? { createdById: String(financeUserId) } : {}),
+        ...(hasMonthFilter
+          ? {
+              createdAt: {
+                gte: monthStart,
+                lte: monthEnd,
+              },
+            }
+          : {}),
+      },
+      _sum: { profit: true },
+    }),
   ]);
+
+  const totalOrderBenefit = Number(
+    allOrdersBenefitAggregate._sum?.totalBenefit || 0,
+  );
+  const totalReadyMadeProfit = Number(
+    readyMadeBenefitAggregate._sum?.totalBenefit || 0,
+  );
+  const totalReadyMadeProfitAfterExpenses =
+    Number(readyMadeFinalProfitAggregate._sum?.totalBenefit || 0) -
+    Number(readyMadeFinalProfitAggregate._sum?.readyMadeOriginalPrice || 0);
+  const totalReadyMadeWaskatProfit = Number(
+    readyMadeWaskatBenefitAggregate._sum?.totalBenefit || 0,
+  );
+  const totalReadyMadeWaskatProfitAfterExpenses =
+    Number(readyMadeWaskatFinalProfitAggregate._sum?.totalBenefit || 0) -
+    Number(
+      readyMadeWaskatFinalProfitAggregate._sum
+        ?.readyMadeWaskatOriginalPrice || 0,
+    );
+  const totalRakhtRevenueNumber = Number(totalRakhtRevenue || 0);
+  const otherItemsTotalProfit = Number(
+    otherItemsProfitAggregate._sum?.profit || 0,
+  );
+  const linkedDailyExpensesInRange = Number(
+    linkedDailyExpenseAggregate._sum?.amount || 0,
+  );
+  const totalProfitBeforeDailyExpenses =
+    totalRakhtRevenueNumber +
+    totalOrderBenefit +
+    totalReadyMadeProfitAfterExpenses +
+    totalReadyMadeWaskatProfitAfterExpenses +
+    otherItemsTotalProfit +
+    linkedDailyExpensesInRange;
+  const netProfit = totalProfitBeforeDailyExpenses - dailyTaskExpenseTotal;
 
   const recentOrdersWithRevenue = recentOrders.map((order) => {
     const readyMadeOriginalPrice =
@@ -376,6 +453,12 @@ export const getDashboardStats = async ({
 
     return {
       ...order,
+      customer: order.customer
+        ? {
+            ...order.customer,
+            billNumber: order.billNumber ?? order.customer.billNumber,
+          }
+        : order.customer,
       finalTotalBenefit,
     };
   });
@@ -391,6 +474,7 @@ export const getDashboardStats = async ({
     pendingOrders,
     allPendingOrders,
     emergencyOrders,
+    damagedClothesTotal,
     todayOrders,
     // Legacy fields kept for non-filtered views
     monthOrders: hasMonthFilter ? totalOrders : completedOrders,
@@ -406,8 +490,9 @@ export const getDashboardStats = async ({
       count: o._count.type,
     })),
     dailyTaskTotal,
-    dailyTaskAmount: dailyTaskAmount._sum?.amount || 0,
-    totalDailyExpenses: dailyTaskAmount._sum?.amount || 0,
+    dailyTaskAmount: dailyTaskExpenseTotal,
+    totalDailyExpenses: dailyTaskExpenseTotal,
+    totalExpenses: dailyTaskExpenseTotal,
     totalRakhtPrice: rakhtPriceAggregate._sum?.totalPrice || 0,
     totalLoan: loanAggregate._sum?.amount || 0,
     totalQichikarUsersMoney:
@@ -416,25 +501,17 @@ export const getDashboardStats = async ({
     totalDokhtUsersMoney:
       (dokhtPaidAggregate._sum?.dokhtPaymentAmount || 0) +
       (legacyDokhtPaidAggregate._sum?.workerPaymentAmount || 0),
-    totalOrderBenefit: Number(
-      allOrdersBenefitAggregate._sum?.totalBenefit || 0,
-    ),
-    totalReadyMadeProfit: Number(
-      readyMadeBenefitAggregate._sum?.totalBenefit || 0,
-    ),
-    totalReadyMadeProfitAfterExpenses:
-      Number(readyMadeFinalProfitAggregate._sum?.totalBenefit || 0) -
-      Number(readyMadeFinalProfitAggregate._sum?.readyMadeOriginalPrice || 0),
-    totalReadyMadeWaskatProfit: Number(
-      readyMadeWaskatBenefitAggregate._sum?.totalBenefit || 0,
-    ),
-    totalReadyMadeWaskatProfitAfterExpenses:
-      Number(readyMadeWaskatFinalProfitAggregate._sum?.totalBenefit || 0) -
-      Number(
-        readyMadeWaskatFinalProfitAggregate._sum
-          ?.readyMadeWaskatOriginalPrice || 0,
-      ),
-    totalRakhtRevenue: Number(totalRakhtRevenue || 0),
+    totalOrderBenefit,
+    totalReadyMadeProfit,
+    totalReadyMadeProfitAfterExpenses,
+    totalReadyMadeWaskatProfit,
+    totalReadyMadeWaskatProfitAfterExpenses,
+    totalRakhtRevenue: totalRakhtRevenueNumber,
+    otherItemsTotalProfit,
+    linkedDailyExpensesInRange,
+    totalProfitBeforeDailyExpenses,
+    netProfit,
+    netBenefit: netProfit,
     isFiltered: hasMonthFilter,
     filteredMonth: hasMonthFilter ? parsedMonth : null,
     filteredYear: hasMonthFilter ? parsedYear : null,

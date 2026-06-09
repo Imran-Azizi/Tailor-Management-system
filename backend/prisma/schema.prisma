@@ -210,7 +210,6 @@ model Customer {
 
   @@index([phoneNumber])
   @@index([tenantId])
-  @@unique([tenantId, phoneNumber])
   @@unique([tenantId, billNumber])
 }
 
@@ -219,6 +218,7 @@ model Order {
   tenantId                   String    @default("default-tenant")
   tenant                     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customerId                 String
+  billNumber                 Int?
   orderName                  String?
   type                       OrderType
   rakhtId                    String?
@@ -342,8 +342,10 @@ model Order {
   readyMadeWaskatClothing      ReadyMadeWaskatClothing? @relation(fields: [readyMadeWaskatClothingId], references: [id], onDelete: SetNull)
 
   @@index([customerId])
+  @@index([billNumber])
   @@index([tenantId])
   @@index([tenantId, customerId])
+  @@index([tenantId, billNumber])
   @@index([type])
   @@index([rakhtId])
   @@index([rakhtTonId])
@@ -961,6 +963,7 @@ model DamagedClothesPenalty {
   roleType           AccountType
   reason             String
   confirmedDuplicate Boolean     @default(false)
+  workerPaymentStatus String?
 
   billNumber   Int
   customerName String

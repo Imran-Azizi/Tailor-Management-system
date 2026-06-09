@@ -216,6 +216,8 @@ const BV = {
   red: "bg-red",
   green: "bg-green",
   amber: "bg-amber",
+  blue: "bg-blue",
+  orange: "bg-orange",
   gray: "bg-gray",
 };
 export const Badge = ({ children, v = "gold" }) => (

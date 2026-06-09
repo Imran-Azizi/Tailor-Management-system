@@ -45,15 +45,6 @@ export default function PrintBills() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const formatEnglishNumber = (value) =>
-    Number(value || 0).toLocaleString("en-US", {
-      maximumFractionDigits: 0,
-    });
-  const toEnglishDigits = (value) =>
-    value === null || value === undefined || value === ""
-      ? "-"
-      : toAsciiDigits(String(value));
-
   const setSelectedCustomer = (full, { showToast = true } = {}) => {
     if (!full || !Array.isArray(full.orders) || full.orders.length === 0) {
       setCustomer(null);
@@ -422,44 +413,6 @@ export default function PrintBills() {
             <div style={{ marginTop: 18 }}>
               {customer ? (
                 <div>
-                  <div
-                    className="info-box ib-gold"
-                    style={{ marginBottom: 12 }}
-                  >
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr 1fr",
-                        gap: 8,
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontSize: 10, color: "var(--text3)" }}>
-                          {t("orders.billNumber")}
-                        </div>
-                        <div style={{ fontWeight: 700 }}>
-                          #{toEnglishDigits(customer.billNumber)}
-                        </div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 10, color: "var(--text3)" }}>
-                          {t("orders.orderDocuments")}
-                        </div>
-                        <div style={{ fontWeight: 700 }}>
-                          {formatEnglishNumber(orders.length)}
-                        </div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 10, color: "var(--text3)" }}>
-                          {t("common.phone", "Phone")}
-                        </div>
-                        <div style={{ fontWeight: 700 }}>
-                          {toEnglishDigits(customer.phoneNumber)}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
                   {isBillEmergency && (
                     <div style={{ marginBottom: 14 }}>
                       <div

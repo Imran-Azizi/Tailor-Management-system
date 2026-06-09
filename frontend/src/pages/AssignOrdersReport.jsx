@@ -8,6 +8,10 @@ import { getApiErrorMessage } from "../lib/feedback.js";
 import { parseNumberLocale } from "../lib/normalize.js";
 import { getOrderLabelParts } from "../lib/orderType.js";
 import {
+  getOrderCompletionBadgeStyle,
+  getOrderCompletionStatus,
+} from "../lib/orderCompletionStatus.js";
+import {
   Card,
   EmptyState,
   Field,
@@ -16,90 +20,106 @@ import {
 } from "../components/ui/index.jsx";
 import OrderCreatorBadge from "../components/order/OrderCreatorBadge.jsx";
 
-function resolveOrderState(order) {
-  if (order?.isDamageOrder) {
-    return { key: "DAMAGE_ORDER", tone: "danger", workerName: "" };
+function getRoleReceivedWorker(order, role) {
+  if (role === "QICHIKAR") {
+    return (
+      order?.qichikarReceivedBy ||
+      (order?.receivedBy?.accountType === "QICHIKAR" ? order.receivedBy : null)
+    );
   }
 
-  if (order?.isCompleted) {
-    return { key: "COMPLETED", tone: "success", workerName: "" };
+  if (role === "DOKHT") {
+    return (
+      order?.dokhtReceivedBy ||
+      (order?.receivedBy?.accountType === "DOKHT" ? order.receivedBy : null)
+    );
   }
 
+  return null;
+}
+
+function getOrderReceivedState(order, t) {
+  const dokhtWorker = getRoleReceivedWorker(order, "DOKHT");
+  if (dokhtWorker || order?.dokhtReceivedById) {
+    return {
+      key: "DOKHT_RECEIVED",
+      color: "#D97706",
+      soft: "#FEF3C7",
+      label: t("assignment.dokhtReceivedStatus", {
+        name:
+          dokhtWorker?.name ||
+          t("assignment.dokhtWorkerFallback", "Dokht worker"),
+        defaultValue: "Dokht worker {{name}} has received this order.",
+      }),
+      detail: "",
+    };
+  }
+
+  const qichikarWorker = getRoleReceivedWorker(order, "QICHIKAR");
+  if (qichikarWorker || order?.qichikarReceivedById) {
+    return {
+      key: "QICHIKAR_RECEIVED",
+      color: "#2563EB",
+      soft: "#DBEAFE",
+      label: t("assignment.qichikarReceivedStatus", {
+        name:
+          qichikarWorker?.name ||
+          t("assignment.qichikarWorkerFallback", "Qichikar"),
+        defaultValue: "Qichikar {{name}} has received this order.",
+      }),
+      detail: "",
+    };
+  }
+
+  return null;
+}
+
+function resolveAssignmentState(order, t) {
+  const completionStatus = getOrderCompletionStatus(order, t);
+  if (
+    completionStatus.key === "damage" ||
+    completionStatus.key === "readyForDelivery" ||
+    completionStatus.key === "dokhtCompleted" ||
+    completionStatus.key === "legacyCompleted"
+  ) {
+    return completionStatus;
+  }
+
+  const receivedStatus = getOrderReceivedState(order, t);
+  if (receivedStatus) return receivedStatus;
+
+  if (completionStatus.key !== "pending") return completionStatus;
   const assignedWorker = order?.assignedTo;
+
   if (assignedWorker?.accountType === "QICHIKAR") {
     return {
       key: "WITH_QICHIKAR",
-      tone: "info",
-      workerName: assignedWorker.name || "Qichikar",
+      color: "#2563EB",
+      soft: "#DBEAFE",
+      label: t("assignment.statusWithQichikar", {
+        defaultValue: "With Qichikar {{name}}",
+        name: assignedWorker.name || "Qichikar",
+      }),
+      detail: "",
     };
   }
 
   if (assignedWorker?.accountType === "DOKHT") {
     return {
       key: "WITH_DOKHT",
-      tone: "info",
-      workerName: assignedWorker.name || "Dokht",
+      color: "#D97706",
+      soft: "#FEF3C7",
+      label: t("assignment.statusWithDokht", {
+        defaultValue: "With Dokht {{name}}",
+        name: assignedWorker.name || "Dokht",
+      }),
+      detail: "",
     };
   }
 
-  return { key: "PENDING", tone: "warning", workerName: "" };
-}
-
-function getLocalizedStatusMessage(t, state) {
-  if (state.key === "DAMAGE_ORDER") {
-    return t("orders.damageOrderStatus", "Damage Order");
-  }
-  if (state.key === "WITH_QICHIKAR") {
-    return t("assignment.statusWithQichikar", {
-      defaultValue: "With Qichikar {{name}}",
-      name: state.workerName || "-",
-    });
-  }
-  if (state.key === "WITH_DOKHT") {
-    return t("assignment.statusWithDokht", {
-      defaultValue: "With Dokht {{name}}",
-      name: state.workerName || "-",
-    });
-  }
-  if (state.key === "COMPLETED") {
-    return t("assignment.statusCompleted", "Order completed");
-  }
-  return t("assignment.statusPending", "Order is pending");
-}
-
-function stateStyle(tone) {
-  if (tone === "danger") {
-    return {
-      color: "#991B1B",
-      background: "#FEF2F2",
-      border: "1px solid #FECACA",
-    };
-  }
-  if (tone === "success") {
-    return {
-      color: "#15803D",
-      background: "#F0FDF4",
-      border: "1px solid #86EFAC",
-    };
-  }
-  if (tone === "info") {
-    return {
-      color: "#1D4ED8",
-      background: "#EFF6FF",
-      border: "1px solid #BFDBFE",
-    };
-  }
-  if (tone === "warning") {
-    return {
-      color: "#B45309",
-      background: "#FFFBEB",
-      border: "1px solid #FCD34D",
-    };
-  }
   return {
-    color: "var(--text2)",
-    background: "var(--surface2)",
-    border: "1px solid var(--border)",
+    ...completionStatus,
+    label: t("assignment.statusPending", "Order is pending"),
   };
 }
 
@@ -265,82 +285,72 @@ export default function AssignOrdersReport() {
         ) : lookupResult ? (
           <div style={{ display: "grid", gap: 16 }}>
             <Card title={t("common.allOrders", "All Orders")}>
-              <div style={{ display: "grid", gap: 10 }}>
-                {(lookupResult.orders || []).map((order) => {
-                  const orderLabel = getOrderLabelParts(order, language);
-                  const state = resolveOrderState(order);
-                  const localizedStatus = getLocalizedStatusMessage(t, state);
-                  const billNumber = order?.customer?.billNumber;
-                  const resolvedRealCustomerName =
-                    String(order?.customer?.firstName || "").trim() ||
-                    String(lookupResult?.customer?.firstName || "").trim() ||
-                    (billNumber !== null && billNumber !== undefined
-                      ? String(customerNameByBill[billNumber] || "").trim()
-                      : "") ||
-                    "-";
-                  const displayCustomerName =
-                    String(orderLabel.customName || "").trim() ||
-                    resolvedRealCustomerName;
-                  return (
-                    <div
-                      key={order.id}
-                      style={{
-                        border: "1px solid var(--border)",
-                        borderRadius: 12,
-                        padding: "12px 14px",
-                        background: "var(--surface)",
-                        display: "grid",
-                        gap: 12,
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 10,
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontSize: 14,
-                            fontWeight: 800,
-                            color: "var(--text1)",
-                          }}
-                        >
-                          {displayCustomerName}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: 13,
-                            fontWeight: 700,
-                            color: "var(--text2)",
-                          }}
-                        >
-                          {orderLabel.typeWithSequenceLabel}
-                        </span>
-                        <span className="badge bg-gray">
-                          #{billNumber ?? "-"}
-                        </span>
-                        <OrderCreatorBadge order={order} compact />
-                      </div>
-
-                      <div
-                        style={{
-                          ...stateStyle(state.tone),
-                          borderRadius: 8,
-                          padding: "6px 10px",
-                          display: "grid",
-                          gap: 6,
-                        }}
-                      >
-                        <span style={{ fontSize: 12, fontWeight: 700 }}>
-                          {localizedStatus}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="tbl-wrap order-scroll-x">
+                <table className="tbl">
+                  <thead>
+                    <tr>
+                      <th>{t("orders.billNumber", "Bill Number")}</th>
+                      <th>{t("common.customer", "Customer")}</th>
+                      <th>{t("common.type", "Type")}</th>
+                      <th>{t("orders.createdBy", "Created By")}</th>
+                      <th>{t("common.status", "Status")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(lookupResult.orders || []).map((order) => {
+                      const orderLabel = getOrderLabelParts(order, language);
+                      const state = resolveAssignmentState(order, t);
+                      const billNumber = order?.customer?.billNumber;
+                      const resolvedRealCustomerName =
+                        String(order?.customer?.firstName || "").trim() ||
+                        String(lookupResult?.customer?.firstName || "").trim() ||
+                        (billNumber !== null && billNumber !== undefined
+                          ? String(customerNameByBill[billNumber] || "").trim()
+                          : "") ||
+                        "-";
+                      const displayCustomerName =
+                        String(orderLabel.customName || "").trim() ||
+                        resolvedRealCustomerName;
+                      return (
+                        <tr key={order.id}>
+                          <td>
+                            <span className="badge bg-gray">
+                              #{billNumber ?? "-"}
+                            </span>
+                          </td>
+                          <td>{displayCustomerName}</td>
+                          <td>{orderLabel.typeWithSequenceLabel}</td>
+                          <td>
+                            <OrderCreatorBadge order={order} compact />
+                          </td>
+                          <td>
+                            <span
+                              style={{
+                                ...getOrderCompletionBadgeStyle(state),
+                                borderRadius: 999,
+                                display: "inline-flex",
+                                flexDirection: "column",
+                                gap: 4,
+                                padding: "6px 10px",
+                                maxWidth: 360,
+                                whiteSpace: "normal",
+                              }}
+                            >
+                              <strong style={{ fontSize: 12 }}>
+                                {state.label}
+                              </strong>
+                              {state.detail ? (
+                                <span style={{ fontSize: 11, fontWeight: 600 }}>
+                                  {state.detail}
+                                </span>
+                              ) : null}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </Card>
           </div>

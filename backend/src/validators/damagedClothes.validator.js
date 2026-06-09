@@ -37,3 +37,10 @@ export const createDamagedPenaltySchema = z.object({
     .max(300, "Reason must be 300 characters or less")
     .default("Damaged Clothes"),
 });
+
+export const damagedClothesPenaltyListSchema = z.object({
+  search: z.string().trim().default(""),
+  roleType: z.enum(ROLE_TYPES).optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+});

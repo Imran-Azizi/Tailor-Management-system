@@ -718,11 +718,7 @@ function drawDashboardStatsCards(
   isRtl,
 ) {
   const statLabels = labels.stats || {};
-  const netBenefit =
-    Number(stats.totalRakhtRevenue || 0) +
-    Number(stats.totalOrderBenefit || 0) +
-    Number(stats.totalReadyMadeProfitAfterExpenses || 0) +
-    Number(stats.totalReadyMadeWaskatProfitAfterExpenses || 0);
+  const netBenefit = Number(stats.netProfit ?? stats.netBenefit ?? 0);
 
   const cards = [
     {
@@ -1079,6 +1075,9 @@ export async function buildMonthlyReportPdf({
         totalPaid,
         totalRemaining,
         totalDailyExpenses: 0,
+        totalExpenses: 0,
+        netProfit: totalRevenue,
+        netBenefit: totalRevenue,
         totalRakhtPrice: 0,
         totalLoan: 0,
         totalQichikarUsersMoney: 0,

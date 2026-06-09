@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   createPenalty,
   getOrderExpenseDetails,
+  listPenalties,
   listWorkersByRole,
   myPenalties,
   searchOrders,
@@ -15,6 +16,7 @@ router.use(authenticate);
 router.get("/my-penalties", myPenalties);
 
 router.get("/workers", authorize("ADMIN"), listWorkersByRole);
+router.get("/penalties", authorize("ADMIN"), listPenalties);
 router.get("/orders/search", authorize("ADMIN"), searchOrders);
 router.get(
   "/orders/:orderId/expenses",

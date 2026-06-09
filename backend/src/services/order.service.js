@@ -185,17 +185,26 @@ export const enrichOrderAssignment = (order) => {
   const isDamageOrder = Array.isArray(order.damagedClothesPenalties)
     ? order.damagedClothesPenalties.length > 0
     : Boolean(order.isDamageOrder);
+  const qichikarCompleted = Boolean(order.qichikarCompletedAt);
+  const dokhtCompleted = Boolean(order.dokhtCompletedAt);
+  const orderStatus = isDamageOrder
+    ? "DAMAGE_ORDER"
+    : qichikarCompleted && dokhtCompleted
+      ? "READY_FOR_DELIVERY"
+      : qichikarCompleted
+        ? "QICHIKAR_COMPLETED"
+        : dokhtCompleted
+          ? "DOKHT_COMPLETED"
+          : order.isCompleted
+            ? "COMPLETED"
+            : order.inProgress
+              ? "IN_PROGRESS"
+              : "PENDING";
 
   return {
     ...order,
     isDamageOrder,
-    orderStatus: isDamageOrder
-      ? "DAMAGE_ORDER"
-      : order.isCompleted
-        ? "COMPLETED"
-        : order.inProgress
-          ? "IN_PROGRESS"
-          : "PENDING",
+    orderStatus,
     assignmentNote:
       typeof order.assignmentNote === "string"
         ? normalizeText(order.assignmentNote) || null
@@ -303,8 +312,12 @@ const buildOrderDisplayName = ({
 
 const withOrderDisplayMeta = (order, { sequence = 1, total = 1 } = {}) => {
   if (!order || typeof order !== "object") return order;
+  const effectiveBillNumber = order.billNumber ?? order.customer?.billNumber;
   return {
     ...order,
+    customer: order.customer
+      ? { ...order.customer, billNumber: effectiveBillNumber }
+      : order.customer,
     orderTypeSequence: sequence,
     orderTypeTotal: total,
     orderDisplayName: buildOrderDisplayName({
@@ -392,17 +405,6 @@ const generateFallbackPhoneNumber = () => {
     .toString()
     .padStart(6, "0");
   return `700${ts}${suffix}`;
-};
-
-const isPhoneNumberConflictError = (error) => {
-  const target = error?.meta?.target;
-  const entries = Array.isArray(target) ? target : [target];
-  const hasPhoneTarget = entries.some((entry) =>
-    String(entry || "")
-      .toLowerCase()
-      .includes("phonenumber"),
-  );
-  return error?.code === "P2002" && hasPhoneTarget;
 };
 
 const getPhoneLookupTokens = (digits) => {
@@ -538,6 +540,8 @@ const ORDER_DETAIL_INCLUDE_BASE = {
   assignedTo: { select: { id: true, name: true, accountType: true } },
   qichikarAssignedTo: { select: { id: true, name: true, accountType: true } },
   dokhtAssignedTo: { select: { id: true, name: true, accountType: true } },
+  qichikarReceivedBy: { select: { id: true, name: true, accountType: true } },
+  dokhtReceivedBy: { select: { id: true, name: true, accountType: true } },
   assignedBy: { select: { id: true, name: true } },
   createdBy: { select: { id: true, name: true, accountType: true } },
   workerPaidBy: { select: { id: true, name: true } },
@@ -1360,7 +1364,7 @@ export const getMonthlyReportOrders = async ({ month, year }) => {
       customer: { select: { id: true, firstName: true, billNumber: true } },
       damagedClothesPenalties: { select: { id: true }, take: 1 },
     },
-    orderBy: [{ customer: { billNumber: "asc" } }, { createdAt: "asc" }],
+    orderBy: [{ billNumber: "asc" }, { createdAt: "asc" }],
   });
 
   return enrichOrdersWithDisplayMeta(enrichOrderListAssignment(orders));
@@ -1422,6 +1426,24 @@ export const lookupOrdersByBillOrPhone = async ({
   let customer = null;
 
   if (parsedBillNumber !== null) {
+    const orders = await findManyOrdersSafe(
+      {
+        where: { billNumber: parsedBillNumber },
+        orderBy: { createdAt: "desc" },
+      },
+      ORDER_DETAIL_INCLUDE_BASE,
+    );
+
+    if (orders.length) {
+      const enrichedOrders = await enrichOrdersWithDisplayMeta(
+        enrichOrderListAssignment(orders),
+      );
+      return {
+        customer: enrichedOrders[0]?.customer || orders[0]?.customer || null,
+        orders: enrichedOrders,
+      };
+    }
+
     customer = await prisma.customer.findFirst({
       where: { billNumber: parsedBillNumber },
     });
@@ -2365,92 +2387,13 @@ export const createOrder = async ({
     const normalizedFirstName = safeCustomerInfo.firstName
       ? normalizeText(safeCustomerInfo.firstName)
       : "";
-    const shouldCreateNewBillNumber = Boolean(createNewBillNumber);
-    let customer;
-
-    if (shouldCreateNewBillNumber) {
-      const fallbackName = normalizedFirstName || "Walk-in Customer";
-      let candidatePhone = normalizedPhone || generateFallbackPhoneNumber();
-
-      // Customer phone is unique, so copied orders may need a generated phone
-      // to guarantee a brand-new bill/customer record.
-      if (candidatePhone) {
-        const existingExactPhone = await tx.customer.findFirst({
-          where: { phoneNumber: candidatePhone },
-          select: { id: true },
-        });
-        if (existingExactPhone) {
-          candidatePhone = generateFallbackPhoneNumber();
-        }
-      }
-
-      try {
-        customer = await createCustomerWithSequentialBill(tx, {
-          firstName: fallbackName,
-          phoneNumber: candidatePhone,
-        });
-      } catch (error) {
-        if (!isPhoneNumberConflictError(error)) {
-          throw error;
-        }
-        customer = await createCustomerWithSequentialBill(tx, {
-          firstName: fallbackName,
-          phoneNumber: generateFallbackPhoneNumber(),
-        });
-      }
-    } else if (safeCustomerInfo.customerId) {
-      customer = await tx.customer.findUnique({
-        where: { id: safeCustomerInfo.customerId },
-      });
-      if (!customer)
-        throw Object.assign(new Error("Customer not found"), { status: 404 });
-
-      const customerPatch = {};
-      if (normalizedFirstName) {
-        customerPatch.firstName = normalizedFirstName;
-      }
-      if (toPhoneDigits(normalizedPhone)) {
-        customerPatch.phoneNumber = normalizedPhone;
-      }
-
-      if (Object.keys(customerPatch).length > 0) {
-        customer = await tx.customer.update({
-          where: { id: customer.id },
-          data: customerPatch,
-        });
-      }
-    } else {
-      customer = toPhoneDigits(normalizedPhone)
-        ? await findExistingCustomerByPhone(tx, normalizedPhone)
-        : null;
-
-      if (customer) {
-        const customerPatch = {};
-        if (normalizedFirstName) {
-          customerPatch.firstName = normalizedFirstName;
-        }
-        if (toPhoneDigits(normalizedPhone)) {
-          customerPatch.phoneNumber = normalizedPhone;
-        }
-
-        if (Object.keys(customerPatch).length > 0) {
-          customer = await tx.customer.update({
-            where: { id: customer.id },
-            data: customerPatch,
-          });
-        }
-      }
-
-      if (!customer) {
-        const fallbackPhone = normalizedPhone || generateFallbackPhoneNumber();
-        const fallbackName = normalizedFirstName || "Walk-in Customer";
-
-        customer = await createCustomerWithSequentialBill(tx, {
-          firstName: fallbackName,
-          phoneNumber: fallbackPhone,
-        });
-      }
-    }
+    const fallbackPhone = normalizedPhone || generateFallbackPhoneNumber();
+    const fallbackName = normalizedFirstName || "Walk-in Customer";
+    const customer = await createCustomerWithSequentialBill(tx, {
+      firstName: fallbackName,
+      phoneNumber: fallbackPhone,
+    });
+    const orderBillNumber = Number(customer.billNumber);
 
     const createdOrders = [];
     const alertedTypes = new Set();
@@ -2612,6 +2555,7 @@ export const createOrder = async ({
       const order = await tx.order.create({
         data: {
           customerId: customer.id,
+          billNumber: orderBillNumber,
           type,
           orderName: orderName || null,
           ...(rakhtSnapshot || {}),
@@ -2706,7 +2650,7 @@ export const createOrder = async ({
               orderType: type,
               customerName: customer.firstName,
               customerPhone: customer.phoneNumber,
-              billNumber: customer.billNumber,
+              billNumber: orderBillNumber,
               createdAt: order.createdAt,
             }),
             nextAlert: new Date(Date.now() + EMERGENCY_ALERT_INTERVAL_MS),
@@ -2720,7 +2664,7 @@ export const createOrder = async ({
         await tx.notification.create({
           data: {
             orderId: order.id,
-            message: `🌍 Foreign Country order for ${customer.firstName} (Bill #${customer.billNumber}) has been assigned to Foreign Country box`,
+            message: `🌍 Foreign Country order for ${customer.firstName} (Bill #${orderBillNumber}) has been assigned to Foreign Country box`,
             nextAlert: new Date(Date.now() + 24 * 60 * 60 * 1000),
             expiresAt: null,
           },
@@ -2732,7 +2676,7 @@ export const createOrder = async ({
           orderId: order.id,
           orderType: type,
           customerName: customer.firstName,
-          billNumber: customer.billNumber,
+          billNumber: orderBillNumber,
           boxName: autoBox.alertBoxName,
           reason: autoBox.alertReason,
         });
@@ -2743,7 +2687,7 @@ export const createOrder = async ({
     }
 
     return {
-      customer,
+      customer: { ...customer, billNumber: orderBillNumber },
       orders: await enrichOrdersWithDisplayMeta(createdOrders, tx),
     };
   });
@@ -3635,15 +3579,18 @@ export const globalSearchOrders = async ({
   const isBillLikeQuery = isNumericQuery && digitsOnly.length <= 8;
   const hasBillNumber = isBillLikeQuery && isSafeBillNumber(maybeBill);
 
-  const customerWhere = hasBillNumber
-    ? { billNumber: maybeBill }
-    : {
-        OR: [
-          { firstName: { contains: q, mode: "insensitive" } },
-          { phoneNumber: { contains: q, mode: "insensitive" } },
-          ...(isNumericQuery ? [{ phoneNumber: { equals: q } }] : []),
-        ],
-      };
+  const customerWhere = {
+    OR: [
+      ...(hasBillNumber ? [{ billNumber: maybeBill }] : []),
+      ...(!hasBillNumber
+        ? [
+            { firstName: { contains: q, mode: "insensitive" } },
+            { phoneNumber: { contains: q, mode: "insensitive" } },
+            ...(isNumericQuery ? [{ phoneNumber: { equals: q } }] : []),
+          ]
+        : []),
+    ],
+  };
 
   const matchingCustomers = await prisma.customer.findMany({
     where: customerWhere,
@@ -3653,9 +3600,14 @@ export const globalSearchOrders = async ({
 
   const customerIds = matchingCustomers.map((c) => c.id);
 
-  const customerOrderWhere = customerIds.length
-    ? { customerId: { in: customerIds } }
-    : { id: "NOMATCH" };
+  const customerOrderWhere =
+    hasBillNumber && customerIds.length
+      ? { OR: [{ billNumber: maybeBill }, { customerId: { in: customerIds } }] }
+      : hasBillNumber
+        ? { billNumber: maybeBill }
+        : customerIds.length
+          ? { customerId: { in: customerIds } }
+          : { id: "NOMATCH" };
 
   const where = financeUserId
     ? {

@@ -12,6 +12,17 @@ import { recalculateOrderBenefit } from "./order.service.js";
 
 const CREATOR_SELECT = { id: true, name: true, accountType: true };
 
+const normalizeExpenseAmount = (value) => {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw Object.assign(
+      new Error("Amount must be a valid number greater than 0."),
+      { status: 400, code: "INVALID_EXPENSE_AMOUNT" },
+    );
+  }
+  return amount;
+};
+
 const assertTaskDateCurrentMonth = (taskDate) => {
   const current = getCurrentAfghanMonthYear();
   const { month: taskMonth, year: taskYear } = getCurrentAfghanMonthYear(
@@ -212,11 +223,12 @@ function buildBreakdown(tasks, granularity) {
 
 export const createDailyTask = async (data, createdById) => {
   assertTaskDateCurrentMonth(data.taskDate);
+  const amount = normalizeExpenseAmount(data.amount);
   const task = await prisma.dailyTask.create({
     data: {
       fromName: data.fromName,
       recipientName: data.recipientName,
-      amount: data.amount,
+      amount,
       taskDate: data.taskDate,
       orderId: data.orderId || null,
       note: data.note || null,
@@ -247,11 +259,12 @@ export const createDailyTaskBatch = async (data, createdById) => {
     const createdTasks = [];
 
     for (const allocation of data.allocations) {
+      const amount = normalizeExpenseAmount(allocation.amount);
       const task = await tx.dailyTask.create({
         data: {
           fromName: data.fromName,
           recipientName: data.recipientName,
-          amount: allocation.amount,
+          amount,
           taskDate: data.taskDate,
           orderId: allocation.orderId,
           note: data.note || null,
@@ -304,7 +317,16 @@ export const getDailyTasks = async ({
       { recipientName: { contains: normalizedSearch, mode: "insensitive" } },
       { note: { contains: normalizedSearch, mode: "insensitive" } },
       ...(Number.isFinite(parsedSearchBill)
-        ? [{ order: { customer: { billNumber: parsedSearchBill } } }]
+        ? [
+            {
+              order: {
+                OR: [
+                  { billNumber: parsedSearchBill },
+                  { customer: { billNumber: parsedSearchBill } },
+                ],
+              },
+            },
+          ]
         : []),
     ];
   }
@@ -366,6 +388,7 @@ export const getDailyTaskById = async (id) => {
 
 export const updateDailyTask = async (id, data) => {
   return prisma.$transaction(async (tx) => {
+    const amount = normalizeExpenseAmount(data.amount);
     const before = await tx.dailyTask.findUnique({
       where: { id },
       select: { orderId: true, taskDate: true },
@@ -379,7 +402,7 @@ export const updateDailyTask = async (id, data) => {
       data: {
         fromName: data.fromName,
         recipientName: data.recipientName,
-        amount: data.amount,
+        amount,
         taskDate: data.taskDate,
         orderId: data.orderId || null,
         note: data.note || null,
@@ -444,26 +467,31 @@ export const getDailyTaskReport = async ({
     year,
   });
 
-  const tasks = await prisma.dailyTask.findMany({
-    where: {
-      taskDate: {
-        gte: resolved.from,
-        lte: resolved.to,
-      },
+  const where = {
+    taskDate: {
+      gte: resolved.from,
+      lte: resolved.to,
     },
-    orderBy: { taskDate: "desc" },
-    include: { createdBy: { select: CREATOR_SELECT } },
-  });
+  };
 
-  const totalAmount = tasks.reduce(
-    (sum, task) => sum + Number(task.amount || 0),
-    0,
-  );
-  const highestExpense =
-    tasks.length > 0
-      ? tasks.reduce((max, task) => Math.max(max, Number(task.amount || 0)), 0)
-      : 0;
-  const averageAmount = tasks.length > 0 ? totalAmount / tasks.length : 0;
+  const [tasks, summaryAggregate, totalTasks] = await Promise.all([
+    prisma.dailyTask.findMany({
+      where,
+      orderBy: { taskDate: "desc" },
+      include: { createdBy: { select: CREATOR_SELECT } },
+    }),
+    prisma.dailyTask.aggregate({
+      where,
+      _sum: { amount: true },
+      _max: { amount: true },
+      _avg: { amount: true },
+    }),
+    prisma.dailyTask.count({ where }),
+  ]);
+
+  const totalAmount = Number(summaryAggregate._sum?.amount || 0);
+  const highestExpense = Number(summaryAggregate._max?.amount || 0);
+  const averageAmount = Number(summaryAggregate._avg?.amount || 0);
 
   return {
     filters: {
@@ -476,7 +504,7 @@ export const getDailyTaskReport = async ({
       granularity: resolved.granularity,
     },
     summary: {
-      totalTasks: tasks.length,
+      totalTasks,
       totalAmount,
       highestExpense,
       averageAmount,

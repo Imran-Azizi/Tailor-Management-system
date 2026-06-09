@@ -544,8 +544,7 @@ function ContributorSection() {
           <strong>{formatCurrency(netBenefit, language)}</strong>
           <span>
             {t("dashboardPage.netBenefitSub", {
-              defaultValue:
-                "Total Rakht Revenue + Total Order Benefit + Total Ready-Made Profit + Total Ready-Made Waskat Profit",
+              defaultValue: "Total Revenue - Total Expenses",
             })}
           </span>
         </div>

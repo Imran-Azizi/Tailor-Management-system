@@ -872,7 +872,7 @@ export default function CompletedWorkerOrders() {
               </div>
             </div>
 
-            <div style={{ overflowX: "auto" }}>
+            <div className="tbl-wrap order-scroll-x">
               <table className="tbl">
                 <thead>
                   <tr>

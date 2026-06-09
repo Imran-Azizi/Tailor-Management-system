@@ -18,6 +18,20 @@ const SEARCH_EMPTY_STATE_CODES = {
   WORKER_NOT_ON_ORDER: "WORKER_NOT_ON_ORDER",
 };
 
+const getOrderWorkflowStatus = (order) => {
+  const isDamageOrder = Array.isArray(order?.damagedClothesPenalties)
+    ? order.damagedClothesPenalties.length > 0
+    : false;
+  if (isDamageOrder) return "DAMAGE_ORDER";
+  if (order?.qichikarCompletedAt && order?.dokhtCompletedAt)
+    return "READY_FOR_DELIVERY";
+  if (order?.qichikarCompletedAt) return "QICHIKAR_COMPLETED";
+  if (order?.dokhtCompletedAt) return "DOKHT_COMPLETED";
+  if (order?.isCompleted) return "COMPLETED";
+  if (order?.inProgress) return "IN_PROGRESS";
+  return "PENDING";
+};
+
 const resolveWorkerAssignedAmountForOrder = ({ order, userId, roleType }) => {
   if (!order || !userId || !WORKER_ROLES.includes(roleType)) return 0;
 
@@ -91,6 +105,29 @@ const buildPenaltyTransactionNote = ({
     `Penalty Amount: ${Number(totalExpense || 0).toFixed(2)}`,
   ].join(" | ");
 
+const getRolePaymentStatusForOrder = (order, roleType) => {
+  if (roleType === "DOKHT") return order?.dokhtPaymentStatus || null;
+  if (roleType === "QICHIKAR") return order?.qichikarPaymentStatus || null;
+  return order?.workerPaymentStatus || null;
+};
+
+const buildDuplicateMessage = (penalty) =>
+  `This damaged order was already assigned to ${penalty?.user?.name || "this worker"} (${penalty?.roleType || "worker"}) and cannot be assigned to another worker.`;
+
+const buildDamagedAssignmentNotification = ({
+  billNumber,
+  roleType,
+  assignedAt,
+  reason,
+}) =>
+  [
+    "Damaged clothes assigned",
+    `Bill Number: ${billNumber || "-"}`,
+    `Role: ${roleType}`,
+    `Date: ${assignedAt.toISOString().slice(0, 10)}`,
+    `Note: ${reason || "Damaged clothes record assigned to you."}`,
+  ].join(" | ");
+
 export const getWorkersByRole = async (roleType) => {
   if (!WORKER_ROLES.includes(roleType)) {
     throw Object.assign(new Error("Invalid worker role."), { status: 400 });
@@ -159,7 +196,7 @@ export const searchOrdersForPenalty = async ({
 
         return {
           id: order.id,
-          billNumber: order.customer?.billNumber ?? null,
+          billNumber: order.billNumber ?? order.customer?.billNumber ?? null,
           customerName: order.customer?.firstName || "-",
           phoneNumber: order.customer?.phoneNumber || "-",
           orderType: order.type,
@@ -167,15 +204,11 @@ export const searchOrdersForPenalty = async ({
           isDamageOrder: Array.isArray(order.damagedClothesPenalties)
             ? order.damagedClothesPenalties.length > 0
             : false,
-          orderStatus:
-            Array.isArray(order.damagedClothesPenalties) &&
-            order.damagedClothesPenalties.length > 0
-              ? "DAMAGE_ORDER"
-              : order.isCompleted
-                ? "COMPLETED"
-                : order.inProgress
-                  ? "IN_PROGRESS"
-                  : "PENDING",
+          damagedAssignedTo:
+            order.damagedClothesPenalties?.[0]?.user || null,
+          damagedAssignedRole:
+            order.damagedClothesPenalties?.[0]?.roleType || null,
+          orderStatus: getOrderWorkflowStatus(order),
           totalOrderAmount: breakdown.totalOrderAmount,
           rakhtExpense: breakdown.rakhtExpense,
           dokhtExpense: breakdown.dokhtExpense,
@@ -190,7 +223,7 @@ export const searchOrdersForPenalty = async ({
 
   if (isNumericQuery && Number.isFinite(queryAsInt)) {
     const exactBillWhere = {
-      customer: { billNumber: queryAsInt },
+      OR: [{ billNumber: queryAsInt }, { customer: { billNumber: queryAsInt } }],
       ...workerWhere,
     };
     const [exactOrders, exactTotal, billExists] = await Promise.all([
@@ -202,12 +235,26 @@ export const searchOrdersForPenalty = async ({
           customer: {
             select: { billNumber: true, firstName: true, phoneNumber: true },
           },
-          damagedClothesPenalties: { select: { id: true }, take: 1 },
+          damagedClothesPenalties: {
+            select: {
+              id: true,
+              roleType: true,
+              user: { select: USER_SELECT },
+            },
+            take: 1,
+          },
         },
         orderBy: [{ createdAt: "desc" }],
       }),
       prisma.order.count({ where: exactBillWhere }),
-      prisma.order.count({ where: { customer: { billNumber: queryAsInt } } }),
+      prisma.order.count({
+        where: {
+          OR: [
+            { billNumber: queryAsInt },
+            { customer: { billNumber: queryAsInt } },
+          ],
+        },
+      }),
     ]);
 
     return {
@@ -254,7 +301,14 @@ export const searchOrdersForPenalty = async ({
         customer: {
           select: { billNumber: true, firstName: true, phoneNumber: true },
         },
-        damagedClothesPenalties: { select: { id: true }, take: 1 },
+        damagedClothesPenalties: {
+          select: {
+            id: true,
+            roleType: true,
+            user: { select: USER_SELECT },
+          },
+          take: 1,
+        },
       },
       orderBy: [{ createdAt: "desc" }],
     }),
@@ -336,7 +390,7 @@ export const getOrderExpenseDetails = async (orderId, workerContext = null) => {
 
   return {
     id: order.id,
-    billNumber: order.customer?.billNumber ?? null,
+    billNumber: order.billNumber ?? order.customer?.billNumber ?? null,
     customerName: order.customer?.firstName || "-",
     phoneNumber: order.customer?.phoneNumber || "-",
     orderType: order.type,
@@ -344,15 +398,9 @@ export const getOrderExpenseDetails = async (orderId, workerContext = null) => {
     isDamageOrder: Array.isArray(order.damagedClothesPenalties)
       ? order.damagedClothesPenalties.length > 0
       : false,
-    orderStatus:
-      Array.isArray(order.damagedClothesPenalties) &&
-      order.damagedClothesPenalties.length > 0
-        ? "DAMAGE_ORDER"
-        : order.isCompleted
-          ? "COMPLETED"
-          : order.inProgress
-            ? "IN_PROGRESS"
-            : "PENDING",
+    damagedAssignedTo: order.damagedClothesPenalties?.[0]?.user || null,
+    damagedAssignedRole: order.damagedClothesPenalties?.[0]?.roleType || null,
+    orderStatus: getOrderWorkflowStatus(order),
     totalOrderAmount: breakdown.totalOrderAmount,
     rakhtExpense: breakdown.rakhtExpense,
     dokhtExpense: breakdown.dokhtExpense,
@@ -402,18 +450,21 @@ export const createDamagedClothesPenalty = async (
   }
 
   const existingPenalty = await prisma.damagedClothesPenalty.findFirst({
-    where: { userId, orderId },
-    select: { id: true },
+    where: { orderId },
+    include: { user: { select: USER_SELECT } },
   });
 
   if (existingPenalty) {
     throw Object.assign(
-      new Error(
-        "A damaged clothes penalty already exists for this worker and order.",
-      ),
+      new Error(buildDuplicateMessage(existingPenalty)),
       {
         status: 409,
         code: "DUPLICATE_DAMAGED_CLOTHES_PENALTY",
+        existingPenalty: {
+          id: existingPenalty.id,
+          workerName: existingPenalty.user?.name || null,
+          roleType: existingPenalty.roleType,
+        },
       },
     );
   }
@@ -428,6 +479,36 @@ export const createDamagedClothesPenalty = async (
   });
 
   const result = await prisma.$transaction(async (tx) => {
+    const existingOrderPenalty = await tx.damagedClothesPenalty.findFirst({
+      where: { orderId },
+      include: { user: { select: USER_SELECT } },
+    });
+
+    if (existingOrderPenalty) {
+      throw Object.assign(new Error(buildDuplicateMessage(existingOrderPenalty)), {
+        status: 409,
+        code: "DUPLICATE_DAMAGED_CLOTHES_PENALTY",
+        existingPenalty: {
+          id: existingOrderPenalty.id,
+          workerName: existingOrderPenalty.user?.name || null,
+          roleType: existingOrderPenalty.roleType,
+        },
+      });
+    }
+
+    const paymentStatusOrder = await tx.order.findUnique({
+      where: { id: orderId },
+      select: {
+        dokhtPaymentStatus: true,
+        qichikarPaymentStatus: true,
+        workerPaymentStatus: true,
+      },
+    });
+    const workerPaymentStatus = getRolePaymentStatusForOrder(
+      paymentStatusOrder,
+      roleType,
+    );
+
     const transaction = await tx.transaction.create({
       data: {
         accountType: roleType,
@@ -454,6 +535,7 @@ export const createDamagedClothesPenalty = async (
         roleType,
         reason,
         confirmedDuplicate: false,
+        workerPaymentStatus,
         billNumber: Number(orderExpense.billNumber),
         customerName: orderExpense.customerName,
         orderType: orderExpense.orderType,
@@ -467,6 +549,21 @@ export const createDamagedClothesPenalty = async (
       },
       include: {
         createdBy: { select: { id: true, name: true } },
+        user: { select: USER_SELECT },
+      },
+    });
+
+    await tx.userNotification.create({
+      data: {
+        userId,
+        orderId,
+        type: "DAMAGED_CLOTHES_ASSIGNED",
+        message: buildDamagedAssignmentNotification({
+          billNumber: orderExpense.billNumber,
+          roleType,
+          assignedAt: now,
+          reason,
+        }),
       },
     });
 
@@ -478,6 +575,71 @@ export const createDamagedClothesPenalty = async (
   });
 
   return result;
+};
+
+export const getDamagedClothesPenalties = async ({
+  page = 1,
+  limit = 20,
+  search = "",
+  roleType,
+} = {}) => {
+  const skip = (page - 1) * limit;
+  const trimmedSearch = String(search || "").trim();
+  const numericSearch = Number(toAsciiDigits(trimmedSearch));
+  const isNumericSearch =
+    trimmedSearch.length > 0 && Number.isFinite(numericSearch);
+
+  const where = {
+    ...(roleType ? { roleType } : {}),
+    ...(trimmedSearch
+      ? {
+          OR: [
+            ...(isNumericSearch
+              ? [{ billNumber: Math.trunc(numericSearch) }]
+              : []),
+            { customerName: { contains: trimmedSearch, mode: "insensitive" } },
+            { reason: { contains: trimmedSearch, mode: "insensitive" } },
+            { user: { name: { contains: trimmedSearch, mode: "insensitive" } } },
+          ],
+        }
+      : {}),
+  };
+
+  const [rows, total] = await Promise.all([
+    prisma.damagedClothesPenalty.findMany({
+      where,
+      skip,
+      take: limit,
+      include: {
+        user: { select: USER_SELECT },
+        createdBy: { select: { id: true, name: true } },
+        transaction: { select: { amount: true, kind: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.damagedClothesPenalty.count({ where }),
+  ]);
+
+  return {
+    data: rows.map((penalty) => ({
+      id: penalty.id,
+      orderId: penalty.orderId,
+      billNumber: penalty.billNumber,
+      workerType: penalty.roleType,
+      workerName: penalty.user?.name || "-",
+      reason: penalty.reason,
+      damageAmount: Number(penalty.totalExpense || 0),
+      penaltyAmount: Number(penalty.transaction?.amount ?? penalty.totalExpense ?? 0),
+      paymentStatus: penalty.workerPaymentStatus || "UNKNOWN",
+      customerName: penalty.customerName,
+      orderType: penalty.orderType,
+      createdAt: penalty.createdAt,
+      createdBy: penalty.createdBy,
+    })),
+    total,
+    page,
+    limit,
+  };
 };
 
 export const getMyDamagedClothesPenalties = async (

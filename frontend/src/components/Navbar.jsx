@@ -1286,7 +1286,7 @@ export default function Navbar({ onHamburger, pageTitle }) {
         ) : drafts.length === 0 ? (
           <EmptyState message={t("orders.noDrafts", "No saved drafts")} />
         ) : (
-          <div className="tbl-wrap">
+          <div className="tbl-wrap order-scroll-x">
             <table className="tbl">
               <thead>
                 <tr>

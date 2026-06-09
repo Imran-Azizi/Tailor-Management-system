@@ -17,10 +17,18 @@ const isBillNumberConflictError = (error) =>
   error?.code === "P2002" && hasBillNumberTarget(error?.meta?.target);
 
 export const getNextSequentialBillNumber = async (db) => {
-  const result = await db.customer.aggregate({
-    _max: { billNumber: true },
-  });
-  const currentMax = Number(result?._max?.billNumber || 0);
+  const [customerResult, orderResult] = await Promise.all([
+    db.customer.aggregate({
+      _max: { billNumber: true },
+    }),
+    db.order.aggregate({
+      _max: { billNumber: true },
+    }),
+  ]);
+  const currentMax = Math.max(
+    Number(customerResult?._max?.billNumber || 0),
+    Number(orderResult?._max?.billNumber || 0),
+  );
   return Number.isFinite(currentMax) && currentMax >= BILL_NUMBER_START
     ? currentMax + 1
     : BILL_NUMBER_START;
