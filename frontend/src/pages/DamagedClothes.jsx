@@ -977,11 +977,87 @@ function RecordsPanel({
   onPageChange,
   onRefresh,
 }) {
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
   const pagePenaltyTotal = records.reduce(
     (sum, record) => sum + Number(record?.penaltyAmount || 0),
     0,
   );
   const hasActiveFilters = Boolean(recordsSearch?.trim() || recordsRole?.value);
+
+  const mobileFilterApply = () => setFilterModalOpen(false);
+  const mobileFilterClear = () => {
+    onSearchChange("");
+    onRoleChange(null);
+    setFilterModalOpen(false);
+  };
+
+  const filterSearchInput = (
+    <div style={{ position: "relative" }}>
+      <LuSearch
+        size={15}
+        style={{
+          position: "absolute",
+          insetInlineStart: 13,
+          top: "50%",
+          transform: "translateY(-50%)",
+          color: "var(--text3)",
+        }}
+      />
+      <input
+        className="inp"
+        value={recordsSearch}
+        onChange={(event) => onSearchChange(event.target.value)}
+        placeholder={t(
+          "damagedClothes.recordsSearchPlaceholder",
+          "Search bill, worker, customer, or reason",
+        )}
+        style={{
+          height: 42,
+          paddingInlineStart: 38,
+          borderRadius: 10,
+          background: "var(--surface)",
+        }}
+      />
+    </div>
+  );
+
+  const filterRoleSelect = (
+    <Select
+      classNamePrefix="rs"
+      isRtl={isRtl}
+      isClearable
+      options={roleOptions}
+      value={recordsRole}
+      onChange={onRoleChange}
+      placeholder={t("damagedClothes.filterByRole", "Filter by role")}
+      styles={buildSelectStyles({ isRtl })}
+    />
+  );
+
+  const filterStatusBadge = (
+    <div
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        color: "var(--text2)",
+        fontSize: 12,
+        fontWeight: 700,
+        justifyContent: "center",
+        minHeight: 42,
+        paddingInline: 12,
+        borderRadius: 10,
+        border: "1px solid var(--border)",
+        background: "var(--surface)",
+        whiteSpace: "nowrap",
+      }}
+    >
+      <LuFilter size={14} />
+      {hasActiveFilters
+        ? t("common.filtered", "Filtered")
+        : t("common.all", "All")}
+    </div>
+  );
 
   return (
     <section
@@ -1071,7 +1147,7 @@ function RecordsPanel({
         </div>
 
         <div
-          className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_240px_auto]"
+          className="hidden gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_240px_auto]"
           style={{
             alignItems: "center",
             border: "1px solid var(--border)",
@@ -1080,66 +1156,54 @@ function RecordsPanel({
             background: "var(--surface2)",
           }}
         >
-          <div style={{ position: "relative" }}>
-            <LuSearch
-              size={15}
-              style={{
-                position: "absolute",
-                insetInlineStart: 13,
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: "var(--text3)",
-              }}
-            />
-            <input
-              className="inp"
-              value={recordsSearch}
-              onChange={(event) => onSearchChange(event.target.value)}
-              placeholder={t(
-                "damagedClothes.recordsSearchPlaceholder",
-                "Search bill, worker, customer, or reason",
-              )}
-              style={{
-                height: 42,
-                paddingInlineStart: 38,
-                borderRadius: 10,
-                background: "var(--surface)",
-              }}
-            />
-          </div>
-          <Select
-            classNamePrefix="rs"
-            isRtl={isRtl}
-            isClearable
-            options={roleOptions}
-            value={recordsRole}
-            onChange={onRoleChange}
-            placeholder={t("damagedClothes.filterByRole", "Filter by role")}
-            styles={buildSelectStyles({ isRtl })}
-          />
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              color: "var(--text2)",
-              fontSize: 12,
-              fontWeight: 700,
-              justifyContent: "center",
-              minHeight: 42,
-              paddingInline: 12,
-              borderRadius: 10,
-              border: "1px solid var(--border)",
-              background: "var(--surface)",
-              whiteSpace: "nowrap",
-            }}
+          {filterSearchInput}
+          {filterRoleSelect}
+          {filterStatusBadge}
+        </div>
+
+        <div className="lg:hidden">
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={() => setFilterModalOpen(true)}
+            style={{ height: 42, borderRadius: 10, gap: 6, width: "100%" }}
           >
             <LuFilter size={14} />
             {hasActiveFilters
               ? t("common.filtered", "Filtered")
-              : t("common.all", "All")}
-          </div>
+              : t("common.filters", "Filters")}
+          </button>
         </div>
+
+        <Modal
+          open={filterModalOpen}
+          onClose={() => setFilterModalOpen(false)}
+          title={t("damagedClothes.recordsTitle", "Filters")}
+          maxW={420}
+        >
+          <div style={{ display: "grid", gap: 16 }}>
+            {filterSearchInput}
+            {filterRoleSelect}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={mobileFilterClear}
+                style={{ height: 40, borderRadius: 10, gap: 6 }}
+              >
+                {t("common.clear", "Clear")}
+              </button>
+              <button
+                type="button"
+                className="btn btn-gold"
+                onClick={mobileFilterApply}
+                style={{ height: 40, borderRadius: 10, gap: 6, minWidth: 90 }}
+              >
+                {t("common.apply", "Apply")}
+              </button>
+            </div>
+          </div>
+        </Modal>
 
         <div
           className="order-scroll-x"

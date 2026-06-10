@@ -623,7 +623,7 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
                     }}
                   >
                     <span
-                      className={`badge bg-gold ${styles["hide-on-mobile"]}`}
+                      className="badge bg-gold"
                       style={{ fontSize: 11 }}
                     >
                       {getOrderTypeLabel(entry.type, language)}

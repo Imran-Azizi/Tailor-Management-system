@@ -33,6 +33,7 @@ import {
   formatAfghanistanReportDate,
   formatDateLocale,
   formatNumberLocale,
+  isRtlLanguage,
 } from "../lib/locale.js";
 import {
   getOrderLabelParts,
@@ -125,7 +126,7 @@ const TooltipCard = ({ active, payload, label, language, t, isRtl }) => {
 export default function Dashboard() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
-  const isRtl = i18n.dir?.(language) === "rtl";
+  const isRtl = isRtlLanguage(language);
   const navigate = useNavigate();
   const { isAdmin, isFinance, user } = useAuth();
   const { viewMonth, viewYear } = useMonth();
@@ -428,7 +429,10 @@ export default function Dashboard() {
       const numericValue = Number(String(card.value).replace(/[^0-9.-]/g, ""));
       return Number.isFinite(numericValue) ? numericValue !== 0 : true;
     })
-    .sort((a, b) => (a.ltrOrder ?? 99) - (b.ltrOrder ?? 99));
+    .sort((a, b) => {
+      const orderKey = isRtl ? "rtlOrder" : "ltrOrder";
+      return (a[orderKey] ?? 99) - (b[orderKey] ?? 99);
+    });
 
   const orderStatusClassName =
     "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold";
@@ -559,6 +563,8 @@ export default function Dashboard() {
         }),
     },
   ];
+  const displayColumns = tableColumns;
+
   return (
     <div
       className={`page report-root dashboard-shell leading-relaxed tracking-normal ${
@@ -567,8 +573,8 @@ export default function Dashboard() {
       dir={isRtl ? "rtl" : "ltr"}
     >
       <section className="dashboard-hero mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
-        <div className="dashboard-hero-row flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="dashboard-hero-title text-start">
+        <div className={`dashboard-hero-row flex flex-col gap-4 lg:items-center ${isRtl ? 'lg:flex-row' : 'lg:flex-row lg:justify-between'}`}>
+          <div className={`dashboard-hero-title ${isRtl ? 'text-end' : 'text-start'}`}>
             <h1 className="dashboard-hero-heading text-2xl font-bold text-gray-900 dark:text-slate-100">
               {t("dashboardPage.title")}
             </h1>
@@ -579,7 +585,7 @@ export default function Dashboard() {
               </strong>
             </p>
           </div>
-          <div className="dashboard-date-chip rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 text-start dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+          <div className={`dashboard-date-chip rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 ${isRtl ? 'text-end lg:ms-auto' : 'text-start'} dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300`}>
             {t("common.date", "Date")}:{" "}
             <span className={isRtl ? "rtl-number-inline" : ""}>
               {generatedAtLabel}
@@ -590,7 +596,7 @@ export default function Dashboard() {
 
       <div
         className="dashboard-stats-grid mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
-        dir="ltr"
+        dir={isRtl ? "rtl" : "ltr"}
       >
         <StatCard
           className="md:col-span-2 xl:col-span-3"
@@ -770,9 +776,12 @@ export default function Dashboard() {
         </ResponsiveContainer>
       </Card>
 
-      <section className="dashboard-recent-orders overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <div className="dashboard-recent-orders__head border-b border-slate-200 px-4 py-3 dark:border-slate-700 sm:px-5">
-          <h3 className="text-base font-semibold text-gray-900 dark:text-slate-100">
+      <section
+        className="dashboard-recent-orders overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900"
+        dir={isRtl ? "rtl" : "ltr"}
+      >
+        <div className={`dashboard-recent-orders__head border-b border-slate-200 px-4 py-3 dark:border-slate-700 sm:px-5 ${isRtl ? 'text-right' : ''}`}>
+          <h3 className={`text-base font-semibold text-gray-900 dark:text-slate-100 ${isRtl ? 'text-right' : ''}`}>
             {t("dashboardPage.recentOrders")}
           </h3>
         </div>
@@ -780,7 +789,7 @@ export default function Dashboard() {
         <ReportTable
           isRtl={isRtl}
           columnFlow={isRtl ? "rtl" : "ltr"}
-          columns={tableColumns}
+          columns={displayColumns}
           rows={data.recentOrders || []}
           emptyText={t("common.noData", { defaultValue: "No data found" })}
         />

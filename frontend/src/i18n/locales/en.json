@@ -52,6 +52,9 @@
     "refresh": "Refresh",
     "reset": "Reset",
     "noDataThisMonth": "No data found for this month",
+    "filters": "Filters",
+    "clear": "Clear",
+    "apply": "Apply",
     "notAvailable": "-"
   },
   "sidebar": {

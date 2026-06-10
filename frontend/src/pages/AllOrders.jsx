@@ -1053,6 +1053,7 @@ const ORDER_TYPE_FILTER_VALUES = [
 export default function AllOrders({ filter, mode = "orders" }) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
+  const isRtl = isRtlLanguage(language);
   const { user, isAdmin, isFinance } = useAuth();
   const { viewMonth, viewYear, getMonthAccessMode } = useMonth();
   const qc = useQueryClient();
@@ -1239,7 +1240,12 @@ export default function AllOrders({ filter, mode = "orders" }) {
   }, [orders]);
 
   return (
-    <div className="page">
+    <div
+      className={`page all-orders-page ${
+        isRtl ? "all-orders-page--rtl" : "all-orders-page--ltr"
+      }`}
+      dir={isRtl ? "rtl" : "ltr"}
+    >
       <PageHeader title={title} subtitle={subtitle} />
 
       {(isAdmin || isFinance) && (
@@ -1280,7 +1286,10 @@ export default function AllOrders({ filter, mode = "orders" }) {
       )}
 
       {(statusFilter === "completed" || statusFilter === "pending") && (
-        <div className="g-stats" style={{ marginBottom: 16 }}>
+        <div
+          className="g-stats all-orders-status-stats"
+          style={{ marginBottom: 16 }}
+        >
           <StatCard
             label={
               statusFilter === "completed"
@@ -1353,7 +1362,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
         </div>
       </Card>
 
-      <div className="order-dashboard-strip">
+      <div className="order-dashboard-strip" dir={isRtl ? "rtl" : "ltr"}>
         {isFinance && (
           <div className="order-dashboard-card order-dashboard-card--finance">
             <span className="order-dashboard-icon">
