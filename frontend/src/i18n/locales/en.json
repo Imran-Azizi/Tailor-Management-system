@@ -859,7 +859,11 @@
     "searchInBox": "Search orders in this box...",
     "fullCapacity": "Full",
     "deleteTitle": "Delete Box",
-    "deleteConfirmDetail": "Delete this box? All orders inside will be unassigned."
+    "deleteConfirmDetail": "Delete this box? All orders inside will be unassigned.",
+    "waitingForBoxDraftTitle": "Order waiting for box design",
+    "waitingForBoxDraftBody": "Create a box for {{type}} below, then resume the saved draft order.",
+    "waitingForBoxDraftBodyGeneric": "Create the required box below, then resume your saved draft order.",
+    "boxCreatedResumeDraft": "Box created successfully. You can now resume your saved order."
   },
   "customersPage": {
     "title": "Customers",

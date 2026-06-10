@@ -2169,7 +2169,10 @@ const resolveAutoBoxForNewOrder = async (tx, orderType) => {
       `No box available for ${orderType}. Please create a box first.`,
     );
     err.code = "BOX_NOT_FOUND_FOR_TYPE";
+    err.boxType = resolvedType;
     err.status = 400;
+    err.publicMessage =
+      "This order type does not have a box design yet. Please create the required box in Box Management.";
     throw err;
   }
 
@@ -2179,8 +2182,11 @@ const resolveAutoBoxForNewOrder = async (tx, orderType) => {
       `All boxes are full for ${orderType}. Please create a new box.`,
     );
     err.code = "BOX_CAPACITY_FULL";
+    err.boxType = resolvedType;
     err.boxName = boxes[0]?.boxName || null;
     err.status = 400;
+    err.publicMessage =
+      "All boxes for this order type are full. Please create another box in Box Management.";
     throw err;
   }
 
@@ -2491,7 +2497,13 @@ export const createOrder = async ({
             new Error(
               "No Foreign Country box exists. Please create one before assigning foreign orders.",
             ),
-            { status: 400 },
+            {
+              status: 400,
+              code: "BOX_NOT_FOUND_FOR_TYPE",
+              boxType: "FOREIGN_COUNTRY",
+              publicMessage:
+                "No Foreign Country box exists yet. Please create one in Box Management.",
+            },
           );
         }
 

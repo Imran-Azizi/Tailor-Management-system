@@ -1,5 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 
+const ACTIVE_DRAFT_STATUSES = ["DRAFT", "WAITING_FOR_BOX"];
+
 function normalizeText(value) {
   if (typeof value !== "string") return "";
   return value.trim();
@@ -17,10 +19,19 @@ function buildDraftData(input = {}) {
     customerInfo: input.customerInfo || {},
     orderTypes: input.orderTypes || [],
     measurements: input.measurements || {},
+    rakhtSelections: input.rakhtSelections || [],
+    billing: input.billing || {},
+    orderItems: input.orderItems || [],
+    entryMonth:
+      input.entryMonth != null ? Number(input.entryMonth) : null,
+    entryYear: input.entryYear != null ? Number(input.entryYear) : null,
+    waitingBoxType: normalizeText(input.waitingBoxType) || null,
+    prefillOrderId: normalizeText(input.prefillOrderId) || null,
   };
 }
 
 function draftResponse(draft) {
+  const draftData = draft.draftData || {};
   return {
     id: draft.id,
     clientKey: draft.clientKey,
@@ -28,7 +39,8 @@ function draftResponse(draft) {
     orderTypes: draft.orderTypes || [],
     step: draft.step || 0,
     status: draft.status,
-    draftData: draft.draftData || {},
+    waitingBoxType: draftData.waitingBoxType || null,
+    draftData,
     createdAt: draft.createdAt,
     updatedAt: draft.updatedAt,
   };
@@ -36,7 +48,7 @@ function draftResponse(draft) {
 
 export async function listOrderDrafts(userId) {
   const drafts = await prisma.orderDraft.findMany({
-    where: { userId, status: "DRAFT" },
+    where: { userId, status: { in: ACTIVE_DRAFT_STATUSES } },
     orderBy: { updatedAt: "desc" },
   });
 
@@ -45,7 +57,7 @@ export async function listOrderDrafts(userId) {
 
 export async function getOrderDraftById(userId, id) {
   const draft = await prisma.orderDraft.findFirst({
-    where: { id, userId, status: "DRAFT" },
+    where: { id, userId, status: { in: ACTIVE_DRAFT_STATUSES } },
   });
   if (!draft) {
     throw Object.assign(new Error("Draft not found"), { status: 404 });
@@ -58,10 +70,15 @@ export async function upsertOrderDraft(userId, payload) {
   const customerName = normalizeText(payload.customerInfo?.firstName) || null;
   const orderTypesSummary = toSummaryOrderTypes(payload.orderTypes);
   const step = Math.max(0, Math.min(Number(payload.step || 0), 10));
+  const status = payload.status === "WAITING_FOR_BOX" ? "WAITING_FOR_BOX" : "DRAFT";
 
   if (payload.id) {
     const existing = await prisma.orderDraft.findFirst({
-      where: { id: payload.id, userId, status: "DRAFT" },
+      where: {
+        id: payload.id,
+        userId,
+        status: { in: ACTIVE_DRAFT_STATUSES },
+      },
     });
     if (!existing) {
       throw Object.assign(new Error("Draft not found"), { status: 404 });
@@ -74,6 +91,7 @@ export async function upsertOrderDraft(userId, payload) {
         customerName,
         orderTypes: orderTypesSummary,
         step,
+        status,
         draftData,
       },
     });
@@ -94,14 +112,14 @@ export async function upsertOrderDraft(userId, payload) {
       customerName,
       orderTypes: orderTypesSummary,
       step,
-      status: "DRAFT",
+      status,
       draftData,
     },
     update: {
       customerName,
       orderTypes: orderTypesSummary,
       step,
-      status: "DRAFT",
+      status,
       draftData,
     },
   });
@@ -111,7 +129,11 @@ export async function upsertOrderDraft(userId, payload) {
 
 export async function deleteOrderDraft(userId, id) {
   const existing = await prisma.orderDraft.findFirst({
-    where: { id, userId, status: "DRAFT" },
+    where: {
+      id,
+      userId,
+      status: { in: ACTIVE_DRAFT_STATUSES },
+    },
     select: { id: true },
   });
 

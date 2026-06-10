@@ -3412,6 +3412,23 @@ select.inp{
   }
 }
 
+/* ── A6 Bill Design System ───────────────────────────────────────────── */
+.print-a6-sheet,
+.print-bill-sheet{
+  --bill-primary:#D97706;
+  --bill-primary-dark:#B45309;
+  --bill-primary-darker:#92400E;
+  --bill-primary-light:#FFF7ED;
+  --bill-primary-muted:#FFEDD5;
+  --bill-border:#E2E8F0;
+  --bill-border-strong:#CBD5E1;
+  --bill-text:#1E293B;
+  --bill-text-muted:#64748B;
+  --bill-surface:#FFFFFF;
+  --bill-surface-alt:#F8FAFC;
+  --bill-table-head:#FFFBEB;
+}
+
 /* A6 bill sheets: flip column-separator borders for RTL */
 .print-a6-sheet[dir="rtl"] .border-r {
   border-right-width: 0;
@@ -3422,9 +3439,216 @@ select.inp{
   border-inline-end-width: 2px;
 }
 
+/* Branded bill header — light primary, no dark bar */
+.print-bill-header{
+  position:relative;
+  overflow:hidden;
+  background:linear-gradient(180deg,var(--bill-primary-light) 0%,var(--bill-surface) 72%);
+  border-bottom:2px solid var(--bill-primary);
+  padding:8px 10px;
+}
+.print-bill-header::before{
+  content:"";
+  position:absolute;
+  top:0;
+  inset-inline:0;
+  height:3px;
+  background:linear-gradient(90deg,var(--bill-primary-dark),var(--bill-primary),var(--bill-primary-dark));
+}
+.print-bill-header-body{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+}
+.print-bill-header-brand{
+  display:flex;
+  min-width:0;
+  flex:1;
+  align-items:center;
+  gap:8px;
+}
+.print-bill-header-logo{
+  width:44px;
+  height:44px;
+  flex-shrink:0;
+  overflow:hidden;
+  border-radius:8px;
+  border:1.5px solid var(--bill-primary-muted);
+  background:var(--bill-surface);
+  box-shadow:0 1px 3px rgba(217,119,6,.12);
+}
+.print-bill-header-logo-img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+.print-bill-header-logo-fallback{
+  display:flex;
+  width:100%;
+  height:100%;
+  align-items:center;
+  justify-content:center;
+  font-size:13px;
+  font-weight:800;
+  color:var(--bill-primary-darker);
+}
+.print-bill-header-shop{
+  display:flex;
+  min-width:0;
+  flex-direction:column;
+  gap:1px;
+}
+.print-bill-header-name{
+  margin:0;
+  font-size:13px;
+  font-weight:800;
+  line-height:1.25;
+  color:var(--bill-primary-darker);
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+.print-bill-header-meta{
+  margin:0;
+  font-size:9px;
+  font-weight:500;
+  line-height:1.3;
+  color:var(--bill-text-muted);
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+.print-bill-header-meta--ltr{
+  direction:ltr;
+  unicode-bidi:embed;
+}
+.print-bill-header-meta-block{
+  flex-shrink:0;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:3px;
+}
+.print-bill-header--rtl .print-bill-header-meta-block{
+  align-items:flex-start;
+}
+.print-bill-header-badge{
+  display:inline-flex;
+  align-items:center;
+  padding:2px 8px;
+  border-radius:999px;
+  background:var(--bill-primary);
+  color:#fff;
+  font-size:8.5px;
+  font-weight:700;
+  line-height:1.3;
+  letter-spacing:.02em;
+  white-space:nowrap;
+}
+.print-bill-header-datetime{
+  margin:0;
+  font-size:9px;
+  font-weight:600;
+  line-height:1.25;
+  color:var(--bill-text-muted);
+  direction:ltr;
+  unicode-bidi:embed;
+}
+
+/* Section separators */
+.print-bill-section-head{
+  padding:4px 8px;
+  border-block:1px solid var(--bill-primary-muted);
+  background:var(--bill-primary-light);
+  color:var(--bill-primary-darker);
+  font-size:8px;
+  font-weight:800;
+  line-height:1.25;
+  letter-spacing:0;
+  text-transform:none;
+}
+.print-bill-section-head--upper{
+  text-transform:uppercase;
+  letter-spacing:.06em;
+}
+
+/* Bill tables — no scrollbars, fit A6 width */
+.print-a6-sheet .print-bill-table-wrap,
+.print-a6-sheet .print-customer-combined-wrap,
+.print-a6-sheet .print-tailor-ledger-wrap{
+  overflow:hidden !important;
+  overflow-x:hidden !important;
+  overflow-y:hidden !important;
+  max-width:100%;
+  min-width:0;
+  scrollbar-width:none !important;
+  -ms-overflow-style:none !important;
+  padding-bottom:0 !important;
+  scrollbar-gutter:auto !important;
+}
+.print-a6-sheet .print-bill-table-wrap::-webkit-scrollbar,
+.print-a6-sheet .print-customer-combined-wrap::-webkit-scrollbar,
+.print-a6-sheet .print-tailor-ledger-wrap::-webkit-scrollbar{
+  display:none;
+  width:0 !important;
+  height:0 !important;
+}
+.print-bill-th{
+  font-size:8px;
+  font-weight:800;
+  color:var(--bill-text-muted);
+  line-height:1.25;
+  letter-spacing:0;
+}
+.print-bill-th--upper{
+  text-transform:uppercase;
+  letter-spacing:.05em;
+}
+.print-bill-number{
+  display:inline-block;
+  font-size:9.5px;
+  font-weight:800;
+  color:var(--bill-primary-darker);
+  letter-spacing:.02em;
+  line-height:1.3;
+}
+.print-bill-kv-strip{
+  background:linear-gradient(180deg,var(--bill-table-head) 0%,var(--bill-surface) 100%);
+}
+.print-bill-kv-cell{
+  min-width:0;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+.print-bill-kv-value{
+  font-weight:700;
+  color:var(--bill-text);
+  line-height:1.3;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+.print-bill-kv-value--qty{
+  color:var(--bill-primary-darker);
+  font-weight:800;
+}
+.print-bill-closing-table tbody tr:last-child td{
+  border-bottom:0 !important;
+}
+.print-bill-closing-section .print-tailor-fabric-grid > div{
+  border-bottom-color:var(--bill-border-strong) !important;
+}
+.print-bill-closing-section .print-tailor-fabric-grid > div:last-child,
+.print-bill-closing-section.print-tailor-ledger-wrap .print-tailor-ledger-row:last-child .print-tailor-ledger-cell{
+  border-bottom:0 !important;
+}
+.print-customer-combined-table,
+.print-reference-detail-table{
+  min-width:0 !important;
+  width:100%;
+}
+
 /* Customer bill: polished A6 receipt layout */
 .print-customer-bill{
-  background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);
+  background:var(--bill-surface);
 }
 .print-customer-info-strip{
   background:linear-gradient(135deg,#f8fafc 0%,#eef2f7 100%);
@@ -3443,18 +3667,12 @@ select.inp{
   overflow-wrap:anywhere;
   word-break:break-word;
 }
-.print-customer-section-title{
-  border-bottom:1px solid #1f2937;
-  line-height:1.25;
-  letter-spacing:0;
-  text-transform:none;
-}
 .print-customer-finance-table thead{
-  background:#eef1f4;
+  background:var(--bill-table-head);
 }
 .print-customer-finance-table th{
-  background:#eef1f4;
-  color:#111827;
+  background:var(--bill-table-head);
+  color:var(--bill-text);
 }
 .print-customer-amount{
   display:inline-flex;
@@ -3462,43 +3680,18 @@ select.inp{
   justify-content:center;
   max-width:100%;
   min-width:0;
-  padding:1px 5px;
-  border-radius:5px;
-  background:#f8fafc;
-  box-shadow:inset 0 0 0 1px rgba(15,23,42,.09);
+  padding:2px 6px;
+  border-radius:4px;
+  background:var(--bill-surface-alt);
+  box-shadow:inset 0 0 0 1px rgba(217,119,6,.1);
   line-height:1.35;
   white-space:normal;
   overflow-wrap:anywhere;
   word-break:break-word;
 }
 .print-customer-amount--final{
-  background:#fffbeb;
-}
-.print-customer-barcode-row{
-  background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);
-}
-.print-customer-barcode-card{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  max-width:100%;
-  box-shadow:inset 0 0 0 1px rgba(15,23,42,.03);
-}
-.print-customer-barcode-card svg{
-  max-width:100%;
-  height:auto;
-}
-.print-customer-quantity{
-  display:inline-block;
-  width:max-content;
-  max-width:100%;
-  padding:1px 7px;
-  border-radius:5px;
-  background:#e0f2fe;
-  color:#075985;
-}
-.print-customer-footer{
-  background:#eef2f7;
+  background:var(--bill-primary-light);
+  box-shadow:inset 0 0 0 1px rgba(217,119,6,.18);
 }
 .print-customer-combined-wrap{
   max-width:100%;
@@ -3509,13 +3702,33 @@ select.inp{
 .print-customer-combined-table tbody tr:nth-child(even){
   background:#f8fafc;
 }
-[dir="rtl"] .print-customer-bill{
+[dir="rtl"] .print-bill-sheet,
+[dir="rtl"] .print-customer-bill,
+[dir="rtl"] .print-shop-bill{
   direction:rtl;
+  text-align:right;
+}
+[dir="rtl"] .print-bill-header-name,
+[dir="rtl"] .print-bill-header-meta,
+[dir="rtl"] .print-bill-section-head,
+[dir="rtl"] .print-bill-kv-cell,
+[dir="rtl"] .print-bill-kv-value{
+  text-align:right;
+}
+[dir="rtl"] .print-bill-header-meta--ltr{
   text-align:right;
 }
 [dir="rtl"] .print-customer-combined-table th,
 [dir="rtl"] .print-customer-combined-table td{
   direction:rtl;
+  text-align:right;
+}
+[dir="rtl"] .print-customer-finance-table th,
+[dir="rtl"] .print-customer-finance-table td{
+  direction:rtl;
+  text-align:right;
+}
+[dir="rtl"] .print-shop-bill .print-tailor-info-strip > div{
   text-align:right;
 }
 
@@ -3620,7 +3833,7 @@ select.inp{
 @media print{
   .print-customer-info-cell{padding:4px 6px}
   .print-customer-info-strip{grid-template-columns:17% 23% 38% 22%}
-  .print-customer-section-title{font-size:7.6px;padding:3px 5px}
+  .print-bill-section-head{font-size:7.4px;padding:3px 5px}
   .print-customer-finance-table th{font-size:7.8px;padding:3px 4.4px}
   .print-customer-finance-table td{padding:7px 4.4px}
   .print-customer-amount{padding:1px 4px;border-radius:4px}
@@ -3641,32 +3854,26 @@ select.inp{
   .print-tailor-ledger-note-text{font-size:8.2px;line-height:1.3}
 }
 
-/* Reference-style A6 bill print layout */
+/* A6 bill sheet — screen preview & print base */
 .print-a6-sheet.print-customer-bill,
-.print-a6-sheet.print-shop-bill{
+.print-a6-sheet.print-shop-bill,
+.print-bill-sheet{
   overflow:hidden;
-  border:2px solid #1f2937 !important;
-  border-radius:8px !important;
-  background:#fff !important;
+  border:1px solid var(--bill-border-strong) !important;
+  border-radius:6px !important;
+  background:var(--bill-surface) !important;
   box-shadow:none !important;
 }
 .print-bill-header{
-  min-height:78px;
-  padding:12px 14px !important;
-  border-bottom:2px solid #1f2937 !important;
-  background:linear-gradient(90deg,#111827 0%,#1e293b 64%,#333026 100%) !important;
+  min-height:64px;
+  padding:7px 9px !important;
 }
-.print-bill-header .pointer-events-none{
-  display:none;
+.print-bill-header-logo{
+  width:40px !important;
+  height:40px !important;
 }
-.print-bill-header .h-12{
-  width:52px !important;
-  height:52px !important;
-  border-radius:8px !important;
-  border-color:rgba(255,255,255,.55) !important;
-}
-.print-bill-header p{
-  letter-spacing:0 !important;
+.print-bill-header-name{
+  font-size:12px !important;
 }
 .print-bill-header .print-shop-meta{
   line-height:1.25;
@@ -3674,12 +3881,11 @@ select.inp{
   overflow:visible;
   text-overflow:clip;
 }
-.print-customer-info-strip,
-.print-customer-barcode-row{
-  display:none !important;
+.print-a6-sheet .border-slate-800{
+  border-color:var(--bill-border-strong) !important;
 }
 .print-customer-combined-wrap{
-  overflow:visible !important;
+  overflow:hidden !important;
 }
 .print-reference-detail-table,
 .print-customer-finance-table,
@@ -3694,13 +3900,13 @@ select.inp{
   background:#fff;
 }
 .print-reference-detail-table thead{
-  background:#eef2f7 !important;
+  background:var(--bill-table-head) !important;
 }
 .print-reference-detail-table th,
 .print-reference-detail-table td,
 .print-customer-finance-table th,
 .print-customer-finance-table td{
-  border-color:#1f2937 !important;
+  border-color:var(--bill-border-strong) !important;
   line-height:1.25;
   vertical-align:top;
   overflow-wrap:anywhere;
@@ -3709,28 +3915,26 @@ select.inp{
 .print-reference-detail-table th{
   padding:4px 5px !important;
   font-size:7.8px;
-  color:#111827 !important;
-  background:#eef2f7 !important;
+  color:var(--bill-text) !important;
+  background:var(--bill-table-head) !important;
 }
 .print-reference-detail-table td{
-  min-height:58px;
-  padding:5px 6px !important;
+  min-height:0;
+  padding:4px 5px !important;
   color:#0f172a;
 }
-.print-customer-section-title{
-  padding:5px 8px !important;
-  border-bottom:1px solid #1f2937 !important;
-  background:#1f2937 !important;
-  line-height:1.15;
+.print-bill-section-head{
+  padding:4px 7px !important;
+  line-height:1.2;
 }
 .print-customer-finance-table{
   font-size:8.4px;
-  background:#fff;
+  background:var(--bill-surface);
 }
 .print-customer-finance-table th{
   padding:4px 6px !important;
-  background:#eef2f7 !important;
-  color:#111827 !important;
+  background:var(--bill-table-head) !important;
+  color:var(--bill-text) !important;
 }
 .print-customer-finance-table td{
   padding:7px 6px !important;
@@ -3749,21 +3953,14 @@ select.inp{
   border-radius:6px !important;
   border-color:#cbd5e1 !important;
 }
-.print-customer-footer,
-.print-tailor-footer{
-  min-height:24px;
-  border-top:1px solid #1f2937;
-  background:#eef2f7 !important;
-  line-height:1.25;
-}
 .print-shop-bill .print-tailor-info-strip{
   grid-template-columns:14% 20% 24% 20% 22%;
-  background:#eef2f7 !important;
+  background:var(--bill-surface-alt) !important;
 }
 .print-shop-bill .print-tailor-info-strip > div{
   min-width:0;
-  padding:7px 10px !important;
-  border-color:#1f2937 !important;
+  padding:6px 8px !important;
+  border-color:var(--bill-border-strong) !important;
   overflow-wrap:anywhere;
   word-break:break-word;
 }
@@ -3775,34 +3972,34 @@ select.inp{
   font-size:9px;
 }
 .print-tailor-ledger-headrow{
-  background:#eef2f7 !important;
+  background:var(--bill-table-head) !important;
 }
 .print-tailor-ledger-headcell{
-  height:24px;
-  padding:4px 8px !important;
-  border-color:#1f2937 !important;
-  background:#eef2f7 !important;
-  color:#111827 !important;
+  height:22px;
+  padding:3px 7px !important;
+  border-color:var(--bill-border-strong) !important;
+  background:var(--bill-table-head) !important;
+  color:var(--bill-text) !important;
   font-size:8px;
   line-height:1.25;
 }
 .print-tailor-ledger-cell{
-  height:25px;
-  padding:4px 8px !important;
-  border-inline-end-color:#1f2937 !important;
-  border-bottom:1px dotted #8b95a1 !important;
+  height:23px;
+  padding:3px 7px !important;
+  border-inline-end-color:var(--bill-border-strong) !important;
+  border-bottom:1px dotted var(--bill-border) !important;
   vertical-align:middle;
   line-height:1.25;
 }
 .print-tailor-ledger-cell--measure{
-  border-inline-end:2px solid #1f2937 !important;
+  border-inline-end:2px solid var(--bill-border-strong) !important;
   font-size:10px;
   font-weight:900;
   text-align:center !important;
 }
 .print-tailor-ledger-headcell--style,
 .print-tailor-ledger-cell--style-label{
-  border-inline-start:2px solid #1f2937 !important;
+  border-inline-start:2px solid var(--bill-border-strong) !important;
 }
 .print-tailor-ledger-row:last-child .print-tailor-ledger-cell{
   border-bottom:0 !important;
@@ -3811,67 +4008,90 @@ select.inp{
   line-height:1.25;
 }
 .print-tailor-fabric-section{
-  border-top:2px solid #1f2937 !important;
-}
-.print-tailor-fabric-section > div:first-child{
-  padding:5px 8px !important;
-  background:#1f2937 !important;
-  line-height:1.15;
+  border-top:1px solid var(--bill-border-strong) !important;
 }
 .print-tailor-fabric-grid{
-  background:#f8fafc !important;
+  background:var(--bill-surface-alt) !important;
 }
 .print-tailor-fabric-grid > div{
-  min-height:50px;
-  padding:8px 10px !important;
-  border-color:#1f2937 !important;
+  min-height:44px;
+  padding:6px 8px !important;
+  border-color:var(--bill-border-strong) !important;
   overflow-wrap:anywhere;
   word-break:break-word;
 }
 [dir="rtl"] .print-reference-detail-table th,
-[dir="rtl"] .print-reference-detail-table td,
-[dir="rtl"] .print-shop-bill .print-tailor-info-strip > div{
+[dir="rtl"] .print-reference-detail-table td{
   direction:rtl;
   text-align:right;
 }
 [dir="rtl"] .print-reference-detail-table [class*="[direction:ltr]"],
-[dir="rtl"] .print-tailor-footer [class*="[direction:ltr]"]{
+[dir="rtl"] .print-tailor-footer [class*="[direction:ltr]"],
+[dir="rtl"] .print-customer-footer [class*="[direction:ltr]"]{
   direction:ltr;
   unicode-bidi:embed;
 }
+[dir="rtl"] .print-bill-header-datetime{
+  text-align:right;
+}
 
+/* A6 print page — centered, minimal margins, no overflow */
+@page bill-a6{
+  size:A6 portrait;
+  margin:0;
+}
 @media print{
   body:has(.print-a6-sheet){
-    min-height:148mm;
     width:105mm;
+    height:148mm;
+    min-height:148mm;
+    max-height:148mm;
     display:flex;
     align-items:center;
     justify-content:center;
-    padding:2.5mm;
+    padding:1.5mm;
+    margin:0;
     overflow:hidden;
+    box-sizing:border-box;
   }
-  .print-a6-sheet{
+  .print-a6-sheet,
+  .print-bill-sheet{
     width:100%;
-    max-width:100mm;
-    margin:auto !important;
+    max-width:102mm;
+    margin:0 auto !important;
+    flex-shrink:0;
     transform:scale(var(--print-a6-scale,1));
     transform-origin:center center;
+    page-break-inside:avoid;
+    break-inside:avoid;
   }
-  .print-bill-header{min-height:76px;padding:10px 12px !important}
-  .print-bill-header .h-12{width:50px !important;height:50px !important}
-  .print-reference-detail-table{font-size:7.8px}
-  .print-reference-detail-table th{font-size:7.2px;padding:3.5px 4px !important}
-  .print-reference-detail-table td{min-height:52px;padding:4px 4.5px !important}
-  .print-customer-section-title{padding:4px 6px !important}
-  .print-customer-finance-table th{font-size:7.2px;padding:3.5px 4px !important}
-  .print-customer-finance-table td{padding:6px 4px !important}
-  .print-customer-amount{min-width:50px;padding:1px 5px}
-  .print-shop-bill .print-tailor-info-strip > div{padding:5px 7px !important}
-  .print-tailor-ledger-headcell{height:22px;font-size:7.4px;padding:3px 6px !important}
-  .print-tailor-ledger-cell{height:23px;padding:3px 6px !important}
-  .print-tailor-fabric-grid > div{min-height:44px;padding:6px 7px !important}
-  .print-customer-footer,
-  .print-tailor-footer{min-height:22px}
+  .print-a6-sheet *{
+    page-break-inside:avoid;
+    break-inside:avoid;
+  }
+  .print-bill-header{
+    min-height:58px;
+    padding:6px 8px !important;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+  .print-bill-header-logo{
+    width:36px !important;
+    height:36px !important;
+  }
+  .print-bill-header-name{font-size:11px !important}
+  .print-bill-header-badge{font-size:7.8px !important}
+  .print-reference-detail-table{font-size:7.6px}
+  .print-reference-detail-table th{font-size:7.1px;padding:3px 4px !important}
+  .print-reference-detail-table td{min-height:0;padding:3px 4px !important}
+  .print-bill-section-head{padding:3px 6px !important;font-size:7.4px !important}
+  .print-customer-finance-table th{font-size:7.1px;padding:3px 4px !important}
+  .print-customer-finance-table td{padding:5px 4px !important}
+  .print-customer-amount{min-width:48px;padding:1px 4px}
+  .print-shop-bill .print-tailor-info-strip > div{padding:4px 6px !important}
+  .print-tailor-ledger-headcell{height:20px;font-size:7.2px;padding:2.5px 5px !important}
+  .print-tailor-ledger-cell{height:21px;padding:2.5px 5px !important}
+  .print-tailor-fabric-grid > div{min-height:40px;padding:5px 6px !important}
 }
 
 /* Alignment helpers */

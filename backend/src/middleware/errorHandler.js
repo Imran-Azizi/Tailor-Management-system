@@ -34,10 +34,20 @@ export const errorHandler = (err, req, res, next) => {
   }
 
   const status = typeof err.status === "number" ? err.status : 500;
-  res.status(status).json({
+  const isServerError = status >= 500;
+  const response = {
     error:
-      process.env.NODE_ENV !== "production"
-        ? err.message || "Internal server error"
-        : "Internal server error",
-  });
+      isServerError && process.env.NODE_ENV === "production"
+        ? "Internal server error"
+        : err.publicMessage || err.message || "Request failed",
+  };
+
+  if (err.code && !String(err.code).startsWith("P")) {
+    response.code = err.code;
+  }
+  if (err.boxType) {
+    response.boxType = err.boxType;
+  }
+
+  res.status(status).json(response);
 };

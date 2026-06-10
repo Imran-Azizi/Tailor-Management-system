@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   LuPlus,
   LuPencil,
@@ -87,7 +88,12 @@ function filterBoxOrders(orders, query) {
 
 export default function Boxes() {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const qc = useQueryClient();
+  const contextBoxType = searchParams.get("type") || "";
+  const linkedDraftId = searchParams.get("draft") || "";
+  const shouldOpenCreate = searchParams.get("openCreate") === "1";
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteBoxTarget, setDeleteBoxTarget] = useState(null);
@@ -104,6 +110,27 @@ export default function Boxes() {
     queryFn: () => api.get("/boxes").then((r) => r.data),
   });
 
+  const sortedBoxes = useMemo(() => {
+    const list = Array.isArray(boxes) ? [...boxes] : [];
+    if (!contextBoxType) return list;
+    return list.sort((a, b) => {
+      const aMatch = a.boxType === contextBoxType ? 0 : 1;
+      const bMatch = b.boxType === contextBoxType ? 0 : 1;
+      return aMatch - bMatch;
+    });
+  }, [boxes, contextBoxType]);
+
+  useEffect(() => {
+    if (!shouldOpenCreate || !contextBoxType) return;
+    setEditing(null);
+    reset({
+      boxName: "",
+      boxType: contextBoxType,
+      capacity: "",
+    });
+    setModal(true);
+  }, [shouldOpenCreate, contextBoxType, reset]);
+
   const saveMut = useMutation({
     mutationFn: (payload) =>
       editing
@@ -116,11 +143,21 @@ export default function Boxes() {
             capacity: Number(payload.capacity),
           }),
     onSuccess: () => {
+      const wasCreate = !editing;
       qc.invalidateQueries({ queryKey: ["boxes"] });
       setModal(false);
       reset();
       setEditing(null);
-      toast.success(editing ? t("boxesPage.updated") : t("boxesPage.created"));
+      toast.success(wasCreate ? t("boxesPage.created") : t("boxesPage.updated"));
+      if (wasCreate && linkedDraftId) {
+        toast.success(
+          t(
+            "boxesPage.boxCreatedResumeDraft",
+            "Box created successfully. You can now resume your saved order.",
+          ),
+          { duration: 5000 },
+        );
+      }
     },
     onError: (error) =>
       toast.error(getApiErrorMessage(error, t("boxesPage.saveFailed"))),
@@ -159,20 +196,93 @@ export default function Boxes() {
         }
       />
 
+      {linkedDraftId ? (
+        <div
+          className="info-box ib-gold"
+          style={{
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <p style={{ margin: 0, fontWeight: 700 }}>
+              {t(
+                "boxesPage.waitingForBoxDraftTitle",
+                "Order waiting for box design",
+              )}
+            </p>
+            <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--text2)" }}>
+              {contextBoxType
+                ? t("boxesPage.waitingForBoxDraftBody", {
+                    type:
+                      contextBoxType === "FOREIGN_COUNTRY"
+                        ? t("createOrder.sendToForeignCountry", {
+                            defaultValue: "Foreign Country",
+                          })
+                        : getOrderTypeLabel(
+                            contextBoxType,
+                            i18n.resolvedLanguage || i18n.language,
+                          ),
+                    defaultValue:
+                      "Create a box for {{type}} below, then resume the saved draft order.",
+                  })
+                : t(
+                    "boxesPage.waitingForBoxDraftBodyGeneric",
+                    "Create the required box below, then resume your saved draft order.",
+                  )}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={() =>
+              navigate(`/orders/create?draft=${encodeURIComponent(linkedDraftId)}`)
+            }
+          >
+            {t("orders.resume", "Resume order")}
+          </button>
+        </div>
+      ) : null}
+
       {isLoading ? (
         <Spinner />
-      ) : !boxes?.length ? (
+      ) : !sortedBoxes.length ? (
         <Card>
           <EmptyState message={t("boxesPage.noBoxesYet")} Icon={LuArchive} />
+          {shouldOpenCreate && contextBoxType ? (
+            <div style={{ marginTop: 12, textAlign: "center" }}>
+              <button
+                type="button"
+                className="btn btn-gold"
+                onClick={() => {
+                  setEditing(null);
+                  reset({
+                    boxName: "",
+                    boxType: contextBoxType,
+                    capacity: "",
+                  });
+                  setModal(true);
+                }}
+              >
+                <LuPlus size={15} /> {t("boxesPage.newBox")}
+              </button>
+            </div>
+          ) : null}
         </Card>
       ) : (
         <div className="g-boxes">
-          {boxes.map((box) => {
+          {sortedBoxes.map((box) => {
             const used = box._count?.orders || box.orders?.length || 0;
             const accent = TC[box.boxType] || "#2563EB";
             const query = searches[box.id] || "";
             const ordersInBox = box.orders || [];
             const filteredOrders = filterBoxOrders(ordersInBox, query);
+            const isContextMatch =
+              contextBoxType && box.boxType === contextBoxType;
 
             return (
               <div
@@ -182,6 +292,7 @@ export default function Boxes() {
                   overflow: "hidden",
                   cursor: "default",
                   transition: "box-shadow .2s,transform .2s",
+                  boxShadow: isContextMatch ? "0 0 0 2px rgba(217,119,6,.35)" : undefined,
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.boxShadow = "var(--sh-md)";

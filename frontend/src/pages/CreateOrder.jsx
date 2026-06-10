@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { parseNumberLocale } from "../lib/normalize.js";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -171,9 +171,12 @@ export default function CreateOrder() {
   );
   const [draftSaveLabel, setDraftSaveLabel] = useState("");
   const [isDraftLoading, setIsDraftLoading] = useState(false);
+  const [isSavingDraftRedirect, setIsSavingDraftRedirect] = useState(false);
+  const submitInFlightRef = useRef(false);
   const draftParam = searchParams.get("draft") || "";
 
   const mutation = useMutation({ mutationFn: (d) => api.post("/orders", d) });
+  const isOrderSubmitting = mutation.isPending || isSavingDraftRedirect;
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
@@ -203,18 +206,39 @@ export default function CreateOrder() {
         const draft = await getOrderDraft(requestedId);
         if (cancelled || !draft) return;
 
+        const draftData = draft.draftData || {};
+        const restoredOrderTypes = draftData.orderTypes || [];
+        const restoredMeasurements = draftData.measurements || {};
         setForm({
-          ...(draft.draftData?.customerInfo || {}),
-          orderTypes: draft.draftData?.orderTypes || [],
-          measurements: draft.draftData?.measurements || {},
+          ...(draftData.customerInfo || {}),
+          orderTypes: restoredOrderTypes,
+          measurements: restoredMeasurements,
+          rakhtSelections: draftData.rakhtSelections || [],
+          billing: draftData.billing || {},
+          orderItems:
+            draftData.orderItems?.length > 0
+              ? draftData.orderItems
+              : buildOrderItems(restoredOrderTypes, restoredMeasurements),
         });
-        setStep(Math.max(0, Math.min(Number(draft.step || 0), 2)));
+        setStep(Math.max(0, Math.min(Number(draft.step || 0), 4)));
         setDraftId(draft.id);
         setDraftClientKey(
           draft.clientKey ||
             `order_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
         );
-        setDraftSaveLabel(i18n.t("orders.draftLoaded", "Draft restored"));
+        if (draftData.entryMonth) setViewMonth(Number(draftData.entryMonth));
+        if (draftData.entryYear) setViewYear(Number(draftData.entryYear));
+        const loadedLabel =
+          draft.status === "WAITING_FOR_BOX"
+            ? i18n.t(
+                "orders.waitingBoxDraftLoaded",
+                "Draft restored. Waiting for box design.",
+              )
+            : i18n.t("orders.draftLoaded", "Draft restored");
+        setDraftSaveLabel(loadedLabel);
+        if (draft.status === "WAITING_FOR_BOX") {
+          toast(loadedLabel, { icon: "📦", duration: 4500 });
+        }
       } catch {
         if (!cancelled) {
           setForm({});
@@ -255,18 +279,16 @@ export default function CreateOrder() {
     }
 
     setDraftSaveLabel(t("orders.savingDraft", "Saving draft..."));
-    const payload = {
-      id: draftId || undefined,
-      clientKey: draftClientKey,
-      step: Math.max(0, Math.min(Number(step || 0), 2)),
-      customerInfo: {
-        customerId: form.customerId || "",
-        firstName: form.firstName || "",
-        phoneNumber: form.phoneNumber || "",
-      },
-      orderTypes: form.orderTypes || [],
-      measurements: form.measurements || {},
-    };
+    const payload = buildFullDraftPayload({
+      merged: form,
+      draftId,
+      draftClientKey,
+      step,
+      status: "DRAFT",
+      viewMonth,
+      viewYear,
+      prefillOrderId: prefillData?.orderId || null,
+    });
 
     try {
       const saved = await upsertOrderDraft(payload);
@@ -391,7 +413,12 @@ export default function CreateOrder() {
         if (!boxes?.length) {
           return {
             available: false,
-            error: `No box available for ${getOrderTypeLabel(boxType, i18n.language)}. Please create a box first.`,
+            reason: "BOX_NOT_FOUND_FOR_TYPE",
+            missingBoxType: boxType,
+            error: t(
+              "createOrder.boxDesignMissing",
+              "This order type does not have a box design yet. Please create the required box in Box Management.",
+            ),
             redirectToBox: true,
           };
         }
@@ -405,7 +432,12 @@ export default function CreateOrder() {
         if (!availableBox) {
           return {
             available: false,
-            error: `All boxes are full for ${getOrderTypeLabel(boxType, i18n.language)}. Please create a new box.`,
+            reason: "BOX_CAPACITY_FULL",
+            missingBoxType: boxType,
+            error: t(
+              "createOrder.boxCapacityFull",
+              "All boxes for this order type are full. Please create another box in Box Management.",
+            ),
             redirectToBox: true,
           };
         }
@@ -428,6 +460,8 @@ export default function CreateOrder() {
         if (!foreignBoxes?.length) {
           return {
             available: false,
+            reason: "BOX_NOT_FOUND_FOR_TYPE",
+            missingBoxType: "FOREIGN_COUNTRY",
             error: t(
               "createOrder.foreignBoxMissing",
               "No Foreign Country box exists. Please create one first.",
@@ -443,6 +477,8 @@ export default function CreateOrder() {
         if (!availableForeign) {
           return {
             available: false,
+            reason: "BOX_CAPACITY_FULL",
+            missingBoxType: "FOREIGN_COUNTRY",
             error: t(
               "createOrder.foreignBoxFull",
               "Foreign Country box is full. Please increase capacity or create another one.",
@@ -465,7 +501,74 @@ export default function CreateOrder() {
     return { available: true };
   };
 
+  const handleMissingBoxAndRedirect = async (merged, missingBoxType) => {
+    if (!missingBoxType || submitInFlightRef.current) return false;
+
+    submitInFlightRef.current = true;
+    setIsSavingDraftRedirect(true);
+    setError("");
+
+    try {
+      const payload = buildFullDraftPayload({
+        merged,
+        draftId,
+        draftClientKey,
+        step: 4,
+        status: "WAITING_FOR_BOX",
+        waitingBoxType: missingBoxType,
+        viewMonth,
+        viewYear,
+        prefillOrderId: prefillData?.orderId || null,
+      });
+      const saved = await upsertOrderDraft(payload);
+      if (!saved?.id) {
+        throw new Error("Draft save failed");
+      }
+
+      setDraftId(saved.id);
+      setDraftClientKey(saved.clientKey || draftClientKey);
+      qc.invalidateQueries({ queryKey: ["order-drafts"] });
+      qc.invalidateQueries({ queryKey: ["order-drafts-navbar"] });
+
+      toast.success(
+        t(
+          "createOrder.boxDraftSavedMessage",
+          "This order type does not have a box design yet. Your order has been saved as a draft. Please create the required box design to continue.",
+        ),
+        { duration: 6000 },
+      );
+
+      navigate(
+        `/boxes?type=${encodeURIComponent(missingBoxType)}&draft=${encodeURIComponent(saved.id)}&openCreate=1`,
+        {
+          state: {
+            fromOrderCreate: true,
+            draftId: saved.id,
+            missingBoxType,
+          },
+        },
+      );
+      return true;
+    } catch (e) {
+      toast.error(
+        getApiErrorMessage(
+          e,
+          t(
+            "createOrder.boxDraftSaveFailed",
+            "We could not save your order as a draft. Please check your connection and try again.",
+          ),
+        ),
+      );
+      return false;
+    } finally {
+      setIsSavingDraftRedirect(false);
+      submitInFlightRef.current = false;
+    }
+  };
+
   const submit = async (mergedInput = form) => {
+    if (submitInFlightRef.current || mutation.isPending) return;
+
     const merged = mergedInput;
     setError("");
 
@@ -500,9 +603,12 @@ export default function CreateOrder() {
 
     const boxCheck = await checkBoxAvailability(merged.orderTypes || []);
     if (!boxCheck.available) {
+      if (boxCheck.redirectToBox && boxCheck.missingBoxType) {
+        await handleMissingBoxAndRedirect(merged, boxCheck.missingBoxType);
+        return;
+      }
       toast.error(boxCheck.error);
       setError(boxCheck.error);
-      navigate("/boxes");
       return;
     }
 
@@ -588,16 +694,26 @@ export default function CreateOrder() {
       });
     } catch (e) {
       const errorData = e.response?.data;
+      const boxErrorCode = errorData?.code;
+      const missingBoxType =
+        errorData?.boxType ||
+        resolveMissingBoxTypeFromOrderTypes(merged.orderTypes || []);
+
+      if (
+        (boxErrorCode === "BOX_NOT_FOUND_FOR_TYPE" ||
+          boxErrorCode === "BOX_CAPACITY_FULL") &&
+        missingBoxType
+      ) {
+        const redirected = await handleMissingBoxAndRedirect(
+          merged,
+          missingBoxType,
+        );
+        if (redirected) return;
+      }
+
       const msg = getApiErrorMessage(e, t("createOrder.createFailed"));
       setError(msg);
       toast.error(msg);
-
-      if (
-        errorData?.code === "BOX_NOT_FOUND_FOR_TYPE" ||
-        errorData?.code === "BOX_CAPACITY_FULL"
-      ) {
-        navigate("/boxes");
-      }
 
       if (import.meta.env.DEV) {
         console.error("Order creation error:", errorData || e);
@@ -709,7 +825,7 @@ export default function CreateOrder() {
             type="button"
             className="btn btn-outline btn-sm"
             onClick={saveDraft}
-            disabled={isDraftLoading || mutation.isPending}
+            disabled={isDraftLoading || isOrderSubmitting}
           >
             <LuFileText size={13} />
             {t("orders.saveDraft", "Save Draft")}
@@ -720,11 +836,17 @@ export default function CreateOrder() {
             {error}
           </div>
         )}
-        {isDraftLoading ? (
+        {isDraftLoading || isSavingDraftRedirect ? (
           <div
-            style={{ fontSize: 13, color: "var(--text3)", marginBottom: 16 }}
+            className="info-box ib-gold"
+            style={{ marginBottom: 16, fontSize: 13 }}
           >
-            {t("common.loading", "Loading...")}
+            {isSavingDraftRedirect
+              ? t(
+                  "createOrder.savingDraftAndRedirecting",
+                  "Saving your order as a draft and opening Box Management...",
+                )
+              : t("common.loading", "Loading...")}
           </div>
         ) : null}
         <div key={step} className="step-panel">
@@ -770,7 +892,7 @@ export default function CreateOrder() {
               orderTypes={form.orderTypes}
               orderItems={form.orderItems}
               initial={form.billing}
-              loading={mutation.isPending}
+              loading={isOrderSubmitting}
             />
           )}
         </div>
@@ -856,6 +978,65 @@ function normalizeMeasurementSets(measurementValue) {
     return [measurementValue];
   }
   return [{}];
+}
+
+function resolveBoxTypeForOrderEntry(entry) {
+  const type = entry?.type;
+  if (!type || entry?.isForeignOrder || type === "READY_MADE_WASKAT") {
+    return null;
+  }
+  if (type === "READY_MADE") return "OUTFIT";
+  return type;
+}
+
+function resolveMissingBoxTypeFromOrderTypes(orderTypes = []) {
+  const entries = Array.isArray(orderTypes) ? orderTypes : [];
+  if (entries.some((entry) => entry?.isForeignOrder)) {
+    return "FOREIGN_COUNTRY";
+  }
+  for (const entry of entries) {
+    const boxType = resolveBoxTypeForOrderEntry(entry);
+    if (boxType) return boxType;
+  }
+  return null;
+}
+
+function buildFullDraftPayload({
+  merged,
+  draftId,
+  draftClientKey,
+  step,
+  status = "DRAFT",
+  waitingBoxType = null,
+  viewMonth,
+  viewYear,
+  prefillOrderId = null,
+}) {
+  const orderTypes = merged?.orderTypes || [];
+  const measurements = merged?.measurements || {};
+  return {
+    id: draftId || undefined,
+    clientKey: draftClientKey,
+    step: Math.max(0, Math.min(Number(step || 0), 4)),
+    status,
+    waitingBoxType: waitingBoxType || undefined,
+    customerInfo: {
+      customerId: merged?.customerId || "",
+      firstName: merged?.firstName || "",
+      phoneNumber: merged?.phoneNumber || "",
+    },
+    orderTypes,
+    measurements,
+    rakhtSelections: merged?.rakhtSelections || [],
+    billing: merged?.billing || {},
+    orderItems:
+      merged?.orderItems?.length > 0
+        ? merged.orderItems
+        : buildOrderItems(orderTypes, measurements),
+    entryMonth: Number(viewMonth) || null,
+    entryYear: Number(viewYear) || null,
+    prefillOrderId: prefillOrderId || undefined,
+  };
 }
 
 function buildOrderItems(orderTypes, measurements) {

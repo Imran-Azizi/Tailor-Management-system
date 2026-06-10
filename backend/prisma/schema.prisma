@@ -126,6 +126,7 @@ enum WorkerRoleType {
 
 enum DraftStatus {
   DRAFT
+  WAITING_FOR_BOX
 }
 
 model User {

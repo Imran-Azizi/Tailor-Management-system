@@ -434,6 +434,10 @@
       lastUpdated: "Last Updated",
       unknownCustomer: "Unnamed",
       resume: "Resume",
+      waitingForBoxDesign: "Waiting for box design",
+      draftStatusSaved: "Draft",
+      waitingBoxDraftLoaded:
+        "Draft restored. Waiting for box design.",
       deleteTitle: "Delete Order",
       deleteConfirm:
         "Delete order #{{billNumber}} for {{name}} permanently? This action cannot be undone.",
@@ -1439,6 +1443,10 @@
       lastUpdated: "آخرین به‌روزرسانی",
       unknownCustomer: "بی‌نام",
       resume: "ادامه",
+      waitingForBoxDesign: "در انتظار طراحی صندوق",
+      draftStatusSaved: "پیش‌نویس",
+      waitingBoxDraftLoaded:
+        "پیش‌نویس بازیابی شد. در انتظار طراحی صندوق.",
       deleteTitle: "حذف سفارش",
       deleteConfirm:
         "سفارش شماره {{billNumber}} مربوط {{name}} به‌صورت دائمی حذف شود؟ این عمل برگشت‌پذیر نیست.",
@@ -2463,6 +2471,10 @@
       lastUpdated: "وروستی تازه کول",
       unknownCustomer: "بې نومه",
       resume: "دوام",
+      waitingForBoxDesign: "د صندوق ډیزاین په تمه",
+      draftStatusSaved: "مسوده",
+      waitingBoxDraftLoaded:
+        "مسوده بېرته راغله. د صندوق ډیزاین په تمه.",
       deleteTitle: "د فرمایش حذف",
       deleteConfirm:
         "د {{name}} فرمایش #{{billNumber}} دایمي حذف شي؟ دا عمل بېرته نه راګرځي.",
@@ -3050,6 +3062,16 @@ const LOCALIZATION_COMPLETION_PATCHES = {
       foreignBoxMissing: "No foreign-country box is available.",
       foreignBoxFull: "The foreign-country box is full.",
       foreignBoxCheckFailed: "Unable to check foreign-country box capacity.",
+      boxDesignMissing:
+        "This order type does not have a box design yet. Please create the required box in Box Management.",
+      boxCapacityFull:
+        "All boxes for this order type are full. Please create another box in Box Management.",
+      boxDraftSavedMessage:
+        "This order type does not have a box design yet. Your order has been saved as a draft. Please create the required box design to continue.",
+      boxDraftSaveFailed:
+        "We could not save your order as a draft. Please check your connection and try again.",
+      savingDraftAndRedirecting:
+        "Saving your order as a draft and opening Box Management...",
     },
     readyMade: {
       selectCode: "Select Clothing Code",
@@ -3281,6 +3303,16 @@ const LOCALIZATION_COMPLETION_PATCHES = {
       foreignBoxMissing: "صندوق سفارش خارجی موجود نیست.",
       foreignBoxFull: "صندوق سفارش خارجی پر است.",
       foreignBoxCheckFailed: "بررسی ظرفیت صندوق سفارش خارجی انجام نشد.",
+      boxDesignMissing:
+        "برای این نوع سفارش هنوز صندوقی ایجاد نشده است. لطفاً صندوق مورد نیاز را در مدیریت صندوق‌ها بسازید.",
+      boxCapacityFull:
+        "همه صندوق‌های این نوع سفارش پر هستند. لطفاً صندوق جدید در مدیریت صندوق‌ها ایجاد کنید.",
+      boxDraftSavedMessage:
+        "برای این نوع سفارش هنوز طراحی صندوق وجود ندارد. سفارش شما به‌صورت پیش‌نویس ذخیره شد. لطفاً صندوق مورد نیاز را بسازید تا ادامه دهید.",
+      boxDraftSaveFailed:
+        "ذخیره سفارش به‌صورت پیش‌نویس انجام نشد. اتصال خود را بررسی کرده و دوباره تلاش کنید.",
+      savingDraftAndRedirecting:
+        "در حال ذخیره پیش‌نویس و باز کردن مدیریت صندوق‌ها...",
     },
     readyMade: {
       selectCode: "انتخاب کود لباس",
@@ -3514,6 +3546,16 @@ const LOCALIZATION_COMPLETION_PATCHES = {
       foreignBoxMissing: "د بهرني فرمایش صندوق نشته.",
       foreignBoxFull: "د بهرني فرمایش صندوق ډک دی.",
       foreignBoxCheckFailed: "د بهرني فرمایش صندوق ظرفیت ونه کتل شو.",
+      boxDesignMissing:
+        "د دې فرمایش ډول لپاره لا صندوق نه دی جوړ شوی. مهرباني وکړئ اړین صندوق د صندوق مدیریت کې جوړ کړئ.",
+      boxCapacityFull:
+        "د دې فرمایش ډول ټول صندوقونه ډک دي. مهرباني وکړئ بل صندوق د صندوق مدیریت کې جوړ کړئ.",
+      boxDraftSavedMessage:
+        "د دې فرمایش ډول لپاره لا صندوق ډیزاین نشته. ستاسو فرمایش د مسودې په توګه خوندي شو. مهرباني وکړئ اړین صندوق جوړ کړئ ترڅو دوام ورکړئ.",
+      boxDraftSaveFailed:
+        "ستاسو فرمایش د مسودې په توګه خوندي نه شو. مهرباني وکړئ اړیکه وګورئ او بیا هڅه وکړئ.",
+      savingDraftAndRedirecting:
+        "ستاسو فرمایش د مسودې په توګه خوندي کېږي او صندوق مدیریت خلاصېږي...",
     },
     readyMade: {
       selectCode: "د کالو کود وټاکئ",

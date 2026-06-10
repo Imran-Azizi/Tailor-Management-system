@@ -1,7 +1,5 @@
-import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
-import JsBarcode from "jsbarcode";
 import {
   LuDownload,
   LuFileText,
@@ -386,84 +384,42 @@ function PrintBillHeader({ settings, title, date, time, shop }) {
   const safeTitle = getPrintableText(title, settings, "");
 
   return (
-    <div className="print-bill-header relative overflow-hidden border-b-2 border-slate-800 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-3 py-2.5 text-white">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,.18),transparent_58%)]" />
-      <div className={`flex items-center justify-between gap-3 ${rowDirClass}`}>
-        <div className={`flex min-w-0 items-center gap-2.5 ${rowDirClass}`}>
-          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-white/35 bg-white shadow-sm">
+    <header
+      className={`print-bill-header ${settings.isRtl ? "print-bill-header--rtl" : ""}`}
+    >
+      <div className={`print-bill-header-body ${rowDirClass}`}>
+        <div className={`print-bill-header-brand ${rowDirClass}`}>
+          <div className="print-bill-header-logo">
             {logoUrl ? (
-              <img
-                src={logoUrl}
-                alt={shopName}
-                className="h-full w-full object-cover"
-              />
+              <img src={logoUrl} alt={shopName} className="print-bill-header-logo-img" />
             ) : (
-              <div className="flex h-full w-full items-center justify-center text-sm font-black text-slate-700">
+              <div className="print-bill-header-logo-fallback">
                 {shopInitials || "KR"}
               </div>
             )}
           </div>
-          <div
-            className={`flex min-w-0 flex-col ${shopInfoAlignClass}`}
-            style={{ textAlign: settings.isRtl ? "right" : "left" }}
-          >
-            <p className="truncate text-[14px] font-black text-white">
-              {shopName}
-            </p>
-            <p className="print-shop-meta truncate text-[10px] text-white/90">
-              {shopAddress}
-            </p>
+          <div className={`print-bill-header-shop ${shopInfoAlignClass}`}>
+            <p className="print-bill-header-name">{shopName}</p>
+            {shopAddress ? (
+              <p className="print-bill-header-meta print-shop-meta">{shopAddress}</p>
+            ) : null}
             <p
-              className="print-shop-meta text-[10px] text-white/90 [direction:ltr] [unicode-bidi:embed]"
-              style={{ textAlign: settings.isRtl ? "right" : "left" }}
+              className="print-bill-header-meta print-bill-header-meta--ltr print-shop-meta"
+              dir="ltr"
             >
               {(shopPhones.length ? shopPhones : fallbackPhones).join(" | ")}
             </p>
           </div>
         </div>
-        <div className={`shrink-0 ${alignClass}`}>
-          <p className="inline-flex rounded-full border border-white/35 bg-white/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-white/95">
-            {safeTitle}
-          </p>
-          <p className="mt-1 text-[10px] font-semibold text-white/90 [direction:ltr] [unicode-bidi:embed]">
+        <div className={`print-bill-header-meta-block ${alignClass}`}>
+          <span className="print-bill-header-badge">{safeTitle}</span>
+          <p className="print-bill-header-datetime" dir="ltr">
             {date} | {time}
           </p>
         </div>
       </div>
-    </div>
+    </header>
   );
-}
-
-function Barcode({
-  value,
-  width = 2,
-  height = 36,
-  displayValue = true,
-  fontSize = 11,
-  margin = 6,
-  style,
-}) {
-  const ref = useRef();
-
-  useEffect(() => {
-    if (!value || !ref.current) return;
-    try {
-      JsBarcode(ref.current, String(value), {
-        format: "CODE128",
-        width,
-        height,
-        displayValue,
-        fontSize,
-        margin,
-      });
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error("Barcode generation failed", error);
-      }
-    }
-  }, [value, width, height, displayValue, fontSize, margin]);
-
-  return <svg ref={ref} style={{ maxWidth: 140, width: "100%", ...style }} />;
 }
 
 export function getMeasurementsFromOrder(order) {
@@ -543,10 +499,9 @@ export function CustomerBill({ customer, order, shop }) {
       ? Number(order.rakhtRequiredMeters)
       : null;
   const alignClass = settings.isRtl ? "text-right" : "text-left";
-  const rowDirClass = settings.isRtl ? "flex-row-reverse" : "flex-row";
   const tableHeadClass = settings.isRtl
-    ? "text-[9px] font-extrabold text-slate-700"
-    : "text-[9px] font-extrabold uppercase tracking-[0.06em] text-slate-700";
+    ? "print-bill-th"
+    : "print-bill-th print-bill-th--upper";
   const billNo = toEnglishDigits(customer?.billNumber);
   const isEmergency = order?.isEmergency;
   const billTypographyStyle = {
@@ -565,7 +520,7 @@ export function CustomerBill({ customer, order, shop }) {
     <div
       lang={settings.htmlLang}
       dir={settings.dir}
-      className="print-a6-sheet print-customer-bill overflow-hidden rounded-[8px] border-2 border-slate-800 bg-white shadow-[0_10px_28px_rgba(15,23,42,.18)]"
+      className="print-a6-sheet print-bill-sheet print-customer-bill overflow-hidden rounded-lg border border-slate-200 bg-white shadow-md"
       style={billTypographyStyle}
     >
       <PrintBillHeader
@@ -584,13 +539,12 @@ export function CustomerBill({ customer, order, shop }) {
         </div>
       )}
 
-      {/* Customer info strip â€” 4 columns */}
-      <div className="print-customer-combined-wrap overflow-x-auto">
-        <table className="print-customer-combined-table print-reference-detail-table w-full min-w-[640px] border-collapse table-fixed text-[9px] text-slate-800 sm:min-w-0">
-          <thead className="bg-slate-100/95">
+      <div className="print-customer-combined-wrap print-bill-table-wrap">
+        <table className="print-customer-combined-table print-reference-detail-table w-full border-collapse table-fixed text-[9px] text-slate-800">
+          <thead>
             <tr>
               <th
-                className={`w-[13%] border-b border-r border-slate-800 px-1.5 py-1 ${tableHeadClass} ${alignClass}`}
+                className={`w-[10%] border-b border-r border-slate-800 px-1.5 py-1 ${tableHeadClass} ${alignClass}`}
               >
                 {txt.billNo}
               </th>
@@ -634,21 +588,11 @@ export function CustomerBill({ customer, order, shop }) {
           <tbody>
             <tr>
               <td
-                className={`border-b border-r border-slate-800 px-1.5 py-1 align-top ${alignClass}`}
+                className={`border-b border-r border-slate-800 px-1.5 py-1.5 align-middle ${alignClass}`}
               >
-                <p className="font-black [direction:ltr] [unicode-bidi:embed]">
+                <span className="print-bill-number [direction:ltr] [unicode-bidi:embed]">
                   #{billNo}
-                </p>
-                <div className="print-barcode-wrap print-customer-barcode-card mt-1 rounded-md border border-slate-300 bg-white p-1">
-                  <Barcode
-                    value={customer?.billNumber || "0"}
-                    width={1}
-                    height={20}
-                    displayValue={false}
-                    margin={1}
-                    style={{ maxWidth: 86 }}
-                  />
-                </div>
+                </span>
               </td>
               <td
                 className={`border-b border-r border-slate-800 px-1.5 py-1 align-top font-semibold ${alignClass}`}
@@ -712,49 +656,12 @@ export function CustomerBill({ customer, order, shop }) {
           </tbody>
         </table>
       </div>
-      <div className="print-customer-info-strip grid grid-cols-4 bg-gradient-to-r from-slate-100 to-slate-50 text-[9px] text-slate-800">
-        <div
-          className={`print-customer-info-cell border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
-        >
-          <p className={tableHeadClass}>{txt.billNo}</p>
-          <p className="mt-0.5 font-black text-sky-700 [direction:ltr] [unicode-bidi:embed]">
-            #{billNo}
-          </p>
-        </div>
-        <div
-          className={`print-customer-info-cell border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
-        >
-          <p className={tableHeadClass}>{txt.name}</p>
-          <p className="mt-0.5 font-semibold text-slate-900">
-            {customerNameLabel}
-          </p>
-        </div>
-        <div
-          className={`print-customer-info-cell border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
-        >
-          <p className={tableHeadClass}>{txt.phone}</p>
-          <p className="mt-0.5 font-semibold text-slate-900 [direction:ltr] [unicode-bidi:embed]">
-            {toEnglishDigits(customer?.phoneNumber)}
-          </p>
-        </div>
-        <div
-          className={`print-customer-info-cell border-b border-slate-800 px-2 py-1.5 ${alignClass}`}
-        >
-          <p className={tableHeadClass}>{t("orders.orderType")}</p>
-          <p className="mt-0.5 font-semibold text-slate-900">
-            {orderTypeLabel}
-          </p>
-        </div>
-      </div>
 
-      {/* Financial summary table */}
-      <div
-        className={`print-customer-section-title bg-slate-800 px-2 py-1 text-[8px] font-extrabold text-white ${alignClass}`}
-      >
+      <div className={`print-bill-section-head ${alignClass}`}>
         {txt.financialSummary}
       </div>
-      <table className="print-customer-finance-table w-full border-collapse table-fixed text-[9px] text-slate-800">
-        <thead className="bg-slate-100/95">
+      <table className="print-customer-finance-table print-bill-closing-table w-full border-collapse table-fixed text-[9px] text-slate-800">
+        <thead>
           <tr>
             <th
               className={`border-b border-r border-slate-800 px-2 py-1.5 ${tableHeadClass} ${alignClass}`}
@@ -809,56 +716,6 @@ export function CustomerBill({ customer, order, shop }) {
           </tr>
         </tbody>
       </table>
-
-      {/* Barcode + Qty row */}
-      <div className="print-customer-barcode-row grid grid-cols-2 border-b border-slate-800">
-        <div
-          className={`print-customer-barcode-cell border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
-          style={{ display: "flex", flexDirection: "column", gap: 4 }}
-        >
-          <p className={tableHeadClass}>{txt.billNo}</p>
-          <div className="print-barcode-wrap print-customer-barcode-card rounded-md border border-slate-300 bg-white p-1.5">
-            <Barcode value={customer?.billNumber} style={{ maxWidth: 148 }} />
-          </div>
-        </div>
-        <div
-          className={`print-customer-detail-cell flex flex-col justify-center gap-2 px-2 py-1.5 ${alignClass}`}
-        >
-          <div>
-            <p className={`${tableHeadClass}`}>{txt.qty}</p>
-            <p className="print-customer-quantity mt-0.5 text-[13px] font-black text-slate-900 [direction:ltr] [unicode-bidi:embed]">
-              {formatNumber(qty)}
-            </p>
-          </div>
-          <div>
-            <p className={`${tableHeadClass}`}>{extraTxt.box}</p>
-            <p className="mt-0.5 font-semibold text-slate-800">
-              {order?.box?.boxName ||
-                order?.foreignBox?.boxName ||
-                extraTxt.notAssigned}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div
-        className={`print-customer-footer grid grid-cols-2 bg-slate-100 text-[9px] text-slate-800`}
-      >
-        <div className={`border-r border-slate-800 px-2 py-1.5 ${alignClass}`}>
-          <span className="font-extrabold">{txt.date}</span>:{" "}
-          <span className="[direction:ltr] [unicode-bidi:embed]">
-            {date} | {time}
-          </span>
-        </div>
-        <div
-          className={`px-2 py-1.5 ${rowDirClass === "flex-row-reverse" ? "text-left" : "text-right"}`}
-        >
-          <span className="font-black text-slate-700 [direction:ltr] [unicode-bidi:embed]">
-            #{billNo}
-          </span>
-        </div>
-      </div>
     </div>
   );
 }
@@ -944,10 +801,9 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
   const remaining = Math.max(0, totals.total - totals.discount - totals.paid);
   const billIsEmergency = safeOrders.some((order) => order?.isEmergency);
   const alignClass = settings.isRtl ? "text-right" : "text-left";
-  const rowDirClass = settings.isRtl ? "flex-row-reverse" : "flex-row";
   const tableHeadClass = settings.isRtl
-    ? "text-[9px] font-extrabold text-slate-700"
-    : "text-[9px] font-extrabold uppercase tracking-[0.06em] text-slate-700";
+    ? "print-bill-th"
+    : "print-bill-th print-bill-th--upper";
   const billTypographyStyle = {
     fontFamily: settings.fontFamily,
     ...(settings.isRtl
@@ -964,7 +820,7 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
     <div
       lang={settings.htmlLang}
       dir={settings.dir}
-      className="print-a6-sheet print-customer-bill print-customer-bill--combined overflow-hidden rounded-[8px] border-2 border-slate-800 bg-white shadow-[0_10px_28px_rgba(15,23,42,.18)]"
+      className="print-a6-sheet print-bill-sheet print-customer-bill print-customer-bill--combined overflow-hidden rounded-lg border border-slate-200 bg-white shadow-md"
       style={billTypographyStyle}
     >
       <PrintBillHeader
@@ -983,12 +839,12 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
         </div>
       ) : null}
 
-      <div className="print-customer-combined-wrap overflow-x-auto">
-        <table className="print-customer-combined-table print-reference-detail-table w-full min-w-[640px] border-collapse table-fixed text-[9px] text-slate-800 sm:min-w-0">
-          <thead className="bg-slate-100/95">
+      <div className="print-customer-combined-wrap print-bill-table-wrap">
+        <table className="print-customer-combined-table print-reference-detail-table w-full border-collapse table-fixed text-[9px] text-slate-800">
+          <thead>
             <tr>
               <th
-                className={`w-[13%] border-b border-r border-slate-800 px-1.5 py-1 ${tableHeadClass} ${alignClass}`}
+                className={`w-[10%] border-b border-r border-slate-800 px-1.5 py-1 ${tableHeadClass} ${alignClass}`}
               >
                 {safeTxt("billNo")}
               </th>
@@ -1043,21 +899,11 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
               rowItems.map((row) => (
                 <tr key={row.order?.id || `${row.order?.type}-${row.index}`}>
                   <td
-                    className={`border-b border-r border-slate-800 px-1.5 py-1 align-top ${alignClass}`}
+                    className={`border-b border-r border-slate-800 px-1.5 py-1.5 align-middle ${alignClass}`}
                   >
-                    <p className="font-black [direction:ltr] [unicode-bidi:embed]">
+                    <span className="print-bill-number [direction:ltr] [unicode-bidi:embed]">
                       #{billNo}
-                    </p>
-                    <div className="print-barcode-wrap print-customer-barcode-card mt-1 rounded-md border border-slate-300 bg-white p-1">
-                      <Barcode
-                        value={customer?.billNumber || "0"}
-                        width={1}
-                        height={20}
-                        displayValue={false}
-                        margin={1}
-                        style={{ maxWidth: 86 }}
-                      />
-                    </div>
+                    </span>
                   </td>
                   <td
                     className={`border-b border-r border-slate-800 px-1.5 py-1 align-top font-semibold ${alignClass}`}
@@ -1124,13 +970,11 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
         </table>
       </div>
 
-      <div
-        className={`print-customer-section-title bg-slate-800 px-2 py-1 text-[8px] font-extrabold text-white ${alignClass}`}
-      >
+      <div className={`print-bill-section-head ${alignClass}`}>
         {safeTxt("financialSummary")}
       </div>
-      <table className="print-customer-finance-table w-full border-collapse table-fixed text-[10px] text-slate-800">
-        <thead className="bg-slate-100">
+      <table className="print-customer-finance-table print-bill-closing-table w-full border-collapse table-fixed text-[10px] text-slate-800">
+        <thead>
           <tr>
             <th
               className={`w-1/4 border-b border-r border-slate-800 px-2 py-1.5 ${tableHeadClass} ${alignClass}`}
@@ -1185,16 +1029,6 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
           </tr>
         </tbody>
       </table>
-      <div className="print-customer-footer border-t border-slate-800 bg-slate-50 px-2 py-1 text-[9px] text-slate-600">
-        <div
-          className={`flex items-center justify-between gap-2 ${rowDirClass}`}
-        >
-          <span>{getPrintableText(SHOP_CONFIG.tagline, settings)}</span>
-          <span className="[direction:ltr] [unicode-bidi:embed]">
-            #{billNo}
-          </span>
-        </div>
-      </div>
     </div>
   );
 }
@@ -1275,8 +1109,8 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
     order?.box?.boxName || order?.foreignBox?.boxName || extraTxt.notAssigned;
   const alignClass = settings.isRtl ? "text-right" : "text-left";
   const tableHeadClass = settings.isRtl
-    ? "text-[9px] font-extrabold text-slate-700"
-    : "text-[9px] font-extrabold uppercase tracking-[0.1em] text-slate-700";
+    ? "print-bill-th"
+    : "print-bill-th print-bill-th--upper";
   const orderType = order?.type;
 
   const allEntries = Object.entries(measurements || {}).filter(
@@ -1366,8 +1200,8 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
   const swatchHex = resolveRakhtColorHex(rakhtColor, rakhtColorHex);
 
   const sectionHeadClass = settings.isRtl
-    ? "text-[8px] font-extrabold text-white"
-    : "text-[8px] font-extrabold uppercase tracking-[0.12em] text-white";
+    ? "print-bill-section-head"
+    : "print-bill-section-head print-bill-section-head--upper";
   const billTypographyStyle = {
     fontFamily: settings.fontFamily,
     ...(settings.isRtl
@@ -1384,7 +1218,7 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
     <div
       lang={settings.htmlLang}
       dir={settings.dir}
-      className="print-a6-sheet print-shop-bill overflow-hidden rounded-[8px] border-2 border-slate-800 bg-white shadow-[0_10px_28px_rgba(15,23,42,.18)]"
+      className="print-a6-sheet print-bill-sheet print-shop-bill overflow-hidden rounded-lg border border-slate-200 bg-white shadow-md"
       style={billTypographyStyle}
     >
       <PrintBillHeader
@@ -1403,50 +1237,48 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
         </div>
       )}
 
-      {/* Customer info strip â€” 5 columns: Bill# | Name | Order Type | Box | Qty */}
-      <div className="print-tailor-info-strip grid grid-cols-5 bg-gradient-to-r from-slate-100 to-slate-50 text-[9px] text-slate-800">
+      <div className="print-tailor-info-strip print-bill-kv-strip grid grid-cols-5 text-[9px] text-slate-800">
         <div
-          className={`print-customer-info-cell border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
+          className={`print-bill-kv-cell border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
         >
           <p className={tableHeadClass}>{safeTxt("billNo")}</p>
-          <p className="mt-0.5 font-black text-sky-700 [direction:ltr] [unicode-bidi:embed]">
+          <p className="print-bill-number mt-0.5 [direction:ltr] [unicode-bidi:embed]">
             #{toEnglishDigits(customer?.billNumber)}
           </p>
         </div>
         <div
-          className={`border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
+          className={`print-bill-kv-cell border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
         >
           <p className={tableHeadClass}>{safeTxt("name")}</p>
-          <p className="mt-0.5 font-semibold text-slate-900">
-            {customerNameLabel}
-          </p>
+          <p className="print-bill-kv-value mt-0.5">{customerNameLabel}</p>
         </div>
         <div
-          className={`border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
+          className={`print-bill-kv-cell border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
         >
           <p className={tableHeadClass}>{t("orders.orderType")}</p>
-          <p className="mt-0.5 font-semibold text-slate-900">
-            {orderTypeLabel}
-          </p>
+          <p className="print-bill-kv-value mt-0.5">{orderTypeLabel}</p>
         </div>
         <div
-          className={`border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
+          className={`print-bill-kv-cell border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
         >
           <p className={tableHeadClass}>{safeExtraTxt("box")}</p>
-          <p className="mt-0.5 font-semibold text-slate-900">{orderBoxName}</p>
+          <p className="print-bill-kv-value mt-0.5">{orderBoxName}</p>
         </div>
         <div
-          className={`print-customer-info-cell border-b border-slate-800 px-2 py-1.5 ${alignClass}`}
+          className={`print-bill-kv-cell border-b border-slate-800 px-2 py-1.5 ${alignClass}`}
         >
           <p className={tableHeadClass}>{safeTxt("qty")}</p>
-          <p className="mt-0.5 font-extrabold text-slate-900 [direction:ltr] [unicode-bidi:embed]">
+          <p className="print-bill-kv-value print-bill-kv-value--qty mt-0.5 [direction:ltr] [unicode-bidi:embed]">
             {formatNumber(order?.quantity || 1)}
           </p>
         </div>
       </div>
 
-      {/* Measurements + Styles table â€” 4 columns */}
-      <div className="overflow-x-auto print-tailor-ledger-wrap">
+      <div
+        className={`print-tailor-ledger-wrap print-bill-table-wrap ${
+          orderType === "READY_MADE" ? "print-bill-closing-section" : ""
+        }`}
+      >
         <table className="print-tailor-ledger-table w-full border-collapse table-fixed text-slate-800">
           <colgroup>
             <col style={{ width: "30%" }} />
@@ -1526,19 +1358,17 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
 
       {/* Rakht (Fabric) section */}
       {orderType !== "READY_MADE" && (
-        <div className="print-tailor-fabric-section border-t-2 border-slate-800">
-          <div
-            className={`bg-slate-800 px-2 py-1 ${sectionHeadClass} ${alignClass}`}
-          >
+        <div className="print-tailor-fabric-section print-bill-closing-section border-t border-slate-800">
+          <div className={`${sectionHeadClass} ${alignClass}`}>
             {t("createOrder.rakhtSelection", {
               defaultValue: "Rakht / Fabric",
             })}
           </div>
-          <div className="print-tailor-fabric-grid grid grid-cols-3 bg-slate-50 text-[10px]">
+          <div className="print-tailor-fabric-grid grid grid-cols-3 text-[10px]">
             <div
-              className={`border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
+              className={`print-bill-kv-cell border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
             >
-              <p className="text-[8px] font-extrabold uppercase tracking-wide text-slate-500">
+              <p className="print-bill-th print-bill-th--upper text-[8px] text-slate-500">
                 {t("rakht.color", { defaultValue: "Color" })}
               </p>
               <p className="mt-0.5 flex items-center gap-1 font-bold text-slate-900">
@@ -1559,42 +1389,26 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
               </p>
             </div>
             <div
-              className={`border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
+              className={`print-bill-kv-cell border-b border-r border-slate-800 px-2 py-1.5 ${alignClass}`}
             >
-              <p className="text-[8px] font-extrabold uppercase tracking-wide text-slate-500">
+              <p className="print-bill-th print-bill-th--upper text-[8px] text-slate-500">
                 {t("rakht.brandName", { defaultValue: "Brand" })}
               </p>
-              <p className="mt-0.5 font-bold text-slate-900">
-                {rakhtBrandName}
-              </p>
+              <p className="print-bill-kv-value mt-0.5">{rakhtBrandName}</p>
             </div>
             <div
-              className={`border-b border-slate-800 px-2 py-1.5 ${alignClass}`}
+              className={`print-bill-kv-cell border-b border-slate-800 px-2 py-1.5 ${alignClass}`}
             >
-              <p className="text-[8px] font-extrabold uppercase tracking-wide text-slate-500">
+              <p className="print-bill-th print-bill-th--upper text-[8px] text-slate-500">
                 {t("rakht.requiredMeters", { defaultValue: "Meters" })}
               </p>
-              <p className="mt-0.5 font-bold text-slate-900 [direction:ltr] [unicode-bidi:embed]">
+              <p className="print-bill-kv-value mt-0.5 [direction:ltr] [unicode-bidi:embed]">
                 {rakhtMetersDisplay}
               </p>
             </div>
           </div>
         </div>
       )}
-
-      {/* Footer */}
-      <div className="print-tailor-footer grid grid-cols-2 bg-slate-100 text-[9px] text-slate-800">
-        <div className={`border-r border-slate-800 px-2 py-1.5 ${alignClass}`}>
-          <span className="font-extrabold">{safeTxt("date")}</span>: {date}
-        </div>
-        <div
-          className={`px-2 py-1.5 ${settings.isRtl ? "text-left" : "text-right"}`}
-        >
-          <span className="font-extrabold [direction:ltr] [unicode-bidi:embed]">
-            {time}
-          </span>
-        </div>
-      </div>
     </div>
   );
 }
@@ -1676,61 +1490,109 @@ export function printElement(id, options = {}) {
         <style>
           *{box-sizing:border-box}
           @page{size:A6 portrait;margin:0}
-          html{
-            width:105mm;
-            min-height:148mm;
-          }
+          html{width:105mm;height:148mm;margin:0}
           body{
             margin:0;
             font-family:${bodyFont};
-            line-height:1.45;
+            line-height:1.4;
             background:#fff;
             width:105mm;
+            height:148mm;
             min-height:148mm;
-            padding:2.5mm;
+            max-height:148mm;
+            padding:1.5mm;
             display:flex;
             align-items:center;
             justify-content:center;
-            color:#0f172a;
+            color:#1e293b;
             direction:${dir};
             text-align:${isRtl ? "right" : "left"};
             -webkit-print-color-adjust:exact;
             print-color-adjust:exact;
             text-rendering:optimizeLegibility;
             overflow:hidden;
+            box-sizing:border-box;
           }
-          .print-a6-sheet{width:100%;max-width:100%;margin:auto;box-sizing:border-box;transform:scale(var(--print-a6-scale,1));transform-origin:center center}
-          .print-bill-header{border-bottom-width:2px !important}
-          .print-bill-header .print-shop-meta{line-height:1.35}
-          .print-a6-sheet table th,
-          .print-a6-sheet table td{vertical-align:top}
+          .print-a6-sheet,.print-bill-sheet{
+            --bill-primary:#D97706;
+            --bill-primary-dark:#B45309;
+            --bill-primary-darker:#92400E;
+            --bill-primary-light:#FFF7ED;
+            --bill-primary-muted:#FFEDD5;
+            --bill-border:#E2E8F0;
+            --bill-border-strong:#CBD5E1;
+            --bill-text:#1E293B;
+            --bill-table-head:#FFFBEB;
+            --bill-surface:#FFFFFF;
+            --bill-surface-alt:#F8FAFC;
+            width:100%;
+            max-width:102mm;
+            margin:0 auto;
+            flex-shrink:0;
+            box-sizing:border-box;
+            transform:scale(var(--print-a6-scale,1));
+            transform-origin:center center;
+            page-break-inside:avoid;
+            break-inside:avoid;
+          }
+          .print-bill-header{
+            background:linear-gradient(180deg,#FFF7ED 0%,#fff 72%) !important;
+            border-bottom:2px solid #D97706 !important;
+            padding:6px 8px !important;
+          }
+          .print-bill-header::before{
+            content:"";
+            position:absolute;
+            top:0;
+            left:0;
+            right:0;
+            height:3px;
+            background:linear-gradient(90deg,#B45309,#D97706,#B45309);
+          }
+          .print-bill-header-name{color:#92400E !important}
+          .print-bill-header-badge{background:#D97706 !important;color:#fff !important}
+          .print-bill-section-head{
+            background:#FFF7ED !important;
+            color:#92400E !important;
+            border-color:#FFEDD5 !important;
+          }
+          .print-a6-sheet .border-slate-800{border-color:#CBD5E1 !important}
+          .print-bill-header .print-shop-meta{line-height:1.3}
+          .print-a6-sheet table th,.print-a6-sheet table td{vertical-align:top}
           .print-tailor-ledger-cell{vertical-align:top}
           .print-tailor-ledger-text{display:block;max-width:100%;overflow:visible;white-space:normal;overflow-wrap:anywhere;word-break:break-word;text-overflow:clip}
-          .print-tailor-ledger-headcell--style,
-          .print-tailor-ledger-cell--style-label{border-inline-start:2px solid #374151}
+          .print-tailor-ledger-headcell--style,.print-tailor-ledger-cell--style-label{border-inline-start:2px solid #CBD5E1}
           .print-tailor-ledger-note-row{height:auto}
           .print-tailor-ledger-note-cell{padding:0!important;border-inline-end:0!important;vertical-align:top}
-          .print-tailor-ledger-note-box{min-height:30px;padding:3px 4.4px 3.5px;background:#f8fafc}
-          .print-tailor-ledger-note-label{margin-bottom:2px;font-size:7.2px;font-weight:800;line-height:1.25;color:#475569}
-          .print-tailor-ledger-note-text{display:block;max-width:100%;font-size:8.2px;font-weight:700;line-height:1.3;color:#111827;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}
-          .print-a6-sheet[dir="rtl"] .print-tailor-ledger-note-text{direction:rtl;text-align:right}
-          .print-customer-bill{background:linear-gradient(180deg,#fff 0%,#f8fafc 100%)}
-          .print-customer-info-strip{background:linear-gradient(135deg,#f8fafc 0%,#eef2f7 100%);grid-template-columns:17% 23% 38% 22%}
-          .print-customer-info-cell,.print-customer-barcode-cell,.print-customer-detail-cell{min-width:0}
-          .print-customer-info-cell p,.print-customer-detail-cell p,.print-customer-combined-table th,.print-customer-combined-table td{max-width:100%;overflow-wrap:anywhere;word-break:break-word}
-          .print-customer-section-title{border-bottom:1px solid #1f2937;line-height:1.25;letter-spacing:0;text-transform:none}
-          .print-customer-finance-table thead,.print-customer-finance-table th{background:#eef1f4;color:#111827}
-          .print-customer-amount{display:inline-flex;align-items:center;justify-content:center;max-width:100%;min-width:0;padding:1px 4px;border-radius:4px;background:#f8fafc;box-shadow:inset 0 0 0 1px rgba(15,23,42,.09);line-height:1.35;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
-          .print-customer-amount--final{background:#fffbeb}
-          .print-customer-barcode-row{background:linear-gradient(180deg,#fff 0%,#f8fafc 100%)}
-          .print-customer-barcode-card{display:inline-flex;align-items:center;justify-content:center;max-width:100%;box-shadow:inset 0 0 0 1px rgba(15,23,42,.03)}
-          .print-customer-barcode-card svg{max-width:100%;height:auto}
-          .print-customer-quantity{display:inline-block;width:max-content;max-width:100%;padding:1px 7px;border-radius:5px;background:#e0f2fe;color:#075985}
-          .print-customer-footer{background:#eef2f7}
-          .print-customer-combined-wrap{max-width:100%}
-          .print-customer-combined-table{min-width:0!important;background:#fff;font-size:7.6px}
-          .print-customer-combined-table tbody tr:nth-child(even){background:#f8fafc}
-          .print-barcode-wrap{box-shadow:inset 0 0 0 1px rgba(15,23,42,.02)}
+          .print-tailor-ledger-note-box{min-height:28px;padding:3px 4px;background:#f8fafc}
+          .print-tailor-ledger-note-label{margin-bottom:2px;font-size:7px;font-weight:800;line-height:1.25;color:#64748b}
+          .print-tailor-ledger-note-text{display:block;max-width:100%;font-size:8px;font-weight:700;line-height:1.3;color:#1e293b;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}
+          .print-bill-table-wrap,.print-customer-combined-wrap,.print-tailor-ledger-wrap{
+            overflow:hidden !important;
+            overflow-x:hidden !important;
+            overflow-y:hidden !important;
+            max-width:100%;
+            scrollbar-width:none !important;
+            -ms-overflow-style:none !important;
+            padding-bottom:0 !important;
+          }
+          .print-bill-table-wrap::-webkit-scrollbar,
+          .print-customer-combined-wrap::-webkit-scrollbar,
+          .print-tailor-ledger-wrap::-webkit-scrollbar{display:none;width:0!important;height:0!important}
+          .print-bill-number{display:inline-block;font-size:9.5px;font-weight:800;color:#92400E;letter-spacing:.02em}
+          .print-bill-th{font-size:8px;font-weight:800;color:#64748B;line-height:1.25}
+          .print-bill-th--upper{text-transform:uppercase;letter-spacing:.05em}
+          .print-bill-kv-strip{background:linear-gradient(180deg,#FFFBEB 0%,#fff 100%)}
+          .print-bill-kv-value{font-weight:700;color:#1e293b;line-height:1.3}
+          .print-bill-kv-value--qty{color:#92400E;font-weight:800}
+          .print-bill-closing-table tbody tr:last-child td,.print-bill-closing-section .print-tailor-fabric-grid > div:last-child{border-bottom:0!important}
+          .print-customer-combined-table th,.print-customer-combined-table td{max-width:100%;overflow-wrap:anywhere;word-break:break-word}
+          .print-customer-finance-table thead,.print-customer-finance-table th{background:#FFFBEB;color:#1e293b}
+          .print-reference-detail-table thead,.print-reference-detail-table th{background:#FFFBEB !important}
+          .print-customer-amount{display:inline-flex;align-items:center;justify-content:center;max-width:100%;min-width:0;padding:2px 5px;border-radius:4px;background:#f8fafc;box-shadow:inset 0 0 0 1px rgba(217,119,6,.12);line-height:1.35;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+          .print-customer-amount--final{background:#FFF7ED;box-shadow:inset 0 0 0 1px rgba(217,119,6,.2)}
+          .print-customer-combined-table{min-width:0!important;width:100%;background:#fff;font-size:7.4px}
+          .print-customer-combined-table tbody tr:nth-child(even){background:#fafafa}
           .print-a6-sheet[dir="rtl"] .border-r{border-right-width:0;border-inline-end-width:1px}
           .print-a6-sheet[dir="rtl"] .border-r-2{border-right-width:0;border-inline-end-width:2px}
           .print-a6-sheet[dir="rtl"]{
@@ -1739,16 +1601,32 @@ export function printElement(id, options = {}) {
             word-spacing:normal;
             font-feature-settings:"rlig" 1,"liga" 1,"calt" 1;
           }
+          .print-a6-sheet[dir="rtl"] .print-bill-header-name,
+          .print-a6-sheet[dir="rtl"] .print-bill-header-meta,
+          .print-a6-sheet[dir="rtl"] .print-bill-section-head,
           .print-a6-sheet[dir="rtl"] .print-customer-combined-table th,
-          .print-a6-sheet[dir="rtl"] .print-customer-combined-table td{
+          .print-a6-sheet[dir="rtl"] .print-customer-combined-table td,
+          .print-a6-sheet[dir="rtl"] .print-customer-finance-table th,
+          .print-a6-sheet[dir="rtl"] .print-customer-finance-table td,
+          .print-a6-sheet[dir="rtl"] .print-tailor-ledger-headcell,
+          .print-a6-sheet[dir="rtl"] .print-tailor-ledger-cell,
+          .print-a6-sheet[dir="rtl"] .print-tailor-ledger-note-text{
             direction:rtl;
             text-align:right;
           }
-          @media (max-width:640px){
-            body{padding:2.5mm}
-            .print-a6-sheet{border-width:1.5px}
+          .print-a6-sheet[dir="rtl"] .print-tailor-ledger-cell--measure,
+          .print-a6-sheet[dir="rtl"] [dir="ltr"]{
+            direction:ltr;
+            unicode-bidi:embed;
           }
-          @media print{*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}html,body{width:105mm;min-height:148mm}body{padding:2.5mm;margin:0;display:flex;align-items:center;justify-content:center}.print-a6-sheet{margin:auto}}
+          .print-a6-sheet[dir="rtl"] .print-tailor-ledger-cell--measure{text-align:center}
+          @media print{
+            *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+            html,body{width:105mm;height:148mm;min-height:148mm;max-height:148mm}
+            body{padding:1.5mm;margin:0;display:flex;align-items:center;justify-content:center}
+            .print-a6-sheet,.print-bill-sheet{margin:0 auto;page-break-inside:avoid;break-inside:avoid}
+            .print-a6-sheet *{page-break-inside:avoid;break-inside:avoid}
+          }
         </style>
       </head>
       <body dir="${dir}">
@@ -1765,7 +1643,7 @@ export function printElement(id, options = {}) {
       if (sheet) {
         const probe = doc.createElement("div");
         probe.style.cssText =
-          "position:absolute;visibility:hidden;pointer-events:none;width:100mm;height:143mm;inset:0";
+          "position:absolute;visibility:hidden;pointer-events:none;width:102mm;height:145mm;inset:0";
         doc.body.appendChild(probe);
         const available = probe.getBoundingClientRect();
         probe.remove();
@@ -1857,7 +1735,7 @@ export function printElement(id, options = {}) {
 
 export function PrintSafeSheet({ id, children, className = "" }) {
   const baseClassName =
-    "mx-auto w-full max-w-[560px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[var(--sh-md)] dark:border-slate-700 dark:bg-slate-900 print:max-w-[148mm] print:rounded-none print:border-gray-300 print:bg-white print:text-black print:shadow-none";
+    "mx-auto w-full max-w-[560px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[var(--sh-md)] dark:border-slate-700 dark:bg-slate-900 [&_.print-bill-table-wrap]:overflow-hidden print:max-w-[105mm] print:rounded-none print:border-slate-300 print:bg-white print:text-black print:shadow-none";
 
   return (
     <div

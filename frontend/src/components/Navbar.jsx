@@ -1292,6 +1292,7 @@ export default function Navbar({ onHamburger, pageTitle }) {
                 <tr>
                   <th>{t("common.customer", "Customer")}</th>
                   <th>{t("orders.orderTypes", "Order Types")}</th>
+                  <th>{t("common.status", "Status")}</th>
                   <th>{t("orders.lastUpdated", "Last Updated")}</th>
                   <th>{t("common.actions", "Actions")}</th>
                 </tr>
@@ -1304,6 +1305,20 @@ export default function Navbar({ onHamburger, pageTitle }) {
                         t("orders.unknownCustomer", "Unnamed")}
                     </td>
                     <td>{(draft.orderTypes || []).join(", ") || "-"}</td>
+                    <td>
+                      {draft.status === "WAITING_FOR_BOX" ? (
+                        <span className="badge bg-amber">
+                          {t(
+                            "orders.waitingForBoxDesign",
+                            "Waiting for box design",
+                          )}
+                        </span>
+                      ) : (
+                        <span className="badge bg-gray">
+                          {t("orders.draftStatusSaved", "Draft")}
+                        </span>
+                      )}
+                    </td>
                     <td>{formatSystemDateTime(draft.updatedAt, language)}</td>
                     <td>
                       <div
@@ -1371,6 +1386,12 @@ export default function Navbar({ onHamburger, pageTitle }) {
             <div style={{ fontSize: 13, color: "var(--text2)" }}>
               <b>{t("orders.orderTypes", "Order Types")}:</b>{" "}
               {(selectedDraft.orderTypes || []).join(", ") || "-"}
+            </div>
+            <div style={{ fontSize: 13, color: "var(--text2)" }}>
+              <b>{t("common.status", "Status")}:</b>{" "}
+              {selectedDraft.status === "WAITING_FOR_BOX"
+                ? t("orders.waitingForBoxDesign", "Waiting for box design")
+                : t("orders.draftStatusSaved", "Draft")}
             </div>
             <div style={{ fontSize: 13, color: "var(--text2)" }}>
               <b>{t("orders.lastUpdated", "Last Updated")}:</b>{" "}
