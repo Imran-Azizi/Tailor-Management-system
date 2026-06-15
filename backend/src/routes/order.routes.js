@@ -61,7 +61,7 @@ router.get(
 );
 router.get(
   "/:id/bill",
-  authorize("ADMIN", "DOKAN"),
+  authorize("ADMIN", "DOKAN", "FINANCE"),
   authorizeDokanOrderOwner("id"),
   ctrl.getBill,
 );

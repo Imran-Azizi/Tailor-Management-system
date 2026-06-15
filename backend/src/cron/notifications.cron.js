@@ -1,5 +1,9 @@
 import cron from "node-cron";
 import { prisma } from "../lib/prisma.js";
+import {
+  getExpiredNotificationWhere,
+  NOTIFICATION_RETENTION_DAYS,
+} from "../lib/notificationRetention.js";
 
 const EMERGENCY_ALERT_INTERVAL_MS = 12 * 60 * 60 * 1000;
 
@@ -28,12 +32,17 @@ export const startCronJobs = () => {
   cron.schedule("*/15 * * * *", async () => {
     const now = new Date();
 
-    // 1. Delete expired notifications
-    const deleted = await prisma.notification.deleteMany({
-      where: { expiresAt: { lt: now } },
-    });
-    if (deleted.count > 0) {
-      console.log(`[Cron] Deleted ${deleted.count} expired notification(s)`);
+    // 1. Retain read and unread notifications for 15 days, then clean them up.
+    const expiredWhere = getExpiredNotificationWhere(now);
+    const [deletedSystem, deletedUser] = await Promise.all([
+      prisma.notification.deleteMany({ where: expiredWhere }),
+      prisma.userNotification.deleteMany({ where: expiredWhere }),
+    ]);
+    const deletedCount = deletedSystem.count + deletedUser.count;
+    if (deletedCount > 0) {
+      console.log(
+        `[Cron] Deleted ${deletedCount} notification(s) older than ${NOTIFICATION_RETENTION_DAYS} days`,
+      );
     }
 
     // 2. Re-trigger emergency notifications every 12 hours while unresolved.

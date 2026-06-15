@@ -28,6 +28,7 @@ import {
 import { formatCurrency } from "../../lib/currency.js";
 import { formatMeters } from "../../lib/meters.js";
 import { Modal, ConfirmDeleteModal, StatCard } from "../ui/index.jsx";
+import MobileFilterPanel from "../ui/MobileFilterPanel.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useMonth } from "../../context/MonthContext.jsx";
 import {
@@ -317,6 +318,21 @@ export default function RakhtManager() {
     });
   }, [rows, filterCompany, filterBrand, filterStatus]);
 
+  const activeFilterCount = [
+    Boolean(filterCompany?.value),
+    Boolean(filterBrand?.value),
+    filterStatus?.value && filterStatus.value !== "ALL",
+  ].filter(Boolean).length;
+
+  const resetFilters = () => {
+    setFilterCompany(null);
+    setFilterBrand(null);
+    setFilterStatus({
+      value: "ALL",
+      label: t("common.all", { defaultValue: "All" }),
+    });
+  };
+
   const stats = useMemo(() => {
     const totalEntries = filteredRows.length;
     const totalPrice = filteredRows.reduce(
@@ -541,70 +557,79 @@ export default function RakhtManager() {
         </div>
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: 10,
-          marginBottom: 14,
-        }}
+      <MobileFilterPanel
+        activeCount={activeFilterCount}
+        clearDisabled={activeFilterCount === 0}
+        isApplying={isLoading}
+        onClear={resetFilters}
+        title={t("common.filters", { defaultValue: "Filters" })}
       >
-        <div>
-          <label className="lbl">
-            <span
-              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-            >
-              <LuFilter size={13} />
-              {t("rakht.companyName", { defaultValue: "Company Name" })}
-            </span>
-          </label>
-          <Select
-            classNamePrefix="rs"
-            value={filterCompany}
-            onChange={setFilterCompany}
-            options={companyOptions}
-            isClearable
-            placeholder={t("common.all", { defaultValue: "All" })}
-          />
-        </div>
+        <div
+          className="rakht-manager-filter-grid"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: 10,
+            marginBottom: 14,
+          }}
+        >
+          <div>
+            <label className="lbl">
+              <span
+                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+              >
+                <LuFilter size={13} />
+                {t("rakht.companyName", { defaultValue: "Company Name" })}
+              </span>
+            </label>
+            <Select
+              classNamePrefix="rs"
+              value={filterCompany}
+              onChange={setFilterCompany}
+              options={companyOptions}
+              isClearable
+              placeholder={t("common.all", { defaultValue: "All" })}
+            />
+          </div>
 
-        <div>
-          <label className="lbl">
-            <span
-              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-            >
-              <LuFilter size={13} />
-              {t("rakht.brandName", { defaultValue: "Brand Name" })}
-            </span>
-          </label>
-          <Select
-            classNamePrefix="rs"
-            value={filterBrand}
-            onChange={setFilterBrand}
-            options={brandOptions}
-            isClearable
-            placeholder={t("common.all", { defaultValue: "All" })}
-          />
-        </div>
+          <div>
+            <label className="lbl">
+              <span
+                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+              >
+                <LuFilter size={13} />
+                {t("rakht.brandName", { defaultValue: "Brand Name" })}
+              </span>
+            </label>
+            <Select
+              classNamePrefix="rs"
+              value={filterBrand}
+              onChange={setFilterBrand}
+              options={brandOptions}
+              isClearable
+              placeholder={t("common.all", { defaultValue: "All" })}
+            />
+          </div>
 
-        <div>
-          <label className="lbl">
-            <span
-              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-            >
-              <LuFilter size={13} />
-              {t("rakht.paymentStatus", { defaultValue: "Payment Status" })}
-            </span>
-          </label>
-          <Select
-            classNamePrefix="rs"
-            value={filterStatus}
-            onChange={setFilterStatus}
-            options={paymentStatusOptions}
-            isSearchable={false}
-          />
+          <div>
+            <label className="lbl">
+              <span
+                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+              >
+                <LuFilter size={13} />
+                {t("rakht.paymentStatus", { defaultValue: "Payment Status" })}
+              </span>
+            </label>
+            <Select
+              classNamePrefix="rs"
+              value={filterStatus}
+              onChange={setFilterStatus}
+              options={paymentStatusOptions}
+              isSearchable={false}
+            />
+          </div>
         </div>
-      </div>
+      </MobileFilterPanel>
 
       {isLoading ? (
         <p style={{ fontSize: 13, color: "var(--text3)" }}>

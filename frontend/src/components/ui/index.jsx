@@ -233,6 +233,7 @@ export const Modal = ({
   overlayClassName = "",
   boxClassName = "",
   bodyClassName = "",
+  dir,
 }) => {
   useEffect(() => {
     if (!open) return undefined;
@@ -248,6 +249,7 @@ export const Modal = ({
     typeof document !== "undefined"
       ? document.documentElement.getAttribute("dir") || "ltr"
       : "ltr";
+  const resolvedDir = dir || docDir;
   const modalMarkup = (
     <div
       className={`modal-bg ${overlayClassName}`.trim()}
@@ -256,7 +258,7 @@ export const Modal = ({
     >
       <div
         className={`modal-box w-[95vw] sm:w-full ${boxClassName}`.trim()}
-        dir={docDir}
+        dir={resolvedDir}
         style={{ maxWidth: maxW }}
         role="dialog"
         aria-modal="true"

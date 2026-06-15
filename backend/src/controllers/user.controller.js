@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma.js";
 import { getAfghanMonthDateRange } from "../lib/afghanistanDate.js";
+import { getNotificationRetentionWhere } from "../lib/notificationRetention.js";
 
 const SALT_ROUNDS = 12;
 
@@ -208,18 +209,24 @@ export async function myNotifications(req, res, next) {
     const { unread } = req.query;
     const month = req.query.month != null ? Number(req.query.month) : null;
     const year = req.query.year != null ? Number(req.query.year) : null;
-    const where = { userId: req.user.id };
+    const retentionWhere = getNotificationRetentionWhere();
+    const where = { userId: req.user.id, ...retentionWhere };
     if (unread === "true") where.isRead = false;
 
     if (month && year && Number.isFinite(month) && Number.isFinite(year)) {
       const { start, end } = getAfghanMonthDateRange({ month, year });
-      where.createdAt = { gte: start, lte: end };
+      where.createdAt = {
+        gte:
+          start > retentionWhere.createdAt.gte
+            ? start
+            : retentionWhere.createdAt.gte,
+        lte: end,
+      };
     }
 
     const notifs = await prisma.userNotification.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      take: 50,
     });
     res.json(notifs);
   } catch (err) {

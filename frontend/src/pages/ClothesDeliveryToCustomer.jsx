@@ -1,10 +1,16 @@
 ﻿import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
-import { LuPhone, LuSearch } from "react-icons/lu";
+import {
+  LuCircleCheck,
+  LuClock,
+  LuPhone,
+  LuSearch,
+  LuSquareCheck,
+  LuWalletCards,
+} from "react-icons/lu";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import api from "../lib/api.js";
-import { getApiErrorMessage } from "../lib/feedback.js";
 import {
   normalizePhone,
   parseNumberLocale,
@@ -46,6 +52,10 @@ export default function ClothesDeliveryToCustomer() {
   const [payments, setPayments] = useState({}); // orderId -> string
 
   const orders = result?.orders || [];
+  const resultCountLabel = t("delivery.ordersFound", {
+    count: orders.length,
+    defaultValue: `${orders.length} order${orders.length === 1 ? "" : "s"} found`,
+  });
 
   const runSearch = async () => {
     const trimmed = query.trim();
@@ -75,9 +85,9 @@ export default function ClothesDeliveryToCustomer() {
         if ((o.remaining || 0) > 0) nextPayments[o.id] = String(o.remaining);
       });
       setPayments(nextPayments);
-    } catch (err) {
+    } catch {
       setResult(null);
-      toast.error(getApiErrorMessage(err, t("delivery.noResults")));
+      toast.error(t("delivery.noResults"));
     } finally {
       setLoading(false);
     }
@@ -120,8 +130,12 @@ export default function ClothesDeliveryToCustomer() {
 
       toast.success(t("delivery.paymentRecorded"));
       await runSearch();
-    } catch (err) {
-      toast.error(getApiErrorMessage(err, "Payment failed"));
+    } catch {
+      toast.error(
+        t("delivery.paymentFailed", {
+          defaultValue: "Unable to record payment. Please try again.",
+        }),
+      );
     } finally {
       setPaying(false);
     }
@@ -276,74 +290,44 @@ export default function ClothesDeliveryToCustomer() {
         </div>
       </Card>
 
-      <div className="mt-6">
+      <div className="mt-6 delivery-results-section">
         {loading ? (
-          <Spinner />
+          <Card title={t("delivery.resultsTitle")}>
+            <div className="delivery-results-loading">
+              <Spinner />
+              <p>{t("common.loading", "Loading")}</p>
+            </div>
+          </Card>
         ) : !result ? (
-          <Card title={t("delivery.resultsTitle")} noPad>
-            <EmptyState message={t("delivery.noResults")} />
+          <Card title={t("delivery.resultsTitle")}>
+            <div className="delivery-results-empty">
+              <EmptyState message={t("delivery.noResults")} />
+            </div>
           </Card>
         ) : (
           <div className="grid gap-4">
-            <Card noPad>
-              <div
-                className="tbl-wrap delivery-results-table order-scroll-x"
-                dir="ltr"
-                tabIndex={0}
-              >
-                <table
-                  className="delivery-results-grid-table min-w-full border-separate border-spacing-0"
-                  dir={dir}
+            <Card title={t("delivery.resultsTitle")} noPad>
+              <div className="delivery-results-card-shell" dir={dir}>
+                <div
+                  className={`delivery-results-summary ${isRtl ? "text-right" : "text-left"}`}
                 >
-                  <colgroup>
-                    <col style={{ width: "10%" }} />
-                    <col style={{ width: "12%" }} />
-                    <col style={{ width: "13%" }} />
-                    <col style={{ width: "10%" }} />
-                    <col style={{ width: "10%" }} />
-                    <col style={{ width: "11%" }} />
-                    <col style={{ width: "11%" }} />
-                    <col style={{ width: "12%" }} />
-                    <col style={{ width: "22%" }} />
-                  </colgroup>
-                  <thead>
-                    <tr
-                      className={`delivery-results-head-row text-xs font-semibold text-slate-500 dark:text-slate-400 ${
-                        isRtl
-                          ? "tracking-normal"
-                          : "uppercase tracking-wide text-left"
-                      }`}
-                    >
-                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
-                        {t("delivery.orderHeader")}
-                      </th>
-                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
-                        {t("common.customer", "Customer")}
-                      </th>
-                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
-                        {t("common.type", "Type")}
-                      </th>
-                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
-                        {t("common.total", "Total")}
-                      </th>
-                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
-                        {t("createOrder.discount", "Discount")}
-                      </th>
-                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
-                        {t("common.paid", "Paid")}
-                      </th>
-                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
-                        {t("common.remaining", "Remaining")}
-                      </th>
-                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
-                        {t("common.status", "Status")}
-                      </th>
-                      <th className="border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
-                        {t("delivery.remainingPayment")}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                  <span className="delivery-results-summary-badge">
+                    {resultCountLabel}
+                  </span>
+                  <span className="delivery-results-summary-text">
+                    {mode === "bill"
+                      ? t("orders.billNumber", "Bill Number")
+                      : t("common.phone", "Phone")}
+                    : <strong>{query}</strong>
+                  </span>
+                </div>
+
+                {orders.length === 0 ? (
+                  <div className="delivery-results-empty">
+                    <EmptyState message={t("delivery.noResults")} />
+                  </div>
+                ) : (
+                  <div className="delivery-results-card-grid">
                     {orders.map((o, idx) => {
                       const orderLabel = getOrderLabelParts(o, language);
                       const itemDisplayName = getOrderPrimaryDisplayName(
@@ -354,79 +338,119 @@ export default function ClothesDeliveryToCustomer() {
                       const remaining = Number(o.remaining || 0);
                       const isCompleted = Boolean(o.isCompleted);
                       const readyToReceive = !isCompleted && remaining <= 0.001;
+                      const statusLabel = isCompleted
+                        ? completedStatusText
+                        : readyToReceive
+                          ? t("delivery.readyToReceive", "Ready to receive")
+                          : t("delivery.notFullyPaidBadge", "Not Completed");
+                      const statusTone = isCompleted
+                        ? "completed"
+                        : readyToReceive
+                          ? "ready"
+                          : "pending";
+                      const StatusIcon = isCompleted
+                        ? LuCircleCheck
+                        : readyToReceive
+                          ? LuSquareCheck
+                          : LuClock;
+                      const stats = [
+                        {
+                          label: t("common.total", "Total"),
+                          value: formatMoney(o.totalPrice, language),
+                          tone: "default",
+                        },
+                        {
+                          label: t("createOrder.discount", "Discount"),
+                          value: formatMoney(o.discount, language),
+                          tone: "muted",
+                        },
+                        {
+                          label: t("common.paid", "Paid"),
+                          value: formatMoney(o.paidAmount, language),
+                          tone: "success",
+                        },
+                        {
+                          label: t("common.remaining", "Remaining"),
+                          value: formatMoney(o.remaining, language),
+                          tone: remaining > 0.001 ? "danger" : "success",
+                        },
+                      ];
 
                       return (
-                        <tr
+                        <article
                           key={o.id}
-                          className="hover:bg-amber-50/70 dark:hover:bg-slate-800"
+                          className="delivery-order-card"
                           dir={dir}
                         >
-                          <td
-                            className={`delivery-results-text-cell border-b border-amber-100 px-4 py-3 text-sm font-semibold text-gray-900 dark:border-slate-700 dark:text-slate-100 ${
-                              isRtl ? "text-right" : "text-left"
-                            }`}
-                          >
-                            {t("delivery.orderLabel", { number: idx + 1 })}
-                          </td>
-                          <td
-                            className={`delivery-results-text-cell border-b border-slate-100 px-4 py-3 text-sm font-semibold text-gray-900 dark:border-slate-700 dark:text-slate-100 ${
-                              isRtl ? "text-right" : "text-left"
-                            }`}
-                          >
-                            {itemDisplayName}
-                          </td>
-                          <td
-                            className={`delivery-results-text-cell border-b border-slate-100 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200 ${
-                              isRtl ? "text-right" : "text-left"
-                            }`}
-                          >
-                            <div>{orderLabel.typeWithSequenceLabel}</div>
-                          </td>
-                          <td className="border-b border-amber-100 px-4 py-3 text-sm font-semibold text-gray-900 dark:border-slate-700 dark:text-slate-100 [direction:ltr] [unicode-bidi:embed]">
-                            {formatMoney(o.totalPrice, language)}
-                          </td>
-                          <td className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200 [direction:ltr] [unicode-bidi:embed]">
-                            {formatMoney(o.discount, language)}
-                          </td>
-                          <td className="border-b border-amber-100 px-4 py-3 text-sm font-semibold text-emerald-700 dark:border-slate-700 dark:text-emerald-300 [direction:ltr] [unicode-bidi:embed]">
-                            {formatMoney(o.paidAmount, language)}
-                          </td>
-                          <td className="border-b border-amber-100 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-slate-700 dark:text-rose-300 [direction:ltr] [unicode-bidi:embed]">
-                            {formatMoney(o.remaining, language)}
-                          </td>
-                          <td className="delivery-results-status-cell border-b border-amber-100 px-4 py-3 dark:border-slate-700">
+                          <div className="delivery-order-card-head">
+                            <div className="delivery-order-card-title-wrap">
+                              <span className="delivery-order-card-kicker">
+                                {t("delivery.orderLabel", {
+                                  number: idx + 1,
+                                })}
+                              </span>
+                              <h3 className="delivery-order-card-title">
+                                {itemDisplayName}
+                              </h3>
+                              <p className="delivery-order-card-type">
+                                {orderLabel.typeWithSequenceLabel}
+                              </p>
+                            </div>
+                            <span
+                              className={`delivery-status-pill delivery-status-pill--${statusTone}`}
+                            >
+                              <StatusIcon size={14} />
+                              {statusLabel}
+                            </span>
+                          </div>
+
+                          <div className="delivery-order-card-stats">
+                            {stats.map((stat) => (
+                              <div
+                                key={stat.label}
+                                className={`delivery-order-card-stat delivery-order-card-stat--${stat.tone}`}
+                              >
+                                <span>{stat.label}</span>
+                                <strong>{stat.value}</strong>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="delivery-order-card-actions">
+                            <div className="delivery-payment-context">
+                              <LuWalletCards size={16} />
+                              <span>{t("delivery.remainingPayment")}</span>
+                            </div>
                             {isCompleted ? (
-                              <span className="inline-flex items-center rounded-full bg-rose-100 px-3 py-1 text-xs font-bold text-rose-700">
+                              <span className="delivery-payment-complete">
                                 {completedStatusText}
                               </span>
                             ) : readyToReceive ? (
-                              <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
-                                {t(
-                                  "delivery.readyToReceive",
-                                  "Ready to receive",
-                                )}
-                              </span>
+                              <button
+                                type="button"
+                                className="delivery-receive-button inline-flex h-10 items-center justify-center rounded-lg bg-amber-500 px-4 text-sm font-semibold text-white hover:bg-amber-600 dark:bg-amber-500 dark:hover:bg-amber-400 disabled:opacity-50"
+                                onClick={() => submitPayment(o)}
+                                disabled={paying}
+                              >
+                                {receiveButtonText}
+                              </button>
                             ) : (
-                              <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
-                                {t(
-                                  "delivery.notFullyPaidBadge",
-                                  "Not Completed",
-                                )}
-                              </span>
-                            )}
-                          </td>
-                          <td className="delivery-results-payment-cell border-b border-amber-100 px-4 py-3 dark:border-slate-700">
-                            <div
-                              className={`delivery-payment-cell ${isRtl ? "delivery-payment-cell--rtl" : ""}`}
-                            >
-                              <p className="delivery-payment-person text-xs text-slate-500 dark:text-slate-400">
-                                {itemDisplayName}
-                              </p>
-                              {isCompleted ? (
-                                <span className="text-sm text-slate-500 dark:text-slate-400">
-                                  -
-                                </span>
-                              ) : readyToReceive ? (
+                              <div className="delivery-payment-controls">
+                                <input
+                                  className="delivery-payment-input h-10 w-full rounded-lg border border-amber-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-amber-400 dark:focus:ring-amber-500/20"
+                                  value={payments[o.id] ?? ""}
+                                  onChange={(e) =>
+                                    setPayments((p) => ({
+                                      ...p,
+                                      [o.id]: e.target.value,
+                                    }))
+                                  }
+                                  inputMode="decimal"
+                                  dir="ltr"
+                                  data-field-direction="ltr"
+                                  placeholder={String(remaining)}
+                                  disabled={paying}
+                                />
                                 <button
                                   type="button"
                                   className="delivery-receive-button inline-flex h-10 items-center justify-center rounded-lg bg-amber-500 px-4 text-sm font-semibold text-white hover:bg-amber-600 dark:bg-amber-500 dark:hover:bg-amber-400 disabled:opacity-50"
@@ -435,42 +459,15 @@ export default function ClothesDeliveryToCustomer() {
                                 >
                                   {receiveButtonText}
                                 </button>
-                              ) : (
-                                <div className="delivery-payment-controls">
-                                  <input
-                                    className="delivery-payment-input h-10 w-full rounded-lg border border-amber-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-amber-400 dark:focus:ring-amber-500/20"
-                                    value={payments[o.id] ?? ""}
-                                    onChange={(e) =>
-                                      setPayments((p) => ({
-                                        ...p,
-                                        [o.id]: e.target.value,
-                                      }))
-                                    }
-                                    inputMode="decimal"
-                                    dir="ltr"
-                                    data-field-direction="ltr"
-                                    placeholder={String(remaining)}
-                                    disabled={paying}
-                                  />
-                                  <button
-                                    type="button"
-                                    className="delivery-receive-button inline-flex h-10 items-center justify-center rounded-lg bg-amber-500 px-4 text-sm font-semibold text-white hover:bg-amber-600 dark:bg-amber-500 dark:hover:bg-amber-400 disabled:opacity-50"
-                                    onClick={() => submitPayment(o)}
-                                    disabled={paying}
-                                  >
-                                    {receiveButtonText}
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
+                              </div>
+                            )}
+                          </div>
+                        </article>
                       );
                     })}
-                  </tbody>
-                </table>
+                  </div>
+                )}
               </div>
-
             </Card>
           </div>
         )}

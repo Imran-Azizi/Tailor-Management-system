@@ -1,10 +1,9 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
-import { LuSearch } from "react-icons/lu";
+import { LuClipboardList, LuSearch } from "react-icons/lu";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import api from "../lib/api.js";
-import { getApiErrorMessage } from "../lib/feedback.js";
 import { parseNumberLocale } from "../lib/normalize.js";
 import { getOrderLabelParts } from "../lib/orderType.js";
 import {
@@ -18,7 +17,6 @@ import {
   PageHeader,
   Spinner,
 } from "../components/ui/index.jsx";
-import OrderCreatorBadge from "../components/order/OrderCreatorBadge.jsx";
 
 function getRoleReceivedWorker(order, role) {
   if (role === "QICHIKAR") {
@@ -190,12 +188,7 @@ export default function AssignOrdersReport() {
       if (err?.response?.status === 404) {
         setIsOrderNotFound(true);
       } else {
-        toast.error(
-          getApiErrorMessage(
-            err,
-            t("assignment.searchFailed", "Search failed."),
-          ),
-        );
+        toast.error(t("assignment.searchFailed", "Search failed."));
       }
     } finally {
       setLoading(false);
@@ -228,6 +221,7 @@ export default function AssignOrdersReport() {
 
       <Card>
         <div
+          className="assignment-report-search-form"
           style={{
             display: "grid",
             gap: 12,
@@ -270,87 +264,76 @@ export default function AssignOrdersReport() {
 
       <div style={{ marginTop: 16 }}>
         {loading ? (
-          <Spinner />
+          <Card title={t("assignment.searchResult", "Search Result")}>
+            <div className="assignment-report-loading">
+              <Spinner />
+              <p>{t("common.loading", "Loading")}</p>
+            </div>
+          </Card>
         ) : isOrderNotFound ? (
           <Card title={t("assignment.searchResult", "Search Result")} noPad>
-            <div style={{ padding: 16, display: "grid", gap: 8 }}>
-              <div className="badge bg-gray">
-                {t(
+            <div className="assignment-report-empty">
+              <EmptyState
+                message={t(
                   "assignment.orderNotFoundSystem",
                   "Order not found in the system",
                 )}
-              </div>
+                Icon={LuClipboardList}
+              />
             </div>
           </Card>
         ) : lookupResult ? (
           <div style={{ display: "grid", gap: 16 }}>
-            <Card title={t("common.allOrders", "All Orders")}>
-              <div className="tbl-wrap order-scroll-x">
-                <table className="tbl">
-                  <thead>
-                    <tr>
-                      <th>{t("orders.billNumber", "Bill Number")}</th>
-                      <th>{t("common.customer", "Customer")}</th>
-                      <th>{t("common.type", "Type")}</th>
-                      <th>{t("orders.createdBy", "Created By")}</th>
-                      <th>{t("common.status", "Status")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(lookupResult.orders || []).map((order) => {
-                      const orderLabel = getOrderLabelParts(order, language);
-                      const state = resolveAssignmentState(order, t);
-                      const billNumber = order?.customer?.billNumber;
-                      const resolvedRealCustomerName =
-                        String(order?.customer?.firstName || "").trim() ||
-                        String(lookupResult?.customer?.firstName || "").trim() ||
-                        (billNumber !== null && billNumber !== undefined
-                          ? String(customerNameByBill[billNumber] || "").trim()
-                          : "") ||
-                        "-";
-                      const displayCustomerName =
-                        String(orderLabel.customName || "").trim() ||
-                        resolvedRealCustomerName;
-                      return (
-                        <tr key={order.id}>
-                          <td>
-                            <span className="badge bg-gray">
-                              #{billNumber ?? "-"}
+            <Card title={t("common.allOrders", "All Orders")} noPad>
+              <div className="assignment-report-results-shell">
+                <div className="assignment-report-results-summary">
+                  <span className="assignment-report-results-badge">
+                    {t("assignment.searchResult", "Search Result")}
+                  </span>
+                  <span className="assignment-report-results-query">
+                    {t("orders.billNumber", "Bill Number")}:{" "}
+                    <strong>{billNumber}</strong>
+                  </span>
+                </div>
+
+                <div className="assignment-report-card-grid">
+                  {(lookupResult.orders || []).map((order) => {
+                    const orderLabel = getOrderLabelParts(order, language);
+                    const state = resolveAssignmentState(order, t);
+                    const bill = order?.customer?.billNumber;
+                    const resolvedRealCustomerName =
+                      String(order?.customer?.firstName || "").trim() ||
+                      String(lookupResult?.customer?.firstName || "").trim() ||
+                      (bill !== null && bill !== undefined
+                        ? String(customerNameByBill[bill] || "").trim()
+                        : "") ||
+                      "-";
+                    const displayCustomerName =
+                      String(orderLabel.customName || "").trim() ||
+                      resolvedRealCustomerName;
+
+                    return (
+                      <article key={order.id} className="assignment-status-card">
+                        <div className="assignment-status-card__head">
+                          <div className="assignment-status-card__identity">
+                            <span className="assignment-status-card__bill">
+                              #{bill ?? "-"}
                             </span>
-                          </td>
-                          <td>{displayCustomerName}</td>
-                          <td>{orderLabel.typeWithSequenceLabel}</td>
-                          <td>
-                            <OrderCreatorBadge order={order} compact />
-                          </td>
-                          <td>
-                            <span
-                              style={{
-                                ...getOrderCompletionBadgeStyle(state),
-                                borderRadius: 999,
-                                display: "inline-flex",
-                                flexDirection: "column",
-                                gap: 4,
-                                padding: "6px 10px",
-                                maxWidth: 360,
-                                whiteSpace: "normal",
-                              }}
-                            >
-                              <strong style={{ fontSize: 12 }}>
-                                {state.label}
-                              </strong>
-                              {state.detail ? (
-                                <span style={{ fontSize: 11, fontWeight: 600 }}>
-                                  {state.detail}
-                                </span>
-                              ) : null}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            <h3>{displayCustomerName}</h3>
+                            <p>{orderLabel.typeWithSequenceLabel}</p>
+                          </div>
+                          <span
+                            className="assignment-status-card__status"
+                            style={getOrderCompletionBadgeStyle(state)}
+                          >
+                            <strong>{state.label}</strong>
+                            {state.detail ? <span>{state.detail}</span> : null}
+                          </span>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
               </div>
             </Card>
           </div>

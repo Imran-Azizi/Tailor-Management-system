@@ -29,6 +29,7 @@ import {
   Spinner,
 } from "../components/ui/index.jsx";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
+import MobileFilterPanel from "../components/ui/MobileFilterPanel.jsx";
 
 const PAGE_SIZE = 20;
 
@@ -185,6 +186,8 @@ export default function PaymentHistory() {
     Boolean(fromDate),
     Boolean(toDate),
   ].filter(Boolean).length;
+  const hasFilterState =
+    activeFilterCount > 0 || sortBy !== "paidAt" || sortOrder !== "desc";
 
   const clearFilters = () => {
     setSearch("");
@@ -313,186 +316,190 @@ export default function PaymentHistory() {
         </div>
       )}
 
-      <Card>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: 10,
-            alignItems: "end",
-          }}
-        >
-          <div>
-            <label className="lbl">
-              {t("common.search", { defaultValue: "Search" })}
-            </label>
-            <div style={{ position: "relative" }}>
-              <LuSearch
-                size={14}
-                style={{
-                  position: "absolute",
-                  insetInlineStart: 10,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "var(--text3)",
-                }}
-              />
-              <input
-                className="inp"
-                style={{ paddingInlineStart: 32 }}
-                value={search}
-                placeholder={t("rakht.paymentHistorySearch", {
-                  defaultValue: "Search by company or recorded user",
-                })}
-                onChange={(event) => {
-                  setSearch(event.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="lbl">
-              {t("rakht.companyName", { defaultValue: "Company Name" })}
-            </label>
-            <Select
-              classNamePrefix="rs"
-              isRtl={isRtl}
-              menuPosition="fixed"
-              value={companyFilter}
-              onChange={(option) => {
-                setCompanyFilter(option);
-                setPage(1);
-              }}
-              options={companyOptions}
-              isClearable
-              placeholder={t("common.all", { defaultValue: "All" })}
-            />
-          </div>
-
-          <div>
-            <label className="lbl">
-              {t("common.status", { defaultValue: "Status" })}
-            </label>
-            <Select
-              classNamePrefix="rs"
-              isRtl={isRtl}
-              menuPosition="fixed"
-              value={statusFilter}
-              onChange={(option) => {
-                setStatusFilter(option);
-                setPage(1);
-              }}
-              options={statusOptions}
-              isClearable
-              placeholder={t("common.all", { defaultValue: "All" })}
-            />
-          </div>
-
-          <div>
-            <label className="lbl">
-              {t("rakht.fromDate", { defaultValue: "From Date" })}
-            </label>
-            <div style={{ position: "relative" }}>
-              <LuCalendarDays
-                size={14}
-                style={{
-                  position: "absolute",
-                  insetInlineStart: 10,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "var(--text3)",
-                  pointerEvents: "none",
-                }}
-              />
-              <input
-                className="inp"
-                type="date"
-                style={{ paddingInlineStart: 32 }}
-                value={fromDate}
-                onChange={(event) => {
-                  setFromDate(event.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="lbl">
-              {t("rakht.toDate", { defaultValue: "To Date" })}
-            </label>
-            <div style={{ position: "relative" }}>
-              <LuCalendarDays
-                size={14}
-                style={{
-                  position: "absolute",
-                  insetInlineStart: 10,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "var(--text3)",
-                  pointerEvents: "none",
-                }}
-              />
-              <input
-                className="inp"
-                type="date"
-                style={{ paddingInlineStart: 32 }}
-                value={toDate}
-                onChange={(event) => {
-                  setToDate(event.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
-          </div>
-
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={clearFilters}
-            disabled={
-              activeFilterCount === 0 &&
-              sortBy === "paidAt" &&
-              sortOrder === "desc"
-            }
+      <MobileFilterPanel
+        activeCount={activeFilterCount}
+        clearDisabled={!hasFilterState}
+        isApplying={isFetching}
+        onClear={clearFilters}
+        title={t("common.filters", { defaultValue: "Filters" })}
+      >
+        <Card>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 10,
+              alignItems: "end",
+            }}
           >
-            <LuX size={14} />
-            {t("common.clear", { defaultValue: "Clear" })}
-          </button>
-        </div>
+            <div>
+              <label className="lbl">
+                {t("common.search", { defaultValue: "Search" })}
+              </label>
+              <div style={{ position: "relative" }}>
+                <LuSearch
+                  size={14}
+                  style={{
+                    position: "absolute",
+                    insetInlineStart: 10,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: "var(--text3)",
+                  }}
+                />
+                <input
+                  className="inp"
+                  style={{ paddingInlineStart: 32 }}
+                  value={search}
+                  placeholder={t("rakht.paymentHistorySearch", {
+                    defaultValue: "Search by company or recorded user",
+                  })}
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                    setPage(1);
+                  }}
+                />
+              </div>
+            </div>
 
-        <div
-          style={{
-            marginTop: 12,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            flexWrap: "wrap",
-          }}
-        >
-          <span
-            style={{ fontSize: 12, color: "var(--text3)", fontWeight: 700 }}
+            <div>
+              <label className="lbl">
+                {t("rakht.companyName", { defaultValue: "Company Name" })}
+              </label>
+              <Select
+                classNamePrefix="rs"
+                isRtl={isRtl}
+                menuPosition="fixed"
+                value={companyFilter}
+                onChange={(option) => {
+                  setCompanyFilter(option);
+                  setPage(1);
+                }}
+                options={companyOptions}
+                isClearable
+                placeholder={t("common.all", { defaultValue: "All" })}
+              />
+            </div>
+
+            <div>
+              <label className="lbl">
+                {t("common.status", { defaultValue: "Status" })}
+              </label>
+              <Select
+                classNamePrefix="rs"
+                isRtl={isRtl}
+                menuPosition="fixed"
+                value={statusFilter}
+                onChange={(option) => {
+                  setStatusFilter(option);
+                  setPage(1);
+                }}
+                options={statusOptions}
+                isClearable
+                placeholder={t("common.all", { defaultValue: "All" })}
+              />
+            </div>
+
+            <div>
+              <label className="lbl">
+                {t("rakht.fromDate", { defaultValue: "From Date" })}
+              </label>
+              <div style={{ position: "relative" }}>
+                <LuCalendarDays
+                  size={14}
+                  style={{
+                    position: "absolute",
+                    insetInlineStart: 10,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: "var(--text3)",
+                    pointerEvents: "none",
+                  }}
+                />
+                <input
+                  className="inp"
+                  type="date"
+                  style={{ paddingInlineStart: 32 }}
+                  value={fromDate}
+                  onChange={(event) => {
+                    setFromDate(event.target.value);
+                    setPage(1);
+                  }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="lbl">
+                {t("rakht.toDate", { defaultValue: "To Date" })}
+              </label>
+              <div style={{ position: "relative" }}>
+                <LuCalendarDays
+                  size={14}
+                  style={{
+                    position: "absolute",
+                    insetInlineStart: 10,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: "var(--text3)",
+                    pointerEvents: "none",
+                  }}
+                />
+                <input
+                  className="inp"
+                  type="date"
+                  style={{ paddingInlineStart: 32 }}
+                  value={toDate}
+                  onChange={(event) => {
+                    setToDate(event.target.value);
+                    setPage(1);
+                  }}
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={clearFilters}
+              disabled={!hasFilterState}
+            >
+              <LuX size={14} />
+              {t("common.clear", { defaultValue: "Clear" })}
+            </button>
+          </div>
+
+          <div
+            style={{
+              marginTop: 12,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              flexWrap: "wrap",
+            }}
           >
-            <LuFilter
-              size={12}
-              style={{ marginInlineEnd: 4, verticalAlign: "middle" }}
-            />
-            {t("common.filters", { defaultValue: "Filters" })}:{" "}
-            {activeFilterCount}
-          </span>
-          {deferredSearch ? (
-            <span className="badge bg-gray">{deferredSearch}</span>
-          ) : null}
-          {companyFilter?.value ? (
-            <span className="badge bg-gray">{companyFilter.value}</span>
-          ) : null}
-          {statusFilter?.label ? (
-            <span className="badge bg-gray">{statusFilter.label}</span>
-          ) : null}
-        </div>
-      </Card>
+            <span
+              style={{ fontSize: 12, color: "var(--text3)", fontWeight: 700 }}
+            >
+              <LuFilter
+                size={12}
+                style={{ marginInlineEnd: 4, verticalAlign: "middle" }}
+              />
+              {t("common.filters", { defaultValue: "Filters" })}:{" "}
+              {activeFilterCount}
+            </span>
+            {deferredSearch ? (
+              <span className="badge bg-gray">{deferredSearch}</span>
+            ) : null}
+            {companyFilter?.value ? (
+              <span className="badge bg-gray">{companyFilter.value}</span>
+            ) : null}
+            {statusFilter?.label ? (
+              <span className="badge bg-gray">{statusFilter.label}</span>
+            ) : null}
+          </div>
+        </Card>
+      </MobileFilterPanel>
 
       <Card>
         <div

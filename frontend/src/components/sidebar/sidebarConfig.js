@@ -50,6 +50,13 @@ const SUPER_ADMIN_SECTIONS = [
         icon: LuBuilding2,
         end: true,
       },
+      {
+        key: "backupRestore",
+        label: "backup.title",
+        fallback: "Backup & Restore",
+        path: "/super-admin/backups",
+        icon: LuDatabaseBackup,
+      },
     ],
   },
 ];
@@ -300,13 +307,6 @@ const ADMIN_SECTIONS = [
         fallback: "Tenant Settings",
         path: "/tenant-settings",
         icon: LuSettings,
-      },
-      {
-        key: "backupManagement",
-        label: "sidebar.backupManagement",
-        fallback: "Backup Management",
-        path: "/backups",
-        icon: LuDatabaseBackup,
       },
       {
         key: "designs",

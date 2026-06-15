@@ -27,7 +27,10 @@ import {
   getOrderPrimaryDisplayName,
 } from "../lib/orderType.js";
 import { formatUserNotificationMessage } from "../lib/notifications.js";
-import { formatDateTimeLocale } from "../lib/locale.js";
+import {
+  formatDateTimeLocale,
+  formatRelativeTimeLocale,
+} from "../lib/locale.js";
 import { formatSystemDate } from "../lib/locale.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import {
@@ -1309,7 +1312,9 @@ export default function MyTasks() {
                       marginTop: 2,
                     }}
                   >
-                    {formatDateTimeLocale(n.createdAt, language)}
+                    <span title={formatDateTimeLocale(n.createdAt, language)}>
+                      {formatRelativeTimeLocale(n.createdAt, language)}
+                    </span>
                   </p>
                 </div>
                 <button

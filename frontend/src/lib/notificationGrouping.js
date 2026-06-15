@@ -28,9 +28,11 @@ export function getNotificationSummary(rawMessage) {
     return { title: "", message: "" };
   }
 
+  const detail = lines.slice(1).join("\n");
+
   return {
     title: lines[0] || "",
-    message: lines.slice(1).join(" • ") || lines[0] || "",
+    message: detail || lines[0] || "",
   };
 }
 

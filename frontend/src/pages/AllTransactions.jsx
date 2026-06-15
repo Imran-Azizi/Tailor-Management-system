@@ -33,6 +33,7 @@ import {
   StatCard,
 } from "../components/ui/index.jsx";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
+import MobileFilterPanel from "../components/ui/MobileFilterPanel.jsx";
 
 const ACCOUNT_TYPE_COLOR = {
   ADMIN: "#2563EB",
@@ -278,125 +279,133 @@ export default function AllTransactions() {
         />
       </div>
 
-      <Card>
-        <div style={{ marginBottom: 12 }}>
-          <span className="badge bg-gray">
-            {t("common.filters", "Filters")}: {activeFilterCount}
-          </span>
-          <span className="badge bg-gold" style={{ marginInlineStart: 8 }}>
-            {t("transaction.totalAmount", "Total Amount")}:{" "}
-            {formatMoney(totalAmount, language)}
-          </span>
-        </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-            gap: 10,
-            alignItems: "end",
-          }}
-        >
-          <div>
-            <label className="lbl">{t("common.search", "Search")}</label>
-            <div style={{ position: "relative" }}>
-              <LuSearch
-                size={14}
-                style={{
-                  position: "absolute",
-                  insetInlineStart: 10,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "var(--text3)",
-                }}
-              />
-              <input
-                className="inp"
-                style={{ paddingInlineStart: 32 }}
-                placeholder={t(
-                  "transaction.searchPlaceholder",
-                  "Search by user name",
-                )}
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
+      <MobileFilterPanel
+        activeCount={activeFilterCount}
+        clearDisabled={activeFilterCount === 0}
+        isApplying={isFetching}
+        onClear={clearFilters}
+        title={t("common.filters", "Filters")}
+      >
+        <Card>
+          <div style={{ marginBottom: 12 }}>
+            <span className="badge bg-gray">
+              {t("common.filters", "Filters")}: {activeFilterCount}
+            </span>
+            <span className="badge bg-gold" style={{ marginInlineStart: 8 }}>
+              {t("transaction.totalAmount", "Total Amount")}:{" "}
+              {formatMoney(totalAmount, language)}
+            </span>
           </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+              gap: 10,
+              alignItems: "end",
+            }}
+          >
+            <div>
+              <label className="lbl">{t("common.search", "Search")}</label>
+              <div style={{ position: "relative" }}>
+                <LuSearch
+                  size={14}
+                  style={{
+                    position: "absolute",
+                    insetInlineStart: 10,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: "var(--text3)",
+                  }}
+                />
+                <input
+                  className="inp"
+                  style={{ paddingInlineStart: 32 }}
+                  placeholder={t(
+                    "transaction.searchPlaceholder",
+                    "Search by user name",
+                  )}
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                />
+              </div>
+            </div>
 
-          <div>
-            <label className="lbl">
-              {t("transaction.accountType", "Account Type")}
-            </label>
-            <div style={{ position: "relative" }}>
-              <LuBuilding2
-                size={14}
-                style={{
-                  position: "absolute",
-                  insetInlineStart: 10,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "var(--text3)",
-                  pointerEvents: "none",
-                }}
-              />
-              <select
-                className="inp"
-                style={{ paddingInlineStart: 32 }}
-                value={typeFilter}
-                onChange={(e) => {
-                  setTypeFilter(e.target.value);
-                  setPage(1);
-                }}
-              >
-                <option value="">
-                  {t("transaction.allTypes", "All types")}
-                </option>
-                {ACCOUNT_TYPES.map((at) => (
-                  <option key={at} value={at}>
-                    {at}
+            <div>
+              <label className="lbl">
+                {t("transaction.accountType", "Account Type")}
+              </label>
+              <div style={{ position: "relative" }}>
+                <LuBuilding2
+                  size={14}
+                  style={{
+                    position: "absolute",
+                    insetInlineStart: 10,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: "var(--text3)",
+                    pointerEvents: "none",
+                  }}
+                />
+                <select
+                  className="inp"
+                  style={{ paddingInlineStart: 32 }}
+                  value={typeFilter}
+                  onChange={(e) => {
+                    setTypeFilter(e.target.value);
+                    setPage(1);
+                  }}
+                >
+                  <option value="">
+                    {t("transaction.allTypes", "All types")}
                   </option>
-                ))}
-              </select>
+                  {ACCOUNT_TYPES.map((at) => (
+                    <option key={at} value={at}>
+                      {at}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
+
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={clearFilters}
+              disabled={!search && !typeFilter}
+            >
+              <LuX size={14} />
+              {t("common.clear", "Clear")}
+            </button>
           </div>
 
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={clearFilters}
-            disabled={!search && !typeFilter}
+          <div
+            style={{
+              marginTop: 12,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              flexWrap: "wrap",
+            }}
           >
-            <LuX size={14} />
-            {t("common.clear", "Clear")}
-          </button>
-        </div>
-
-        <div
-          style={{
-            marginTop: 12,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            flexWrap: "wrap",
-          }}
-        >
-          <span
-            style={{ fontSize: 12, color: "var(--text3)", fontWeight: 700 }}
-          >
-            <LuFilter
-              size={12}
-              style={{ marginInlineEnd: 4, verticalAlign: "middle" }}
-            />
-            {t("common.filters", "Filters")}: {activeFilterCount}
-          </span>
-          {search ? <span className="badge bg-gray">{search}</span> : null}
-          {typeFilter ? (
-            <span className="badge bg-gray">{typeFilter}</span>
-          ) : null}
-        </div>
-      </Card>
+            <span
+              style={{ fontSize: 12, color: "var(--text3)", fontWeight: 700 }}
+            >
+              <LuFilter
+                size={12}
+                style={{ marginInlineEnd: 4, verticalAlign: "middle" }}
+              />
+              {t("common.filters", "Filters")}: {activeFilterCount}
+            </span>
+            {search ? <span className="badge bg-gray">{search}</span> : null}
+            {typeFilter ? (
+              <span className="badge bg-gray">{typeFilter}</span>
+            ) : null}
+          </div>
+        </Card>
+      </MobileFilterPanel>
 
       <div className="all-transactions-table-section" dir={isRtl ? "rtl" : "ltr"}>
         <Card

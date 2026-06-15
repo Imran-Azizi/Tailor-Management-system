@@ -21,7 +21,13 @@ import { useTheme } from "../context/ThemeContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
 import api from "../lib/api.js";
 import { formatUserNotificationMessage } from "../lib/notifications.js";
-import { formatDateTimeLocale } from "../lib/locale.js";
+import { getNotificationSummary } from "../lib/notificationGrouping.js";
+import {
+  formatDateTimeLocale,
+  formatRelativeTimeLocale,
+  isRtlLanguage,
+  normalizeLanguage,
+} from "../lib/locale.js";
 import {
   getLatestNotificationTimestamp,
   playNotificationChime,
@@ -192,47 +198,50 @@ function WorkerNotifDrawer({ open, roleColor, onClose }) {
                     {t("workerLayout.paymentsFromAdmin", "Payments from Admin")}
                   </span>
                 </div>
-                {paymentNotifs.map((n) => (
-                  <div key={n.id} className="notif-panel-item">
-                    <AfCurrencyIcon
-                      size={14}
-                      style={{
-                        color: "var(--success)",
-                        flexShrink: 0,
-                        marginTop: 2,
-                      }}
-                    />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <NotificationText
-                        language={language}
+                {paymentNotifs.map((n) => {
+                  const summary = getNotificationSummary(
+                    formatUserNotificationMessage(n, t, language),
+                  );
+                  return (
+                    <div key={n.id} className="notif-panel-item">
+                      <AfCurrencyIcon
+                        size={14}
                         style={{
-                          fontSize: 13,
-                          lineHeight: 1.45,
-                          color: "var(--text1)",
+                          color: "var(--success)",
+                          flexShrink: 0,
+                          marginTop: 2,
                         }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p className="notif-feed-item__title">
+                          {summary.title}
+                        </p>
+                        {summary.message && (
+                          <NotificationText
+                            language={language}
+                            className="notif-feed-item__message"
+                          >
+                            {summary.message}
+                          </NotificationText>
+                        )}
+                        <p
+                          className="notif-feed-item__meta"
+                          title={formatDateTimeLocale(n.createdAt, language)}
+                        >
+                          {formatRelativeTimeLocale(n.createdAt, language)}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => readOneMut.mutate(n.id)}
+                        title={t("navbar.markAsRead")}
+                        className="notif-panel-close-btn"
+                        style={{ width: 26, height: 26, borderRadius: 6 }}
                       >
-                        {formatUserNotificationMessage(n, t, language)}
-                      </NotificationText>
-                      <p
-                        style={{
-                          fontSize: 11,
-                          color: "var(--text3)",
-                          marginTop: 3,
-                        }}
-                      >
-                        {formatDateTimeLocale(n.createdAt, language)}
-                      </p>
+                        <LuCheck size={12} />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => readOneMut.mutate(n.id)}
-                      title={t("navbar.markAsRead")}
-                      className="notif-panel-close-btn"
-                      style={{ width: 26, height: 26, borderRadius: 6 }}
-                    >
-                      <LuCheck size={12} />
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </>
             )}
 
@@ -262,43 +271,46 @@ function WorkerNotifDrawer({ open, roleColor, onClose }) {
                     {t("navbar.workUpdates", "Work Updates")}
                   </span>
                 </div>
-                {otherNotifs.map((n) => (
-                  <div key={n.id} className="notif-panel-item">
-                    <LuBell
-                      size={13}
-                      style={{ color: roleColor, flexShrink: 0, marginTop: 3 }}
-                    />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <NotificationText
-                        language={language}
-                        style={{
-                          fontSize: 12,
-                          lineHeight: 1.45,
-                          color: "var(--text1)",
-                        }}
+                {otherNotifs.map((n) => {
+                  const summary = getNotificationSummary(
+                    formatUserNotificationMessage(n, t, language),
+                  );
+                  return (
+                    <div key={n.id} className="notif-panel-item">
+                      <LuBell
+                        size={13}
+                        style={{ color: roleColor, flexShrink: 0, marginTop: 3 }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p className="notif-feed-item__title">
+                          {summary.title}
+                        </p>
+                        {summary.message && (
+                          <NotificationText
+                            language={language}
+                            className="notif-feed-item__message"
+                          >
+                            {summary.message}
+                          </NotificationText>
+                        )}
+                        <p
+                          className="notif-feed-item__meta"
+                          title={formatDateTimeLocale(n.createdAt, language)}
+                        >
+                          {formatRelativeTimeLocale(n.createdAt, language)}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => readOneMut.mutate(n.id)}
+                        title={t("navbar.markAsRead")}
+                        className="notif-panel-close-btn"
+                        style={{ width: 26, height: 26, borderRadius: 6 }}
                       >
-                        {formatUserNotificationMessage(n, t, language)}
-                      </NotificationText>
-                      <p
-                        style={{
-                          fontSize: 11,
-                          color: "var(--text3)",
-                          marginTop: 3,
-                        }}
-                      >
-                        {formatDateTimeLocale(n.createdAt, language)}
-                      </p>
+                        <LuCheck size={12} />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => readOneMut.mutate(n.id)}
-                      title={t("navbar.markAsRead")}
-                      className="notif-panel-close-btn"
-                      style={{ width: 26, height: 26, borderRadius: 6 }}
-                    >
-                      <LuCheck size={12} />
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </>
             )}
           </div>
@@ -315,38 +327,30 @@ function LangMenu({ onClose }) {
     { code: "dari", label: t("common.dari"), flag: "DR" },
     { code: "pashto", label: t("common.pashto"), flag: "PS" },
   ];
-  const current = i18n.resolvedLanguage || "en";
+  const current = normalizeLanguage(i18n.resolvedLanguage || i18n.language);
+  const isRtl = isRtlLanguage(current);
 
   return (
     <div
-      className="absolute top-[110%] z-[300] min-w-[150px] rounded-[10px] border border-[var(--border)] bg-[var(--surface)] shadow-md"
-      style={{ insetInlineEnd: 0 }}
+      className={`language-dd-menu worker-language-dd-menu ${
+        isRtl ? "language-dd-menu--rtl" : "language-dd-menu--ltr"
+      }`}
+      dir={isRtl ? "rtl" : "ltr"}
     >
       {langs.map((l) => (
-        <div
+        <button
           key={l.code}
+          type="button"
+          className={`language-dd-item${current === l.code ? " on" : ""}`}
           onClick={() => {
             i18n.changeLanguage(l.code);
             localStorage.setItem("lang", l.code);
             onClose();
           }}
-          style={{
-            padding: "10px 14px",
-            display: "flex",
-            alignItems: "center",
-            gap: 9,
-            cursor: "pointer",
-            fontSize: 13,
-            color: current === l.code ? "var(--primary)" : "var(--text1)",
-            fontWeight: current === l.code ? 600 : 400,
-          }}
         >
-          <span style={{ fontSize: 11, fontWeight: 800 }}>{l.flag}</span>
-          {l.label}
-          {current === l.code && (
-            <LuCheck size={12} style={{ marginInlineStart: "auto" }} />
-          )}
-        </div>
+          <span className="language-dd-item__code">{l.flag}</span>
+          <span className="language-dd-item__label">{l.label}</span>
+        </button>
       ))}
     </div>
   );
@@ -464,8 +468,10 @@ export default function WorkerLayout() {
   const unreadNotifs = Array.isArray(unreadNotifsRaw) ? unreadNotifsRaw : [];
   const lastWorkerSoundTs = useRef(0);
 
-  const currentLang = (i18n.resolvedLanguage || "en").slice(0, 2).toUpperCase();
-  const isRtl = (i18n.dir?.() || "ltr") === "rtl";
+  const normalizedLang = normalizeLanguage(i18n.resolvedLanguage || i18n.language);
+  const currentLang =
+    normalizedLang === "dari" ? "DR" : normalizedLang === "pashto" ? "PS" : "EN";
+  const isRtl = isRtlLanguage(normalizedLang);
 
   useEffect(() => {
     const latestTimestamp = getLatestNotificationTimestamp(unreadNotifs);

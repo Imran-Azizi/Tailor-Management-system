@@ -37,7 +37,13 @@ import {
   formatSystemNotificationMessage,
   formatUserNotificationMessage,
 } from "../lib/notifications.js";
-import { formatDateTimeLocale, formatSystemDateTime } from "../lib/locale.js";
+import {
+  formatDateTimeLocale,
+  formatRelativeTimeLocale,
+  formatSystemDateTime,
+  isRtlLanguage,
+  normalizeLanguage,
+} from "../lib/locale.js";
 import {
   getNotificationSummary,
   groupNotificationsByDay,
@@ -91,7 +97,7 @@ function SystemNotifPanel({
   const navigate = useNavigate();
   const { viewMonth, viewYear } = useMonth();
   const language = i18n.resolvedLanguage || i18n.language || "en";
-  const isRtl = (i18n.dir?.() || "ltr") === "rtl";
+  const isRtl = isRtlLanguage(i18n.resolvedLanguage || i18n.language);
 
   // Emergency order alerts (Notification model)
   const { data: emergency = [] } = useQuery({
@@ -301,8 +307,8 @@ function SystemNotifPanel({
                         </NotificationText>
                       )}
                       <div className="notif-feed-item__meta">
-                        <span>
-                          {formatDateTimeLocale(entry.createdAt, language)}
+                        <span title={formatDateTimeLocale(entry.createdAt, language)}>
+                          {formatRelativeTimeLocale(entry.createdAt, language)}
                         </span>
                         {isActionable && (
                           <span className="notif-feed-item__hint">
@@ -458,8 +464,8 @@ function UserNotifPanel({ onClose }) {
                         </NotificationText>
                       )}
                       <div className="notif-feed-item__meta">
-                        <span>
-                          {formatDateTimeLocale(n.createdAt, language)}
+                        <span title={formatDateTimeLocale(n.createdAt, language)}>
+                          {formatRelativeTimeLocale(n.createdAt, language)}
                         </span>
                       </div>
                     </div>
@@ -543,7 +549,14 @@ function MonthDropdown({ onClose }) {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language || "en";
-  const isRtl = (i18n.dir?.() || "ltr") === "rtl";
+  const normalizedLanguage = normalizeLanguage(language);
+  const isRtl = isRtlLanguage(normalizedLanguage);
+  const languageBadge =
+    normalizedLanguage === "dari"
+      ? "DR"
+      : normalizedLanguage === "pashto"
+        ? "PS"
+        : "EN";
   const {
     viewMonth,
     viewYear,
@@ -775,40 +788,40 @@ function MonthSelector() {
 
 function LangDropdown({ onClose }) {
   const { t, i18n } = useTranslation();
-  const isRtl = (i18n.dir?.() || "ltr") === "rtl";
   const langs = [
     { code: "en", label: t("common.english"), flag: "EN" },
     { code: "dari", label: t("common.dari"), flag: "DR" },
     { code: "pashto", label: t("common.pashto"), flag: "PS" },
   ];
-  const current = i18n.resolvedLanguage || i18n.language || "en";
+  const current = normalizeLanguage(i18n.resolvedLanguage || i18n.language);
+  const isRtl = isRtlLanguage(current);
 
   return (
     <div
-      className={`dd-menu absolute z-50 ${isRtl ? "left-0 right-auto" : "right-0 left-auto"} min-w-[180px]`}
+      className={`dd-menu language-dd-menu ${
+        isRtl ? "language-dd-menu--rtl" : "language-dd-menu--ltr"
+      }`}
+      dir={isRtl ? "rtl" : "ltr"}
       style={{
         maxWidth: "calc(100vw - 16px)",
         maxHeight: "min(70vh, 420px)",
         overflowY: "auto",
       }}
     >
-      <div className="dd-hd">{t("common.language")}</div>
       {langs.map((lang) => (
-        <div
+        <button
           key={lang.code}
-          className={`dd-item${current === lang.code ? " on" : ""}`}
+          type="button"
+          className={`dd-item language-dd-item${current === lang.code ? " on" : ""}`}
           onClick={() => {
             i18n.changeLanguage(lang.code);
             localStorage.setItem("lang", lang.code);
             onClose();
           }}
         >
-          <span style={{ fontSize: 12, fontWeight: 800 }}>{lang.flag}</span>
-          <span>{lang.label}</span>
-          {current === lang.code && (
-            <LuCheck size={13} style={{ marginInlineStart: "auto" }} />
-          )}
-        </div>
+          <span className="language-dd-item__code">{lang.flag}</span>
+          <span className="language-dd-item__label">{lang.label}</span>
+        </button>
       ))}
     </div>
   );
@@ -908,7 +921,14 @@ function UserDropdown({ onClose }) {
 export default function Navbar({ onHamburger, pageTitle }) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language || "en";
-  const isRtl = (i18n.dir?.() || "ltr") === "rtl";
+  const normalizedLanguage = normalizeLanguage(language);
+  const isRtl = isRtlLanguage(normalizedLanguage);
+  const languageBadge =
+    normalizedLanguage === "dari"
+      ? "DR"
+      : normalizedLanguage === "pashto"
+        ? "PS"
+        : "EN";
   const { dark, toggle } = useTheme();
   const { user, isWorker, isAdmin, isFinance, canManageOrders } =
     useAuth();
@@ -1178,9 +1198,7 @@ export default function Navbar({ onHamburger, pageTitle }) {
             }}
           >
             <LuLanguages size={17} />
-            <span className="nbl">
-              {(i18n.resolvedLanguage || "en").slice(0, 2).toUpperCase()}
-            </span>
+            <span className="nbl">{languageBadge}</span>
           </button>
           {langOpen && <LangDropdown onClose={() => setLangOpen(false)} />}
         </div>

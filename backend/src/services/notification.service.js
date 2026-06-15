@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { getAfghanMonthDateRange } from "../lib/afghanistanDate.js";
+import { getNotificationRetentionWhere } from "../lib/notificationRetention.js";
 
 const dedupeByOrderId = (notifications = []) => {
   const seen = new Set();
@@ -45,6 +46,7 @@ export const getAllNotifications = async ({
 
   const notifications = await prisma.notification.findMany({
     where: {
+      ...getNotificationRetentionWhere(),
       ...(unreadOnly ? { isRead: false } : {}),
       order: {
         isEmergency: true,

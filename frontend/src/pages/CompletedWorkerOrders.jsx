@@ -34,6 +34,7 @@ import {
   StatCard,
 } from "../components/ui/index.jsx";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
+import MobileFilterPanel from "../components/ui/MobileFilterPanel.jsx";
 
 const LIMIT = 15;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -387,7 +388,7 @@ export default function CompletedWorkerOrders() {
   ].filter(Boolean).length;
 
   const onSearch = (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
     setPage(1);
     setSearch(searchInput);
   };
@@ -659,11 +660,19 @@ export default function CompletedWorkerOrders() {
         />
       </section>
 
-      <Card>
-        <form
-          onSubmit={onSearch}
-          className="grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] items-end gap-3"
-        >
+      <MobileFilterPanel
+        activeCount={activeFilterCount}
+        clearDisabled={activeFilterCount === 0}
+        isApplying={isFetching}
+        onApply={onSearch}
+        onClear={resetFilters}
+        title={t("common.filters", "Filters")}
+      >
+        <Card>
+          <form
+            onSubmit={onSearch}
+            className="grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] items-end gap-3"
+          >
           <div>
             <label className="lbl">{t("common.search", "Search")}</label>
             <div className="relative">
@@ -779,9 +788,9 @@ export default function CompletedWorkerOrders() {
             <LuRefreshCcw size={14} />
             {t("completedWorkerOrders.clearFilters", "Clear Filters")}
           </button>
-        </form>
+          </form>
 
-        <div className="mt-3.5 flex flex-wrap items-center gap-2">
+          <div className="mt-3.5 flex flex-wrap items-center gap-2">
           <span className="text-xs font-bold text-[var(--text3)]">
             {t("completedWorkerOrders.activeFilters", "Active Filters")}:{" "}
             {activeFilterCount}
@@ -806,8 +815,9 @@ export default function CompletedWorkerOrders() {
               {selectedDokht.name}
             </span>
           ) : null}
-        </div>
-      </Card>
+          </div>
+        </Card>
+      </MobileFilterPanel>
 
       <div
         className="completed-worker-orders-table-section"

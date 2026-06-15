@@ -21,6 +21,7 @@ import {
   LoadingState,
   EmptyState,
 } from "../components/ui/index.jsx";
+import MobileFilterPanel from "../components/ui/MobileFilterPanel.jsx";
 
 const EMPTY_FILTERS = {
   search: "",
@@ -65,6 +66,7 @@ export default function ItemSalesRecords() {
 
   const sales = salesQuery.data?.sales || [];
   const stats = statsQuery.data || {};
+  const activeFilterCount = Object.keys(activeFilters).length;
 
   const setFilter = (field, value) => {
     setFilters((current) => ({ ...current, [field]: value }));
@@ -107,72 +109,80 @@ export default function ItemSalesRecords() {
         />
       </div>
 
-      <section className="card item-record-filters">
-        <div className="item-record-filters-head">
-          <h3>
-            <LuFilter size={17} />
-            {t("items.records.filters", { defaultValue: "Filters" })}
-          </h3>
-          <button
-            type="button"
-            className="btn btn-outline btn-sm"
-            onClick={() => setFilters(EMPTY_FILTERS)}
-          >
-            {t("common.reset", { defaultValue: "Reset" })}
-          </button>
-        </div>
-        <div className="item-record-filter-grid">
-          <label className="items-field">
-            <span>{t("common.search", { defaultValue: "Search" })}</span>
-            <div className="items-code-search">
-              <LuSearch size={16} />
+      <MobileFilterPanel
+        activeCount={activeFilterCount}
+        clearDisabled={activeFilterCount === 0}
+        isApplying={salesQuery.isFetching || statsQuery.isFetching}
+        onClear={() => setFilters(EMPTY_FILTERS)}
+        title={t("common.filters", "Filters")}
+      >
+        <section className="card item-record-filters">
+          <div className="item-record-filters-head">
+            <h3>
+              <LuFilter size={17} />
+              {t("items.records.filters", { defaultValue: "Filters" })}
+            </h3>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => setFilters(EMPTY_FILTERS)}
+            >
+              {t("common.reset", { defaultValue: "Reset" })}
+            </button>
+          </div>
+          <div className="item-record-filter-grid">
+            <label className="items-field">
+              <span>{t("common.search", { defaultValue: "Search" })}</span>
+              <div className="items-code-search">
+                <LuSearch size={16} />
+                <input
+                  className="inp"
+                  value={filters.search}
+                  onChange={(event) => setFilter("search", event.target.value)}
+                  placeholder={t("items.records.searchAny", {
+                    defaultValue: "Name, brand, or code",
+                  })}
+                />
+              </div>
+            </label>
+            <label className="items-field">
+              <span>{t("items.fields.name", { defaultValue: "Item Name" })}</span>
               <input
                 className="inp"
-                value={filters.search}
-                onChange={(event) => setFilter("search", event.target.value)}
-                placeholder={t("items.records.searchAny", {
-                  defaultValue: "Name, brand, or code",
-                })}
+                value={filters.name}
+                onChange={(event) => setFilter("name", event.target.value)}
               />
-            </div>
-          </label>
-          <label className="items-field">
-            <span>{t("items.fields.name", { defaultValue: "Item Name" })}</span>
-            <input
-              className="inp"
-              value={filters.name}
-              onChange={(event) => setFilter("name", event.target.value)}
-            />
-          </label>
-          <label className="items-field">
-            <span>{t("items.fields.code", { defaultValue: "Code" })}</span>
-            <input
-              className="inp"
-              value={filters.code}
-              onChange={(event) => setFilter("code", event.target.value)}
-            />
-          </label>
-          <label className="items-field">
-            <span>
-              {t("items.sell.itemType", { defaultValue: "Item Type" })}
-            </span>
-            <select
-              className="inp"
-              value={filters.type}
-              onChange={(event) => setFilter("type", event.target.value)}
-            >
-              <option value="">
-                {t("common.all", { defaultValue: "All" })}
-              </option>
-              {ITEM_CATEGORIES.map((category) => (
-                <option key={category.key} value={category.key}>
-                  {getItemCategoryLabel(category.key, t)}
+            </label>
+            <label className="items-field">
+              <span>{t("items.fields.code", { defaultValue: "Code" })}</span>
+              <input
+                className="inp"
+                value={filters.code}
+                onChange={(event) => setFilter("code", event.target.value)}
+              />
+            </label>
+            <label className="items-field">
+              <span>
+                {t("items.sell.itemType", { defaultValue: "Item Type" })}
+              </span>
+              <select
+                className="inp"
+                value={filters.type}
+                onChange={(event) => setFilter("type", event.target.value)}
+              >
+                <option value="">
+                  {t("common.all", { defaultValue: "All" })}
                 </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </section>
+                {ITEM_CATEGORIES.map((category) => (
+                  <option key={category.key} value={category.key}>
+                    {getItemCategoryLabel(category.key, t)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </section>
+      </MobileFilterPanel>
 
       <section className="card item-record-table-card">
         <header className="card-hd">

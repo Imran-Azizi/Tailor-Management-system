@@ -337,16 +337,6 @@ export default function TenantSettings() {
               ) : null}
             </div>
 
-            <div className="mt-4 grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface2)] p-4 text-sm">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-[var(--text3)]">{t("tenantSettings.meta.currency")}</span>
-                <strong className="text-[var(--text1)]">AFN</strong>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-[var(--text3)]">{t("tenantSettings.meta.timezone")}</span>
-                <strong className="text-[var(--text1)]">Asia/Kabul</strong>
-              </div>
-            </div>
           </section>
 
           <section className="rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[0_18px_45px_-34px_rgba(15,23,42,.65)]">

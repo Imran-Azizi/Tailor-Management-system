@@ -5,7 +5,14 @@ const LRM = "\u200E";
 
 export function normalizeLanguage(language = "en") {
   const lang = String(language || "en").toLowerCase();
-  if (lang.startsWith("dari") || lang.startsWith("fa")) return "dari";
+  if (
+    lang.startsWith("dari") ||
+    lang.startsWith("dr") ||
+    lang.startsWith("fa") ||
+    lang.startsWith("prs")
+  ) {
+    return "dari";
+  }
   if (lang.startsWith("pashto") || lang.startsWith("ps")) return "pashto";
   return "en";
 }
@@ -133,6 +140,38 @@ export function formatSystemDateTime(value, language = "en", options = {}) {
 
 export function formatDateTimeLocale(value, language = "en", options = {}) {
   return formatSystemDateTime(value, language, options);
+}
+
+export function formatRelativeTimeLocale(value, language = "en", now = new Date()) {
+  if (!value) return "-";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+
+  const diffMs = date.getTime() - now.getTime();
+  const absMs = Math.abs(diffMs);
+  const units = [
+    ["year", 365 * 24 * 60 * 60 * 1000],
+    ["month", 30 * 24 * 60 * 60 * 1000],
+    ["week", 7 * 24 * 60 * 60 * 1000],
+    ["day", 24 * 60 * 60 * 1000],
+    ["hour", 60 * 60 * 1000],
+    ["minute", 60 * 1000],
+    ["second", 1000],
+  ];
+  const [unit, unitMs] =
+    units.find(([, candidateMs]) => absMs >= candidateMs) || units.at(-1);
+  const amount = Math.round(diffMs / unitMs);
+
+  try {
+    const rendered = toAsciiDigits(
+      new Intl.RelativeTimeFormat(getLocaleTag(language), {
+        numeric: "auto",
+      }).format(amount, unit),
+    );
+    return stabilizeRtlMixedText(rendered, language);
+  } catch {
+    return formatDateTimeLocale(value, language);
+  }
 }
 
 export function formatDateThenTimeLocale(

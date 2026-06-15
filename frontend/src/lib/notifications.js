@@ -9,7 +9,7 @@ const ASSIGNMENT_REGEX =
 const WORK_STARTED_REGEX =
   /^(.+?) started working on order for (.+?) - Bill #(\d+) \((.+?)\)\.?$/i;
 const WORK_STARTED_PIPE_REGEX =
-  /^Worker Name:\s*(.+?)\s*\|\s*Bill Number:\s*(\d+)\s*\|\s*Order Type:\s*(.+?)\s*\|\s*Customer Name:\s*(.+?)\s*\|\s*has started working on this order\.?$/i;
+  /^(Worker|Qichikar|Dokht) Name:\s*(.+?)\s*\|\s*Bill Number:\s*(\d+)\s*\|\s*Order Type:\s*(.+?)\s*\|\s*Customer Name:\s*(.+?)\s*\|\s*has started working on this order\.?$/i;
 const WORK_COMPLETED_REGEX =
   /^Order completed successfully - (.+?) - (.+?) - Bill #(\d+) \((.+?)\)\.?$/i;
 const WORK_COMPLETED_PIPE_REGEX =
@@ -20,6 +20,8 @@ const QICHIKAR_READY_PIPE_REGEX =
   /^Qichikar Name:\s*(.+?)\s*\|\s*Bill Number:\s*(\d+)\s*\|\s*Order Type:\s*(.+?)\s*\|\s*Customer Name:\s*(.+?)\s*\|\s*Cutting completed successfully and ready for Dokht\.?$/i;
 const ORDER_COMPLETED_BY_REGEX =
   /^Order completed - (.+?) - Bill #(\d+) \((.+?)\) by (.+?)\.?$/i;
+const WORK_RECEIVED_PIPE_REGEX =
+  /^(Worker|Qichikar|Dokht) Name:\s*(.+?)\s*\|\s*Bill Number:\s*(\d+)\s*\|\s*Order Type:\s*(.+?)\s*\|\s*Customer Name:\s*(.+?)\s*\|\s*(?:accepted|received)(?: and self-assigned)? this order\.?$/i;
 const WORK_RECEIVED_REGEX =
   /^(.+?) (?:received|accepted)(?: and self-assigned)?(?: the)? order - (.+?) - Bill #(\d+) \((.+?)\)\.?$/i;
 const BOX_CAPACITY_FULL_REGEX =
@@ -60,6 +62,13 @@ const normalizeOrderTypeFromText = (typeText) => {
   return "";
 };
 
+const normalizeWorkerRoleFromText = (roleText) => {
+  const raw = String(roleText || "").toUpperCase().trim();
+  if (raw === "DOKHT") return "DOKHT";
+  if (raw === "QICHIKAR") return "QICHIKAR";
+  return "";
+};
+
 const isolateLtr = (value) => {
   const normalized = String(value ?? "").trim();
   if (!normalized) return "-";
@@ -74,6 +83,26 @@ const buildLine = (label, value) => {
   if (!normalized) return "";
   return `${label}: ${normalized}`;
 };
+
+const buildWorkerLine = (t, name, role) =>
+  buildLine(getWorkerRoleLabel(role, t), name);
+
+const buildCompactContext = (t, parts = {}) => {
+  const entries = [];
+  if (parts.billNumber) {
+    entries.push(
+      `${t("notificationMessages.billShortLabel", "Bill")} ${isolateLtr(
+        `#${parts.billNumber}`,
+      )}`,
+    );
+  }
+  if (parts.customerName) entries.push(parts.customerName);
+  if (parts.orderTypeLabel) entries.push(parts.orderTypeLabel);
+  return entries.filter(Boolean).join(" - ");
+};
+
+const buildCompactMessage = (title, ...lines) =>
+  buildNotificationBody(title, lines);
 
 const getLocalizedCurrencyUnit = (t) =>
   t("notificationMessages.currencyUnit", "AF");
@@ -196,10 +225,11 @@ const parseKnownUserNotification = (notification) => {
   if (matched) {
     return {
       kind: "WORK_STARTED",
-      actor: matched[1],
-      billNumber: matched[2],
-      orderType: normalizeOrderTypeFromText(matched[3]),
-      customerName: matched[4],
+      workerRole: normalizeWorkerRoleFromText(matched[1]),
+      actor: matched[2],
+      billNumber: matched[3],
+      orderType: normalizeOrderTypeFromText(matched[4]),
+      customerName: matched[5],
     };
   }
 
@@ -230,6 +260,7 @@ const parseKnownUserNotification = (notification) => {
     return {
       kind: "WORK_COMPLETED",
       actor: matched[1],
+      workerRole: "DOKHT",
       billNumber: matched[2],
       orderType: normalizeOrderTypeFromText(matched[3]),
       customerName: matched[4],
@@ -241,6 +272,7 @@ const parseKnownUserNotification = (notification) => {
     return {
       kind: "QICHIKAR_READY_FOR_DOKHT",
       actor: matched[1],
+      workerRole: "QICHIKAR",
       billNumber: matched[2],
       orderType: normalizeOrderTypeFromText(matched[3]),
       customerName: matched[4],
@@ -255,6 +287,18 @@ const parseKnownUserNotification = (notification) => {
       billNumber: matched[2],
       customerName: matched[3],
       actor: matched[4],
+    };
+  }
+
+  matched = msg.match(WORK_RECEIVED_PIPE_REGEX);
+  if (matched) {
+    return {
+      kind: "WORK_RECEIVED",
+      workerRole: normalizeWorkerRoleFromText(matched[1]),
+      actor: matched[2],
+      billNumber: matched[3],
+      orderType: normalizeOrderTypeFromText(matched[4]),
+      customerName: matched[5],
     };
   }
 
@@ -391,134 +435,76 @@ export function formatUserNotificationMessage(
   const orderTypeLabel = parsed.orderType
     ? getOrderTypeLabel(parsed.orderType, language)
     : parsed.orderType;
-  const labels = {
-    assignedBy: t("notificationMessages.assignedByLabel", "Assigned by"),
-    worker: t("notificationMessages.workerLabel", "Worker"),
-    customer: t("notificationMessages.customerLabel", "Customer"),
-    billNumber: t("notificationMessages.billNumberLabel", "Bill Number"),
-    orderType: t("notificationMessages.orderTypeLabel", "Order Type"),
-    price: t("notificationMessages.priceLabel", "Price"),
-    note: t("notificationMessages.noteLabel", "Note"),
-    box: t("notificationMessages.boxLabel", "Box"),
-    amount: t("notificationMessages.amountLabel", "Amount"),
-    date: t("notificationMessages.dateLabel", "Date"),
-    nextStep: t("notificationMessages.nextStepLabel", "Next step"),
-    role: t("notificationMessages.roleLabel", "Role"),
-  };
+  const context = buildCompactContext(t, {
+    billNumber: parsed.billNumber,
+    customerName: parsed.customerName,
+    orderTypeLabel,
+  });
+  const workerLine = buildWorkerLine(t, parsed.actor, parsed.workerRole);
 
   if (parsed.kind === "ASSIGNMENT") {
-    return buildNotificationBody(
+    return buildCompactMessage(
       t("notificationMessages.assignmentTitle", "New order assigned"),
-      [
-        buildLine(labels.assignedBy, parsed.actor || "-"),
-        buildLine(labels.customer, parsed.customerName || "-"),
-        buildLine(
-          labels.billNumber,
-          isolateLtr(`#${parsed.billNumber || "-"}`),
-        ),
-        buildLine(labels.orderType, orderTypeLabel || "-"),
-        buildLine(
-          labels.price,
-          formatAmount(parsed.price || "0", t, language),
-        ),
-        parsed.note ? buildLine(labels.note, parsed.note) : "",
-      ],
+      t("notificationMessages.assignmentShort", "Order assigned to a worker."),
+      context,
     );
   }
 
   if (parsed.kind === "WORK_STARTED") {
-    return buildNotificationBody(
+    return buildCompactMessage(
       t("notificationMessages.workStartedTitle", "Work started"),
-      [
-        buildLine(labels.worker, parsed.actor || "-"),
-        buildLine(labels.customer, parsed.customerName || "-"),
-        buildLine(
-          labels.billNumber,
-          isolateLtr(`#${parsed.billNumber || "-"}`),
-        ),
-        buildLine(labels.orderType, orderTypeLabel || "-"),
-      ],
+      t("notificationMessages.workStartedShort", "Worker started the order."),
+      workerLine,
+      context,
     );
   }
 
   if (parsed.kind === "WORK_COMPLETED") {
-    return buildNotificationBody(
+    return buildCompactMessage(
       t(
         "notificationMessages.workCompletedTitle",
         "Work completed successfully",
       ),
-      [
-        buildLine(labels.worker, parsed.actor || "-"),
-        buildLine(labels.customer, parsed.customerName || "-"),
-        buildLine(
-          labels.billNumber,
-          isolateLtr(`#${parsed.billNumber || "-"}`),
-        ),
-        buildLine(labels.orderType, orderTypeLabel || "-"),
-      ],
+      t("notificationMessages.workCompletedShort", "Order work is complete."),
+      workerLine,
+      context,
     );
   }
 
   if (parsed.kind === "QICHIKAR_READY_FOR_DOKHT") {
-    return buildNotificationBody(
+    return buildCompactMessage(
       t("notificationMessages.qichikarReadyForDokhtTitle", "Ready for Dokht"),
-      [
-        buildLine(labels.worker, parsed.actor || "-"),
-        buildLine(labels.customer, parsed.customerName || "-"),
-        buildLine(
-          labels.billNumber,
-          isolateLtr(`#${parsed.billNumber || "-"}`),
-        ),
-        buildLine(labels.orderType, orderTypeLabel || "-"),
-        buildLine(
-          labels.nextStep,
-          t("notificationMessages.readyForDokhtValue", "Hand over to Dokht"),
-        ),
-      ],
+      t(
+        "notificationMessages.qichikarReadyForDokhtShort",
+        "Cutting is complete. Send it to Dokht.",
+      ),
+      workerLine,
+      context,
     );
   }
 
   if (parsed.kind === "WORK_RECEIVED") {
-    return buildNotificationBody(
+    return buildCompactMessage(
       t("notificationMessages.workReceivedTitle", "Order received"),
-      [
-        buildLine(labels.worker, parsed.actor || "-"),
-        buildLine(labels.customer, parsed.customerName || "-"),
-        buildLine(
-          labels.billNumber,
-          isolateLtr(`#${parsed.billNumber || "-"}`),
-        ),
-        buildLine(labels.orderType, orderTypeLabel || "-"),
-      ],
+      t("notificationMessages.workReceivedShort", "Worker received the order."),
+      workerLine,
+      context,
     );
   }
 
   if (parsed.kind === "BOX_CAPACITY_FULL") {
-    return buildNotificationBody(
+    return buildCompactMessage(
       t("notificationMessages.boxCapacityFullTitle", "Box capacity full"),
-      [
-        parsed.boxName ? buildLine(labels.box, parsed.boxName) : "",
-        buildLine(labels.customer, parsed.customerName || "-"),
-        buildLine(
-          labels.billNumber,
-          isolateLtr(`#${parsed.billNumber || "-"}`),
-        ),
-        buildLine(labels.orderType, orderTypeLabel || "-"),
-      ],
+      t("notificationMessages.boxCapacityFullShort", "This box has no free space."),
+      context,
     );
   }
 
   if (parsed.kind === "BOX_NOT_FOUND") {
-    return buildNotificationBody(
+    return buildCompactMessage(
       t("notificationMessages.boxNotFoundTitle", "Box not found"),
-      [
-        buildLine(labels.customer, parsed.customerName || "-"),
-        buildLine(
-          labels.billNumber,
-          isolateLtr(`#${parsed.billNumber || "-"}`),
-        ),
-        buildLine(labels.orderType, orderTypeLabel || "-"),
-      ],
+      t("notificationMessages.boxNotFoundShort", "Create a box for this order type."),
+      context,
     );
   }
 
@@ -526,12 +512,13 @@ export function formatUserNotificationMessage(
     const formattedDate = parsed.date
       ? formatSystemDate(parsed.date, language)
       : parsed.date;
-    return buildNotificationBody(
+    return buildCompactMessage(
       t("notificationMessages.adminPaymentTitle", "Payment received"),
+      t("notificationMessages.adminPaymentShort", "A payment was recorded for you."),
       [
-        buildLine(labels.amount, formatAmount(parsed.amount, t, language)),
-        buildLine(labels.date, formattedDate || "-"),
-      ],
+        formatAmount(parsed.amount, t, language),
+        formattedDate,
+      ].filter(Boolean).join(" - "),
     );
   }
 
@@ -544,73 +531,56 @@ export function formatUserNotificationMessage(
       parsed.paymentAction === "updated"
         ? "Worker payment updated"
         : "Worker payment paid";
-    return buildNotificationBody(t(titleKey, fallbackTitle), [
-      buildLine(labels.role, getWorkerRoleLabel(parsed.workerRole, t)),
-      buildLine(labels.customer, parsed.customerName || "-"),
-      buildLine(labels.billNumber, isolateLtr(`#${parsed.billNumber || "-"}`)),
-      buildLine(labels.amount, formatAmount(parsed.amount, t, language)),
-    ]);
+    return buildCompactMessage(
+      t(titleKey, fallbackTitle),
+      t("notificationMessages.workerPaymentShort", "Worker payment was saved."),
+      [
+        context,
+        formatAmount(parsed.amount, t, language),
+      ].filter(Boolean).join(" - "),
+    );
   }
 
   if (parsed.kind === "WORKER_PAYMENT_RECEIPT") {
-    return buildNotificationBody(
+    return buildCompactMessage(
       t(
         "notificationMessages.workerPaymentReceiptTitle",
         "Payment receipt confirmed",
       ),
+      t("notificationMessages.workerPaymentReceiptShort", "Payment receipt was confirmed."),
       [
-        buildLine(labels.role, getWorkerRoleLabel(parsed.workerRole, t)),
-        buildLine(labels.customer, parsed.customerName || "-"),
-        buildLine(
-          labels.billNumber,
-          isolateLtr(`#${parsed.billNumber || "-"}`),
-        ),
-        buildLine(labels.amount, formatAmount(parsed.amount, t, language)),
-      ],
+        context,
+        formatAmount(parsed.amount, t, language),
+      ].filter(Boolean).join(" - "),
     );
   }
 
   if (parsed.kind === "BOX_CREATE_NEEDED") {
-    return buildNotificationBody(
+    return buildCompactMessage(
       t("notificationMessages.boxCreateNeededTitle", "Box action needed"),
-      [
-        parsed.boxName ? buildLine(labels.box, parsed.boxName) : "",
-        buildLine(labels.customer, parsed.customerName || "-"),
-        buildLine(
-          labels.billNumber,
-          isolateLtr(`#${parsed.billNumber || "-"}`),
-        ),
-        buildLine(labels.orderType, orderTypeLabel || "-"),
-        buildLine(
-          labels.nextStep,
-          t("notificationMessages.createBoxValue", "Create another box"),
-        ),
-      ],
+      t("notificationMessages.boxCreateNeededShort", "Create another box to continue."),
+      context,
     );
   }
 
   if (parsed.kind === "BOX_AVAILABLE") {
-    return buildNotificationBody(
+    return buildCompactMessage(
       t("notificationMessages.boxCapacityAvailableTitle", "Box has capacity"),
-      [
-        buildLine(labels.box, parsed.boxName || "-"),
-        buildLine(labels.orderType, orderTypeLabel || "-"),
-      ],
+      t("notificationMessages.boxCapacityAvailableShort", "You can add more orders to this box."),
+      [parsed.boxName, orderTypeLabel].filter(Boolean).join(" - "),
     );
   }
 
   if (parsed.kind === "DAMAGED_CLOTHES_ASSIGNED") {
-    return buildNotificationBody(
+    return buildCompactMessage(
       t("notificationMessages.damagedClothesAssignedTitle", "Damaged clothes assigned"),
+      t("notificationMessages.damagedClothesAssignedShort", "A damaged-clothes task was assigned."),
       [
-        buildLine(
-          labels.billNumber,
-          isolateLtr(`#${parsed.billNumber || "-"}`),
-        ),
-        buildLine(labels.role, getWorkerRoleLabel(parsed.workerRole, t)),
-        buildLine(labels.date, formatSystemDate(parsed.date, language) || "-"),
-        buildLine(labels.note, parsed.note || "-"),
-      ],
+        `${t("notificationMessages.billShortLabel", "Bill")} ${isolateLtr(
+          `#${parsed.billNumber || "-"}`,
+        )}`,
+        getWorkerRoleLabel(parsed.workerRole, t),
+      ].join(" - "),
     );
   }
 
@@ -629,18 +599,15 @@ export function formatSystemNotificationMessage(
   return buildNotificationBody(
     t("notificationMessages.emergencyOrderTitle", "Emergency order alert"),
     [
-      buildLine(
-        t("notificationMessages.customerLabel", "Customer"),
-        order.customer.firstName,
+      t(
+        "notificationMessages.emergencyOrderShort",
+        "This order needs priority attention.",
       ),
-      buildLine(
-        t("notificationMessages.billNumberLabel", "Bill Number"),
-        isolateLtr(`#${order.customer.billNumber ?? "-"}`),
-      ),
-      buildLine(
-        t("notificationMessages.orderTypeLabel", "Order Type"),
-        getOrderTypeLabel(order.type, language),
-      ),
+      buildCompactContext(t, {
+        billNumber: order.customer.billNumber,
+        customerName: order.customer.firstName,
+        orderTypeLabel: getOrderTypeLabel(order.type, language),
+      }),
     ],
   );
 }

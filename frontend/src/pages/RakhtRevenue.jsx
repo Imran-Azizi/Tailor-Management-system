@@ -16,6 +16,7 @@ import {
 } from "../components/ui/index.jsx";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
+import MobileFilterPanel from "../components/ui/MobileFilterPanel.jsx";
 
 const DEFAULT_FILTERS = {
   search: "",
@@ -84,6 +85,13 @@ export default function RakhtRevenue() {
     pagination: { page: 1, totalPages: 1, total: 0, limit: 25 },
     filters: { companies: [], brands: [], tons: [], orderTypes: [] },
   };
+  const activeFilterCount = [
+    Boolean(filters.search.trim()),
+    Boolean(filters.companyName),
+    Boolean(filters.brandName),
+    Boolean(filters.tonName),
+    Boolean(filters.orderType),
+  ].filter(Boolean).length;
 
   return (
     <div className="page">
@@ -135,112 +143,120 @@ export default function RakhtRevenue() {
         />
       </div>
 
-      <Card
-        title={t("rakht.advancedFilters", {
-          defaultValue: "Advanced Filters",
-        })}
-        style={{ marginBottom: 18 }}
+      <MobileFilterPanel
+        activeCount={activeFilterCount}
+        clearDisabled={activeFilterCount === 0}
+        isApplying={isFetching}
+        onClear={() => setFilters(DEFAULT_FILTERS)}
+        title={t("common.filters", "Filters")}
       >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-            gap: 12,
-            marginBottom: 12,
-          }}
+        <Card
+          title={t("rakht.advancedFilters", {
+            defaultValue: "Advanced Filters",
+          })}
+          style={{ marginBottom: 18 }}
         >
-          <div>
-            <label className="lbl">{t("common.search", "Search")}</label>
-            <input
-              className="inp"
-              value={filters.search}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  search: event.target.value,
-                  page: 1,
-                }))
-              }
-              placeholder={t("rakht.searchPlaceholder", {
-                defaultValue: "Order ID, customer, company, ton...",
-              })}
-            />
-          </div>
-
-          <div>
-            <label className="lbl" htmlFor="companyName-select">
-              {t("rakht.companyName", "Company")}
-            </label>
-            <select
-              id="companyName-select"
-              className="inp"
-              value={filters.companyName}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  companyName: event.target.value,
-                  page: 1,
-                }))
-              }
-            >
-              <option value="">{t("common.all", "All")}</option>
-              {summary.filters.companies.map((company) => (
-                <option key={company} value={company}>
-                  {company}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="lbl" htmlFor="orderType-select">
-              {t("createOrder.orderTypes", "Order Type")}
-            </label>
-            <select
-              id="orderType-select"
-              className="inp"
-              value={filters.orderType}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  orderType: event.target.value,
-                  page: 1,
-                }))
-              }
-            >
-              <option value="">{t("common.all", "All")}</option>
-              {summary.filters.orderTypes.map((type) => (
-                <option key={type} value={type}>
-                  {getOrderTypeLabel(type, language)}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            gap: 10,
-            alignItems: "center",
-            flexWrap: "wrap",
-          }}
-        >
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={() => setFilters(DEFAULT_FILTERS)}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              gap: 12,
+              marginBottom: 12,
+            }}
           >
-            <LuFilter size={14} style={{ marginInlineEnd: 6 }} />
-            {t("common.reset", "Reset")}
-          </button>
-          {isFetching && (
-            <span style={{ fontSize: 12, color: "var(--text3)" }}>
-              {t("common.loading", "Loading...")}
-            </span>
-          )}
-        </div>
-      </Card>
+            <div>
+              <label className="lbl">{t("common.search", "Search")}</label>
+              <input
+                className="inp"
+                value={filters.search}
+                onChange={(event) =>
+                  setFilters((current) => ({
+                    ...current,
+                    search: event.target.value,
+                    page: 1,
+                  }))
+                }
+                placeholder={t("rakht.searchPlaceholder", {
+                  defaultValue: "Order ID, customer, company, ton...",
+                })}
+              />
+            </div>
+
+            <div>
+              <label className="lbl" htmlFor="companyName-select">
+                {t("rakht.companyName", "Company")}
+              </label>
+              <select
+                id="companyName-select"
+                className="inp"
+                value={filters.companyName}
+                onChange={(event) =>
+                  setFilters((current) => ({
+                    ...current,
+                    companyName: event.target.value,
+                    page: 1,
+                  }))
+                }
+              >
+                <option value="">{t("common.all", "All")}</option>
+                {summary.filters.companies.map((company) => (
+                  <option key={company} value={company}>
+                    {company}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="lbl" htmlFor="orderType-select">
+                {t("createOrder.orderTypes", "Order Type")}
+              </label>
+              <select
+                id="orderType-select"
+                className="inp"
+                value={filters.orderType}
+                onChange={(event) =>
+                  setFilters((current) => ({
+                    ...current,
+                    orderType: event.target.value,
+                    page: 1,
+                  }))
+                }
+              >
+                <option value="">{t("common.all", "All")}</option>
+                {summary.filters.orderTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {getOrderTypeLabel(type, language)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => setFilters(DEFAULT_FILTERS)}
+            >
+              <LuFilter size={14} style={{ marginInlineEnd: 6 }} />
+              {t("common.reset", "Reset")}
+            </button>
+            {isFetching && (
+              <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                {t("common.loading", "Loading...")}
+              </span>
+            )}
+          </div>
+        </Card>
+      </MobileFilterPanel>
 
       <div className="rakht-revenue-details-section" dir={isRtl ? "rtl" : "ltr"}>
         <Card

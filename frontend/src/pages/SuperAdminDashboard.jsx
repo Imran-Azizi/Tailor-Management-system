@@ -59,6 +59,17 @@ function cn(...classes) {
   return classes.filter(Boolean).join(" ");
 }
 
+function resolveIsRtl(i18n, language) {
+  const normalized = String(language || "").toLowerCase();
+  return (
+    (i18n.dir?.(language) || i18n.dir?.() || "ltr") === "rtl" ||
+    normalized.startsWith("fa") ||
+    normalized.startsWith("ps") ||
+    normalized.includes("dari") ||
+    normalized.includes("pashto")
+  );
+}
+
 function statusTone(status, isActive = true) {
   if (!isActive || status === "SUSPENDED") {
     return "border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200";
@@ -213,7 +224,8 @@ function TenantModal({
 }) {
   const { t, i18n } = useTranslation();
   const firstInputRef = useRef(null);
-  const isRtl = (i18n.dir?.() || "ltr") === "rtl";
+  const language = i18n.resolvedLanguage || i18n.language || "en";
+  const isRtl = resolveIsRtl(i18n, language);
   const [logoPreview, setLogoPreview] = useState("");
 
   useEffect(() => {
@@ -276,6 +288,7 @@ function TenantModal({
       maxW={860}
       boxClassName="!rounded-lg"
       bodyClassName="!p-0"
+      dir={isRtl ? "rtl" : "ltr"}
     >
       <form onSubmit={onSubmit} className="flex flex-col">
         <div className="border-b border-[var(--border)] bg-[var(--surface2)] px-5 py-4 sm:px-6">
@@ -487,11 +500,13 @@ function TenantModal({
 
 export default function SuperAdminDashboard() {
   const { t, i18n } = useTranslation();
-  const isRtl = (i18n.dir?.() || "ltr") === "rtl";
+  const language = i18n.resolvedLanguage || i18n.language || "en";
+  const isRtl = resolveIsRtl(i18n, language);
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [modalMode, setModalMode] = useState(null);
   const [editingTenant, setEditingTenant] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
 
@@ -560,6 +575,7 @@ export default function SuperAdminDashboard() {
     mutationFn: (id) => api.delete(`/tenants/${id}`),
     onSuccess: () => {
       toast.success(t("superAdmin.toast.deleted"));
+      setDeleteTarget(null);
       qc.invalidateQueries({ queryKey: ["saas-tenants"] });
     },
     onError: (error) => toast.error(getApiErrorMessage(error, t("superAdmin.toast.deleteFailed"))),
@@ -595,7 +611,13 @@ export default function SuperAdminDashboard() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-var(--nav-h,0px))] bg-[var(--bg)] px-4 py-5 sm:px-6 lg:px-8">
+    <div
+      className={cn(
+        "superadmin-page superadmin-dashboard-page min-h-[calc(100vh-var(--nav-h,0px))] bg-[var(--bg)] px-4 py-5 sm:px-6 lg:px-8",
+        isRtl ? "text-right" : "text-left",
+      )}
+      dir={isRtl ? "rtl" : "ltr"}
+    >
       <div className="mx-auto flex max-w-7xl flex-col gap-5">
         <section className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_18px_45px_-34px_rgba(15,23,42,.65)] sm:p-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
@@ -754,7 +776,7 @@ export default function SuperAdminDashboard() {
                         />
                       </td>
                       <td className="px-5 py-4 text-[var(--text2)]">
-                        {formatDateLocale(tenant.expiryDate, i18n.resolvedLanguage || i18n.language)}
+                        {formatDateLocale(tenant.expiryDate, language)}
                       </td>
                       <td className="px-5 py-4 font-semibold text-[var(--text1)]">{tenant._count?.users || 0}</td>
                       <td className="px-5 py-4 font-semibold text-[var(--text1)]">{tenant._count?.customers || 0}</td>
@@ -789,7 +811,7 @@ export default function SuperAdminDashboard() {
                             className="btn btn-outline btn-sm"
                             disabled={deleteMut.isPending}
                             style={{ color: "var(--danger)" }}
-                            onClick={() => deleteMut.mutate(tenant.id)}
+                            onClick={() => setDeleteTarget(tenant)}
                           >
                             <LuTrash2 size={13} />
                             {t("common.delete")}
@@ -822,6 +844,58 @@ export default function SuperAdminDashboard() {
           }}
           onSubmit={submit}
         />
+
+        <Modal
+          open={Boolean(deleteTarget)}
+          onClose={() => (deleteMut.isPending ? null : setDeleteTarget(null))}
+          title={t("superAdmin.deleteConfirmTitle")}
+          maxW={480}
+          boxClassName="!rounded-lg"
+          dir={isRtl ? "rtl" : "ltr"}
+        >
+          <div className="space-y-4">
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100">
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/70 text-red-600 ring-1 ring-red-200 dark:bg-white/10 dark:text-red-200 dark:ring-red-500/30">
+                  <LuTrash2 size={19} />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold">
+                    {t("superAdmin.deleteConfirmHeading", {
+                      name: deleteTarget?.businessName || "-",
+                    })}
+                  </p>
+                  <p className="mt-1 text-sm leading-6">
+                    {t("superAdmin.deleteConfirmBody")}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                className="btn btn-outline"
+                disabled={deleteMut.isPending}
+                onClick={() => setDeleteTarget(null)}
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                disabled={deleteMut.isPending || !deleteTarget?.id}
+                onClick={() => deleteMut.mutate(deleteTarget.id)}
+              >
+                {deleteMut.isPending ? (
+                  <LuRefreshCw size={15} className="animate-spin" />
+                ) : (
+                  <LuTrash2 size={15} />
+                )}
+                {t("common.delete")}
+              </button>
+            </div>
+          </div>
+        </Modal>
       </div>
     </div>
   );

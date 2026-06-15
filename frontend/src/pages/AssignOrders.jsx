@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
-import { LuSearch, LuUserCheck } from "react-icons/lu";
+import { LuSearch, LuSend } from "react-icons/lu";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
@@ -96,6 +96,31 @@ export default function AssignOrders() {
   const selectedOrder = useMemo(
     () => matchedOrders.find((order) => order.id === selectedOrderId) || null,
     [matchedOrders, selectedOrderId],
+  );
+
+  const selectedWorker = useMemo(
+    () => workersForType.find((worker) => worker.id === workerId) || null,
+    [workersForType, workerId],
+  );
+
+  const selectedWorkerType = WORKER_TYPES.find(
+    (type) => type.value === workerType,
+  );
+
+  const selectedWorkerTypeLabel = workerType
+    ? t(
+        selectedWorkerType?.labelKey || "assignment.selectUserType",
+        selectedWorkerType?.fallback || "Worker",
+      )
+    : t("assignment.selectUserType", "Select user type");
+
+  const selectedClothesTypeLabel = clothesType
+    ? getOrderTypeLabel(clothesType, language)
+    : t("assignment.clothesType", "Clothes type");
+
+  const selectedOrderLabel = useMemo(
+    () => (selectedOrder ? getOrderLabelParts(selectedOrder, language) : null),
+    [selectedOrder, language],
   );
 
   useEffect(() => {
@@ -274,8 +299,8 @@ export default function AssignOrders() {
 
   return (
     <div
-      className={`page assign-orders-page mx-auto max-w-[1240px] px-4 pb-14 pt-5 ${
-        isRtl ? "assign-orders-page--rtl" : ""
+      className={`page assign-orders-page ${
+        isRtl ? "assign-orders-page--rtl" : "assign-orders-page--ltr"
       }`}
       dir={isRtl ? "rtl" : "ltr"}
     >
@@ -287,22 +312,10 @@ export default function AssignOrders() {
         )}
       />
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <Card noPad>
-          <div className="border-b border-slate-200 bg-gradient-to-br from-sky-50 via-cyan-50 to-white px-5 py-4 dark:border-slate-700 dark:from-slate-800 dark:via-slate-800 dark:to-slate-900">
-            <h3 className="m-0 text-base font-extrabold text-slate-900 dark:text-slate-100">
-              {t("assignment.assignmentSetup", "Assignment Setup")}
-            </h3>
-            <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
-              {t(
-                "assignment.setupHint",
-                "Pick clothes type, account type, user account, then search by bill number.",
-              )}
-            </p>
-          </div>
-
-          <div className="p-4 sm:p-5">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="assign-orders-stack">
+        <Card title={t("assignment.assignmentSetup", "Assignment Setup")}>
+          <div className="assign-orders-setup">
+            <div className="assign-orders-form-grid">
               <Field
                 label={t("assignment.clothesType", "Clothes type")}
                 required
@@ -370,7 +383,7 @@ export default function AssignOrders() {
               </Field>
 
               <Field label={t("orders.billNumber", "Bill Number")} required>
-                <div className="flex gap-2">
+                <div className="assign-orders-search-control">
                   <input
                     className="inp"
                     value={billNumber}
@@ -389,24 +402,26 @@ export default function AssignOrders() {
                     className="btn btn-outline"
                     onClick={searchByBill}
                     disabled={loadingResult || assignMutation.isPending}
-                    style={{ whiteSpace: "nowrap" }}
                   >
                     <LuSearch size={14} />
-                    {t("common.search", "Search")}
+                    <span>{t("common.search", "Search")}</span>
                   </button>
                 </div>
               </Field>
             </div>
           </div>
         </Card>
-      </div>
 
-      <div style={{ marginTop: 16 }}>
         {loadingResult ? (
-          <Spinner />
+          <Card title={t("assignment.searchResult", "Search Result")}>
+            <div className="assign-orders-loading">
+              <Spinner />
+              <p>{t("common.loading", "Loading...")}</p>
+            </div>
+          </Card>
         ) : !lookupResult ? (
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-            <Card title={t("assignment.searchResult", "Search Result")} noPad>
+          <Card title={t("assignment.searchResult", "Search Result")} noPad>
+            <div className="assign-orders-empty">
               <EmptyState
                 message={t(
                   "assignment.searchResultHint",
@@ -414,97 +429,172 @@ export default function AssignOrders() {
                 )}
                 Icon={AfCurrencyIcon}
               />
-            </Card>
-          </div>
+            </div>
+          </Card>
         ) : (
-          <div style={{ display: "grid", gap: 16 }}>
+          <>
             <Card
               title={t("assignment.customerInfo", "Customer & Order Selection")}
             >
-              <div className="mb-3.5 grid grid-cols-1 gap-2.5 md:grid-cols-2">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/70">
-                  <p className="mb-0.5 text-xs text-slate-500 dark:text-slate-400">
-                    {t("common.customer", "Customer")}
-                  </p>
-                  <p className="font-extrabold text-slate-900 dark:text-slate-100">
-                    {lookupResult.customer?.firstName || "-"}
-                  </p>
+              <div className="assign-orders-results">
+                <div className="assign-orders-customer-strip">
+                  <div className="assign-orders-info-tile">
+                    <span>{t("common.customer", "Customer")}</span>
+                    <strong>{lookupResult.customer?.firstName || "-"}</strong>
+                  </div>
+                  <div className="assign-orders-info-tile">
+                    <span>{t("orders.billNumber", "Bill Number")}</span>
+                    <strong>#{lookupResult.customer?.billNumber || "-"}</strong>
+                  </div>
+                  <div className="assign-orders-info-tile">
+                    <span>{t("assignment.clothesType", "Clothes type")}</span>
+                    <strong>{selectedClothesTypeLabel}</strong>
+                  </div>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/70">
-                  <p className="mb-0.5 text-xs text-slate-500 dark:text-slate-400">
-                    {t("orders.billNumber", "Bill Number")}
-                  </p>
-                  <p className="font-extrabold text-slate-900 dark:text-slate-100">
-                    #{lookupResult.customer?.billNumber || "-"}
-                  </p>
-                </div>
+                {!matchedOrders.length ? (
+                  <div className="assign-orders-empty">
+                    <EmptyState
+                      message={t(
+                        "assignment.noMatchingPendingOrders",
+                        "No pending orders found for the selected clothes type.",
+                      )}
+                    />
+                  </div>
+                ) : (
+                  <div className="assign-orders-records">
+                    <div className="assign-orders-records-table-wrap">
+                      <table className="assign-orders-records-table">
+                        <thead>
+                          <tr>
+                            <th>{t("common.type", "Type")}</th>
+                            <th>{t("common.customer", "Customer")}</th>
+                            <th>{t("assignment.quantity", "Quantity")}</th>
+                            <th>{t("common.total", "Total")}</th>
+                            <th>{t("common.action", "Action")}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {matchedOrders.map((order, idx) => {
+                            const orderLabel = getOrderLabelParts(
+                              order,
+                              language,
+                            );
+                            const active = selectedOrderId === order.id;
+                            const orderName =
+                              orderLabel.customName ||
+                              order.customer?.firstName ||
+                              t("assignment.noOrderName", "No custom name");
+
+                            return (
+                              <tr
+                                key={order.id}
+                                className={
+                                  active
+                                    ? "assign-orders-record-row--active"
+                                    : ""
+                                }
+                              >
+                                <td>
+                                  <strong>
+                                    {t(
+                                      "assignment.orderLabelWithNumber",
+                                      "Order #{{number}}",
+                                      { number: idx + 1 },
+                                    )}
+                                  </strong>
+                                  <span>{orderLabel.typeWithSequenceLabel}</span>
+                                </td>
+                                <td>{orderName}</td>
+                                <td>{order.quantity || 1}</td>
+                                <td>
+                                  <span className="assign-orders-money">
+                                    <AfCurrencyIcon size={13} />
+                                    {formatMoney(order.totalPrice, language)}
+                                  </span>
+                                </td>
+                                <td>
+                                  <button
+                                    type="button"
+                                    className={
+                                      active
+                                        ? "btn btn-gold btn-sm"
+                                        : "btn btn-outline btn-sm"
+                                    }
+                                    onClick={() => setSelectedOrderId(order.id)}
+                                  >
+                                    <span>
+                                      {active
+                                        ? t("assignment.selected", "Selected")
+                                        : t("common.select", "Select")}
+                                    </span>
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="assign-orders-record-cards">
+                      {matchedOrders.map((order, idx) => {
+                        const orderLabel = getOrderLabelParts(order, language);
+                        const active = selectedOrderId === order.id;
+                        const orderName =
+                          orderLabel.customName ||
+                          order.customer?.firstName ||
+                          t("assignment.noOrderName", "No custom name");
+
+                        return (
+                          <button
+                            key={order.id}
+                            type="button"
+                            className={`assign-orders-record-card ${
+                              active ? "assign-orders-record-card--active" : ""
+                            }`}
+                            onClick={() => setSelectedOrderId(order.id)}
+                          >
+                            <div className="assign-orders-record-card__head">
+                              <div>
+                                <span className="assign-orders-record-kicker">
+                                  {t(
+                                    "assignment.orderLabelWithNumber",
+                                    "Order #{{number}}",
+                                    { number: idx + 1 },
+                                  )}
+                                </span>
+                                <strong>
+                                  {orderLabel.typeWithSequenceLabel}
+                                </strong>
+                                <p>{orderName}</p>
+                              </div>
+                              {active ? (
+                                <span className="assign-orders-selected-label">
+                                  {t("assignment.selected", "Selected")}
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="assign-orders-record-card__meta">
+                              <span>
+                                {t("assignment.quantity", "Quantity")}
+                                <strong>{order.quantity || 1}</strong>
+                              </span>
+                              <span>
+                                {t("common.total", "Total")}
+                                <strong className="assign-orders-money">
+                                  <AfCurrencyIcon size={13} />
+                                  {formatMoney(order.totalPrice, language)}
+                                </strong>
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
-
-              {!matchedOrders.length ? (
-                <EmptyState
-                  message={t(
-                    "assignment.noMatchingPendingOrders",
-                    "No pending orders found for the selected clothes type.",
-                  )}
-                />
-              ) : (
-                <div className="grid gap-2.5">
-                  {matchedOrders.map((order, idx) => {
-                    const orderLabel = getOrderLabelParts(order, language);
-                    const active = selectedOrderId === order.id;
-                    return (
-                      <button
-                        key={order.id}
-                        type="button"
-                        onClick={() => setSelectedOrderId(order.id)}
-                        className={`w-full cursor-pointer rounded-xl border px-3.5 py-3 text-left transition ${
-                          active
-                            ? "border-sky-500 bg-gradient-to-br from-sky-50 to-cyan-50 shadow-sm dark:border-sky-400 dark:from-slate-800 dark:to-slate-800"
-                            : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600"
-                        }`}
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div>
-                            <p className="text-[13px] font-bold text-slate-900 dark:text-slate-100">
-                              {t(
-                                "assignment.orderLabelWithNumber",
-                                "Order #{{number}}",
-                                {
-                                  number: idx + 1,
-                                },
-                              )}{" "}
-                              - {orderLabel.typeWithSequenceLabel}
-                            </p>
-                            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                              {/* Show only custom name if provided, else real customer name */}
-                              {orderLabel.customName
-                                ? orderLabel.customName
-                                : order.customer?.firstName ||
-                                  t("assignment.noOrderName", "No custom name")}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                              {t("assignment.quantity", "Quantity")}
-                            </p>
-                            <p className="mt-0.5 text-[13px] font-bold text-slate-700 dark:text-slate-200">
-                              {order.quantity || 1}
-                            </p>
-                            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                              {t("common.total", "Total")}
-                            </p>
-                            <p className="mt-0.5 inline-flex items-center gap-1 text-sm font-extrabold text-slate-900 dark:text-slate-100">
-                              <AfCurrencyIcon size={13} />
-                              {formatMoney(order.totalPrice, language)}
-                            </p>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
             </Card>
 
             {selectedOrder && (
@@ -514,33 +604,54 @@ export default function AssignOrders() {
                   "Selected Order Summary",
                 )}
               >
-                <div className="grid grid-cols-1 gap-4">
-                  <Field
-                    label={t("assignment.priceForWorker", "Price for worker")}
-                    required
-                    hint={t(
-                      "assignment.priceForWorkerHint",
-                      "Enter the sewing or cutting price before sending this order.",
-                    )}
-                  >
-                    <div className="relative">
-                      <span className="pointer-events-none absolute inset-y-0 left-3 inline-flex items-center text-slate-500 dark:text-slate-300">
-                        <AfCurrencyIcon size={13} />
-                      </span>
-                      <input
-                        className="inp pl-9"
-                        value={assignmentPrice}
-                        onChange={(e) => setAssignmentPrice(e.target.value)}
-                        placeholder={t(
-                          "assignment.pricePlaceholder",
-                          "Enter assignment price",
-                        )}
-                        inputMode="decimal"
-                      />
+                <div className="assign-orders-assignment-panel">
+                  <div className="assign-orders-assignment-grid">
+                    <div className="assign-orders-worker-card">
+                      <span>{selectedWorkerTypeLabel}</span>
+                      <strong>
+                        {selectedWorker?.name ||
+                          t("assignment.chooseAccount", "Choose account")}
+                      </strong>
+                      {selectedWorker?.phoneNumber ? (
+                        <p>{selectedWorker.phoneNumber}</p>
+                      ) : null}
                     </div>
-                  </Field>
 
-                  <div className="mt-3">
+                    <div className="assign-orders-selected-card">
+                      <span>{t("common.type", "Type")}</span>
+                      <strong>
+                        {selectedOrderLabel?.typeWithSequenceLabel}
+                      </strong>
+                      <p>
+                        {selectedOrderLabel?.customName ||
+                          selectedOrder.customer?.firstName ||
+                          t("assignment.noOrderName", "No custom name")}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="assign-orders-assignment-form">
+                    <Field
+                      label={t("assignment.priceForWorker", "Price for worker")}
+                      required
+                    >
+                      <div className="assign-orders-money-field">
+                        <span className="assign-orders-money-field__icon">
+                          <AfCurrencyIcon size={13} />
+                        </span>
+                        <input
+                          className="inp"
+                          value={assignmentPrice}
+                          onChange={(e) => setAssignmentPrice(e.target.value)}
+                          placeholder={t(
+                            "assignment.pricePlaceholder",
+                            "Enter assignment price",
+                          )}
+                          inputMode="decimal"
+                        />
+                      </div>
+                    </Field>
+
                     <Field label={t("assignment.note", "Note")}>
                       <textarea
                         className="inp"
@@ -554,32 +665,31 @@ export default function AssignOrders() {
                         style={{ resize: "vertical" }}
                       />
                     </Field>
-                  </div>
 
-                  <div className="mt-1">
-                    <button
-                      type="button"
-                      className="btn btn-gold"
-                      onClick={() => assignMutation.mutate()}
-                      disabled={
-                        assignMutation.isPending || !workerType || !workerId
-                      }
-                      style={{ minWidth: 170, justifyContent: "center" }}
-                    >
-                      {assignMutation.isPending ? (
-                        t("common.loading", "Loading...")
-                      ) : (
-                        <>
-                          <LuUserCheck size={14} />
-                          <span>{t("assignment.send", "Send")}</span>
-                        </>
-                      )}
-                    </button>
+                    <div className="assign-orders-submit-wrap">
+                      <button
+                        type="button"
+                        className="btn btn-gold"
+                        onClick={() => assignMutation.mutate()}
+                        disabled={
+                          assignMutation.isPending || !workerType || !workerId
+                        }
+                      >
+                        {assignMutation.isPending ? (
+                          t("common.loading", "Loading...")
+                        ) : (
+                          <>
+                            <LuSend size={14} />
+                            <span>{t("assignment.send", "Send")}</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </Card>
             )}
-          </div>
+          </>
         )}
       </div>
     </div>

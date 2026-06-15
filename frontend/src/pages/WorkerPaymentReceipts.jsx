@@ -17,6 +17,7 @@ import {
   StatCard,
 } from "../components/ui/index.jsx";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
+import MobileFilterPanel from "../components/ui/MobileFilterPanel.jsx";
 
 const LIMIT = 15;
 
@@ -81,9 +82,15 @@ export default function WorkerPaymentReceipts() {
     totalReceipts: 0,
     totalPaidAmount: 0,
   };
+  const activeFilterCount = [
+    Boolean(search.trim()),
+    Boolean(workerId),
+    Boolean(workerRole),
+    status !== "RECEIVED",
+  ].filter(Boolean).length;
 
   const onSearch = (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
     setPage(1);
     setSearch(searchInput);
   };
@@ -125,16 +132,24 @@ export default function WorkerPaymentReceipts() {
         />
       </section>
 
-      <Card>
-        <form
-          onSubmit={onSearch}
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-            gap: 12,
-            alignItems: "end",
-          }}
-        >
+      <MobileFilterPanel
+        activeCount={activeFilterCount}
+        clearDisabled={activeFilterCount === 0}
+        isApplying={isFetching}
+        onApply={onSearch}
+        onClear={resetFilters}
+        title={t("common.filters", "Filters")}
+      >
+        <Card>
+          <form
+            onSubmit={onSearch}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+              gap: 12,
+              alignItems: "end",
+            }}
+          >
           <div>
             <label className="lbl">{t("common.search", "Search")}</label>
             <div style={{ position: "relative" }}>
@@ -247,25 +262,26 @@ export default function WorkerPaymentReceipts() {
             <LuRefreshCcw size={14} />
             {t("completedWorkerOrders.clearFilters", "Clear Filters")}
           </button>
-        </form>
+          </form>
 
-        <div
-          style={{
-            marginTop: 12,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            flexWrap: "wrap",
-            color: "var(--text3)",
-            fontSize: 12,
-          }}
-        >
-          <span>
-            {t("common.viewingMonth", "Viewing data for")}:{" "}
-            <b>{formatMonthYearLabel(viewMonth, viewYear, language)}</b>
-          </span>
-        </div>
-      </Card>
+          <div
+            style={{
+              marginTop: 12,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              flexWrap: "wrap",
+              color: "var(--text3)",
+              fontSize: 12,
+            }}
+          >
+            <span>
+              {t("common.viewingMonth", "Viewing data for")}:{" "}
+              <b>{formatMonthYearLabel(viewMonth, viewYear, language)}</b>
+            </span>
+          </div>
+        </Card>
+      </MobileFilterPanel>
 
       <div
         className="worker-payment-receipts-table-section"

@@ -104,6 +104,14 @@ export default function App() {
                     }
                   />
                   <Route
+                    path="super-admin/backups"
+                    element={
+                      <RoleRoute roles={["SUPER_ADMIN"]}>
+                        <BackupManagement />
+                      </RoleRoute>
+                    }
+                  />
+                  <Route
                     path="dashboard"
                     element={
                       <RoleRoute roles={["ADMIN"]}>
@@ -338,15 +346,6 @@ export default function App() {
                       </RoleRoute>
                     }
                   />
-                  <Route
-                    path="backups"
-                    element={
-                      <RoleRoute roles={["ADMIN"]}>
-                        <BackupManagement />
-                      </RoleRoute>
-                    }
-                  />
-
                   <Route
                     path="transactions/create"
                     element={

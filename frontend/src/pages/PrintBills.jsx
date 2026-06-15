@@ -10,6 +10,8 @@ import {
   getOrderDisplayName,
   getBillLanguageSettings,
   getMeasurementsFromOrder,
+  getRakhtDetails,
+  hasPrintableBillValue,
   printElement,
 } from "../components/order/OrderDocumentPack.jsx";
 import {
@@ -22,7 +24,6 @@ import {
   normalizePhone,
   toAsciiDigits,
 } from "../lib/normalize.js";
-import { formatMeters } from "../lib/meters.js";
 import { resolveRakhtColorHex } from "../lib/rakhtColors.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
@@ -37,6 +38,8 @@ export default function PrintBills() {
   const { text: billText, langCode: currentLanguage, isRtl } = billSettings;
   const alignClass = isRtl ? "text-right" : "text-left";
   const preselectCustomerId = location?.state?.preselectCustomerId;
+  const preselectBillNumber = location?.state?.preselectBillNumber;
+  const isFinance = user?.accountType === "FINANCE";
 
   const [billNumber, setBillNumber] = useState("");
   const [phone, setPhone] = useState("");
@@ -66,6 +69,35 @@ export default function PrintBills() {
     return true;
   };
 
+  const toPrintableCustomer = (payload) => {
+    if (!payload) return null;
+
+    if (payload.customer && Array.isArray(payload.orders)) {
+      return {
+        ...payload.customer,
+        orders: payload.orders,
+      };
+    }
+
+    return payload;
+  };
+
+  const fetchBillDetailsByOrderId = async (orderId) => {
+    if (!orderId) return null;
+    const billRes = await api.get(`/orders/${orderId}/bill`);
+    return toPrintableCustomer(billRes.data);
+  };
+
+  const fetchBillDetailsByBillNumber = async (value) => {
+    const bn = parseNumberLocale(toAsciiDigits(String(value || "").trim()));
+    if (!Number.isFinite(bn) || bn <= 0) return null;
+
+    const { data } = await api.get("/orders/lookup", {
+      params: { billNumber: Math.trunc(bn) },
+    });
+    return toPrintableCustomer(data);
+  };
+
   const fetchCustomerDetails = async (id) => {
     const res = await api.get(`/customers/${id}`);
     const customerDetails = res.data;
@@ -73,13 +105,11 @@ export default function PrintBills() {
     if (!firstOrderId) return customerDetails;
 
     try {
-      const billRes = await api.get(`/orders/${firstOrderId}/bill`);
-      const billData = billRes.data;
-      if (billData?.customer && Array.isArray(billData.orders)) {
+      const billData = await fetchBillDetailsByOrderId(firstOrderId);
+      if (billData?.orders?.length) {
         return {
           ...customerDetails,
-          ...billData.customer,
-          orders: billData.orders,
+          ...billData,
         };
       }
     } catch (error) {
@@ -92,12 +122,23 @@ export default function PrintBills() {
   };
 
   useEffect(() => {
-    if (!preselectCustomerId) return;
+    if (!preselectCustomerId && !preselectBillNumber) return;
 
     let ignore = false;
     setLoading(true);
 
-    fetchCustomerDetails(preselectCustomerId)
+    const loadPreselectedBill = async () => {
+      if (preselectBillNumber) {
+        const full = await fetchBillDetailsByBillNumber(preselectBillNumber);
+        if (full) return full;
+      }
+      if (preselectCustomerId && !isFinance) {
+        return fetchCustomerDetails(preselectCustomerId);
+      }
+      return null;
+    };
+
+    loadPreselectedBill()
       .then((full) => {
         if (ignore) return;
         setSelectedCustomer(full, { showToast: false });
@@ -118,7 +159,14 @@ export default function PrintBills() {
     return () => {
       ignore = true;
     };
-  }, [location.pathname, navigate, preselectCustomerId, t]);
+  }, [
+    isFinance,
+    location.pathname,
+    navigate,
+    preselectBillNumber,
+    preselectCustomerId,
+    t,
+  ]);
 
   const handleSearch = async () => {
     setLoading(true);
@@ -138,7 +186,7 @@ export default function PrintBills() {
         });
 
         if (data?.customer?.id) {
-          const full = await fetchCustomerDetails(data.customer.id);
+          const full = toPrintableCustomer(data);
           setSelectedCustomer(full);
           return;
         }
@@ -153,7 +201,7 @@ export default function PrintBills() {
         });
 
         if (data?.customer?.id) {
-          const full = await fetchCustomerDetails(data.customer.id);
+          const full = toPrintableCustomer(data);
           setSelectedCustomer(full);
           return;
         }
@@ -163,6 +211,20 @@ export default function PrintBills() {
 
       if (name.trim()) {
         const normalizedName = normalizeText(name.trim());
+        if (isFinance) {
+          const { data } = await api.get("/orders/global-search", {
+            params: { q: normalizedName, limit: 1 },
+          });
+          const order = data?.data?.[0];
+          const full = await fetchBillDetailsByOrderId(order?.id);
+          if (full) {
+            setSelectedCustomer(full);
+            return;
+          }
+          toast.error(t("createOrder.customerNotFound"));
+          return;
+        }
+
         const res = await api.get("/customers", {
           params: { search: normalizedName, limit: 50 },
         });
@@ -209,11 +271,14 @@ export default function PrintBills() {
       return;
     }
     try {
-      printElement("preview-customer", {
+      const printed = printElement("preview-customer", {
         dir: billSettings.dir,
         lang: billSettings.htmlLang,
         title: t("orders.orderDocuments"),
       });
+      if (!printed) {
+        toast.error(t("orders.printFailed") || "Print failed");
+      }
     } catch (error) {
       if (import.meta.env.DEV) {
         console.error("Print failed", error);
@@ -231,11 +296,14 @@ export default function PrintBills() {
     }
     setSelectedOrder(order);
     try {
-      printElement(previewId, {
+      const printed = printElement(previewId, {
         dir: billSettings.dir,
         lang: billSettings.htmlLang,
         title: t("orders.orderDocuments"),
       });
+      if (!printed) {
+        toast.error(t("orders.printFailed") || "Print failed");
+      }
     } catch (error) {
       if (import.meta.env.DEV) {
         console.error("Print failed", error);
@@ -474,6 +542,7 @@ export default function PrintBills() {
                       {orderMeta.map((meta) => {
                         const { order, index, itemLabel, primaryName } = meta;
                         const isSelected = selectedOrder?.id === order.id;
+                        const rakhtDetails = getRakhtDetails(order);
                         return (
                           <div
                             key={order.id || `${order.type}-${index}`}
@@ -521,7 +590,7 @@ export default function PrintBills() {
                               </button>
                             </div>
 
-                            {(order?.rakhtBrandName || order?.rakhtColor) && (
+                            {rakhtDetails.hasData && (
                               <div
                                 style={{
                                   marginTop: 10,
@@ -544,48 +613,54 @@ export default function PrintBills() {
                                     defaultValue: "Rakht",
                                   })}
                                 </span>
-                                <span
-                                  className="badge"
-                                  style={{
-                                    background: "var(--warning-soft)",
-                                    color: "var(--warning-strong)",
-                                    border:
-                                      "1px solid var(--warning-soft-border)",
-                                  }}
-                                >
-                                  {order.rakhtBrandName || "-"}
-                                </span>
-                                <span
-                                  className="badge"
-                                  style={{
-                                    background: "var(--info-soft)",
-                                    color: "var(--info)",
-                                    border: "1px solid var(--info-soft-border)",
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: 6,
-                                  }}
-                                >
-                                  {resolveRakhtColorHex(
-                                    order.rakhtColor,
-                                    order.rakhtColorHex,
-                                  ) ? (
-                                    <span
-                                      style={{
-                                        width: 10,
-                                        height: 10,
-                                        borderRadius: "50%",
-                                        border: "1px solid rgba(15,23,42,0.16)",
-                                        background: resolveRakhtColorHex(
-                                          order.rakhtColor,
-                                          order.rakhtColorHex,
-                                        ),
-                                      }}
-                                    />
-                                  ) : null}
-                                  {order.rakhtColor || "-"}
-                                </span>
-                                {order?.rakhtRequiredMeters != null && (
+                                {hasPrintableBillValue(
+                                  rakhtDetails.brand || rakhtDetails.company,
+                                ) && (
+                                  <span
+                                    className="badge"
+                                    style={{
+                                      background: "var(--warning-soft)",
+                                      color: "var(--warning-strong)",
+                                      border:
+                                        "1px solid var(--warning-soft-border)",
+                                    }}
+                                  >
+                                    {rakhtDetails.brand || rakhtDetails.company}
+                                  </span>
+                                )}
+                                {hasPrintableBillValue(rakhtDetails.color) && (
+                                  <span
+                                    className="badge"
+                                    style={{
+                                      background: "var(--info-soft)",
+                                      color: "var(--info)",
+                                      border: "1px solid var(--info-soft-border)",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 6,
+                                    }}
+                                  >
+                                    {resolveRakhtColorHex(
+                                      rakhtDetails.color,
+                                      rakhtDetails.colorHex,
+                                    ) ? (
+                                      <span
+                                        style={{
+                                          width: 10,
+                                          height: 10,
+                                          borderRadius: "50%",
+                                          border: "1px solid rgba(15,23,42,0.16)",
+                                          background: resolveRakhtColorHex(
+                                            rakhtDetails.color,
+                                            rakhtDetails.colorHex,
+                                          ),
+                                        }}
+                                      />
+                                    ) : null}
+                                    {rakhtDetails.color}
+                                  </span>
+                                )}
+                                {hasPrintableBillValue(rakhtDetails.meters) && (
                                   <span
                                     style={{
                                       fontSize: 11,
@@ -593,8 +668,7 @@ export default function PrintBills() {
                                       color: "var(--text1)",
                                     }}
                                   >
-                                    {formatMeters(order.rakhtRequiredMeters)}
-                                    m
+                                    {rakhtDetails.meters}
                                   </span>
                                 )}
                               </div>

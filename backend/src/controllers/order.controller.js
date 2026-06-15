@@ -29,6 +29,12 @@ const WORKER_PAYMENT_EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 const FINANCE_ORDER_ACCESS_ERROR =
   "You do not have permission to access this order.";
 
+const getWorkerNotificationRoleLabel = (accountType) => {
+  if (accountType === "QICHIKAR") return "Qichikar";
+  if (accountType === "DOKHT") return "Dokht";
+  return "Worker";
+};
+
 const financeCanAccessOrder = (order, user) =>
   user?.accountType !== "FINANCE" ||
   service.isFinanceCreatedOrder(order, user.id);
@@ -228,8 +234,23 @@ export const getOne = async (req, res, next) => {
 
 export const getBill = async (req, res, next) => {
   try {
+    await assertFinanceOrderAccess(req.params.id, req.user);
     const result = await service.getOrderBillByOrderId(req.params.id);
     if (!result) return res.status(404).json({ error: "Order not found" });
+
+    if (req.user?.accountType === "FINANCE") {
+      const visibleOrders = (result.orders || []).filter((order) =>
+        service.isFinanceCreatedOrder(order, req.user.id),
+      );
+
+      if (!visibleOrders.length) {
+        return res.status(403).json({ error: FINANCE_ORDER_ACCESS_ERROR });
+      }
+
+      res.json({ ...result, orders: visibleOrders });
+      return;
+    }
+
     res.json(result);
   } catch (error) {
     next(error);
@@ -588,7 +609,7 @@ export const markComplete = async (req, res, next) => {
       await service.recalculateOrderBenefit(req.params.id);
 
       const billNumber = order.billNumber ?? order.customer.billNumber;
-      const msg = `Worker Name: ${user.name} | Bill Number: ${billNumber} | Order Type: ${order.type} | Customer Name: ${order.customer.firstName} | This order has been completed successfully.`;
+      const msg = `Dokht Name: ${user.name} | Bill Number: ${billNumber} | Order Type: ${order.type} | Customer Name: ${order.customer.firstName} | Stitching completed successfully and waiting for full payment / admin completion.`;
       await Promise.all(
         admins.map((admin) =>
           prisma.userNotification.create({
@@ -717,7 +738,8 @@ export const markInProgress = async (req, res, next) => {
         select: { id: true },
       });
       const billNumber = order.billNumber ?? order.customer.billNumber;
-      const msg = `${user.name} started working on order for ${order.customer.firstName} - Bill #${billNumber} (${order.type})`;
+      const workerRoleLabel = getWorkerNotificationRoleLabel(user.accountType);
+      const msg = `${workerRoleLabel} Name: ${user.name} | Bill Number: ${billNumber} | Order Type: ${order.type} | Customer Name: ${order.customer.firstName} | has started working on this order.`;
       await Promise.all(
         admins.map((admin) =>
           prisma.userNotification.create({
@@ -869,6 +891,7 @@ export const markReceived = async (req, res, next) => {
         previousRoleReceivedById: roleReceivedById,
         shouldAssignToSelf,
         customer: order.customer,
+        billNumber: order.billNumber,
         type: order.type,
       };
     });
@@ -904,9 +927,11 @@ export const markReceived = async (req, res, next) => {
         where: { accountType: "ADMIN" },
         select: { id: true },
       });
-      const msg = claim.shouldAssignToSelf
-        ? `${user.name} accepted and self-assigned order - ${claim.type} - Bill #${claim.billNumber ?? claim.customer.billNumber} (${claim.customer.firstName}).`
-        : `${user.name} accepted order - ${claim.type} - Bill #${claim.billNumber ?? claim.customer.billNumber} (${claim.customer.firstName}).`;
+      const workerRoleLabel = getWorkerNotificationRoleLabel(user.accountType);
+      const receiveAction = claim.shouldAssignToSelf
+        ? "accepted and self-assigned"
+        : "accepted";
+      const msg = `${workerRoleLabel} Name: ${user.name} | Bill Number: ${claim.billNumber ?? claim.customer.billNumber} | Order Type: ${claim.type} | Customer Name: ${claim.customer.firstName} | ${receiveAction} this order.`;
       await Promise.all(
         admins.map((admin) =>
           prisma.userNotification.create({

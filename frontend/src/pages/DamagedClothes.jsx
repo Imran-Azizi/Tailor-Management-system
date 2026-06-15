@@ -54,11 +54,11 @@ function buildSelectStyles({ hasError = false, isRtl = false } = {}) {
       minHeight: 44,
       borderRadius: 10,
       borderColor: hasError
-        ? "#DC2626"
+        ? "var(--danger)"
         : state.isFocused
           ? "var(--primary)"
           : "var(--border)",
-      boxShadow: state.isFocused ? "0 0 0 3px var(--primary-100)" : "none",
+      boxShadow: state.isFocused ? "0 0 0 3px var(--focus-ring)" : "none",
       background: "var(--surface)",
       direction: isRtl ? "rtl" : "ltr",
       textAlign: "start",
@@ -72,7 +72,7 @@ function buildSelectStyles({ hasError = false, isRtl = false } = {}) {
       borderRadius: 10,
       overflow: "hidden",
       direction: isRtl ? "rtl" : "ltr",
-      boxShadow: "0 8px 24px rgba(0,0,0,.12)",
+      boxShadow: "var(--sh-lg)",
     }),
     option: (base, state) => ({
       ...base,
@@ -100,23 +100,46 @@ function buildSelectStyles({ hasError = false, isRtl = false } = {}) {
   };
 }
 
+const DAMAGED_TONES = {
+  neutral: {
+    bg: "var(--surface2)",
+    text: "var(--text1)",
+    border: "var(--border)",
+  },
+  red: {
+    bg: "var(--danger-soft)",
+    text: "var(--danger-strong)",
+    border: "var(--danger-soft-border)",
+  },
+  green: {
+    bg: "var(--success-soft)",
+    text: "var(--success-strong)",
+    border: "var(--success-soft-border)",
+  },
+  blue: {
+    bg: "var(--info-soft)",
+    text: "var(--info)",
+    border: "var(--info-soft-border)",
+  },
+  amber: {
+    bg: "var(--warning-soft)",
+    text: "var(--warning-strong)",
+    border: "var(--warning-soft-border)",
+  },
+  orange: {
+    bg: "var(--warning-soft)",
+    text: "var(--warning-strong)",
+    border: "var(--warning-soft-border)",
+  },
+  primary: {
+    bg: "color-mix(in srgb,var(--primary) 12%,var(--surface))",
+    text: "var(--primary)",
+    border: "color-mix(in srgb,var(--primary) 30%,var(--border))",
+  },
+};
+
 function StatPill({ label, value, color = "neutral" }) {
-  const colorMap = {
-    neutral: {
-      bg: "var(--surface2)",
-      text: "var(--text1)",
-      border: "var(--border)",
-    },
-    red: { bg: "#FFF1F2", text: "#BE123C", border: "#FECDD3" },
-    green: { bg: "#F0FDF4", text: "#166534", border: "#BBF7D0" },
-    blue: {
-      bg: "var(--primary-50)",
-      text: "var(--primary-800)",
-      border: "var(--primary-200)",
-    },
-    amber: { bg: "#FFFBEB", text: "#92400E", border: "#FDE68A" },
-  };
-  const c = colorMap[color] || colorMap.neutral;
+  const c = DAMAGED_TONES[color] || DAMAGED_TONES.neutral;
   return (
     <div
       style={{
@@ -555,9 +578,9 @@ export default function DamagedClothes() {
                   fontWeight: 600,
                   padding: "3px 10px",
                   borderRadius: 20,
-                  background: "var(--primary-50)",
-                  color: "var(--primary-800)",
-                  border: "1px solid var(--primary-200)",
+                  background: DAMAGED_TONES.primary.bg,
+                  color: DAMAGED_TONES.primary.text,
+                  border: `1px solid ${DAMAGED_TONES.primary.border}`,
                 }}
               >
                 {t("damagedClothes.totalFound", { count: orders.length })}
@@ -839,9 +862,9 @@ function OrderCard({
                 fontWeight: 700,
                 padding: "3px 10px",
                 borderRadius: 20,
-                background: "#FEF2F2",
-                border: "1px solid #FECACA",
-                color: "#B91C1C",
+                background: DAMAGED_TONES.red.bg,
+                border: `1px solid ${DAMAGED_TONES.red.border}`,
+                color: DAMAGED_TONES.red.text,
               }}
             >
               {t("orders.damageOrderStatus", "Damage Order")}
@@ -853,9 +876,9 @@ function OrderCard({
               fontWeight: 700,
               padding: "3px 10px",
               borderRadius: 20,
-              background: "var(--primary-50)",
-              border: "1px solid var(--primary-200)",
-              color: "var(--primary-800)",
+              background: DAMAGED_TONES.primary.bg,
+              border: `1px solid ${DAMAGED_TONES.primary.border}`,
+              color: DAMAGED_TONES.primary.text,
             }}
           >
             {order.orderType || "-"}
@@ -907,9 +930,9 @@ function OrderCard({
         {isDamageOrder && (
           <div
             style={{
-              border: "1px solid #FECACA",
-              background: "#FEF2F2",
-              color: "#991B1B",
+              border: `1px solid ${DAMAGED_TONES.red.border}`,
+              background: DAMAGED_TONES.red.bg,
+              color: DAMAGED_TONES.red.text,
               borderRadius: 10,
               padding: "9px 12px",
               fontSize: 12,
@@ -1096,9 +1119,9 @@ function RecordsPanel({
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              background: "#FEF2F2",
-              border: "1px solid #FECACA",
-              color: "#B91C1C",
+              background: DAMAGED_TONES.red.bg,
+              border: `1px solid ${DAMAGED_TONES.red.border}`,
+              color: DAMAGED_TONES.red.text,
               flexShrink: 0,
             }}
           >
@@ -1359,12 +1382,7 @@ function RecordsPanel({
 }
 
 function RecordSummaryTile({ label, value, tone }) {
-  const tones = {
-    red: { bg: "#FEF2F2", border: "#FECACA", text: "#991B1B" },
-    amber: { bg: "#FFFBEB", border: "#FDE68A", text: "#92400E" },
-    blue: { bg: "#EFF6FF", border: "#BFDBFE", text: "#1D4ED8" },
-  };
-  const c = tones[tone] || tones.blue;
+  const c = DAMAGED_TONES[tone] || DAMAGED_TONES.blue;
   return (
     <div
       style={{
@@ -1396,12 +1414,7 @@ function RecordSummaryTile({ label, value, tone }) {
 }
 
 function StatusBadge({ children, tone = "blue" }) {
-  const tones = {
-    blue: { bg: "#EFF6FF", border: "#BFDBFE", text: "#1D4ED8" },
-    orange: { bg: "#FFF7ED", border: "#FED7AA", text: "#C2410C" },
-    green: { bg: "#F0FDF4", border: "#BBF7D0", text: "#15803D" },
-  };
-  const c = tones[tone] || tones.blue;
+  const c = DAMAGED_TONES[tone] || DAMAGED_TONES.blue;
   return (
     <span
       style={{

@@ -1028,6 +1028,9 @@
     "modalHelp": "Business identity, subscription access, and owner credentials are managed here.",
     "ownerPasswordPlaceholder": "Leave blank to keep current password",
     "activeHelp": "Inactive tenants cannot use their workspace.",
+    "deleteConfirmTitle": "Confirm Tenant Delete",
+    "deleteConfirmHeading": "Delete {{name}}?",
+    "deleteConfirmBody": "This tenant and its related information will be permanently deleted. This action cannot be undone.",
     "metrics": {
       "tenants": "Tenants",
       "orders": "Orders",

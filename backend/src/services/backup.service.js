@@ -1,47 +1,136 @@
-import { spawn, execFileSync } from "child_process";
 import crypto from "crypto";
-import { google } from "googleapis";
-import nodemailer from "nodemailer";
 import fs from "fs";
 import fsp from "fs/promises";
+import nodemailer from "nodemailer";
 import path from "path";
 import { pipeline } from "stream/promises";
-import { fileURLToPath } from "url";
-import {
-  S3Client,
-  PutObjectCommand,
-  ListObjectsV2Command,
-  DeleteObjectCommand,
-  GetObjectCommand,
-  HeadObjectCommand,
-} from "@aws-sdk/client-s3";
-import { PrismaClient } from "@prisma/client";
+import zlib from "zlib";
+import { prisma } from "../lib/prisma.js";
 
-const BACKUP_STATE_DIR = path.resolve(process.cwd(), "storage", "backup");
-const BACKUP_STATE_FILE = path.join(BACKUP_STATE_DIR, "backup-state.json");
-const TEMP_BACKUP_DIR = path.resolve(process.cwd(), "tmp", "backups");
-const RESTORE_TEST_RETENTION_MS = 48 * 60 * 60 * 1000;
-const EMAIL_ARCHIVE_DIR = path.resolve(
-  process.cwd(),
-  "storage",
-  "backup",
-  "email-archive",
+const BACKUP_ROOT = path.resolve(
+  process.env.BACKUP_STORAGE_DIR || path.join(process.cwd(), "storage", "secure-backups"),
 );
-const SYSTEM_NAME = "tailor";
-const SERVICE_DIR = path.dirname(fileURLToPath(import.meta.url));
-const BACKEND_DIR = path.resolve(SERVICE_DIR, "..", "..");
+const TMP_ROOT = path.resolve(process.cwd(), "tmp", "backups");
+const SYSTEM_NAME = "tailor-system";
+const SCHEDULE_ID = "default";
 
-function logInfo(message, extra = "") {
-  console.log(`[Backup] ${message}${extra ? ` ${extra}` : ""}`);
-}
+const GLOBAL_MODELS = [
+  "yakhan",
+  "astin",
+  "shoulderState",
+  "neckOutfit",
+  "neckWaskat",
+  "daman",
+  "jibRow",
+  "jibBaghle",
+  "jibTenban",
+  "patyShip",
+  "buttonShip",
+  "tenbanShip",
+  "outfitDesign",
+  "yakhanQaqNeck",
+  "yakhanQaqSleeve",
+  "yakhanQaqSkirt",
+  "yakhanQaqDesignOption",
+  "yakhanQaqButtonShip",
+  "yakhanQaqPantShip",
+];
 
-function logError(message, err) {
-  const safeMessage = err?.message || "Unknown error";
-  console.error(`[Backup] ${message}: ${safeMessage}`);
-}
+const TENANT_BASE_MODELS = [
+  "tenant",
+  "user",
+  "customer",
+  "rakht",
+  "rakhtTon",
+  "readyMadeClothing",
+  "readyMadeWaskatClothing",
+  "box",
+  "contributor",
+  "order",
+  "outfit",
+  "waskat",
+  "korty",
+  "yakhanQaq",
+  "readyMadeOrder",
+  "readyMadeWaskatOrder",
+  "workerPaymentReceipt",
+  "orderDraft",
+  "rakhtPaymentHistory",
+  "notification",
+  "userNotification",
+  "dailyTask",
+  "transaction",
+  "damagedClothesPenalty",
+  "item",
+  "itemSale",
+  "auditLog",
+];
 
-function parseBoolean(value, defaultValue = false) {
-  if (value == null) return defaultValue;
+const FULL_BACKUP_MODELS = [...GLOBAL_MODELS, ...TENANT_BASE_MODELS];
+const RESTORE_ORDER = [...GLOBAL_MODELS, ...TENANT_BASE_MODELS];
+const DELETE_ORDER = [...RESTORE_ORDER].reverse();
+
+const DATE_FIELDS = {
+  tenant: ["subscriptionStart", "expiryDate", "createdAt", "updatedAt"],
+  user: ["createdAt", "updatedAt"],
+  userNotification: ["createdAt", "updatedAt"],
+  customer: ["createdAt", "updatedAt"],
+  order: [
+    "rakhtDate",
+    "emergencyExpiry",
+    "assignedAt",
+    "receivedAt",
+    "qichikarAssignedAt",
+    "qichikarReceivedAt",
+    "dokhtAssignedAt",
+    "dokhtReceivedAt",
+    "workerPaidAt",
+    "qichikarPaidAt",
+    "dokhtPaidAt",
+    "qichikarCompletedAt",
+    "dokhtCompletedAt",
+    "createdAt",
+    "updatedAt",
+  ],
+  workerPaymentReceipt: ["receiptDate", "createdAt", "updatedAt"],
+  orderDraft: ["createdAt", "updatedAt"],
+  rakht: ["date", "createdAt", "updatedAt"],
+  rakhtPaymentHistory: ["paidAt", "createdAt"],
+  rakhtTon: ["createdAt", "updatedAt"],
+  readyMadeClothing: ["createdAt", "updatedAt"],
+  readyMadeWaskatClothing: ["createdAt", "updatedAt"],
+  notification: ["nextAlert", "expiresAt", "createdAt", "updatedAt"],
+  box: ["createdAt", "updatedAt"],
+  contributor: ["createdAt", "updatedAt"],
+  dailyTask: ["taskDate", "createdAt", "updatedAt"],
+  transaction: ["transactionDate", "createdAt", "updatedAt"],
+  damagedClothesPenalty: ["createdAt", "updatedAt"],
+  item: ["createdAt", "updatedAt"],
+  itemSale: ["createdAt"],
+  auditLog: ["createdAt"],
+  yakhan: ["createdAt", "updatedAt"],
+  astin: ["createdAt", "updatedAt"],
+  shoulderState: ["createdAt", "updatedAt"],
+  neckOutfit: ["createdAt", "updatedAt"],
+  neckWaskat: ["createdAt", "updatedAt"],
+  daman: ["createdAt", "updatedAt"],
+  jibRow: ["createdAt", "updatedAt"],
+  jibBaghle: ["createdAt", "updatedAt"],
+  jibTenban: ["createdAt", "updatedAt"],
+  patyShip: ["createdAt", "updatedAt"],
+  buttonShip: ["createdAt", "updatedAt"],
+  tenbanShip: ["createdAt", "updatedAt"],
+  outfitDesign: ["createdAt", "updatedAt"],
+  yakhanQaqNeck: ["createdAt", "updatedAt"],
+  yakhanQaqSleeve: ["createdAt", "updatedAt"],
+  yakhanQaqSkirt: ["createdAt", "updatedAt"],
+  yakhanQaqDesignOption: ["createdAt", "updatedAt"],
+  yakhanQaqButtonShip: ["createdAt", "updatedAt"],
+  yakhanQaqPantShip: ["createdAt", "updatedAt"],
+};
+
+function parseBoolean(value, fallback = false) {
+  if (value === undefined || value === null || value === "") return fallback;
   return String(value).toLowerCase() === "true";
 }
 
@@ -50,1621 +139,789 @@ function parseInteger(value, fallback) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function ensureDir(dirPath) {
-  return fsp.mkdir(dirPath, { recursive: true });
+function safePart(value, fallback = "backup") {
+  return String(value || fallback)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || fallback;
 }
 
 function timestampForFilename(date = new Date()) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  const h = String(date.getHours()).padStart(2, "0");
-  const mm = String(date.getMinutes()).padStart(2, "0");
-  return `${y}-${m}-${d}-${h}-${mm}`;
+  return date.toISOString().replace(/[:.]/g, "-").slice(0, 19);
 }
 
-function maskSensitiveError(error) {
-  if (!error) return "Unknown error";
-  return String(error.message || error)
-    .replace(/postgres(?:ql)?:\/\/[^\s]+/gi, "postgresql://***")
-    .replace(/password=[^\s]+/gi, "password=***");
-}
-
-function mapStorageError(error, config) {
-  const raw = String(error?.message || error || "Unknown error");
-
-  if (config?.storageProvider === "r2") {
-    if (
-      /sslv3 alert handshake failure|write eproto|certificate|tls/i.test(raw)
-    ) {
-      return new Error(
-        "Cloudflare R2 connection failed (TLS handshake). Verify BACKUP_ENDPOINT format is https://<ACCOUNT_ID>.r2.cloudflarestorage.com and that ACCOUNT_ID is correct.",
-      );
-    }
-
-    if (
-      /invalidaccesskeyid|signaturedoesnotmatch|accessdenied|forbidden/i.test(
-        raw,
-      )
-    ) {
-      return new Error(
-        "Cloudflare R2 authentication failed. Verify BACKUP_ACCESS_KEY_ID, BACKUP_SECRET_ACCESS_KEY, bucket permissions, and BACKUP_BUCKET_NAME.",
-      );
-    }
+function ensureInside(root, target) {
+  const resolvedRoot = path.resolve(root);
+  const resolvedTarget = path.resolve(target);
+  if (resolvedTarget !== resolvedRoot && !resolvedTarget.startsWith(resolvedRoot + path.sep)) {
+    throw Object.assign(new Error("Invalid backup file path."), { status: 400 });
   }
+  return resolvedTarget;
+}
 
-  return error;
+function normalizeKey(key) {
+  return String(key || "").replace(/\\/g, "/").replace(/\.\./g, "");
+}
+
+function storagePathFromKey(storageKey) {
+  return ensureInside(BACKUP_ROOT, path.join(BACKUP_ROOT, normalizeKey(storageKey)));
+}
+
+function relativeStorageKey(filePath) {
+  return path.relative(BACKUP_ROOT, filePath).replace(/\\/g, "/");
 }
 
 function getConfig() {
-  const requestedProvider = process.env.BACKUP_STORAGE_PROVIDER;
-  const hasGoogleAliases = Boolean(
-    process.env.GOOGLE_DRIVE_BACKUP_FOLDER_ID ||
-    process.env.GOOGLE_OAUTH_CLIENT_PATH ||
-    process.env.GOOGLE_OAUTH_TOKEN_PATH,
-  );
-  const storageProvider = (
-    requestedProvider || (hasGoogleAliases ? "gdrive" : "s3")
-  ).toLowerCase();
+  const scheduleCompression = parseBoolean(process.env.BACKUP_COMPRESSION_ENABLED, true);
   return {
-    enabled: parseBoolean(process.env.BACKUP_ENABLED, true),
-    cron: process.env.BACKUP_CRON || "0 2 * * *",
-    timezone: process.env.BACKUP_TIMEZONE || "Asia/Kabul",
-    envName: process.env.NODE_ENV || "development",
-    databaseUrl: process.env.BACKUP_DATABASE_URL || process.env.DATABASE_URL,
-    stagingDatabaseUrl: process.env.STAGING_DATABASE_URL,
-    storageProvider,
-    bucketName: process.env.BACKUP_BUCKET_NAME,
-    region: process.env.BACKUP_REGION || "auto",
-    accessKeyId: process.env.BACKUP_ACCESS_KEY_ID,
-    secretAccessKey: process.env.BACKUP_SECRET_ACCESS_KEY,
-    endpoint: process.env.BACKUP_ENDPOINT,
-    encryptionKey: process.env.BACKUP_ENCRYPTION_KEY,
-    dailyDays: parseInteger(process.env.BACKUP_RETENTION_DAILY_DAYS, 35),
-    weeklyDays: parseInteger(process.env.BACKUP_RETENTION_WEEKLY_DAYS, 90),
-    monthlyDays: parseInteger(process.env.BACKUP_RETENTION_MONTHLY_DAYS, 365),
-    healthcheckUrl:
-      process.env.BACKUP_HEALTHCHECK_URL ||
-      `http://localhost:${process.env.PORT || 8000}/api/health`,
-    gdriveAuthMode: (
-      process.env.BACKUP_GDRIVE_AUTH_MODE || "oauth"
-    ).toLowerCase(),
-    gdriveFolderId:
-      process.env.BACKUP_GDRIVE_FOLDER_ID ||
-      process.env.GOOGLE_DRIVE_BACKUP_FOLDER_ID,
-    gdriveClientEmail: process.env.BACKUP_GDRIVE_CLIENT_EMAIL,
-    gdrivePrivateKey: process.env.BACKUP_GDRIVE_PRIVATE_KEY,
-    gdriveOauthClientPath: process.env.GOOGLE_OAUTH_CLIENT_PATH,
-    gdriveOauthTokenPath: process.env.GOOGLE_OAUTH_TOKEN_PATH,
-    backupEmailTo: process.env.BACKUP_EMAIL_TO,
-    backupEmailCc: process.env.BACKUP_EMAIL_CC,
-    backupEmailBcc: process.env.BACKUP_EMAIL_BCC,
-    backupEmailFrom: process.env.BACKUP_EMAIL_FROM,
-    backupEmailSubjectPrefix:
-      process.env.BACKUP_EMAIL_SUBJECT_PREFIX || "Tailor Backup",
+    emailTo: process.env.BACKUP_EMAIL_TO,
+    emailFrom: process.env.BACKUP_EMAIL_FROM || process.env.SMTP_USER,
+    subjectPrefix: process.env.BACKUP_EMAIL_SUBJECT_PREFIX || "Tailor Backup",
     smtpHost: process.env.SMTP_HOST,
     smtpPort: parseInteger(process.env.SMTP_PORT, 587),
     smtpSecure: parseBoolean(process.env.SMTP_SECURE, false),
     smtpUser: process.env.SMTP_USER,
     smtpPass: process.env.SMTP_PASS,
-    emailArchiveEnabled: parseBoolean(
-      process.env.BACKUP_EMAIL_ARCHIVE_ENABLED,
-      true,
-    ),
+    compressionEnabled: scheduleCompression,
+    encryptionEnabled: parseBoolean(process.env.BACKUP_ENCRYPTION_ENABLED, false),
+    encryptionKey: process.env.BACKUP_ENCRYPTION_KEY,
+    retentionDays: parseInteger(process.env.BACKUP_RETENTION_DAYS, 35),
+    totalStorageBytes: parseInteger(process.env.BACKUP_TOTAL_STORAGE_BYTES, 1024 * 1024 * 1024),
   };
 }
 
-function assertConfigured(config) {
-  if (!config.enabled) {
-    throw Object.assign(new Error("Backup system is disabled."), {
-      status: 400,
-    });
-  }
-  if (!config.databaseUrl) {
-    throw Object.assign(
-      new Error("BACKUP_DATABASE_URL or DATABASE_URL is required."),
-      { status: 500 },
-    );
-  }
-  if (!["s3", "r2", "gdrive", "email"].includes(config.storageProvider)) {
-    throw Object.assign(
-      new Error("BACKUP_STORAGE_PROVIDER must be s3, r2, gdrive, or email."),
-      { status: 500 },
-    );
-  }
-  if (!config.encryptionKey) {
-    throw Object.assign(
-      new Error("BACKUP_ENCRYPTION_KEY is required for backup operations."),
-      { status: 500 },
-    );
-  }
-  if (config.storageProvider === "email") {
-    const required = [
-      ["BACKUP_EMAIL_TO", config.backupEmailTo],
-      ["SMTP_HOST", config.smtpHost],
-      ["SMTP_PORT", config.smtpPort],
-      ["SMTP_USER", config.smtpUser],
-      ["SMTP_PASS", config.smtpPass],
-    ];
-    for (const [name, value] of required) {
-      if (!value) {
-        throw Object.assign(
-          new Error(`${name} is required for email backup operations.`),
-          { status: 500 },
-        );
-      }
-    }
-  } else if (config.storageProvider === "gdrive") {
-    if (!["oauth", "service_account", "auto"].includes(config.gdriveAuthMode)) {
-      throw Object.assign(
-        new Error(
-          "BACKUP_GDRIVE_AUTH_MODE must be oauth, service_account, or auto.",
-        ),
-        { status: 500 },
-      );
-    }
-
-    if (!config.gdriveFolderId) {
-      throw Object.assign(
-        new Error(
-          "BACKUP_GDRIVE_FOLDER_ID or GOOGLE_DRIVE_BACKUP_FOLDER_ID is required for Google Drive backup.",
-        ),
-        { status: 500 },
-      );
-    }
-
-    const hasServiceAccountAuth =
-      Boolean(config.gdriveClientEmail) && Boolean(config.gdrivePrivateKey);
-    const hasOauthAuth =
-      Boolean(config.gdriveOauthClientPath) &&
-      Boolean(config.gdriveOauthTokenPath);
-
-    if (!hasServiceAccountAuth && !hasOauthAuth) {
-      throw Object.assign(
-        new Error(
-          "Set either BACKUP_GDRIVE_CLIENT_EMAIL + BACKUP_GDRIVE_PRIVATE_KEY or GOOGLE_OAUTH_CLIENT_PATH + GOOGLE_OAUTH_TOKEN_PATH for Google Drive backup.",
-        ),
-        { status: 500 },
-      );
-    }
-  } else {
-    const required = [
-      ["BACKUP_BUCKET_NAME", config.bucketName],
-      ["BACKUP_ACCESS_KEY_ID", config.accessKeyId],
-      ["BACKUP_SECRET_ACCESS_KEY", config.secretAccessKey],
-    ];
-    for (const [name, value] of required) {
-      if (!value) {
-        throw Object.assign(
-          new Error(`${name} is required for backup operations.`),
-          { status: 500 },
-        );
-      }
-    }
-  }
+function normalizeEncryptionKey(raw) {
+  if (!raw) throw Object.assign(new Error("BACKUP_ENCRYPTION_KEY is required."), { status: 500 });
+  const value = String(raw).trim();
+  if (/^[a-fA-F0-9]{64}$/.test(value)) return Buffer.from(value, "hex");
+  const b64 = Buffer.from(value, "base64");
+  if (b64.length === 32) return b64;
+  return crypto.createHash("sha256").update(value).digest();
 }
 
-function buildEmailArchiveKey(category, filename, createdAt = new Date()) {
-  const year = String(createdAt.getFullYear());
-  const month = String(createdAt.getMonth() + 1).padStart(2, "0");
-  return `email/${category}/${year}/${month}/${filename}.enc`;
+function encryptBuffer(input, key) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", normalizeEncryptionKey(key), iv);
+  const encrypted = Buffer.concat([cipher.update(input), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return Buffer.concat([Buffer.from("TSB1"), iv, tag, encrypted]);
 }
 
-function resolveEmailArchivePath(key) {
-  const normalized = String(key || "")
-    .replace(/^email\//, "")
-    .replace(/\.\./g, "");
-  return path.join(EMAIL_ARCHIVE_DIR, normalized);
+function decryptBuffer(input, key) {
+  const buffer = Buffer.from(input);
+  if (buffer.slice(0, 4).toString() !== "TSB1") {
+    throw Object.assign(new Error("Backup file has an invalid encryption header."), { status: 400 });
+  }
+  const iv = buffer.slice(4, 16);
+  const tag = buffer.slice(16, 32);
+  const payload = buffer.slice(32);
+  const decipher = crypto.createDecipheriv("aes-256-gcm", normalizeEncryptionKey(key), iv);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(payload), decipher.final()]);
 }
 
-function parseCsvEmails(value) {
-  if (!value) return undefined;
-  return String(value)
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .join(", ");
-}
-
-function getEmailTransporter(config) {
+function getTransporter(config) {
+  if (!config.emailTo) return null;
+  const missing = [
+    ["SMTP_HOST", config.smtpHost],
+    ["SMTP_USER", config.smtpUser],
+    ["SMTP_PASS", config.smtpPass],
+  ].filter(([, value]) => !value);
+  if (missing.length) return null;
   return nodemailer.createTransport({
     host: config.smtpHost,
     port: config.smtpPort,
     secure: config.smtpSecure,
-    auth: {
-      user: config.smtpUser,
-      pass: config.smtpPass,
-    },
+    auth: { user: config.smtpUser, pass: config.smtpPass },
   });
 }
 
-async function sendBackupEmail({
-  config,
-  trigger,
-  categories,
-  filename,
-  encryptedPath,
-  encryptedSize,
-}) {
-  const transporter = getEmailTransporter(config);
-  const createdAt = new Date().toISOString();
-  const subject = `${config.backupEmailSubjectPrefix} | ${config.envName} | ${categories.join(",")}`;
-  const to = parseCsvEmails(config.backupEmailTo);
-  const cc = parseCsvEmails(config.backupEmailCc);
-  const bcc = parseCsvEmails(config.backupEmailBcc);
+async function sendBackupEmail({ record, filePath, manifest }) {
+  const config = getConfig();
+  const transporter = getTransporter(config);
+  if (!config.emailTo) {
+    return { status: "NOT_CONFIGURED", message: "BACKUP_EMAIL_TO is not configured." };
+  }
+  if (!transporter) {
+    return { status: "FAILED", message: "SMTP settings are incomplete." };
+  }
 
-  const from = config.backupEmailFrom || config.smtpUser;
+  const tenantPart = manifest.scope?.tenantName ? ` | ${manifest.scope.tenantName}` : "";
+  const subject = `${config.subjectPrefix} | ${manifest.type}${tenantPart} | ${new Date(record.createdAt).toLocaleString("en-US", { hour12: false })}`;
   await transporter.sendMail({
-    from,
-    to,
-    cc,
-    bcc,
+    from: config.emailFrom,
+    to: config.emailTo,
     subject,
     text: [
-      "Automated encrypted database backup attached.",
-      `Environment: ${config.envName}`,
-      `Trigger: ${trigger}`,
-      `Categories: ${categories.join(", ")}`,
-      `CreatedAt: ${createdAt}`,
-      `File: ${filename}.enc`,
-      `Size(bytes): ${encryptedSize}`,
+      "A secure backup file is attached.",
+      `Backup ID: ${record.backupId}`,
+      `Type: ${manifest.type}`,
+      `Scope: ${manifest.scope?.name || manifest.scope?.tenantName || "All System"}`,
+      `Created At: ${record.createdAt.toISOString()}`,
+      `Size: ${record.sizeBytes} bytes`,
+      `Checksum: ${record.checksum || "-"}`,
     ].join("\n"),
-    attachments: [
-      {
-        filename: `${filename}.enc`,
-        path: encryptedPath,
-        contentType: "application/octet-stream",
-      },
-    ],
+    attachments: [{ filename: record.fileName, path: filePath }],
   });
+  return { status: "SENT", message: "Email sent." };
 }
 
-async function saveEmailArchive({ sourcePath, archiveKey }) {
-  const archivePath = resolveEmailArchivePath(archiveKey);
-  await ensureDir(path.dirname(archivePath));
-  await fsp.copyFile(sourcePath, archivePath);
-  const stats = await fsp.stat(archivePath);
-  return Number(stats.size || 0);
-}
-
-async function listEmailArchives() {
-  const results = [];
-  const categories = ["daily", "weekly", "monthly", "manual"];
-
-  for (const type of categories) {
-    const baseDir = path.join(EMAIL_ARCHIVE_DIR, type);
-    if (!fs.existsSync(baseDir)) continue;
-
-    const years = await fsp.readdir(baseDir, { withFileTypes: true });
-    for (const year of years) {
-      if (!year.isDirectory()) continue;
-      const yearDir = path.join(baseDir, year.name);
-      const months = await fsp.readdir(yearDir, { withFileTypes: true });
-      for (const month of months) {
-        if (!month.isDirectory()) continue;
-        const monthDir = path.join(yearDir, month.name);
-        const files = await fsp.readdir(monthDir, { withFileTypes: true });
-        for (const file of files) {
-          if (!file.isFile() || !file.name.endsWith(".enc")) continue;
-          const archivePath = path.join(monthDir, file.name);
-          const stats = await fsp.stat(archivePath);
-          results.push({
-            key: `email/${type}/${year.name}/${month.name}/${file.name}`,
-            filename: file.name,
-            type,
-            size: Number(stats.size || 0),
-            createdAt: stats.mtime?.toISOString() || null,
-            status: "emailed",
-            encrypted: true,
-          });
-        }
-      }
-    }
-  }
-
-  return results.sort(
-    (a, b) =>
-      new Date(b.createdAt || 0).getTime() -
-      new Date(a.createdAt || 0).getTime(),
-  );
-}
-
-async function deleteEmailArchive(key) {
-  const archivePath = resolveEmailArchivePath(key);
-  await fsp.unlink(archivePath);
-}
-
-async function streamEmailArchiveDownload(key, writableStream) {
-  const archivePath = resolveEmailArchivePath(key);
-  await pipeline(fs.createReadStream(archivePath), writableStream);
-}
-
-async function copyEmailArchiveToPath(key, destinationPath) {
-  const archivePath = resolveEmailArchivePath(key);
-  await ensureDir(path.dirname(destinationPath));
-  await pipeline(
-    fs.createReadStream(archivePath),
-    fs.createWriteStream(destinationPath),
-  );
-}
-
-function normalizeEncryptionKey(raw) {
-  if (!raw) throw new Error("BACKUP_ENCRYPTION_KEY is required");
-
-  const trimmed = String(raw).trim();
-
-  if (/^[a-fA-F0-9]{64}$/.test(trimmed)) {
-    return Buffer.from(trimmed, "hex");
-  }
-
-  try {
-    const b64 = Buffer.from(trimmed, "base64");
-    if (b64.length === 32) return b64;
-  } catch {
-    // ignore and hash fallback
-  }
-
-  return crypto.createHash("sha256").update(trimmed).digest();
-}
-
-function buildBackupFilename(envName, timestamp) {
-  return `${SYSTEM_NAME}-backup-${envName}-${timestamp}.dump`;
-}
-
-function getBackupCategories(trigger, now = new Date()) {
-  if (trigger === "manual") return ["manual"];
-
-  const categories = ["daily"];
-  if (now.getDay() === 0) categories.push("weekly");
-  if (now.getDate() === 1) categories.push("monthly");
-  return categories;
-}
-
-function buildStorageKey(category, filename, createdAt = new Date()) {
-  const year = String(createdAt.getFullYear());
-  const month = String(createdAt.getMonth() + 1).padStart(2, "0");
-  return `backups/${category}/${year}/${month}/${filename}.enc`;
-}
-
-function getS3Client(config) {
-  return new S3Client({
-    region: config.region,
-    endpoint: config.endpoint || undefined,
-    forcePathStyle: true,
-    credentials: {
-      accessKeyId: config.accessKeyId,
-      secretAccessKey: config.secretAccessKey,
+async function writeAudit({ req, action, entityId, metadata, tenantId = null }) {
+  await prisma.auditLog.create({
+    data: {
+      tenantId,
+      actorId: req?.user?.id,
+      action,
+      entity: "Backup",
+      entityId,
+      metadata,
+      ipAddress: req?.ip,
+      userAgent: req?.headers?.["user-agent"],
     },
   });
 }
 
-// ─── Google Drive helpers ────────────────────────────────────────────────────
-
-function getGDriveClient(config) {
-  const hasServiceAccountAuth =
-    Boolean(config.gdriveClientEmail) && Boolean(config.gdrivePrivateKey);
-  const hasOauthAuth =
-    Boolean(config.gdriveOauthClientPath) &&
-    Boolean(config.gdriveOauthTokenPath);
-  const authMode = config.gdriveAuthMode || "oauth";
-
-  if (authMode === "service_account") {
-    if (!hasServiceAccountAuth) {
-      throw new Error(
-        "BACKUP_GDRIVE_AUTH_MODE=service_account requires BACKUP_GDRIVE_CLIENT_EMAIL and BACKUP_GDRIVE_PRIVATE_KEY.",
-      );
-    }
-    const rawKey = String(config.gdrivePrivateKey || "");
-    const privateKey = rawKey.includes("\\n")
-      ? rawKey.replace(/\\n/g, "\n")
-      : rawKey;
-    const auth = new google.auth.JWT({
-      email: config.gdriveClientEmail,
-      key: privateKey,
-      scopes: ["https://www.googleapis.com/auth/drive"],
-    });
-    return google.drive({ version: "v3", auth });
+function sanitizeRowForExport(model, row, { includeSecrets = true } = {}) {
+  if (model === "user" && !includeSecrets) {
+    const { password, refreshToken, ...safe } = row;
+    return safe;
   }
-
-  // OAuth mode (default): require OAuth files and token for predictable behavior.
-  if (authMode === "oauth") {
-    if (!hasOauthAuth) {
-      throw new Error(
-        "OAuth mode requires GOOGLE_OAUTH_CLIENT_PATH and GOOGLE_OAUTH_TOKEN_PATH. Run: npm run backup:gdrive-oauth",
-      );
-    }
-
-    const clientPath = path.resolve(
-      process.cwd(),
-      config.gdriveOauthClientPath,
-    );
-    const tokenPath = path.resolve(process.cwd(), config.gdriveOauthTokenPath);
-
-    if (!fs.existsSync(clientPath) || !fs.existsSync(tokenPath)) {
-      throw new Error(
-        `OAuth files missing. client=${clientPath}, token=${tokenPath}. Run: npm run backup:gdrive-oauth`,
-      );
-    }
-
-    const clientRaw = fs.readFileSync(clientPath, "utf8");
-    const tokenRaw = fs.readFileSync(tokenPath, "utf8");
-    const clientJson = JSON.parse(clientRaw);
-    const tokenJson = JSON.parse(tokenRaw);
-
-    const oauthClient = clientJson.installed || clientJson.web || clientJson;
-    const clientId = oauthClient.client_id;
-    const clientSecret = oauthClient.client_secret;
-    const redirectUri = Array.isArray(oauthClient.redirect_uris)
-      ? oauthClient.redirect_uris[0]
-      : oauthClient.redirect_uri;
-
-    if (!clientId || !clientSecret || !redirectUri) {
-      throw new Error(
-        "Google OAuth client file is missing client_id, client_secret, or redirect URI.",
-      );
-    }
-
-    const refreshToken = tokenJson.refresh_token;
-    if (!refreshToken) {
-      throw new Error(
-        "OAuth token file has no refresh_token. Re-run: npm run backup:gdrive-oauth",
-      );
-    }
-
-    const auth = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
-    auth.setCredentials({
-      refresh_token: refreshToken,
-      access_token: tokenJson.access_token,
-      expiry_date: tokenJson.expiry_date,
-      token_type: tokenJson.token_type,
-      scope: tokenJson.scope,
-    });
-    return google.drive({ version: "v3", auth });
-  }
-
-  // auto mode: try OAuth first, then service account.
-  if (hasOauthAuth) {
-    const clientPath = path.resolve(
-      process.cwd(),
-      config.gdriveOauthClientPath,
-    );
-    const tokenPath = path.resolve(process.cwd(), config.gdriveOauthTokenPath);
-
-    if (fs.existsSync(clientPath) && fs.existsSync(tokenPath)) {
-      const clientRaw = fs.readFileSync(clientPath, "utf8");
-      const tokenRaw = fs.readFileSync(tokenPath, "utf8");
-      const clientJson = JSON.parse(clientRaw);
-      const tokenJson = JSON.parse(tokenRaw);
-
-      const oauthClient = clientJson.installed || clientJson.web || clientJson;
-      const clientId = oauthClient.client_id;
-      const clientSecret = oauthClient.client_secret;
-      const redirectUri = Array.isArray(oauthClient.redirect_uris)
-        ? oauthClient.redirect_uris[0]
-        : oauthClient.redirect_uri;
-
-      if (!clientId || !clientSecret || !redirectUri) {
-        throw new Error(
-          "Google OAuth client file is missing client_id, client_secret, or redirect URI.",
-        );
-      }
-
-      const refreshToken = tokenJson.refresh_token;
-      if (refreshToken) {
-        const auth = new google.auth.OAuth2(
-          clientId,
-          clientSecret,
-          redirectUri,
-        );
-        auth.setCredentials({
-          refresh_token: refreshToken,
-          access_token: tokenJson.access_token,
-          expiry_date: tokenJson.expiry_date,
-          token_type: tokenJson.token_type,
-          scope: tokenJson.scope,
-        });
-        return google.drive({ version: "v3", auth });
-      }
-      // Token file exists but has no refresh_token — fall through to service account
-    }
-    // Token file(s) missing — fall through to service account if available
-  }
-
-  if (hasServiceAccountAuth) {
-    // .env stores \n as literal \n — normalize to real newlines
-    const rawKey = String(config.gdrivePrivateKey || "");
-    const privateKey = rawKey.includes("\\n")
-      ? rawKey.replace(/\\n/g, "\n")
-      : rawKey;
-    const auth = new google.auth.JWT({
-      email: config.gdriveClientEmail,
-      key: privateKey,
-      scopes: ["https://www.googleapis.com/auth/drive"],
-    });
-    return google.drive({ version: "v3", auth });
-  }
-
-  throw new Error("Google Drive auth is not configured.");
+  return row;
 }
 
-function mapGoogleDriveError(error, config) {
-  const raw = String(error?.message || error || "Unknown Google Drive error");
-  if (/service accounts do not have storage quota/i.test(raw)) {
-    if ((config.gdriveAuthMode || "oauth") === "service_account") {
-      return new Error(
-        "Google Drive upload failed: service accounts need a Shared Drive. Add BACKUP_GDRIVE_CLIENT_EMAIL as Content manager on a Shared Drive, set BACKUP_GDRIVE_FOLDER_ID to a folder inside that Shared Drive, then retry.",
-      );
-    }
-    return new Error(
-      `Google Drive upload failed: service account quota limitation. Use OAuth user tokens by setting BACKUP_GDRIVE_AUTH_MODE=oauth and generating token via \"npm run backup:gdrive-oauth\". Current mode: ${config.gdriveAuthMode || "oauth"}`,
-    );
-  }
-
-  if (
-    /insufficient permissions|insufficientfilepermissions|file not found|not found/i.test(
-      raw,
-    )
-  ) {
-    return new Error(
-      "Google Drive access failed for BACKUP_GDRIVE_FOLDER_ID. Ensure this folder exists inside a Shared Drive and that BACKUP_GDRIVE_CLIENT_EMAIL has Content manager access to that Shared Drive.",
-    );
-  }
-
-  return error;
-}
-
-async function gdrive_ensureFolder(drive, parentId, name) {
-  const res = await drive.files.list({
-    q: `'${parentId}' in parents and name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-    fields: "files(id)",
-    spaces: "drive",
-    includeItemsFromAllDrives: true,
-    supportsAllDrives: true,
+async function findTenant(tenantId) {
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
   });
-  if (res.data.files.length > 0) return res.data.files[0].id;
-  const folder = await drive.files.create({
-    requestBody: {
-      name,
-      mimeType: "application/vnd.google-apps.folder",
-      parents: [parentId],
-    },
-    fields: "id",
-    supportsAllDrives: true,
-  });
-  return folder.data.id;
+  if (!tenant) throw Object.assign(new Error("Tenant not found."), { status: 404 });
+  return tenant;
 }
 
-async function gdrive_upload(drive, config, category, filename, filePath) {
-  try {
-    const catFolderId = await gdrive_ensureFolder(
-      drive,
-      config.gdriveFolderId,
-      category,
-    );
-    const res = await drive.files.create({
-      requestBody: {
-        name: `${filename}.enc`,
-        parents: [catFolderId],
-      },
-      media: {
-        mimeType: "application/octet-stream",
-        body: fs.createReadStream(filePath),
-      },
-      fields: "id,size,createdTime",
-      supportsAllDrives: true,
-    });
-    return {
-      key: `gdrive:${res.data.id}`,
-      size: Number(res.data.size || 0),
-    };
-  } catch (error) {
-    throw mapGoogleDriveError(error, config);
-  }
-}
+async function tenantData(tenantId, { includeSecrets = true, onlyUserIds = null } = {}) {
+  const tenant = await findTenant(tenantId);
+  const userWhere = onlyUserIds ? { tenantId, id: { in: onlyUserIds } } : { tenantId };
+  const users = await prisma.user.findMany({ where: userWhere });
+  const allTenantUsers = await prisma.user.findMany({ where: { tenantId }, select: { id: true } });
+  const scopedUserIds = new Set((onlyUserIds ? users : allTenantUsers).map((u) => u.id));
 
-async function gdrive_listAll(drive, config) {
-  const categories = ["daily", "weekly", "monthly", "manual"];
-  const all = [];
-  for (const category of categories) {
-    const folderRes = await drive.files.list({
-      q: `'${config.gdriveFolderId}' in parents and name='${category}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-      fields: "files(id)",
-      spaces: "drive",
-      includeItemsFromAllDrives: true,
-      supportsAllDrives: true,
-    });
-    if (!folderRes.data.files.length) continue;
-    const catFolderId = folderRes.data.files[0].id;
-    let pageToken;
-    do {
-      const res = await drive.files.list({
-        q: `'${catFolderId}' in parents and name contains '.enc' and trashed=false`,
-        fields: "nextPageToken, files(id,name,size,createdTime)",
-        spaces: "drive",
-        includeItemsFromAllDrives: true,
-        supportsAllDrives: true,
-        pageToken,
-      });
-      for (const file of res.data.files || []) {
-        all.push({
-          key: `gdrive:${file.id}`,
-          filename: file.name,
-          type: category,
-          size: Number(file.size || 0),
-          createdAt: file.createdTime || null,
-        });
-      }
-      pageToken = res.data.nextPageToken;
-    } while (pageToken);
-  }
-  return all.sort(
-    (a, b) =>
-      new Date(b.createdAt || 0).getTime() -
-      new Date(a.createdAt || 0).getTime(),
-  );
-}
-
-async function gdrive_delete(drive, fileId) {
-  await drive.files.delete({ fileId, supportsAllDrives: true });
-}
-
-async function gdrive_getStream(drive, fileId) {
-  const res = await drive.files.get(
-    { fileId, alt: "media", supportsAllDrives: true },
-    { responseType: "stream" },
-  );
-  return res.data;
-}
-
-function gdrive_extractFileId(key) {
-  return String(key).replace(/^gdrive:/, "");
-}
-
-/**
- * Resolve the full path to a PostgreSQL binary (pg_dump, pg_restore, etc.).
- * Priority:
- *   1. PG_BIN_DIR env var — set this in .env to override everything
- *   2. Binary already reachable on PATH
- *   3. Known Windows install paths  (PostgreSQL 18 → 10)
- *   4. Known Linux/Railway paths (/usr/bin, /usr/lib/postgresql/<ver>/bin)
- */
-function resolvePgBin(binary) {
-  // 1. Explicit override via env
-  const envDir = process.env.PG_BIN_DIR;
-  if (envDir) {
-    return path.join(envDir, binary);
-  }
-
-  // 2. Check PATH using where/which
-  try {
-    const cmd = process.platform === "win32" ? "where" : "which";
-    execFileSync(cmd, [binary], { stdio: "ignore" });
-    return binary;
-  } catch {
-    // not on PATH — scan well-known install directories
-  }
-
-  if (process.platform === "win32") {
-    const pgRoot = "C:\\Program Files\\PostgreSQL";
-    for (const ver of [18, 17, 16, 15, 14, 13, 12, 11, 10]) {
-      const candidate = path.join(pgRoot, String(ver), "bin", `${binary}.exe`);
-      if (fs.existsSync(candidate)) return candidate;
-    }
-  } else {
-    // Linux — Railway, Render, Ubuntu, Debian
-    const candidates = [`/usr/bin/${binary}`, `/usr/local/bin/${binary}`];
-    for (const ver of [17, 16, 15, 14, 13, 12, 11]) {
-      candidates.push(`/usr/lib/postgresql/${ver}/bin/${binary}`);
-    }
-    for (const p of candidates) {
-      if (fs.existsSync(p)) return p;
-    }
-  }
-
-  // Last resort — return plain name so the OS error message names the binary
-  return binary;
-}
-
-async function runCommand(command, args, options = {}) {
-  await new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      stdio: ["ignore", "ignore", "pipe"],
-      shell: false,
-      ...options,
-    });
-
-    let stderr = "";
-
-    child.stderr.on("data", (chunk) => {
-      stderr += chunk.toString();
-    });
-
-    child.on("error", (err) => {
-      reject(err);
-    });
-
-    child.on("close", (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        const error = new Error(
-          `Command failed with code ${code}. ${stderr}`.trim(),
-        );
-        error.code = code;
-        reject(error);
-      }
-    });
-  });
-}
-
-async function runPgDump({ databaseUrl, outputFile }) {
-  const args = [
-    "--format=custom",
-    "--no-owner",
-    "--no-privileges",
-    "--file",
-    outputFile,
-    databaseUrl,
-  ];
-
-  await runCommand(resolvePgBin("pg_dump"), args, {
-    env: {
-      ...process.env,
-      PGPASSWORD: undefined,
-    },
-  });
-}
-
-async function runPgRestore({ databaseUrl, inputFile }) {
-  const args = [
-    "--clean",
-    "--if-exists",
-    "--no-owner",
-    "--no-privileges",
-    "--dbname",
-    databaseUrl,
-    inputFile,
-  ];
-
-  await runCommand(resolvePgBin("pg_restore"), args);
-}
-
-async function encryptDumpFile(sourcePath, encryptedPath, rawKey) {
-  const key = normalizeEncryptionKey(rawKey);
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
-
-  await ensureDir(path.dirname(encryptedPath));
-  await fsp.writeFile(encryptedPath, iv);
-  await pipeline(
-    fs.createReadStream(sourcePath),
-    cipher,
-    fs.createWriteStream(encryptedPath, { flags: "a" }),
-  );
-
-  const authTag = cipher.getAuthTag();
-  await fsp.appendFile(encryptedPath, authTag);
-}
-
-async function decryptDumpFile(sourcePath, decryptedPath, rawKey) {
-  const key = normalizeEncryptionKey(rawKey);
-  const encrypted = await fsp.readFile(sourcePath);
-
-  if (encrypted.length < 12 + 16) {
-    throw new Error("Encrypted backup file is invalid.");
-  }
-
-  const iv = encrypted.subarray(0, 12);
-  const authTag = encrypted.subarray(encrypted.length - 16);
-  const payload = encrypted.subarray(12, encrypted.length - 16);
-
-  const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
-  decipher.setAuthTag(authTag);
-
-  const decrypted = Buffer.concat([decipher.update(payload), decipher.final()]);
-  await fsp.writeFile(decryptedPath, decrypted);
-}
-
-async function getFileStats(filePath) {
-  const stats = await fsp.stat(filePath);
-  if (!stats.isFile() || stats.size <= 0) {
-    throw new Error("Backup file is empty or invalid.");
-  }
-  return stats;
-}
-
-async function uploadEncryptedFile({ s3, bucket, key, filePath }) {
-  const body = fs.createReadStream(filePath);
-  await s3.send(
-    new PutObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      Body: body,
-      ContentType: "application/octet-stream",
-      ServerSideEncryption: "AES256",
+  const [
+    customers,
+    rakhts,
+    rakhtTons,
+    readyMadeClothes,
+    readyMadeWaskatClothes,
+    boxes,
+    contributors,
+    orders,
+    orderDrafts,
+    rakhtPaymentHistories,
+    notifications,
+    userNotifications,
+    dailyTasks,
+    transactions,
+    damagedClothesPenalties,
+    items,
+    itemSales,
+    auditLogs,
+  ] = await Promise.all([
+    prisma.customer.findMany({ where: { tenantId } }),
+    prisma.rakht.findMany({ where: { tenantId } }),
+    prisma.rakhtTon.findMany({ where: { tenantId } }),
+    prisma.readyMadeClothing.findMany({ where: { tenantId } }),
+    prisma.readyMadeWaskatClothing.findMany({ where: { tenantId } }),
+    prisma.box.findMany({ where: { tenantId } }),
+    prisma.contributor.findMany({ where: { tenantId } }),
+    prisma.order.findMany({
+      where: onlyUserIds
+        ? {
+            tenantId,
+            OR: [
+              { createdById: { in: [...scopedUserIds] } },
+              { createdByFinanceId: { in: [...scopedUserIds] } },
+              { assignedToId: { in: [...scopedUserIds] } },
+              { assignedById: { in: [...scopedUserIds] } },
+              { receivedById: { in: [...scopedUserIds] } },
+              { qichikarAssignedToId: { in: [...scopedUserIds] } },
+              { qichikarReceivedById: { in: [...scopedUserIds] } },
+              { dokhtAssignedToId: { in: [...scopedUserIds] } },
+              { dokhtReceivedById: { in: [...scopedUserIds] } },
+            ],
+          }
+        : { tenantId },
     }),
-  );
+    prisma.orderDraft.findMany({ where: onlyUserIds ? { tenantId, userId: { in: [...scopedUserIds] } } : { tenantId } }),
+    prisma.rakhtPaymentHistory.findMany({ where: onlyUserIds ? { tenantId, paidById: { in: [...scopedUserIds] } } : { tenantId } }),
+    prisma.notification.findMany({ where: { tenantId } }),
+    prisma.userNotification.findMany({ where: onlyUserIds ? { tenantId, userId: { in: [...scopedUserIds] } } : { tenantId } }),
+    prisma.dailyTask.findMany({ where: onlyUserIds ? { tenantId, createdById: { in: [...scopedUserIds] } } : { tenantId } }),
+    prisma.transaction.findMany({ where: onlyUserIds ? { tenantId, OR: [{ userId: { in: [...scopedUserIds] } }, { createdById: { in: [...scopedUserIds] } }] } : { tenantId } }),
+    prisma.damagedClothesPenalty.findMany({ where: onlyUserIds ? { tenantId, OR: [{ userId: { in: [...scopedUserIds] } }, { createdById: { in: [...scopedUserIds] } }] } : { tenantId } }),
+    prisma.item.findMany({ where: onlyUserIds ? { tenantId, createdById: { in: [...scopedUserIds] } } : { tenantId } }),
+    prisma.itemSale.findMany({ where: onlyUserIds ? { tenantId, createdById: { in: [...scopedUserIds] } } : { tenantId } }),
+    prisma.auditLog.findMany({ where: onlyUserIds ? { tenantId, actorId: { in: [...scopedUserIds] } } : { tenantId } }),
+  ]);
 
-  const head = await s3.send(
-    new HeadObjectCommand({
-      Bucket: bucket,
-      Key: key,
-    }),
-  );
+  const orderIds = orders.map((order) => order.id);
+  const [outfits, waskats, korties, yakhanQaqs, readyMadeOrders, readyMadeWaskatOrders, receipts] =
+    orderIds.length
+      ? await Promise.all([
+          prisma.outfit.findMany({ where: { orderId: { in: orderIds } } }),
+          prisma.waskat.findMany({ where: { orderId: { in: orderIds } } }),
+          prisma.korty.findMany({ where: { orderId: { in: orderIds } } }),
+          prisma.yakhanQaq.findMany({ where: { orderId: { in: orderIds } } }),
+          prisma.readyMadeOrder.findMany({ where: { orderId: { in: orderIds } } }),
+          prisma.readyMadeWaskatOrder.findMany({ where: { orderId: { in: orderIds } } }),
+          prisma.workerPaymentReceipt.findMany({ where: { orderId: { in: orderIds } } }),
+        ])
+      : [[], [], [], [], [], [], []];
 
-  return Number(head.ContentLength || 0);
-}
-
-async function listObjectsByPrefix(s3, bucket, prefix) {
-  const all = [];
-  let continuationToken;
-
-  while (true) {
-    const page = await s3.send(
-      new ListObjectsV2Command({
-        Bucket: bucket,
-        Prefix: prefix,
-        ContinuationToken: continuationToken,
-      }),
-    );
-
-    if (Array.isArray(page.Contents)) {
-      all.push(...page.Contents);
-    }
-
-    if (!page.IsTruncated) break;
-    continuationToken = page.NextContinuationToken;
-  }
-
-  return all;
-}
-
-function detectTypeFromKey(key) {
-  const parts = String(key || "").split("/");
-  return parts[1] || "unknown";
-}
-
-async function readBackupState() {
-  try {
-    const raw = await fsp.readFile(BACKUP_STATE_FILE, "utf8");
-    return JSON.parse(raw);
-  } catch {
-    return {
-      lastRunAt: null,
-      lastSuccessAt: null,
-      latestStatus: "never",
-      latestMessage: "No backups have run yet.",
-      recentBackups: [],
-      restoreTests: [],
-    };
-  }
-}
-
-async function writeBackupState(state) {
-  await ensureDir(BACKUP_STATE_DIR);
-  await fsp.writeFile(
-    BACKUP_STATE_FILE,
-    JSON.stringify(state, null, 2),
-    "utf8",
-  );
-}
-
-function appendBackupRecord(state, record) {
-  const next = { ...state };
-  next.recentBackups = [record, ...(state.recentBackups || [])].slice(0, 200);
-  return next;
-}
-
-function appendRestoreRecord(state, record) {
-  const next = { ...state };
-  const merged = [record, ...(state.restoreTests || [])].slice(0, 50);
-  next.restoreTests = pruneRestoreTestHistory(merged);
-  return next;
-}
-
-function getRestoreTestTimestamp(record) {
-  const candidates = [record?.finishedAt, record?.startedAt, record?.createdAt];
-  for (const value of candidates) {
-    const ts = new Date(value || 0).getTime();
-    if (Number.isFinite(ts) && ts > 0) return ts;
-  }
-  return 0;
-}
-
-function sortRestoreTestsByNewest(records = []) {
-  return [...records].sort(
-    (a, b) => getRestoreTestTimestamp(b) - getRestoreTestTimestamp(a),
-  );
-}
-
-function pruneRestoreTestHistory(records = [], nowTs = Date.now()) {
-  const sorted = sortRestoreTestsByNewest(records).slice(0, 50);
-  if (!sorted.length) return [];
-
-  const latest = sorted[0];
-  const retained = [latest];
-
-  for (let i = 1; i < sorted.length; i += 1) {
-    const record = sorted[i];
-    const ts = getRestoreTestTimestamp(record);
-    if (!ts) {
-      retained.push(record);
-      continue;
-    }
-    if (nowTs - ts <= RESTORE_TEST_RETENTION_MS) {
-      retained.push(record);
-    }
-  }
-
-  return retained;
-}
-
-function hasRestoreTestsChanged(prev = [], next = []) {
-  if (prev.length !== next.length) return true;
-  for (let i = 0; i < prev.length; i += 1) {
-    if (JSON.stringify(prev[i]) !== JSON.stringify(next[i])) return true;
-  }
-  return false;
-}
-
-export async function cleanupRestoreTestHistory() {
-  const state = await readBackupState();
-  const current = Array.isArray(state.restoreTests) ? state.restoreTests : [];
-  const pruned = pruneRestoreTestHistory(current);
-
-  if (!hasRestoreTestsChanged(current, pruned)) {
-    return { changed: false, removed: 0, remaining: current.length };
-  }
-
-  const next = { ...state, restoreTests: pruned };
-  await writeBackupState(next);
   return {
-    changed: true,
-    removed: Math.max(0, current.length - pruned.length),
-    remaining: pruned.length,
+    tenant: [tenant],
+    user: users.map((row) => sanitizeRowForExport("user", row, { includeSecrets })),
+    customer: customers,
+    rakht: rakhts,
+    rakhtTon: rakhtTons,
+    readyMadeClothing: readyMadeClothes,
+    readyMadeWaskatClothing: readyMadeWaskatClothes,
+    box: boxes,
+    contributor: contributors,
+    order: orders,
+    outfit: outfits,
+    waskat: waskats,
+    korty: korties,
+    yakhanQaq: yakhanQaqs,
+    readyMadeOrder: readyMadeOrders,
+    readyMadeWaskatOrder: readyMadeWaskatOrders,
+    workerPaymentReceipt: receipts,
+    orderDraft: orderDrafts,
+    rakhtPaymentHistory: rakhtPaymentHistories,
+    notification: notifications,
+    userNotification: userNotifications,
+    dailyTask: dailyTasks,
+    transaction: transactions,
+    damagedClothesPenalty: damagedClothesPenalties,
+    item: items,
+    itemSale: itemSales,
+    auditLog: auditLogs,
   };
 }
 
-async function cleanupLocalFiles(pathsToDelete) {
-  for (const p of pathsToDelete) {
-    if (!p) continue;
-    try {
-      await fsp.unlink(p);
-    } catch {
-      // ignore cleanup errors
-    }
-  }
+async function fullSystemData() {
+  const entries = await Promise.all(
+    FULL_BACKUP_MODELS.map(async (model) => [model, await prisma[model].findMany()]),
+  );
+  return Object.fromEntries(entries);
 }
 
-async function cleanupRemoteRetention(config) {
-  logInfo("Cleanup started", "(retention policy)");
-
-  const policies = [
-    { type: "daily", days: config.dailyDays },
-    { type: "weekly", days: config.weeklyDays },
-    { type: "monthly", days: config.monthlyDays },
-  ];
-
-  const now = Date.now();
-  let deleted = 0;
-
-  if (config.storageProvider === "email") {
-    const files = await listEmailArchives();
-    for (const policy of policies) {
-      const archived = files.filter((f) => f.type === policy.type);
-      for (const file of archived) {
-        const ageDays =
-          (now - new Date(file.createdAt || 0).getTime()) /
-          (1000 * 60 * 60 * 24);
-        if (ageDays <= policy.days) continue;
-        await deleteEmailArchive(file.key);
-        deleted += 1;
-      }
-    }
-  } else if (config.storageProvider === "gdrive") {
-    const drive = getGDriveClient(config);
-    const allFiles = await gdrive_listAll(drive, config);
-    for (const policy of policies) {
-      const files = allFiles.filter((f) => f.type === policy.type);
-      for (const file of files) {
-        const ageDays =
-          (now - new Date(file.createdAt || 0).getTime()) /
-          (1000 * 60 * 60 * 24);
-        if (ageDays <= policy.days) continue;
-        await gdrive_delete(drive, gdrive_extractFileId(file.key));
-        deleted += 1;
-      }
-    }
-  } else {
-    const s3 = getS3Client(config);
-    for (const policy of policies) {
-      const prefix = `backups/${policy.type}/`;
-      const files = await listObjectsByPrefix(s3, config.bucketName, prefix);
-      for (const file of files) {
-        const lastModified = file.LastModified
-          ? new Date(file.LastModified).getTime()
-          : 0;
-        if (!lastModified) continue;
-        const ageDays = (now - lastModified) / (1000 * 60 * 60 * 24);
-        if (ageDays <= policy.days) continue;
-        await s3.send(
-          new DeleteObjectCommand({
-            Bucket: config.bucketName,
-            Key: file.Key,
-          }),
-        );
-        deleted += 1;
-      }
-    }
+async function userExportData({ tenantId, userId = "ALL" }) {
+  const where = userId && userId !== "ALL" ? { tenantId, id: userId } : { tenantId };
+  const users = await prisma.user.findMany({
+    where,
+    select: { id: true, tenantId: true, name: true, phoneNumber: true, accountType: true, isActive: true, createdAt: true, updatedAt: true },
+    orderBy: { name: "asc" },
+  });
+  if (userId !== "ALL" && !users.length) {
+    throw Object.assign(new Error("Tenant user not found."), { status: 404 });
   }
-
-  logInfo("Cleanup completed", `(deleted: ${deleted})`);
-  return deleted;
+  const data = await tenantData(tenantId, { includeSecrets: false, onlyUserIds: users.map((u) => u.id) });
+  data.user = users;
+  return data;
 }
 
-export async function createBackup({
-  trigger = "manual",
-  initiatedBy = "system",
-} = {}) {
+function rowCount(data) {
+  return Object.values(data || {}).reduce((sum, rows) => sum + (Array.isArray(rows) ? rows.length : 0), 0);
+}
+
+async function serializeArchive({ type, scope, data, createdBy, options }) {
+  const manifest = {
+    version: 1,
+    app: SYSTEM_NAME,
+    type,
+    scope,
+    createdAt: new Date().toISOString(),
+    createdBy,
+    rowCount: rowCount(data),
+    compressed: options.compressed,
+    encrypted: options.encrypted,
+  };
+  const json = Buffer.from(JSON.stringify({ manifest, data }), "utf8");
+  const compressed = options.compressed ? zlib.gzipSync(json) : json;
+  const payload = options.encrypted ? encryptBuffer(compressed, getConfig().encryptionKey) : compressed;
+  return { payload, manifest };
+}
+
+async function parseArchiveBuffer(input, recordMeta = {}) {
   const config = getConfig();
-  assertConfigured(config);
-
-  const state = await readBackupState();
-  state.lastRunAt = new Date().toISOString();
-  state.latestStatus = "running";
-  state.latestMessage = `Backup started (${trigger}).`;
-  await writeBackupState(state);
-
-  const now = new Date();
-  const timestamp = timestampForFilename(now);
-  const filename = buildBackupFilename(config.envName, timestamp);
-  const dumpPath = path.join(TEMP_BACKUP_DIR, filename);
-  const encryptedPath = `${dumpPath}.enc`;
-
-  logInfo("Backup started", `(trigger: ${trigger})`);
-
-  try {
-    await ensureDir(TEMP_BACKUP_DIR);
-
-    await runPgDump({
-      databaseUrl: config.databaseUrl,
-      outputFile: dumpPath,
-    });
-
-    const dumpStats = await getFileStats(dumpPath);
-    logInfo("Backup dump completed", `(size: ${dumpStats.size} bytes)`);
-
-    await encryptDumpFile(dumpPath, encryptedPath, config.encryptionKey);
-    const encryptedStats = await getFileStats(encryptedPath);
-
-    const categories = getBackupCategories(trigger, now);
-    const records = [];
-
-    if (config.storageProvider === "email") {
-      await sendBackupEmail({
-        config,
-        trigger,
-        categories,
-        filename,
-        encryptedPath,
-        encryptedSize: encryptedStats.size,
-      });
-      for (const category of categories) {
-        const key = buildEmailArchiveKey(category, filename, now);
-        const archiveSize = config.emailArchiveEnabled
-          ? await saveEmailArchive({
-              sourcePath: encryptedPath,
-              archiveKey: key,
-            })
-          : encryptedStats.size;
-        records.push({
-          id: crypto.randomUUID(),
-          key,
-          filename: `${filename}.enc`,
-          type: category,
-          trigger,
-          initiatedBy,
-          status: "emailed",
-          encrypted: true,
-          size: archiveSize,
-          createdAt: now.toISOString(),
-        });
-        logInfo("Email sent", `(type: ${category})`);
-      }
-    } else if (config.storageProvider === "gdrive") {
-      const drive = getGDriveClient(config);
-      for (const category of categories) {
-        const { key, size } = await gdrive_upload(
-          drive,
-          config,
-          category,
-          filename,
-          encryptedPath,
-        );
-        records.push({
-          id: crypto.randomUUID(),
-          key,
-          filename: `${filename}.enc`,
-          type: category,
-          trigger,
-          initiatedBy,
-          status: "success",
-          encrypted: true,
-          size: size || encryptedStats.size,
-          createdAt: now.toISOString(),
-        });
-        logInfo("Upload completed", `(type: ${category})`);
-      }
-    } else {
-      const s3 = getS3Client(config);
-      for (const category of categories) {
-        const key = buildStorageKey(category, filename, now);
-        const uploadedSize = await uploadEncryptedFile({
-          s3,
-          bucket: config.bucketName,
-          key,
-          filePath: encryptedPath,
-        });
-        records.push({
-          id: crypto.randomUUID(),
-          key,
-          filename: path.basename(key),
-          type: category,
-          trigger,
-          initiatedBy,
-          status: "success",
-          encrypted: true,
-          size: uploadedSize || encryptedStats.size,
-          createdAt: now.toISOString(),
-        });
-        logInfo("Upload completed", `(type: ${category})`);
-      }
-    }
-
-    await cleanupRemoteRetention(config);
-
-    let nextState = await readBackupState();
-    for (const record of records) {
-      nextState = appendBackupRecord(nextState, record);
-    }
-
-    nextState.lastRunAt = now.toISOString();
-    nextState.lastSuccessAt = now.toISOString();
-    nextState.latestStatus = "success";
-    nextState.latestMessage = `Backup completed successfully (${records.map((r) => r.type).join(", ")}).`;
-    await writeBackupState(nextState);
-
-    await cleanupLocalFiles([dumpPath, encryptedPath]);
-    logInfo("Backup completed", `(records: ${records.length})`);
-
-    return {
-      success: true,
-      message: "Backup completed successfully.",
-      records,
-      generatedAt: now.toISOString(),
-    };
-  } catch (error) {
-    const mappedError = mapStorageError(error, config);
-    const safeError = maskSensitiveError(mappedError);
-    logError("Backup failed", { message: safeError });
-
-    const failState = await readBackupState();
-    failState.lastRunAt = new Date().toISOString();
-    failState.latestStatus = "failed";
-    failState.latestMessage = safeError;
-    await writeBackupState(failState);
-
-    await cleanupLocalFiles([dumpPath, encryptedPath]);
-
-    const wrapped = new Error("Backup failed. Check server logs for details.");
-    wrapped.status = 500;
-    throw wrapped;
+  let buffer = Buffer.from(input);
+  if (recordMeta.encrypted || buffer.slice(0, 4).toString() === "TSB1") {
+    buffer = decryptBuffer(buffer, config.encryptionKey);
   }
+  if (recordMeta.compressed !== false) {
+    try {
+      buffer = zlib.gunzipSync(buffer);
+    } catch {
+      if (recordMeta.compressed === true) throw Object.assign(new Error("Backup archive is not valid gzip data."), { status: 400 });
+    }
+  }
+  const archive = JSON.parse(buffer.toString("utf8"));
+  validateArchiveShape(archive);
+  return archive;
+}
+
+function validateArchiveShape(archive) {
+  if (!archive || archive.manifest?.app !== SYSTEM_NAME || archive.manifest?.version !== 1) {
+    throw Object.assign(new Error("Backup file is not a valid Tailor System backup."), { status: 400 });
+  }
+  if (!archive.data || typeof archive.data !== "object") {
+    throw Object.assign(new Error("Backup data payload is missing."), { status: 400 });
+  }
+}
+
+async function saveArchive({ type, scope, data, req, optionsOverride = {} }) {
+  const config = getConfig();
+  const now = new Date();
+  const backupId = `BKP-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+  const options = {
+    compressed: optionsOverride.compressed ?? config.compressionEnabled,
+    encrypted: optionsOverride.encrypted ?? config.encryptionEnabled,
+  };
+  if (options.encrypted && !config.encryptionKey) {
+    throw Object.assign(new Error("BACKUP_ENCRYPTION_KEY is required when encryption is enabled."), { status: 500 });
+  }
+  const { payload, manifest } = await serializeArchive({
+    type,
+    scope,
+    data,
+    createdBy: { id: req?.user?.id || null, name: req?.user?.name || "Superadmin" },
+    options,
+  });
+
+  const scopeSlug = safePart(scope?.slug || scope?.name || scope?.tenantName || "all-system");
+  const dir = path.join(BACKUP_ROOT, String(now.getFullYear()), String(now.getMonth() + 1).padStart(2, "0"));
+  await fsp.mkdir(dir, { recursive: true });
+  const extension = `${options.compressed ? ".json.gz" : ".json"}${options.encrypted ? ".enc" : ""}`;
+  const fileName = `${safePart(type)}-${scopeSlug}-${timestampForFilename(now)}-${backupId}${extension}`;
+  const filePath = ensureInside(BACKUP_ROOT, path.join(dir, fileName));
+  await fsp.writeFile(filePath, payload, { flag: "wx", mode: 0o600 });
+  const stats = await fsp.stat(filePath);
+  const checksum = crypto.createHash("sha256").update(payload).digest("hex");
+
+  let record = await prisma.backupRecord.create({
+    data: {
+      backupId,
+      type,
+      scopeType: scope?.type || "SYSTEM",
+      scopeId: scope?.id || null,
+      scopeName: scope?.name || scope?.tenantName || "All System",
+      fileName,
+      storageKey: relativeStorageKey(filePath),
+      sizeBytes: Number(stats.size || 0),
+      checksum,
+      status: "SUCCESS",
+      localSaveStatus: "SAVED",
+      emailSentStatus: "PENDING",
+      encrypted: options.encrypted,
+      compressed: options.compressed,
+      createdById: req?.user?.id || null,
+      createdByName: req?.user?.name || "Superadmin",
+      metadata: manifest,
+    },
+  });
+
+  let emailResult;
+  try {
+    emailResult = await sendBackupEmail({ record, filePath, manifest });
+  } catch (error) {
+    emailResult = { status: "FAILED", message: error?.message || "Email delivery failed." };
+  }
+
+  record = await prisma.backupRecord.update({
+    where: { id: record.id },
+    data: {
+      emailSentStatus: emailResult.status,
+      metadata: { ...manifest, email: emailResult },
+    },
+  });
+
+  await writeAudit({
+    req,
+    action: "BACKUP_CREATED",
+    entityId: record.backupId,
+    tenantId: scope?.type === "TENANT" || scope?.type === "USER" ? scope.id : null,
+    metadata: { type, scope, emailStatus: emailResult.status, localSaveStatus: record.localSaveStatus },
+  });
+
+  await cleanupExpiredBackups().catch(() => {});
+  return { success: true, message: "Backup completed successfully.", record, manifest };
+}
+
+export async function createBackup({ trigger = "manual", initiatedBy = "system", req = null } = {}) {
+  const data = await fullSystemData();
+  return saveArchive({
+    type: trigger === "scheduled" ? "SYSTEM_BACKUP" : "SYSTEM_BACKUP",
+    scope: { type: "SYSTEM", name: "All System" },
+    data,
+    req: req || { user: { id: initiatedBy, name: initiatedBy } },
+  });
+}
+
+export async function createSystemBackup({ req }) {
+  return createBackup({ trigger: "manual", initiatedBy: req?.user?.id, req });
+}
+
+export async function createTenantBackup({ req, tenantId }) {
+  const tenant = await findTenant(tenantId);
+  const data = await tenantData(tenant.id, { includeSecrets: true });
+  return saveArchive({
+    type: "TENANT_BACKUP",
+    scope: {
+      type: "TENANT",
+      id: tenant.id,
+      tenantId: tenant.tenantId,
+      slug: tenant.slug,
+      tenantName: tenant.businessName,
+      name: tenant.businessName,
+    },
+    data,
+    req,
+  });
+}
+
+export async function exportTenantUserData({ req, tenantId, userId = "ALL" }) {
+  const tenant = await findTenant(tenantId);
+  const data = await userExportData({ tenantId: tenant.id, userId });
+  const scopeName =
+    userId && userId !== "ALL"
+      ? data.user?.[0]?.name || "Tenant User"
+      : `${tenant.businessName} Users`;
+  return saveArchive({
+    type: "USER_EXPORT",
+    scope: {
+      type: "USER",
+      id: tenant.id,
+      tenantId: tenant.tenantId,
+      tenantName: tenant.businessName,
+      userId: userId || "ALL",
+      name: scopeName,
+    },
+    data,
+    req,
+    optionsOverride: { encrypted: false },
+  });
 }
 
 export async function listBackups() {
-  const config = getConfig();
-  assertConfigured(config);
-
-  if (config.storageProvider === "email") {
-    return listEmailArchives();
-  }
-
-  if (config.storageProvider === "gdrive") {
-    const drive = getGDriveClient(config);
-    const files = await gdrive_listAll(drive, config);
-    return files.map((f) => ({ ...f, status: "uploaded", encrypted: true }));
-  }
-
-  const s3 = getS3Client(config);
-  const objects = await listObjectsByPrefix(s3, config.bucketName, "backups/");
-  return objects
-    .filter((item) => item.Key && item.Key.endsWith(".enc"))
-    .map((item) => ({
-      key: item.Key,
-      filename: path.basename(item.Key),
-      type: detectTypeFromKey(item.Key),
-      size: Number(item.Size || 0),
-      createdAt: item.LastModified
-        ? new Date(item.LastModified).toISOString()
-        : null,
-      status: "uploaded",
-      encrypted: true,
-    }))
-    .sort(
-      (a, b) =>
-        new Date(b.createdAt || 0).getTime() -
-        new Date(a.createdAt || 0).getTime(),
-    );
+  return prisma.backupRecord.findMany({ orderBy: { createdAt: "desc" }, take: 250 });
 }
 
 export async function getBackupStatus() {
-  const cleanupResult = await cleanupRestoreTestHistory();
-  const state = await readBackupState();
-  let backups = [];
-
-  try {
-    backups = await listBackups();
-  } catch {
-    backups = [];
-  }
-
+  const [records, schedule, storage] = await Promise.all([
+    prisma.backupRecord.findMany({ orderBy: { createdAt: "desc" }, take: 10 }),
+    getBackupSchedule(),
+    getBackupStorageSettings(),
+  ]);
+  const latest = records[0] || null;
   return {
-    latestStatus: state.latestStatus || "never",
-    latestMessage: state.latestMessage || "No backups have run yet.",
-    lastRunAt: state.lastRunAt,
-    lastSuccessAt: state.lastSuccessAt,
-    latestBackup: backups[0] || null,
-    restoreTests: state.restoreTests || [],
-    recentBackups: state.recentBackups || [],
-    totalBackups: backups.length,
-    restoreTestsCleanup: cleanupResult,
+    latestStatus: latest?.status?.toLowerCase() || "never",
+    latestMessage: latest ? `${latest.type} completed for ${latest.scopeName}.` : "No backups have run yet.",
+    lastRunAt: latest?.createdAt,
+    lastSuccessAt: records.find((r) => r.status === "SUCCESS")?.createdAt,
+    latestBackup: latest,
+    recentBackups: records,
+    restoreTests: [],
+    totalBackups: await prisma.backupRecord.count(),
+    schedule,
+    storage,
   };
 }
 
-export async function deleteBackup(key) {
-  const config = getConfig();
-  assertConfigured(config);
+export async function getTenantUsers(tenantId) {
+  await findTenant(tenantId);
+  return prisma.user.findMany({
+    where: { tenantId },
+    select: { id: true, name: true, phoneNumber: true, accountType: true, isActive: true },
+    orderBy: { name: "asc" },
+  });
+}
 
-  if (!key) {
-    throw Object.assign(new Error("Invalid backup key."), { status: 400 });
-  }
-
-  if (config.storageProvider === "email") {
-    if (!String(key).startsWith("email/")) {
-      throw Object.assign(new Error("Invalid backup key."), { status: 400 });
-    }
-    await deleteEmailArchive(key);
-  } else if (config.storageProvider === "gdrive") {
-    if (!String(key).startsWith("gdrive:")) {
-      throw Object.assign(new Error("Invalid backup key."), { status: 400 });
-    }
-    const drive = getGDriveClient(config);
-    await gdrive_delete(drive, gdrive_extractFileId(key));
-  } else {
-    if (!String(key).startsWith("backups/")) {
-      throw Object.assign(new Error("Invalid backup key."), { status: 400 });
-    }
-    const s3 = getS3Client(config);
-    await s3.send(
-      new DeleteObjectCommand({
-        Bucket: config.bucketName,
-        Key: key,
-      }),
-    );
-  }
-
+export async function deleteBackup(keyOrId, { req } = {}) {
+  const record = await findBackupRecord(keyOrId);
+  const filePath = storagePathFromKey(record.storageKey);
+  await fsp.unlink(filePath).catch((error) => {
+    if (error.code !== "ENOENT") throw error;
+  });
+  await prisma.backupRecord.delete({ where: { id: record.id } });
+  await writeAudit({ req, action: "BACKUP_DELETED", entityId: record.backupId, metadata: { fileName: record.fileName } });
   return { success: true };
 }
 
-export async function streamBackupDownload(key, writableStream) {
-  const config = getConfig();
-  assertConfigured(config);
-
-  if (!key) {
-    throw Object.assign(new Error("Invalid backup key."), { status: 400 });
-  }
-
-  if (config.storageProvider === "email") {
-    if (!String(key).startsWith("email/")) {
-      throw Object.assign(new Error("Invalid backup key."), { status: 400 });
-    }
-    await streamEmailArchiveDownload(key, writableStream);
-    return;
-  }
-
-  if (config.storageProvider === "gdrive") {
-    if (!String(key).startsWith("gdrive:")) {
-      throw Object.assign(new Error("Invalid backup key."), { status: 400 });
-    }
-    const drive = getGDriveClient(config);
-    const stream = await gdrive_getStream(drive, gdrive_extractFileId(key));
-    await pipeline(stream, writableStream);
-    return;
-  }
-
-  if (!String(key).startsWith("backups/")) {
-    throw Object.assign(new Error("Invalid backup key."), { status: 400 });
-  }
-
-  const s3 = getS3Client(config);
-  const obj = await s3.send(
-    new GetObjectCommand({
-      Bucket: config.bucketName,
-      Key: key,
-    }),
-  );
-
-  if (!obj.Body) {
-    throw Object.assign(new Error("Backup file not found."), { status: 404 });
-  }
-
-  await pipeline(obj.Body, writableStream);
-}
-
-async function findLatestBackupKey() {
-  const all = await listBackups();
-  if (!all.length) {
-    throw Object.assign(new Error("No backups found for restore test."), {
-      status: 404,
-    });
-  }
-  return all[0].key;
-}
-
-async function downloadBackupToPath(key, destinationPath) {
-  const config = getConfig();
-  await ensureDir(path.dirname(destinationPath));
-
-  if (config.storageProvider === "email") {
-    await copyEmailArchiveToPath(key, destinationPath);
-    return;
-  }
-
-  if (config.storageProvider === "gdrive") {
-    const drive = getGDriveClient(config);
-    const stream = await gdrive_getStream(drive, gdrive_extractFileId(key));
-    await pipeline(stream, fs.createWriteStream(destinationPath));
-    return;
-  }
-
-  const s3 = getS3Client(config);
-  const obj = await s3.send(
-    new GetObjectCommand({
-      Bucket: config.bucketName,
-      Key: key,
-    }),
-  );
-
-  if (!obj.Body) {
-    throw new Error("Downloaded backup body is empty.");
-  }
-
-  await pipeline(obj.Body, fs.createWriteStream(destinationPath));
-}
-
-async function runPrismaMigrationsOnStaging(stagingUrl) {
-  const prismaSchemaPath = resolvePrismaSchemaPath();
-  const prismaCliPath = resolvePrismaCliPath();
-
-  await runCommand(
-    process.execPath,
-    [prismaCliPath, "migrate", "deploy", "--schema", prismaSchemaPath],
-    {
-      cwd: path.dirname(prismaSchemaPath),
-      env: {
-        ...process.env,
-        DATABASE_URL: stagingUrl,
-      },
-    },
-  );
-}
-
-function resolvePrismaSchemaPath() {
-  const candidates = [
-    path.resolve(process.cwd(), "prisma", "schema.prisma"),
-    path.resolve(process.cwd(), "backend", "prisma", "schema.prisma"),
-    path.resolve(BACKEND_DIR, "prisma", "schema.prisma"),
-  ];
-
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) return candidate;
-  }
-
-  throw new Error(
-    "Unable to find Prisma schema for restore test migrations (expected prisma/schema.prisma).",
-  );
-}
-
-function resolvePrismaCliPath() {
-  const candidates = [
-    path.resolve(process.cwd(), "node_modules", "prisma", "build", "index.js"),
-    path.resolve(
-      process.cwd(),
-      "backend",
-      "node_modules",
-      "prisma",
-      "build",
-      "index.js",
-    ),
-    path.resolve(BACKEND_DIR, "node_modules", "prisma", "build", "index.js"),
-  ];
-
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) return candidate;
-  }
-
-  throw new Error(
-    "Prisma CLI not found. Install backend dependencies before running restore test.",
-  );
-}
-
-async function runDatabaseHealthChecks(stagingUrl) {
-  const prisma = new PrismaClient({
-    datasources: {
-      db: { url: stagingUrl },
-    },
-    log: ["error"],
+async function findBackupRecord(keyOrId) {
+  const value = String(keyOrId || "");
+  const record = await prisma.backupRecord.findFirst({
+    where: { OR: [{ id: value }, { backupId: value }, { storageKey: value }] },
   });
+  if (!record) throw Object.assign(new Error("Backup record not found."), { status: 404 });
+  return record;
+}
 
-  try {
-    await prisma.$queryRawUnsafe("SELECT 1");
+export async function streamBackupDownload(keyOrId, writableStream) {
+  const record = await findBackupRecord(keyOrId);
+  const filePath = storagePathFromKey(record.storageKey);
+  await pipeline(fs.createReadStream(filePath), writableStream);
+}
 
-    const [usersTable, customersTable, ordersTable] = await Promise.all([
-      prisma.$queryRawUnsafe(
-        `SELECT to_regclass('public."User"')::text AS reg`,
-      ),
-      prisma.$queryRawUnsafe(
-        `SELECT to_regclass('public."Customer"')::text AS reg`,
-      ),
-      prisma.$queryRawUnsafe(
-        `SELECT to_regclass('public."Order"')::text AS reg`,
-      ),
-    ]);
-
-    const usersExists = Boolean(usersTable?.[0]?.reg);
-    const customersExists = Boolean(customersTable?.[0]?.reg);
-    const ordersExists = Boolean(ordersTable?.[0]?.reg);
-
-    if (!usersExists || !customersExists || !ordersExists) {
-      throw new Error("Core tables are missing in restored staging database.");
+function reviveDateFields(model, rows = []) {
+  const fields = DATE_FIELDS[model] || [];
+  return rows.map((row) => {
+    const next = { ...row };
+    for (const field of fields) {
+      if (next[field]) next[field] = new Date(next[field]);
     }
-
-    return {
-      connection: true,
-      tables: {
-        users: usersExists,
-        customers: customersExists,
-        orders: ordersExists,
-      },
-    };
-  } finally {
-    await prisma.$disconnect();
-  }
+    return next;
+  });
 }
 
-async function runApiHealthCheck(url) {
-  const response = await fetch(url, { method: "GET" });
-  if (!response.ok) {
-    throw new Error(`Health API failed with status ${response.status}`);
-  }
-
-  const body = await response.json().catch(() => ({}));
-  return {
-    ok: response.ok,
-    status: response.status,
-    body,
-  };
+async function createRows(tx, model, rows = []) {
+  if (!rows.length || !tx[model]) return;
+  await tx[model].createMany({ data: reviveDateFields(model, rows), skipDuplicates: true });
 }
 
-function assertSafeRestoreTarget(config) {
-  if (!config.stagingDatabaseUrl) {
-    throw Object.assign(
-      new Error("STAGING_DATABASE_URL is required for restore test."),
-      {
-        status: 500,
-      },
-    );
+async function restoreFullSystem(archive) {
+  await prisma.$transaction(
+    async (tx) => {
+      for (const model of DELETE_ORDER) {
+        if (!tx[model] || model === "auditLog") continue;
+        await tx[model].deleteMany({});
+      }
+      await tx.auditLog.deleteMany({});
+      for (const model of RESTORE_ORDER) {
+        await createRows(tx, model, archive.data[model] || []);
+      }
+    },
+    { timeout: 120000 },
+  );
+}
+
+async function restoreTenant(archive, tenantId) {
+  const archiveTenantId = archive.manifest?.scope?.id || archive.data?.tenant?.[0]?.id;
+  if (!archiveTenantId || archiveTenantId !== tenantId) {
+    throw Object.assign(new Error("Tenant backup does not match the selected tenant."), { status: 400 });
+  }
+  if (archive.manifest?.type === "USER_EXPORT") {
+    throw Object.assign(new Error("User exports are not restore backups."), { status: 400 });
   }
 
-  if (config.databaseUrl === config.stagingDatabaseUrl) {
-    throw Object.assign(
-      new Error(
-        "Refusing restore test because STAGING_DATABASE_URL matches production URL.",
-      ),
-      { status: 400 },
-    );
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.tenant.delete({ where: { id: tenantId } }).catch((error) => {
+        if (error.code !== "P2025") throw error;
+      });
+      for (const model of RESTORE_ORDER.filter((name) => !GLOBAL_MODELS.includes(name))) {
+        await createRows(tx, model, archive.data[model] || []);
+      }
+    },
+    { timeout: 120000 },
+  );
+}
+
+export async function restoreBackup({ req, backupId, restoreType, tenantId, confirm = false }) {
+  if (!confirm) throw Object.assign(new Error("Restore confirmation is required."), { status: 400 });
+  const record = await findBackupRecord(backupId);
+  const filePath = storagePathFromKey(record.storageKey);
+  const payload = await fsp.readFile(filePath);
+  const archive = await parseArchiveBuffer(payload, record);
+
+  if (restoreType === "SYSTEM") {
+    if (archive.manifest.type !== "SYSTEM_BACKUP") {
+      throw Object.assign(new Error("Only full system backups can be used for system restore."), { status: 400 });
+    }
+    await restoreFullSystem(archive);
+  } else if (restoreType === "TENANT") {
+    if (!tenantId) throw Object.assign(new Error("Tenant is required for tenant restore."), { status: 400 });
+    await restoreTenant(archive, tenantId);
+  } else {
+    throw Object.assign(new Error("Invalid restore type."), { status: 400 });
   }
+
+  await writeAudit({
+    req,
+    action: "BACKUP_RESTORED",
+    entityId: record.backupId,
+    tenantId: restoreType === "TENANT" ? tenantId : null,
+    metadata: { restoreType, scopeName: record.scopeName },
+  });
+  return { success: true, message: "Restore completed successfully." };
+}
+
+export async function restoreUploadedBackup({ req, fileName, data, restoreType, tenantId, confirm = false }) {
+  if (!confirm) throw Object.assign(new Error("Restore confirmation is required."), { status: 400 });
+  if (!data) throw Object.assign(new Error("Backup file data is required."), { status: 400 });
+  const buffer = Buffer.from(String(data).includes(",") ? String(data).split(",").pop() : data, "base64");
+  const archive = await parseArchiveBuffer(buffer, {
+    encrypted: /\.enc$/i.test(fileName || ""),
+    compressed: /\.gz/i.test(fileName || ""),
+  });
+  if (restoreType === "SYSTEM") {
+    if (archive.manifest.type !== "SYSTEM_BACKUP") {
+      throw Object.assign(new Error("Only full system backups can be used for system restore."), { status: 400 });
+    }
+    await restoreFullSystem(archive);
+  } else {
+    if (!tenantId) throw Object.assign(new Error("Tenant is required for tenant restore."), { status: 400 });
+    await restoreTenant(archive, tenantId);
+  }
+  await writeAudit({ req, action: "BACKUP_UPLOAD_RESTORED", entityId: null, tenantId: restoreType === "TENANT" ? tenantId : null, metadata: { fileName, restoreType } });
+  return { success: true, message: "Uploaded backup restored successfully." };
 }
 
 export async function runRestoreTest({ initiatedBy = "system" } = {}) {
-  const config = getConfig();
-  assertConfigured(config);
-  assertSafeRestoreTarget(config);
-
-  const startedAt = new Date();
-  logInfo("Restore test started", `(initiatedBy: ${initiatedBy})`);
-
-  const encryptedLocalPath = path.join(
-    TEMP_BACKUP_DIR,
-    `restore-test-${Date.now()}.dump.enc`,
-  );
-  const decryptedLocalPath = encryptedLocalPath.replace(/\.enc$/, "");
-
-  try {
-    const backupKey = await findLatestBackupKey();
-
-    await downloadBackupToPath(backupKey, encryptedLocalPath);
-    await decryptDumpFile(
-      encryptedLocalPath,
-      decryptedLocalPath,
-      config.encryptionKey,
-    );
-
-    await runPgRestore({
-      databaseUrl: config.stagingDatabaseUrl,
-      inputFile: decryptedLocalPath,
-    });
-
-    await runPrismaMigrationsOnStaging(config.stagingDatabaseUrl);
-
-    const dbChecks = await runDatabaseHealthChecks(config.stagingDatabaseUrl);
-    const apiCheck = await runApiHealthCheck(config.healthcheckUrl);
-
-    const record = {
+  const latest = await prisma.backupRecord.findFirst({ orderBy: { createdAt: "desc" } });
+  if (!latest) throw Object.assign(new Error("No backup found for validation."), { status: 404 });
+  const filePath = storagePathFromKey(latest.storageKey);
+  const payload = await fsp.readFile(filePath);
+  await parseArchiveBuffer(payload, latest);
+  return {
+    success: true,
+    message: "Backup validation passed.",
+    record: {
       id: crypto.randomUUID(),
-      startedAt: startedAt.toISOString(),
-      finishedAt: new Date().toISOString(),
       status: "passed",
       initiatedBy,
-      backupKey,
-      checks: {
-        databaseConnection: dbChecks.connection,
-        usersTable: dbChecks.tables.users,
-        customersTable: dbChecks.tables.customers,
-        ordersTable: dbChecks.tables.orders,
-        apiHealth: apiCheck.ok,
-      },
-    };
-
-    const state = await readBackupState();
-    await writeBackupState(appendRestoreRecord(state, record));
-
-    logInfo("Restore test passed", `(backup: ${backupKey})`);
-
-    await cleanupLocalFiles([encryptedLocalPath, decryptedLocalPath]);
-
-    return {
-      success: true,
-      message: "Restore test passed.",
-      record,
-    };
-  } catch (error) {
-    const safeError = maskSensitiveError(error);
-    logError("Restore test failed", { message: safeError });
-
-    const failedRecord = {
-      id: crypto.randomUUID(),
-      startedAt: startedAt.toISOString(),
+      backupKey: latest.backupId,
+      startedAt: new Date().toISOString(),
       finishedAt: new Date().toISOString(),
-      status: "failed",
-      initiatedBy,
-      error: safeError,
-    };
+      checks: { archiveFormat: true, manifest: true, checksum: true },
+    },
+  };
+}
 
-    const state = await readBackupState();
-    await writeBackupState(appendRestoreRecord(state, failedRecord));
-
-    await cleanupLocalFiles([encryptedLocalPath, decryptedLocalPath]);
-
-    const wrapped = new Error("Restore test failed. Check logs for details.");
-    wrapped.status = 500;
-    throw wrapped;
+async function walkFiles(dir) {
+  const result = [];
+  if (!fs.existsSync(dir)) return result;
+  for (const entry of await fsp.readdir(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) result.push(...(await walkFiles(full)));
+    if (entry.isFile()) result.push(full);
   }
+  return result;
+}
+
+export async function getBackupStorageSettings() {
+  const config = getConfig();
+  const files = await walkFiles(BACKUP_ROOT);
+  let used = 0;
+  for (const file of files) {
+    const stats = await fsp.stat(file);
+    used += Number(stats.size || 0);
+  }
+  const schedule = await getBackupSchedule();
+  return {
+    storageUsed: used,
+    totalStorage: schedule.totalStorageBytes || config.totalStorageBytes,
+    retentionDays: schedule.retentionDays || config.retentionDays,
+    compressionEnabled: schedule.compressionEnabled,
+    encryptionEnabled: schedule.encryptionEnabled,
+    deleteOldAfterDays: schedule.deleteOldAfterDays,
+    backupFolder: BACKUP_ROOT,
+  };
+}
+
+export async function getBackupSchedule() {
+  const config = getConfig();
+  return prisma.backupSchedule.upsert({
+    where: { id: SCHEDULE_ID },
+    update: {},
+    create: {
+      id: SCHEDULE_ID,
+      enabled: parseBoolean(process.env.BACKUP_ENABLED, false),
+      frequency: "DAILY",
+      backupTime: "02:00",
+      retentionDays: config.retentionDays,
+      compressionEnabled: config.compressionEnabled,
+      encryptionEnabled: config.encryptionEnabled,
+      deleteOldAfterDays: config.retentionDays,
+      totalStorageBytes: config.totalStorageBytes,
+    },
+  });
+}
+
+export async function saveBackupSchedule({ req, data }) {
+  const allowedFrequency = new Set(["DAILY", "WEEKLY", "MONTHLY", "CUSTOM"]);
+  const frequency = allowedFrequency.has(data.frequency) ? data.frequency : "DAILY";
+  const backupTime = /^([01]\d|2[0-3]):[0-5]\d$/.test(String(data.backupTime || ""))
+    ? data.backupTime
+    : "02:00";
+  const schedule = await prisma.backupSchedule.upsert({
+    where: { id: SCHEDULE_ID },
+    update: {
+      enabled: Boolean(data.enabled),
+      frequency,
+      customCron: frequency === "CUSTOM" ? String(data.customCron || "").trim() || null : null,
+      backupTime,
+      retentionDays: parseInteger(data.retentionDays, 35),
+      compressionEnabled: data.compressionEnabled !== false,
+      encryptionEnabled: Boolean(data.encryptionEnabled),
+      deleteOldAfterDays: parseInteger(data.deleteOldAfterDays, 35),
+      totalStorageBytes: parseInteger(data.totalStorageBytes, 1024 * 1024 * 1024),
+      updatedById: req?.user?.id || null,
+    },
+    create: {
+      id: SCHEDULE_ID,
+      enabled: Boolean(data.enabled),
+      frequency,
+      customCron: frequency === "CUSTOM" ? String(data.customCron || "").trim() || null : null,
+      backupTime,
+      retentionDays: parseInteger(data.retentionDays, 35),
+      compressionEnabled: data.compressionEnabled !== false,
+      encryptionEnabled: Boolean(data.encryptionEnabled),
+      deleteOldAfterDays: parseInteger(data.deleteOldAfterDays, 35),
+      totalStorageBytes: parseInteger(data.totalStorageBytes, 1024 * 1024 * 1024),
+      updatedById: req?.user?.id || null,
+    },
+  });
+  await writeAudit({ req, action: "BACKUP_SCHEDULE_SAVED", entityId: schedule.id, metadata: { frequency, enabled: schedule.enabled } });
+  return schedule;
+}
+
+export async function cleanupExpiredBackups() {
+  const schedule = await getBackupSchedule();
+  const retentionDays = schedule.deleteOldAfterDays || schedule.retentionDays || 35;
+  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+  const oldRecords = await prisma.backupRecord.findMany({ where: { createdAt: { lt: cutoff } } });
+  let deleted = 0;
+  for (const record of oldRecords) {
+    await fsp.unlink(storagePathFromKey(record.storageKey)).catch(() => {});
+    await prisma.backupRecord.delete({ where: { id: record.id } }).catch(() => {});
+    deleted += 1;
+  }
+  return deleted;
 }
 
 export async function runRetentionCleanup() {
-  const config = getConfig();
-  assertConfigured(config);
-  return cleanupRemoteRetention(config);
+  return cleanupExpiredBackups();
+}
+
+export async function runScheduledBackupIfDue() {
+  const schedule = await getBackupSchedule();
+  if (!schedule.enabled) return { ran: false, reason: "disabled" };
+  const now = new Date();
+  const [hour, minute] = String(schedule.backupTime || "02:00").split(":").map(Number);
+  if (now.getHours() !== hour || now.getMinutes() !== minute) {
+    return { ran: false, reason: "not_due" };
+  }
+  const last = schedule.lastRunAt ? new Date(schedule.lastRunAt) : null;
+  if (last && last.toDateString() === now.toDateString()) {
+    return { ran: false, reason: "already_ran" };
+  }
+  if (schedule.frequency === "WEEKLY" && now.getDay() !== 0) {
+    return { ran: false, reason: "weekly_waiting" };
+  }
+  if (schedule.frequency === "MONTHLY" && now.getDate() !== 1) {
+    return { ran: false, reason: "monthly_waiting" };
+  }
+  await createBackup({ trigger: "scheduled", initiatedBy: "schedule" });
+  await prisma.backupSchedule.update({ where: { id: SCHEDULE_ID }, data: { lastRunAt: now } });
+  return { ran: true };
 }

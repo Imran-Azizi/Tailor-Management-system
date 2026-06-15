@@ -102,6 +102,53 @@ model AuditLog {
   @@index([entity, entityId])
 }
 
+model BackupRecord {
+  id              String   @id @default(uuid())
+  backupId        String   @unique
+  type            String
+  scopeType       String
+  scopeId         String?
+  scopeName       String
+  fileName        String
+  storageKey      String
+  sizeBytes       Int      @default(0)
+  checksum        String?
+  status          String   @default("SUCCESS")
+  localSaveStatus String   @default("SUCCESS")
+  emailSentStatus String   @default("PENDING")
+  encrypted       Boolean  @default(false)
+  compressed      Boolean  @default(true)
+  createdById     String?
+  createdByName   String?
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([backupId])
+  @@index([type])
+  @@index([scopeType, scopeId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model BackupSchedule {
+  id                 String   @id @default("default")
+  enabled            Boolean  @default(false)
+  frequency          String   @default("DAILY")
+  customCron         String?
+  backupTime         String   @default("02:00")
+  retentionDays      Int      @default(35)
+  compressionEnabled Boolean  @default(true)
+  encryptionEnabled  Boolean  @default(false)
+  deleteOldAfterDays Int      @default(35)
+  totalStorageBytes  Int      @default(1073741824)
+  lastRunAt          DateTime?
+  nextRunAt          DateTime?
+  updatedById        String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
 enum TransactionKind {
   LOAN
 }
@@ -192,6 +239,10 @@ model UserNotification {
   @@index([userId])
   @@index([tenantId])
   @@index([isRead])
+  @@index([createdAt])
+  @@index([tenantId, createdAt])
+  @@index([userId, createdAt])
+  @@index([tenantId, userId, createdAt])
   @@index([userId, isRead, createdAt])
   @@index([tenantId, userId, isRead, createdAt])
 }
@@ -720,6 +771,8 @@ model Notification {
   @@index([isRead])
   @@index([nextAlert])
   @@index([expiresAt])
+  @@index([createdAt])
+  @@index([tenantId, createdAt])
 }
 
 model Box {

@@ -16,7 +16,10 @@ import {
   formatSystemNotificationMessage,
   formatUserNotificationMessage,
 } from "../lib/notifications.js";
-import { formatDateTimeLocale, formatDateLocale } from "../lib/locale.js";
+import {
+  formatDateTimeLocale,
+  formatRelativeTimeLocale,
+} from "../lib/locale.js";
 import {
   getNotificationSummary,
   groupNotificationsByDay,
@@ -292,20 +295,10 @@ export default function Notifications() {
                           </NotificationText>
                         )}
                         <div className="notif-feed-item__meta">
-                          <span>
+                          <span title={formatDateTimeLocale(n.createdAt, language)}>
                             {t("notificationsPage.created")}:{" "}
-                            {formatDateTimeLocale(n.createdAt, language)}
+                            {formatRelativeTimeLocale(n.createdAt, language)}
                           </span>
-                          <span>
-                            {t("notificationsPage.next")}:{" "}
-                            {formatDateTimeLocale(n.nextAlert, language)}
-                          </span>
-                          {n.expiresAt && (
-                            <span className="notif-feed-item__meta-danger">
-                              {t("notificationsPage.expires")}:{" "}
-                              {formatDateLocale(n.expiresAt, language)}
-                            </span>
-                          )}
                         </div>
                       </div>
                       <div className="notif-feed-item__actions">

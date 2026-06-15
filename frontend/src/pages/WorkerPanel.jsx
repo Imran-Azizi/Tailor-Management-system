@@ -12,7 +12,7 @@ import {
   LuPlay,
   LuSearch,
   LuSquareCheck,
-  LuUser,
+  LuX,
 } from "react-icons/lu";
 import api from "../lib/api.js";
 import { parseNumberLocale } from "../lib/normalize.js";
@@ -22,7 +22,13 @@ import {
   getOrderPrimaryDisplayName,
 } from "../lib/orderType.js";
 import { formatUserNotificationMessage } from "../lib/notifications.js";
-import { formatDateTimeLocale, formatSystemDate } from "../lib/locale.js";
+import {
+  formatDateTimeLocale,
+  formatRelativeTimeLocale,
+  formatSystemDate,
+  isRtlLanguage,
+  normalizeLanguage,
+} from "../lib/locale.js";
 import {
   getNotificationSummary,
   groupNotificationsByDay,
@@ -39,7 +45,6 @@ import { useMonth } from "../context/MonthContext.jsx";
 import { formatMonthYearLabel } from "../lib/months.js";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import { NotificationText } from "../components/ui/index.jsx";
-import OrderCreatorBadge from "../components/order/OrderCreatorBadge.jsx";
 
 const ROLE_CONFIG = {
   DOKHT: {
@@ -153,6 +158,25 @@ const BOOL_LABEL_KEYS = {
   doubleSidePocket: "createOrder.fields.doubleSidePocket",
   underPocket: "createOrder.fields.underPocket",
 };
+
+const RECEIVED_CARD_VISIBILITY_MS = 60 * 1000;
+
+function getTimestampMs(value) {
+  const timestamp = value ? new Date(value).getTime() : NaN;
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function shouldHideReceivedOrderCard(order, accountType, userId, nowMs) {
+  const roleState = getRoleOrderState(order, accountType);
+  if (roleState.receivedById !== userId || !roleState.receivedAt) {
+    return false;
+  }
+
+  const receivedAtMs = getTimestampMs(roleState.receivedAt);
+  return (
+    receivedAtMs != null && nowMs - receivedAtMs >= RECEIVED_CARD_VISIBILITY_MS
+  );
+}
 
 function getMeasure(order) {
   return (
@@ -312,9 +336,7 @@ function ConfirmActionModal({ config, pending, onClose, onConfirm }) {
   if (typeof window !== "undefined" && window.i18next) {
     language = window.i18next.language;
   }
-  const isRtl = ["fa", "ps", "prs", "uz-Arab", "ar", "ur"].includes(
-    (language || "").split("-")[0],
-  );
+  const isRtl = isRtlLanguage(language);
 
   return (
     <div
@@ -383,7 +405,7 @@ function ConfirmActionModal({ config, pending, onClose, onConfirm }) {
   );
 }
 
-function OrderDetailsModal({ order, language, t, onClose }) {
+function OrderDetailsModal({ order, language, accountType, t, onClose }) {
   if (!order) return null;
   const orderLabel = getOrderLabelParts(order, language);
   const orderPrimaryName = getOrderPrimaryDisplayName(
@@ -393,6 +415,7 @@ function OrderDetailsModal({ order, language, t, onClose }) {
   );
   const payment = getRolePaymentState(order, order?.assignedTo?.accountType);
   const completionStatus = getOrderCompletionStatus(order, t);
+  const isCompleted = isWorkerCompletedForRole(order, accountType);
   const measure = getMeasure(order);
   const paidToWorker = payment.status === "PAID_TO_WORKER";
   const priceValue = paidToWorker
@@ -410,38 +433,38 @@ function OrderDetailsModal({ order, language, t, onClose }) {
     ([key]) => measure[key] === true,
   );
 
-  const tableWrapStyle = {
-    border: "1px solid var(--border)",
-    borderRadius: 10,
-    overflow: "hidden",
-    background: "var(--surface)",
-  };
+  const isRtl = isRtlLanguage(language);
+  const showCompletionBadge = !isCompleted;
+  const rakhtRows = [
+    [t("rakht.brandName", { defaultValue: "Brand" }), order?.rakhtBrandName],
+    [t("rakht.color", { defaultValue: "Color" }), order?.rakhtColor],
+    [
+      t("rakht.requiredMeters", {
+        defaultValue: "Required Meters",
+      }),
+      order?.rakhtRequiredMeters != null
+        ? formatMeters(order.rakhtRequiredMeters)
+        : "",
+    ],
+  ].filter(([, value]) => value != null && String(value).trim() !== "");
 
-  const thStyle = {
-    fontSize: 11,
-    color: "var(--text3)",
-    textTransform: "uppercase",
-    letterSpacing: ".04em",
-    textAlign: "start",
-    padding: "9px 10px",
-    background: "var(--surface2)",
-    borderBottom: "1px solid var(--border)",
-  };
+  const renderDetailItems = (rows) =>
+    rows.length ? (
+      <div className="worker-detail-list">
+        {rows.map(([label, value]) => (
+          <div className="worker-detail-item" key={label}>
+            <span>{label}</span>
+            <strong>{value}</strong>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div className="worker-detail-empty">-</div>
+    );
 
-  const tdStyle = {
-    fontSize: 13,
-    color: "var(--text1)",
-    padding: "9px 10px",
-    borderBottom: "1px solid var(--border)",
-  };
-
-  // RTL support
-  const isRtl = ["fa", "ps", "prs", "uz-Arab", "ar", "ur"].includes(
-    (language || "").split("-")[0],
-  );
   return (
     <div
-      className={`fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-3 sm:p-4`}
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm sm:p-4"
       dir={isRtl ? "rtl" : "ltr"}
       style={
         isRtl
@@ -455,21 +478,25 @@ function OrderDetailsModal({ order, language, t, onClose }) {
       }
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="w-full max-h-[90vh] max-w-[800px] overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-0 shadow-2xl">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 px-6 pt-6 pb-2 border-b border-[var(--border)] bg-gradient-to-br from-sky-50 via-cyan-50 to-white dark:from-slate-800 dark:via-slate-800 dark:to-slate-900">
-          <div>
-            <h2 className="m-0 text-2xl font-extrabold text-sky-900 dark:text-slate-100">
+      <div
+        className="worker-details-modal max-h-[82vh] overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl"
+        dir={isRtl ? "rtl" : "ltr"}
+        style={{
+          width: "min(430px, calc(100vw - 28px))",
+          maxWidth: "430px",
+        }}
+      >
+        <div className="worker-details-modal__header">
+          <div className="min-w-0">
+            <h2>
               {orderPrimaryName}
             </h2>
-            <div className="mt-1 text-sm text-[var(--text3)] font-medium">
-              #{order.customer?.billNumber || "-"} &bull;{" "}
-              {orderLabel.typeWithSequenceLabel}
+            <div className="worker-details-modal__meta">
+              <span>#{order.customer?.billNumber || "-"}</span>
+              <span>{orderLabel.typeWithSequenceLabel}</span>
             </div>
-            <div className="mt-2">
-              <OrderCreatorBadge order={order} compact />
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5">
+            {showCompletionBadge ? (
+              <div className="worker-details-modal__status">
               <span
                 className="badge"
                 style={getOrderCompletionBadgeStyle(completionStatus)}
@@ -482,175 +509,253 @@ function OrderDetailsModal({ order, language, t, onClose }) {
                   {completionStatus.detail}
                 </span>
               ) : null}
-            </div>
+              </div>
+            ) : null}
           </div>
           <button
-            className="btn btn-outline btn-sm mt-2 sm:mt-0"
+            className="worker-details-modal__close"
             onClick={onClose}
+            aria-label={t("common.close", "Close")}
           >
-            {t("common.close", "Close")}
+            <LuX size={18} />
           </button>
         </div>
-        {/* Price & Updated */}
-        <div className="px-6 pt-5 pb-2">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="rounded-xl bg-sky-50 dark:bg-slate-800/70 p-4 border border-sky-100 dark:border-slate-700">
-              <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold mb-1">
+
+        <div className="worker-details-modal__body">
+          <div className="worker-details-summary">
+            <div className="worker-details-summary__item">
+              <span>
                 {t("workerPanel.price", "Price")}
-              </div>
-              <div className="text-lg font-bold text-sky-900 dark:text-slate-100">
+              </span>
+              <strong>
                 {formatCurrency(priceValue, language)}
-              </div>
+              </strong>
             </div>
-            <div className="rounded-xl bg-cyan-50 dark:bg-slate-800/70 p-4 border border-cyan-100 dark:border-slate-700">
-              <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold mb-1">
+            <div className="worker-details-summary__item">
+              <span>
                 {t("workerPanel.updatedOn", "Updated")}
-              </div>
-              <div className="text-lg font-bold text-sky-900 dark:text-slate-100">
+              </span>
+              <strong>
                 {fmtDate(payment.paidAt || order.updatedAt, language)}
-              </div>
+              </strong>
             </div>
           </div>
+
+          <section className="worker-detail-section">
+            <h3>
+              {t("createOrder.rakhtSelection", {
+                defaultValue: "Rakht Selection",
+              })}
+            </h3>
+            {renderDetailItems(rakhtRows)}
+          </section>
+
+          <section className="worker-detail-section">
+            <h3>{t("createOrder.measurements", "Measurements")}</h3>
+            {renderDetailItems(
+              measurementRows.map(([key, tKey]) => [t(tKey), measure[key]]),
+            )}
+          </section>
+
+          <section className="worker-detail-section">
+            <h3>{t("createOrder.styleOptions", "Styling Details")}</h3>
+            {renderDetailItems(
+              [...styleRows, ...booleanRows].map(([key, tKey]) => [
+                t(tKey),
+                measure[key] === true ? t("common.yes", "Yes") : measure[key],
+              ]),
+            )}
+          </section>
         </div>
-        {/* Rakht Section */}
-        <div className="px-6 pt-5 pb-2">
-          <div className="text-base font-bold text-sky-800 dark:text-slate-200 mb-2 border-b border-sky-100 dark:border-slate-700 pb-1">
-            {t("createOrder.rakhtSelection", {
-              defaultValue: "Rakht Selection",
-            })}
-          </div>
-          <div className="order-scroll-x overflow-x-auto rounded-xl border border-sky-100 dark:border-slate-700 bg-white dark:bg-slate-900">
-            <table className="min-w-full border-collapse">
-              <thead>
-                <tr>
-                  <th className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-3 py-2 bg-sky-50 dark:bg-slate-800/70 border-b border-sky-100 dark:border-slate-700">
-                    {t("common.field", "Field")}
-                  </th>
-                  <th className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-3 py-2 bg-sky-50 dark:bg-slate-800/70 border-b border-sky-100 dark:border-slate-700">
-                    {t("common.value", "Value")}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  [
-                    t("rakht.brandName", { defaultValue: "Brand" }),
-                    order?.rakhtBrandName || "-",
-                  ],
-                  [
-                    t("rakht.color", { defaultValue: "Color" }),
-                    order?.rakhtColor || "-",
-                  ],
-                  [
-                    t("rakht.requiredMeters", {
-                      defaultValue: "Required Meters",
-                    }),
-                    order?.rakhtRequiredMeters != null
-                      ? formatMeters(order.rakhtRequiredMeters)
-                      : "-",
-                  ],
-                ].map(([field, value]) => (
-                  <tr key={field}>
-                    <td className="px-3 py-2 text-sm text-sky-900 dark:text-slate-100 border-b border-sky-100 dark:border-slate-700">
-                      {field}
-                    </td>
-                    <td className="px-3 py-2 text-sm text-sky-900 dark:text-slate-100 border-b border-sky-100 dark:border-slate-700">
-                      {value}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        {/* Measurements Section */}
-        <div className="px-6 pt-5 pb-2">
-          <div className="text-base font-bold text-sky-800 dark:text-slate-200 mb-2 border-b border-sky-100 dark:border-slate-700 pb-1">
-            {t("createOrder.measurements", "Measurements")}
-          </div>
-          <div className="order-scroll-x overflow-x-auto rounded-xl border border-sky-100 dark:border-slate-700 bg-white dark:bg-slate-900">
-            <table className="min-w-full border-collapse">
-              <thead>
-                <tr>
-                  <th className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-3 py-2 bg-sky-50 dark:bg-slate-800/70 border-b border-sky-100 dark:border-slate-700">
-                    {t("common.field", "Field")}
-                  </th>
-                  <th className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-3 py-2 bg-sky-50 dark:bg-slate-800/70 border-b border-sky-100 dark:border-slate-700">
-                    {t("common.value", "Value")}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {measurementRows.length ? (
-                  measurementRows.map(([key, tKey]) => (
-                    <tr key={key}>
-                      <td className="px-3 py-2 text-sm text-sky-900 dark:text-slate-100 border-b border-sky-100 dark:border-slate-700">
-                        {t(tKey)}
-                      </td>
-                      <td className="px-3 py-2 text-sm text-sky-900 dark:text-slate-100 border-b border-sky-100 dark:border-slate-700">
-                        {measure[key]}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td
-                      className="px-3 py-2 text-sm text-sky-900 dark:text-slate-100 border-b-0"
-                      colSpan={2}
-                    >
-                      -
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        {/* Styling Details Section */}
-        <div className="px-6 pt-5 pb-6">
-          <div className="text-base font-bold text-sky-800 dark:text-slate-200 mb-2 border-b border-sky-100 dark:border-slate-700 pb-1">
-            {t("createOrder.styleOptions", "Styling Details")}
-          </div>
-          <div className="order-scroll-x overflow-x-auto rounded-xl border border-sky-100 dark:border-slate-700 bg-white dark:bg-slate-900">
-            <table className="min-w-full border-collapse">
-              <thead>
-                <tr>
-                  <th className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-3 py-2 bg-sky-50 dark:bg-slate-800/70 border-b border-sky-100 dark:border-slate-700">
-                    {t("common.field", "Field")}
-                  </th>
-                  <th className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-3 py-2 bg-sky-50 dark:bg-slate-800/70 border-b border-sky-100 dark:border-slate-700">
-                    {t("common.value", "Value")}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...styleRows, ...booleanRows].length ? (
-                  [...styleRows, ...booleanRows].map(([key, tKey]) => (
-                    <tr key={key}>
-                      <td className="px-3 py-2 text-sm text-sky-900 dark:text-slate-100 border-b border-sky-100 dark:border-slate-700">
-                        {t(tKey)}
-                      </td>
-                      <td className="px-3 py-2 text-sm text-sky-900 dark:text-slate-100 border-b border-sky-100 dark:border-slate-700">
-                        {measure[key] === true
-                          ? t("common.yes", "Yes")
-                          : measure[key]}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td
-                      className="px-3 py-2 text-sm text-sky-900 dark:text-slate-100 border-b-0"
-                      colSpan={2}
-                    >
-                      -
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+
+        <style>{`
+          .worker-details-modal {
+            color: var(--text1, #0f172a);
+          }
+
+          .worker-details-modal__header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: .65rem;
+            padding: .68rem .76rem;
+            border-bottom: 1px solid var(--border, #e2e8f0);
+            background: linear-gradient(180deg, color-mix(in srgb, var(--surface2, #f8fafc) 70%, var(--surface, #fff)), var(--surface, #fff));
+          }
+
+          .worker-details-modal__header h2 {
+            margin: 0;
+            color: var(--text1, #0f172a);
+            font-size: clamp(.98rem, 1.8vw, 1.12rem);
+            font-weight: 900;
+            line-height: 1.3;
+            letter-spacing: 0;
+          }
+
+          .worker-details-modal__meta,
+          .worker-details-modal__status {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: .3rem;
+            margin-top: .34rem;
+          }
+
+          .worker-details-modal__meta span {
+            min-height: 23px;
+            display: inline-flex;
+            align-items: center;
+            border: 1px solid var(--border, #e2e8f0);
+            border-radius: 999px;
+            background: var(--surface, #fff);
+            color: var(--text2, #64748b);
+            font-size: .7rem;
+            font-weight: 800;
+            padding: .16rem .46rem;
+          }
+
+          .worker-details-modal__close {
+            width: 29px;
+            height: 29px;
+            display: inline-grid;
+            place-items: center;
+            flex: 0 0 auto;
+            border: 1px solid var(--border, #e2e8f0);
+            border-radius: 9px;
+            color: var(--text2, #64748b);
+            background: var(--surface, #fff);
+            cursor: pointer;
+            transition: transform .16s ease, border-color .16s ease, color .16s ease;
+          }
+
+          .worker-details-modal__close:hover {
+            transform: translateY(-1px);
+            color: var(--primary, #2563eb);
+            border-color: color-mix(in srgb, var(--primary, #2563eb) 34%, var(--border, #e2e8f0));
+          }
+
+          .worker-details-modal__body {
+            display: grid;
+            gap: .5rem;
+            padding: .56rem;
+          }
+
+          .worker-details-summary {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: .42rem;
+          }
+
+          .worker-details-summary__item,
+          .worker-detail-section {
+            border: 1px solid var(--border, #e2e8f0);
+            border-radius: 10px;
+            background: color-mix(in srgb, var(--surface2, #f8fafc) 34%, var(--surface, #fff));
+          }
+
+          .worker-details-summary__item {
+            padding: .48rem .55rem;
+          }
+
+          .worker-details-summary__item span {
+            display: block;
+            color: var(--text3, #94a3b8);
+            font-size: .66rem;
+            font-weight: 900;
+            line-height: 1.5;
+          }
+
+          .worker-details-summary__item strong {
+            display: block;
+            margin-top: .12rem;
+            color: var(--text1, #0f172a);
+            font-size: .8rem;
+            line-height: 1.5;
+            overflow-wrap: anywhere;
+          }
+
+          .worker-detail-section {
+            overflow: hidden;
+          }
+
+          .worker-detail-section h3 {
+            margin: 0;
+            padding: .45rem .55rem;
+            border-bottom: 1px solid var(--border, #e2e8f0);
+            color: var(--text1, #0f172a);
+            font-size: .78rem;
+            font-weight: 900;
+            line-height: 1.5;
+          }
+
+          .worker-detail-list {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: .38rem;
+            padding: .44rem;
+          }
+
+          .worker-detail-item {
+            min-width: 0;
+            border: 1px solid color-mix(in srgb, var(--border, #e2e8f0) 78%, transparent);
+            border-radius: 8px;
+            background: var(--surface, #fff);
+            padding: .4rem .46rem;
+          }
+
+          .worker-detail-item span {
+            display: block;
+            color: var(--text3, #94a3b8);
+            font-size: .64rem;
+            font-weight: 900;
+            line-height: 1.5;
+          }
+
+          .worker-detail-item strong {
+            display: block;
+            margin-top: .1rem;
+            color: var(--text1, #0f172a);
+            font-size: .76rem;
+            line-height: 1.55;
+            overflow-wrap: anywhere;
+          }
+
+          .worker-detail-empty {
+            padding: .5rem .55rem;
+            color: var(--text3, #94a3b8);
+            font-weight: 700;
+          }
+
+          .worker-details-modal[dir="rtl"],
+          .worker-details-modal[dir="rtl"] h2,
+          .worker-details-modal[dir="rtl"] h3,
+          .worker-details-modal[dir="rtl"] .worker-details-summary__item,
+          .worker-details-modal[dir="rtl"] .worker-detail-item {
+            text-align: right;
+          }
+
+          .worker-details-modal[dir="rtl"] .worker-details-modal__header,
+          .worker-details-modal[dir="rtl"] .worker-details-modal__meta,
+          .worker-details-modal[dir="rtl"] .worker-details-modal__status {
+            direction: rtl;
+          }
+
+          @media (max-width: 680px) {
+            .worker-details-modal {
+              max-height: 90vh;
+              border-radius: 12px;
+            }
+
+            .worker-details-modal__header {
+              gap: .52rem;
+            }
+
+            .worker-details-summary,
+            .worker-detail-list {
+              grid-template-columns: 1fr;
+            }
+          }
+        `}</style>
       </div>
     </div>
   );
@@ -1118,7 +1223,15 @@ export default function WorkerPanel() {
   const [optimisticInProgressIds, setOptimisticInProgressIds] = useState([]);
   const [optimisticCompletedIds, setOptimisticCompletedIds] = useState([]);
   const [receiveSuccessIds, setReceiveSuccessIds] = useState([]);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const receiveSuccessTimersRef = useRef({});
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+    return () => clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -1278,8 +1391,8 @@ export default function WorkerPanel() {
         receiveSuccessTimersRef.current[orderId] = setTimeout(() => {
           setReceiveSuccessIds((ids) => ids.filter((id) => id !== orderId));
           delete receiveSuccessTimersRef.current[orderId];
-          finishReceiveUpdate();
-        }, 1500);
+        }, RECEIVED_CARD_VISIBILITY_MS);
+        finishReceiveUpdate();
       } else {
         finishReceiveUpdate();
       }
@@ -1435,6 +1548,15 @@ export default function WorkerPanel() {
     () => new Set(receiveSuccessIds),
     [receiveSuccessIds],
   );
+  const visibleSearchResultOrders = useMemo(() => {
+    const resultOrders = Array.isArray(searchResult?.orders)
+      ? searchResult.orders
+      : [];
+    return resultOrders.filter(
+      (order) =>
+        !shouldHideReceivedOrderCard(order, user?.accountType, user?.id, nowMs),
+    );
+  }, [nowMs, searchResult?.orders, user?.accountType, user?.id]);
 
   const filteredOrders = useMemo(() => {
     const accountType = user?.accountType;
@@ -1772,13 +1894,15 @@ export default function WorkerPanel() {
             >
               {orderLabel.typeWithSequenceLabel}
             </span>
-            <span
-              className="badge"
-              style={getOrderCompletionBadgeStyle(completionStatus)}
-              title={completionStatus.detail || completionStatus.label}
-            >
-              {completionStatus.label}
-            </span>
+            {!isCompleted ? (
+              <span
+                className="badge"
+                style={getOrderCompletionBadgeStyle(completionStatus)}
+                title={completionStatus.detail || completionStatus.label}
+              >
+                {completionStatus.label}
+              </span>
+            ) : null}
           </div>
         </div>
 
@@ -1805,9 +1929,6 @@ export default function WorkerPanel() {
               order.customer?.phoneNumber && (
                 <span>{order.customer.phoneNumber}</span>
               )}
-          </div>
-          <div style={{ marginTop: 6 }}>
-            <OrderCreatorBadge order={order} compact />
           </div>
         </div>
 
@@ -1987,7 +2108,6 @@ export default function WorkerPanel() {
             {t("workerPanel.orderType", "Order Type")}:{" "}
             {orderLabel.typeWithSequenceLabel}
           </div>
-          <OrderCreatorBadge order={order} compact />
           {(order?.rakhtBrandName || order?.rakhtColor) && (
             <div className="order-mobile-rakht">
               <span className="order-rakht-chip order-rakht-chip--brand">
@@ -2044,10 +2164,10 @@ export default function WorkerPanel() {
       : typeof language !== "undefined"
         ? language
         : "en";
-  const isRtl =
-    typeof i18n !== "undefined" && typeof i18n.dir === "function"
-      ? i18n.dir(lang) === "rtl"
-      : ["fa", "prs", "ps", "ar", "ur"].some((code) => lang.startsWith(code));
+  const isRtl = isRtlLanguage(lang);
+  const isWorkerStatsRtl = ["dari", "pashto"].includes(
+    normalizeLanguage(lang),
+  );
   window.__isRtl = isRtl; // for debugging
 
   return (
@@ -2080,22 +2200,29 @@ export default function WorkerPanel() {
         </div>
 
         {/* Stat Cards Section - Dokht/Qichikar only */}
-        <div className="mt-4 grid gap-3" dir={isRtl ? "rtl" : "ltr"}>
+        <div
+          className={`worker-panel-stats mt-4 grid gap-3 ${
+            isWorkerStatsRtl
+              ? "worker-panel-stats--rtl"
+              : "worker-panel-stats--ltr"
+          }`}
+          dir={isWorkerStatsRtl ? "rtl" : "ltr"}
+        >
           <div
-            className={`min-h-[118px] rounded-xl border-2 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+            className={`worker-panel-stat-card min-h-[118px] rounded-xl border-2 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
               currentMoney >= 0
                 ? "border-emerald-300 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-800 dark:from-emerald-950/40 dark:to-slate-900"
                 : "border-rose-300 bg-gradient-to-br from-rose-50 to-white dark:border-rose-800 dark:from-rose-950/40 dark:to-slate-900"
             }`}
           >
-            <div className="flex h-full items-start justify-between gap-3">
-              <div className="grid min-w-0 content-between gap-3">
+            <div className="worker-panel-stat-card__shell flex h-full items-start justify-between gap-3">
+              <div className="worker-panel-stat-card__copy grid min-w-0 content-between gap-3">
                 <div>
-                  <div className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  <div className="worker-panel-stat-card__label text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     {t("workerPanel.currentMoney", "Current Money")}
                   </div>
                   <div
-                    className={`mt-2 flex flex-wrap items-center gap-2 text-3xl font-extrabold ${
+                    className={`worker-panel-stat-card__value mt-2 flex flex-wrap items-center gap-2 text-3xl font-extrabold ${
                       currentMoney >= 0
                         ? "text-emerald-700 dark:text-emerald-300"
                         : "text-rose-700 dark:text-rose-300"
@@ -2107,7 +2234,7 @@ export default function WorkerPanel() {
                 </div>
               </div>
               <div
-                className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl ring-1 ${
+                className={`worker-panel-stat-card__icon grid h-12 w-12 shrink-0 place-items-center rounded-xl ring-1 ${
                   currentMoney >= 0
                     ? "bg-emerald-100 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:ring-emerald-900"
                     : "bg-rose-100 text-rose-700 ring-rose-200 dark:bg-rose-950/70 dark:text-rose-300 dark:ring-rose-900"
@@ -2119,88 +2246,91 @@ export default function WorkerPanel() {
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="min-h-[118px] rounded-xl border border-rose-200 bg-gradient-to-br from-rose-50 to-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-rose-900/70 dark:from-rose-950/35 dark:to-slate-900">
-            <div className="flex h-full items-start justify-between gap-3">
-              <div className="grid min-w-0 content-between gap-3">
-                <div>
-                  <div className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    {t("workerPanel.totalPenaltyAmount", "Total Damage Penalty")}
+            <div className="worker-panel-stat-card min-h-[118px] rounded-xl border border-rose-200 bg-gradient-to-br from-rose-50 to-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-rose-900/70 dark:from-rose-950/35 dark:to-slate-900">
+              <div className="worker-panel-stat-card__shell flex h-full items-start justify-between gap-3">
+                <div className="worker-panel-stat-card__copy grid min-w-0 content-between gap-3">
+                  <div>
+                    <div className="worker-panel-stat-card__label text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      {t(
+                        "workerPanel.totalPenaltyAmount",
+                        "Total Damage Penalty",
+                      )}
+                    </div>
+                    <div className="worker-panel-stat-card__value mt-2 flex flex-wrap items-center gap-2 text-2xl font-extrabold text-rose-700 dark:text-rose-300">
+                      <AfCurrencyIcon size={20} />
+                      {formatCurrency(totalDamagePenaltyAmount, language)}
+                    </div>
                   </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-2xl font-extrabold text-rose-700 dark:text-rose-300">
-                    <AfCurrencyIcon size={20} />
-                    {formatCurrency(totalDamagePenaltyAmount, language)}
+                  <div className="worker-panel-stat-card__sub text-xs font-semibold text-rose-700 dark:text-rose-300">
+                    {damagedPenaltyPayload?.total || 0}{" "}
+                    {t("workerPanel.totalPenalties", "penalties")}
                   </div>
                 </div>
-                <div className="text-xs font-semibold text-rose-700 dark:text-rose-300">
-                  {damagedPenaltyPayload?.total || 0}{" "}
-                  {t("workerPanel.totalPenalties", "penalties")}
+                <div className="worker-panel-stat-card__icon grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-rose-100 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-950/70 dark:text-rose-300 dark:ring-rose-900">
+                  <LuCircleAlert size={22} />
                 </div>
-              </div>
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-rose-100 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-950/70 dark:text-rose-300 dark:ring-rose-900">
-                <LuCircleAlert size={22} />
               </div>
             </div>
-          </div>
 
-          <div className="min-h-[118px] rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-amber-900/70 dark:from-amber-950/35 dark:to-slate-900">
-            <div className="flex h-full items-start justify-between gap-3">
-              <div className="grid min-w-0 content-between gap-3">
-                <div>
-                  <div className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    {t("workerPanel.loanTotal", "Loan Total")}
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-2xl font-extrabold text-amber-700 dark:text-amber-300">
-                    <AfCurrencyIcon size={20} />
-                    {formatCurrency(totalLoanAmount, language)}
+            <div className="worker-panel-stat-card min-h-[118px] rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-amber-900/70 dark:from-amber-950/35 dark:to-slate-900">
+              <div className="worker-panel-stat-card__shell flex h-full items-start justify-between gap-3">
+                <div className="worker-panel-stat-card__copy grid min-w-0 content-between gap-3">
+                  <div>
+                    <div className="worker-panel-stat-card__label text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      {t("workerPanel.loanTotal", "Loan Total")}
+                    </div>
+                    <div className="worker-panel-stat-card__value mt-2 flex flex-wrap items-center gap-2 text-2xl font-extrabold text-amber-700 dark:text-amber-300">
+                      <AfCurrencyIcon size={20} />
+                      {formatCurrency(totalLoanAmount, language)}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950/70 dark:text-amber-300 dark:ring-amber-900">
-                <LuHash size={22} />
+                <div className="worker-panel-stat-card__icon grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950/70 dark:text-amber-300 dark:ring-amber-900">
+                  <LuHash size={22} />
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="min-h-[118px] rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-blue-900/70 dark:from-blue-950/35 dark:to-slate-900">
-            <div className="flex h-full items-start justify-between gap-3">
-              <div className="grid min-w-0 content-between gap-3">
-                <div>
-                  <div className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    {t(
-                      "workerPanel.totalCompletedPayments",
-                      "Total Money from Completed Orders",
-                    )}
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-2xl font-extrabold text-blue-700 dark:text-blue-300">
-                    <AfCurrencyIcon size={20} />
-                    {formatCurrency(totalCompletedPayments, language)}
+            <div className="worker-panel-stat-card min-h-[118px] rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-blue-900/70 dark:from-blue-950/35 dark:to-slate-900">
+              <div className="worker-panel-stat-card__shell flex h-full items-start justify-between gap-3">
+                <div className="worker-panel-stat-card__copy grid min-w-0 content-between gap-3">
+                  <div>
+                    <div className="worker-panel-stat-card__label text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      {t(
+                        "workerPanel.totalCompletedPayments",
+                        "Total Money from Completed Orders",
+                      )}
+                    </div>
+                    <div className="worker-panel-stat-card__value mt-2 flex flex-wrap items-center gap-2 text-2xl font-extrabold text-blue-700 dark:text-blue-300">
+                      <AfCurrencyIcon size={20} />
+                      {formatCurrency(totalCompletedPayments, language)}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-blue-100 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-950/70 dark:text-blue-300 dark:ring-blue-900">
-                <LuSquareCheck size={22} />
+                <div className="worker-panel-stat-card__icon grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-blue-100 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-950/70 dark:text-blue-300 dark:ring-blue-900">
+                  <LuSquareCheck size={22} />
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="min-h-[118px] rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-emerald-900/70 dark:from-emerald-950/35 dark:to-slate-900">
-            <div className="flex h-full items-start justify-between gap-3">
-              <div className="grid min-w-0 content-between gap-3">
-                <div>
-                  <div className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    {t("workerPanel.moneyReceipt", "Money Receipt")}
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-2xl font-extrabold text-emerald-700 dark:text-emerald-300">
-                    <AfCurrencyIcon size={20} />
-                    {formatCurrency(moneyReceiptTotal, language)}
+            <div className="worker-panel-stat-card min-h-[118px] rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-emerald-900/70 dark:from-emerald-950/35 dark:to-slate-900">
+              <div className="worker-panel-stat-card__shell flex h-full items-start justify-between gap-3">
+                <div className="worker-panel-stat-card__copy grid min-w-0 content-between gap-3">
+                  <div>
+                    <div className="worker-panel-stat-card__label text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      {t("workerPanel.moneyReceipt", "Money Receipt")}
+                    </div>
+                    <div className="worker-panel-stat-card__value mt-2 flex flex-wrap items-center gap-2 text-2xl font-extrabold text-emerald-700 dark:text-emerald-300">
+                      <AfCurrencyIcon size={20} />
+                      {formatCurrency(moneyReceiptTotal, language)}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:ring-emerald-900">
-                <AfCurrencyIcon size={22} />
+                <div className="worker-panel-stat-card__icon grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:ring-emerald-900">
+                  <AfCurrencyIcon size={22} />
+                </div>
               </div>
             </div>
-          </div>
           </div>
         </div>
       </div>
@@ -2253,11 +2383,13 @@ export default function WorkerPanel() {
           </div>
         </div>
 
-        {searchResult?.orders?.length ? (
+        {visibleSearchResultOrders.length ? (
           <div className="mt-3.5 grid gap-2.5">
-            {searchResult.orders.map((order) => renderSearchResultCard(order))}
+            {visibleSearchResultOrders.map((order) =>
+              renderSearchResultCard(order),
+            )}
           </div>
-        ) : hasSearchAttempt ? (
+        ) : hasSearchAttempt && !searchResult?.orders?.length ? (
           <div className="mt-3 text-xs text-slate-500 dark:text-slate-400">
             {t(
               "workerPanel.noOrderFoundByBill",
@@ -2322,9 +2454,6 @@ export default function WorkerPanel() {
                       </div>
                       <div style={{ fontSize: 12, color: "var(--text3)" }}>
                         {orderLabel.typeWithSequenceLabel}
-                      </div>
-                      <div style={{ marginTop: 4 }}>
-                        <OrderCreatorBadge order={order} compact />
                       </div>
                       {order.assignmentPrice != null && (
                         <div
@@ -2419,8 +2548,8 @@ export default function WorkerPanel() {
                             </NotificationText>
                           )}
                           <div className="notif-feed-item__meta">
-                            <span>
-                              {formatDateTimeLocale(item.createdAt, language)}
+                            <span title={formatDateTimeLocale(item.createdAt, language)}>
+                              {formatRelativeTimeLocale(item.createdAt, language)}
                             </span>
                           </div>
                         </div>
@@ -2803,6 +2932,7 @@ export default function WorkerPanel() {
       <OrderDetailsModal
         order={detailOrder}
         language={language}
+        accountType={user?.accountType}
         t={t}
         onClose={() => setDetailOrder(null)}
       />

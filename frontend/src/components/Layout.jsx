@@ -32,7 +32,7 @@ const TITLES = {
   "/notifications": "common.notifications",
   "/users": "users.title",
   "/damaged-clothes": "damagedClothes.title",
-  "/backups": "backup.title",
+  "/super-admin/backups": "backup.title",
   "/my-tasks": "myTasks.title",
   "/customers/create": "sidebar.createNewAccount",
   "/customers/transactions": "sidebar.dadAndStud",
