@@ -73,14 +73,20 @@ function OrderTypeBadge({ type, language }) {
 }
 
 function StatusBadge({ order, t }) {
-  const completionStatus = getOrderCompletionStatus(order, t);
+  const completionStatus = getOrderCompletionStatus(order, t, {
+    variant: "long",
+  });
   if (completionStatus.key !== "pending") {
     return (
       <span
         style={{
+          display: "inline-block",
+          maxWidth: "100%",
           color: completionStatus.color,
           fontWeight: 600,
           fontSize: 12,
+          lineHeight: 1.45,
+          overflowWrap: "anywhere",
         }}
         title={completionStatus.detail || completionStatus.label}
       >

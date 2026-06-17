@@ -7,6 +7,8 @@ import {
   LuBuilding2,
   LuCircleCheck,
   LuClipboardList,
+  LuEye,
+  LuEyeOff,
   LuPencil,
   LuPlus,
   LuRefreshCw,
@@ -133,7 +135,7 @@ function dateInputValue(value) {
 function tenantToForm(tenant) {
   return {
     ...emptyForm,
-    businessName: tenant.businessName || "",
+    businessName: tenant.systemName || tenant.businessName || "",
     systemName: tenant.systemName || "",
     address: tenant.address || "",
     phone: tenant.phone || "",
@@ -155,6 +157,7 @@ function trimPayload(form, mode) {
   const payload = {};
   for (const [key, value] of Object.entries(form)) {
     if (clientOnlyFields.includes(key)) continue;
+    if (key === "businessName") continue;
     if (key === "ownerPassword" && value === "") continue;
     if (value === "") {
       payload[key] = ["expiryDate", "subscriptionStart"].includes(key)
@@ -164,12 +167,12 @@ function trimPayload(form, mode) {
       payload[key] = typeof value === "string" ? value.trim() : value;
     }
   }
+  payload.businessName = String(form.systemName || "").trim();
   return payload;
 }
 
 function validateTenantForm(form, mode, t) {
   const errors = {};
-  if (!form.businessName.trim()) errors.businessName = t("superAdmin.validation.businessName");
   if (!form.systemName.trim()) errors.systemName = t("superAdmin.validation.systemName");
 
   if (!form.ownerName.trim()) errors.ownerName = t("superAdmin.validation.ownerName");
@@ -227,10 +230,12 @@ function TenantModal({
   const language = i18n.resolvedLanguage || i18n.language || "en";
   const isRtl = resolveIsRtl(i18n, language);
   const [logoPreview, setLogoPreview] = useState("");
+  const [showOwnerPassword, setShowOwnerPassword] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     const timer = window.setTimeout(() => firstInputRef.current?.focus(), 0);
+    setShowOwnerPassword(false);
     return () => window.clearTimeout(timer);
   }, [open, mode]);
 
@@ -250,7 +255,6 @@ function TenantModal({
     {
       title: "Business",
       fields: [
-        ["businessName", t("superAdmin.fields.businessName")],
         ["systemName", t("superAdmin.fields.systemName")],
         ["address", t("superAdmin.fields.address")],
         ["phone", t("superAdmin.fields.phone")],
@@ -315,7 +319,6 @@ function TenantModal({
                     const isDate = ["expiryDate", "subscriptionStart"].includes(key);
                     const isPassword = key === "ownerPassword";
                     const isRequired =
-                      key === "businessName" ||
                       key === "systemName" ||
                       ["ownerName", "ownerPhone"].includes(key);
 
@@ -377,7 +380,11 @@ function TenantModal({
                             </div>
                           </div>
                           {errors.logoFile ? (
-                            <span className="text-xs font-medium text-red-600 dark:text-red-300">
+                            <span
+                              className="err-msg"
+                              role="alert"
+                              aria-live="polite"
+                            >
                               {errors.logoFile}
                             </span>
                           ) : null}
@@ -433,18 +440,48 @@ function TenantModal({
                           {label}
                           {isRequired ? " *" : ""}
                         </span>
-                        <input
-                          ref={groupIndex === 0 && index === 0 ? firstInputRef : null}
-                          className={`inp${errors[key] ? " err" : ""}`}
-                          type={isDate ? "date" : isPassword ? "password" : "text"}
-                          value={form[key]}
-                          onChange={(e) => onChange(key, e.target.value)}
-                          disabled={isPending}
-                          autoComplete={isPassword ? "new-password" : key === "ownerPhone" ? "tel" : "off"}
-                          placeholder={mode === "edit" && isPassword ? t("superAdmin.ownerPasswordPlaceholder") : undefined}
-                        />
+                        <div className={isPassword ? "relative" : undefined}>
+                          <input
+                            ref={groupIndex === 0 && index === 0 ? firstInputRef : null}
+                            className={`inp${errors[key] ? " err" : ""}`}
+                            aria-invalid={errors[key] ? "true" : undefined}
+                            type={
+                              isDate
+                                ? "date"
+                                : isPassword && !showOwnerPassword
+                                  ? "password"
+                                  : "text"
+                            }
+                            value={form[key]}
+                            onChange={(e) => onChange(key, e.target.value)}
+                            disabled={isPending}
+                            autoComplete={isPassword ? "new-password" : key === "ownerPhone" ? "tel" : "off"}
+                            placeholder={mode === "edit" && isPassword ? t("superAdmin.ownerPasswordPlaceholder") : undefined}
+                            style={isPassword ? { paddingInlineEnd: 42 } : undefined}
+                          />
+                          {isPassword ? (
+                            <button
+                              type="button"
+                              className="absolute top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-[var(--text3)] transition hover:bg-[var(--surface2)] hover:text-[var(--text1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/30"
+                              style={{ insetInlineEnd: 6 }}
+                              onClick={() => setShowOwnerPassword((current) => !current)}
+                              disabled={isPending}
+                              aria-label={
+                                showOwnerPassword
+                                  ? t("superAdmin.hidePassword")
+                                  : t("superAdmin.showPassword")
+                              }
+                            >
+                              {showOwnerPassword ? <LuEyeOff size={17} /> : <LuEye size={17} />}
+                            </button>
+                          ) : null}
+                        </div>
                         {errors[key] ? (
-                          <span className="text-xs font-medium text-red-600 dark:text-red-300">
+                          <span
+                            className="err-msg"
+                            role="alert"
+                            aria-live="polite"
+                          >
                             {errors[key]}
                           </span>
                         ) : null}
@@ -634,10 +671,10 @@ export default function SuperAdminDashboard() {
               </p>
             </div>
             <button
-              className="group inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-600 px-5 text-sm font-semibold text-white shadow-[0_16px_32px_-22px_rgba(5,150,105,0.95)] transition duration-200 hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-[0_18px_36px_-20px_rgba(5,150,105,0.95)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] active:translate-y-0"
+              className="group inline-flex min-h-12 w-full items-center justify-center gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-600 px-5 text-sm font-bold text-white shadow-[0_18px_34px_-22px_rgba(5,150,105,0.95)] transition duration-200 hover:-translate-y-0.5 hover:border-emerald-600 hover:bg-emerald-700 hover:shadow-[0_22px_42px_-22px_rgba(5,150,105,0.95)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] active:translate-y-0 sm:w-auto"
               onClick={openCreateModal}
             >
-              <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white/15 transition group-hover:bg-white/20">
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white/15 transition group-hover:bg-white/20">
                 <LuPlus size={16} />
               </span>
               <span>{t("superAdmin.createTenant")}</span>
@@ -751,10 +788,7 @@ export default function SuperAdminDashboard() {
                           </div>
                           <div className="min-w-0">
                             <p className="truncate font-bold text-[var(--text1)]">
-                              {tenant.businessName}
-                            </p>
-                            <p className="mt-0.5 truncate text-xs text-[var(--text3)]">
-                              {tenant.systemName}
+                              {tenant.systemName || tenant.businessName}
                             </p>
                             {tenant.owner ? (
                               <p className="mt-0.5 truncate text-[11px] text-[var(--text3)]">
@@ -862,7 +896,7 @@ export default function SuperAdminDashboard() {
                 <div className="min-w-0">
                   <p className="text-sm font-bold">
                     {t("superAdmin.deleteConfirmHeading", {
-                      name: deleteTarget?.businessName || "-",
+                      name: deleteTarget?.systemName || deleteTarget?.businessName || "-",
                     })}
                   </p>
                   <p className="mt-1 text-sm leading-6">

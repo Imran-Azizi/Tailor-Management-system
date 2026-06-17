@@ -102,12 +102,15 @@ function Field({ icon: Icon, label, error, isRtl, ...inputProps }) {
         />
         <input
           className={cn("inp w-full", error && "err")}
+          aria-invalid={error ? "true" : undefined}
           style={{ paddingInlineStart: 38 }}
           {...inputProps}
         />
       </span>
       {error ? (
-        <span className="text-xs font-semibold text-red-600 dark:text-red-300">{error}</span>
+        <span className="err-msg" role="alert" aria-live="polite">
+          {error}
+        </span>
       ) : null}
     </label>
   );

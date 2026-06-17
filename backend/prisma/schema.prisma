@@ -55,6 +55,12 @@ model Tenant {
   users                    User[]
   customers                Customer[]
   orders                   Order[]
+  outfits                  Outfit[]
+  waskats                  Waskat[]
+  korties                  Korty[]
+  yakhanQaqs               YakhanQaq[]
+  readyMadeOrders          ReadyMadeOrder[]
+  readyMadeWaskatOrders    ReadyMadeWaskatOrder[]
   workerPaymentReceipts    WorkerPaymentReceipt[]
   orderDrafts              OrderDraft[]
   rakhts                   Rakht[]
@@ -63,6 +69,25 @@ model Tenant {
   notifications            Notification[]
   userNotifications        UserNotification[]
   boxes                    Box[]
+  yakhans                  Yakhan[]
+  astins                   Astin[]
+  shoulderStates           ShoulderState[]
+  neckOutfits              NeckOutfit[]
+  neckWaskats              NeckWaskat[]
+  damans                   Daman[]
+  jibRows                  JibRow[]
+  jibBaghles               JibBaghle[]
+  jibTenbans               JibTenban[]
+  patyShips                PatyShip[]
+  buttonShips              ButtonShip[]
+  tenbanShips              TenbanShip[]
+  outfitDesigns            OutfitDesign[]
+  yakhanQaqNecks           YakhanQaqNeck[]
+  yakhanQaqSleeves         YakhanQaqSleeve[]
+  yakhanQaqSkirts          YakhanQaqSkirt[]
+  yakhanQaqDesignOptions   YakhanQaqDesignOption[]
+  yakhanQaqButtonShips     YakhanQaqButtonShip[]
+  yakhanQaqPantShips       YakhanQaqPantShip[]
   readyMadeClothes         ReadyMadeClothing[]
   readyMadeWaskatClothes   ReadyMadeWaskatClothing[]
   dailyTasks               DailyTask[]
@@ -181,7 +206,7 @@ model User {
   tenantId     String?
   tenant       Tenant?     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name         String
-  phoneNumber  String      @unique
+  phoneNumber  String
   accountType  AccountType
   password     String
   isActive     Boolean     @default(true)
@@ -220,6 +245,7 @@ model User {
   @@index([accountType])
   @@index([tenantId])
   @@index([tenantId, accountType])
+  @@unique([tenantId, phoneNumber])
 }
 
 model UserNotification {
@@ -565,9 +591,11 @@ enum BoxType {
 }
 
 model Outfit {
-  id      String @id @default(uuid())
-  orderId String @unique
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  tenantId String @default("default-tenant")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orderId  String @unique
+  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   height   Float
   shoulder Float
@@ -595,12 +623,17 @@ model Outfit {
   buttonStyle         String?
   pantStyle           String?
   additionalStyleInfo String?
+
+  @@index([tenantId])
+  @@index([tenantId, orderId])
 }
 
 model Waskat {
-  id      String @id @default(uuid())
-  orderId String @unique
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  tenantId String @default("default-tenant")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orderId  String @unique
+  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   height   Float
   shoulder Float
@@ -612,12 +645,17 @@ model Waskat {
   neckStyle     String?
   shoulderState String?
   waskatStyle   String?
+
+  @@index([tenantId])
+  @@index([tenantId, orderId])
 }
 
 model Korty {
-  id      String @id @default(uuid())
-  orderId String @unique
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  tenantId String @default("default-tenant")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orderId  String @unique
+  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   height           Float
   arm              Float
@@ -634,12 +672,17 @@ model Korty {
   pachaPatlon      Float
 
   style String?
+
+  @@index([tenantId])
+  @@index([tenantId, orderId])
 }
 
 model YakhanQaq {
-  id      String @id @default(uuid())
-  orderId String @unique
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  tenantId String @default("default-tenant")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orderId  String @unique
+  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   height   Float
   sleeve   Float
@@ -657,6 +700,9 @@ model YakhanQaq {
   yakhanQaqDesign String?
   buttonStyle     String?
   pantStyle       String?
+
+  @@index([tenantId])
+  @@index([tenantId, orderId])
 }
 
 // ─── Ready-Made Clothes ───────────────────────────────────────────────────────
@@ -679,9 +725,11 @@ model ReadyMadeClothing {
 }
 
 model ReadyMadeOrder {
-  id      String @id @default(uuid())
-  orderId String @unique
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  tenantId String @default("default-tenant")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orderId  String @unique
+  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   height   Float?
   chest    Float?
@@ -711,6 +759,9 @@ model ReadyMadeOrder {
   pantStyle           String?
   additionalStyleInfo String?
   additionalNotes     String?
+
+  @@index([tenantId])
+  @@index([tenantId, orderId])
 }
 
 model ReadyMadeWaskatClothing {
@@ -731,9 +782,11 @@ model ReadyMadeWaskatClothing {
 }
 
 model ReadyMadeWaskatOrder {
-  id      String @id @default(uuid())
-  orderId String @unique
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  tenantId String @default("default-tenant")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orderId  String @unique
+  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   height   Float?
   chest    Float?
@@ -750,6 +803,9 @@ model ReadyMadeWaskatOrder {
   sorain   Float?
 
   additionalNotes String?
+
+  @@index([tenantId])
+  @@index([tenantId, orderId])
 }
 
 model Notification {
@@ -794,135 +850,230 @@ model Box {
 
 model Yakhan {
   id        String   @id @default(uuid())
-  name      String   @unique
+  tenantId  String   @default("default-tenant")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@unique([tenantId, name])
 }
 
 model Astin {
   id        String   @id @default(uuid())
-  name      String   @unique
+  tenantId  String   @default("default-tenant")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@unique([tenantId, name])
 }
 
 model ShoulderState {
   id        String   @id @default(uuid())
-  name      String   @unique
+  tenantId  String   @default("default-tenant")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@unique([tenantId, name])
 }
 
 model NeckOutfit {
   id        String   @id @default(uuid())
-  name      String   @unique
+  tenantId  String   @default("default-tenant")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@unique([tenantId, name])
 }
 
 model NeckWaskat {
   id        String   @id @default(uuid())
-  name      String   @unique
+  tenantId  String   @default("default-tenant")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@unique([tenantId, name])
 }
 
 model Daman {
   id        String   @id @default(uuid())
-  name      String   @unique
+  tenantId  String   @default("default-tenant")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@unique([tenantId, name])
 }
 
 model JibRow {
   id        String   @id @default(uuid())
-  name      String   @unique
+  tenantId  String   @default("default-tenant")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@unique([tenantId, name])
 }
 
 model JibBaghle {
   id        String   @id @default(uuid())
-  name      String   @unique
+  tenantId  String   @default("default-tenant")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@unique([tenantId, name])
 }
 
 model JibTenban {
   id        String   @id @default(uuid())
-  name      String   @unique
+  tenantId  String   @default("default-tenant")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@unique([tenantId, name])
 }
 
 model PatyShip {
   id        String   @id @default(uuid())
-  name      String   @unique
+  tenantId  String   @default("default-tenant")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@unique([tenantId, name])
 }
 
 model ButtonShip {
   id        String   @id @default(uuid())
-  name      String   @unique
+  tenantId  String   @default("default-tenant")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@unique([tenantId, name])
 }
 
 model TenbanShip {
   id        String   @id @default(uuid())
-  name      String   @unique
+  tenantId  String   @default("default-tenant")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@unique([tenantId, name])
 }
 
 model OutfitDesign {
   id        String   @id @default(uuid())
-  name      String   @unique
+  tenantId  String   @default("default-tenant")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@unique([tenantId, name])
 }
 
 model YakhanQaqNeck {
   id        String   @id @default(uuid())
-  name      String   @unique
+  tenantId  String   @default("default-tenant")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@unique([tenantId, name])
 }
 
 model YakhanQaqSleeve {
   id        String   @id @default(uuid())
-  name      String   @unique
+  tenantId  String   @default("default-tenant")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@unique([tenantId, name])
 }
 
 model YakhanQaqSkirt {
   id        String   @id @default(uuid())
-  name      String   @unique
+  tenantId  String   @default("default-tenant")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@unique([tenantId, name])
 }
 
 model YakhanQaqDesignOption {
   id        String   @id @default(uuid())
-  name      String   @unique
+  tenantId  String   @default("default-tenant")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@unique([tenantId, name])
 }
 
 model YakhanQaqButtonShip {
   id        String   @id @default(uuid())
-  name      String   @unique
+  tenantId  String   @default("default-tenant")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@unique([tenantId, name])
 }
 
 model YakhanQaqPantShip {
   id        String   @id @default(uuid())
-  name      String   @unique
+  tenantId  String   @default("default-tenant")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@unique([tenantId, name])
 }
 
 model Contributor {

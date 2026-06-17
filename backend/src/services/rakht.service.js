@@ -759,39 +759,102 @@ export const getRakhtPaymentHistory = async ({
 };
 
 export const createRakht = async (payload) => {
-  const { tons, ...rest } = payload;
+  const { tons, paidById, ...rest } = payload;
   const tenantId = getActiveTenantId();
-  const created = await prisma.rakht.create({
-    data: {
-      ...(tenantId ? { tenantId } : {}),
-      companyName: normalizeText(rest.companyName),
-      brandName: normalizeText(rest.brandName),
-      tonQuantity: toPositiveInt(rest.tonQuantity),
-      totalPrice: toNonNegativeInt(rest.totalPrice),
-      givenMoney: toNonNegativeInt(rest.givenMoney || 0),
-      remainingMoney: maxScaled(
-        subScaled(rest.totalPrice, rest.givenMoney || 0, MONEY_SCALE),
-        0,
-        MONEY_SCALE,
-      ),
-      tons: {
-        create: tons.map((ton) =>
-          withTenantId(
-            {
-              name: normalizeText(ton.name),
-              colorHex: normalizeHexColor(ton.colorHex),
-              totalMeters: maxScaled(
-                toPositiveNumber(ton.totalMeters),
-                0.01,
-                METER_SCALE,
-              ),
-            },
-            tenantId,
-          ),
-        ),
+  const companyName = normalizeText(rest.companyName);
+  const brandName = normalizeText(rest.brandName);
+  const totalPrice = toNonNegativeInt(rest.totalPrice);
+  const givenMoney = toNonNegativeInt(rest.givenMoney || 0);
+  const remainingMoney = maxScaled(
+    subScaled(totalPrice, givenMoney, MONEY_SCALE),
+    0,
+    MONEY_SCALE,
+  );
+  const companyWhere = {
+    companyName,
+    ...(tenantId ? { tenantId } : {}),
+  };
+
+  const created = await prisma.$transaction(async (tx) => {
+    const existingRows = await tx.rakht.findMany({
+      where: companyWhere,
+      select: {
+        totalPrice: true,
+        givenMoney: true,
+        remainingMoney: true,
       },
-    },
-    include: { tons: { orderBy: { createdAt: "asc" } } },
+    });
+
+    const totalPriceBefore = sumScaled(
+      existingRows.map((row) => toNonNegativeInt(row.totalPrice)),
+      MONEY_SCALE,
+    );
+    const totalPaidBefore = sumScaled(
+      existingRows.map((row) => toNonNegativeInt(row.givenMoney)),
+      MONEY_SCALE,
+    );
+    const remainingBefore = maxScaled(
+      subScaled(totalPriceBefore, totalPaidBefore, MONEY_SCALE),
+      0,
+      MONEY_SCALE,
+    );
+    const totalPriceAfter = addScaled(totalPriceBefore, totalPrice, MONEY_SCALE);
+    const totalPaidAfter = addScaled(totalPaidBefore, givenMoney, MONEY_SCALE);
+    const remainingAfter = maxScaled(
+      subScaled(totalPriceAfter, totalPaidAfter, MONEY_SCALE),
+      0,
+      MONEY_SCALE,
+    );
+
+    const row = await tx.rakht.create({
+      data: {
+        ...(tenantId ? { tenantId } : {}),
+        companyName,
+        brandName,
+        tonQuantity: toPositiveInt(rest.tonQuantity),
+        totalPrice,
+        givenMoney,
+        remainingMoney,
+        tons: {
+          create: tons.map((ton) =>
+            withTenantId(
+              {
+                name: normalizeText(ton.name),
+                colorHex: normalizeHexColor(ton.colorHex),
+                totalMeters: maxScaled(
+                  toPositiveNumber(ton.totalMeters),
+                  0.01,
+                  METER_SCALE,
+                ),
+              },
+              tenantId,
+            ),
+          ),
+        },
+      },
+      include: { tons: { orderBy: { createdAt: "asc" } } },
+    });
+
+    if (paidById) {
+      await tx.rakhtPaymentHistory.create({
+        data: withTenantId(
+          {
+            companyName,
+            paidAmount: givenMoney,
+            totalPriceBefore,
+            totalPaidBefore,
+            remainingBefore,
+            totalPriceAfter,
+            totalPaidAfter,
+            remainingAfter,
+            paidById,
+          },
+          tenantId,
+        ),
+      });
+    }
+
+    return row;
   });
   return withComputedFields(created);
 };

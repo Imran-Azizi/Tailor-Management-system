@@ -1,7 +1,23 @@
 import axios from "axios";
 import { normalizeDigits } from "./normalize.js";
 
-const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || "/api" });
+const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
+const CSRF_HEADER_NAME = "X-CSRF-Token";
+const SAFE_METHODS = new Set(["get", "head", "options"]);
+
+let csrfToken = null;
+let csrfPromise = null;
+let onAuthSessionExpired = null;
+
+const csrfClient = axios.create({
+  baseURL: API_BASE_URL,
+  withCredentials: true,
+});
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  withCredentials: true,
+});
 
 function normalizeApiPayload(payload) {
   return normalizeDigits(payload);
@@ -13,10 +29,68 @@ function shouldBypassResponseNormalization(config = {}) {
   );
 }
 
-// Attach access token to every request
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("accessToken");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+function isUnsafeMethod(method) {
+  return !SAFE_METHODS.has(String(method || "get").toLowerCase());
+}
+
+function isAuthRefreshRequest(config = {}) {
+  return String(config.url || "").includes("/auth/refresh");
+}
+
+function isAuthLoginRequest(config = {}) {
+  return String(config.url || "").includes("/auth/login");
+}
+
+function shouldRedirectToLogin(config = {}) {
+  if (config.skipAuthRedirect) return false;
+  return window.location.pathname !== "/login";
+}
+
+export function clearCsrfToken() {
+  csrfToken = null;
+  csrfPromise = null;
+}
+
+export function setAuthSessionExpiredHandler(handler) {
+  onAuthSessionExpired = typeof handler === "function" ? handler : null;
+}
+
+export async function ensureCsrfToken() {
+  if (csrfToken) return csrfToken;
+  if (!csrfPromise) {
+    csrfPromise = csrfClient
+      .get("/auth/csrf")
+      .then(({ data }) => {
+        csrfToken = data?.csrfToken || null;
+        return csrfToken;
+      })
+      .finally(() => {
+        csrfPromise = null;
+      });
+  }
+  return csrfPromise;
+}
+
+async function attachCsrfHeader(config) {
+  if (!isUnsafeMethod(config.method)) return config;
+
+  const token = await ensureCsrfToken();
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers[CSRF_HEADER_NAME] = token;
+  }
+  return config;
+}
+
+function expireAuthSession() {
+  clearCsrfToken();
+  onAuthSessionExpired?.();
+}
+
+api.interceptors.request.use(async (config) => {
+  config.withCredentials = true;
+  config = await attachCsrfHeader(config);
+
   if (config.params !== undefined) {
     config.params = normalizeApiPayload(config.params);
   }
@@ -26,7 +100,6 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// On 401 try to refresh once, then redirect to login
 api.interceptors.response.use(
   (response) => {
     if (!shouldBypassResponseNormalization(response.config)) {
@@ -38,36 +111,53 @@ api.interceptors.response.use(
     if (err?.response && !shouldBypassResponseNormalization(err.config)) {
       err.response.data = normalizeApiPayload(err.response.data);
     }
+
     if (err.response?.status === 402) {
       window.location.href = "/subscription-expired";
       return Promise.reject(err);
     }
+
     const original = err.config;
-    if (err.response?.status === 401 && !original._retry) {
+
+    if (
+      err.response?.status === 403 &&
+      err.response?.data?.code === "CSRF_INVALID" &&
+      original &&
+      !original._csrfRetry
+    ) {
+      original._csrfRetry = true;
+      clearCsrfToken();
+      await attachCsrfHeader(original);
+      return api(original);
+    }
+
+    if (
+      err.response?.status === 401 &&
+      original &&
+      !original._retry &&
+      !original.skipAuthRefresh &&
+      !isAuthRefreshRequest(original) &&
+      !isAuthLoginRequest(original)
+    ) {
       original._retry = true;
       try {
-        const refreshToken = localStorage.getItem("refreshToken");
-        if (refreshToken) {
-          const { data } = await axios.post(
-            (import.meta.env.VITE_API_URL || "/api") + "/auth/refresh",
-            { refreshToken },
-          );
-          localStorage.setItem("accessToken", data.accessToken);
-          localStorage.setItem("refreshToken", data.refreshToken);
-          if (data.user) {
-            localStorage.setItem("authUser", JSON.stringify(data.user));
-          }
-          original.headers.Authorization = `Bearer ${data.accessToken}`;
-          return api(original);
-        }
+        const token = await ensureCsrfToken();
+        await csrfClient.post(
+          "/auth/refresh",
+          {},
+          { headers: token ? { [CSRF_HEADER_NAME]: token } : undefined },
+        );
+        delete original.headers?.Authorization;
+        return api(original);
       } catch {
-        // refresh failed — clear and redirect
+        // Refresh failed; clear in-memory auth state and redirect.
       }
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
-      localStorage.removeItem("authUser");
-      window.location.href = "/login";
+      expireAuthSession();
+      if (shouldRedirectToLogin(original)) {
+        window.location.href = "/login";
+      }
     }
+
     if (import.meta.env.DEV) {
       console.error("[API]", err.response?.data || err.message);
     }

@@ -498,7 +498,7 @@ export default function BackupManagement() {
                     </option>
                     {tenants.map((tenant) => (
                       <option key={tenant.id} value={tenant.id}>
-                        {tenant.businessName}
+                        {tenant.systemName || tenant.businessName}
                       </option>
                     ))}
                   </select>
@@ -547,12 +547,35 @@ export default function BackupManagement() {
             />
             <div className="space-y-4 p-4 sm:p-5">
               <Field label={t("backup.fields.restoreFile")}>
-                <input
-                  className="inp"
-                  type="file"
-                  accept=".json,.gz,.enc,application/json,application/gzip"
-                  onChange={(event) => setRestoreFile(event.target.files?.[0] || null)}
-                />
+                <label className="group flex cursor-pointer flex-col gap-3 rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface2)] p-4 transition hover:border-emerald-400 hover:bg-emerald-50/40 focus-within:border-emerald-500 focus-within:ring-4 focus-within:ring-emerald-500/10 dark:hover:bg-emerald-500/10 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 transition group-hover:border-emerald-300 group-hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
+                      <LuFileArchive size={21} />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-bold text-[var(--text1)]">
+                        {restoreFile?.name || t("backup.restore.chooseFile", "Choose backup file")}
+                      </span>
+                      <span className="mt-1 block text-xs leading-5 text-[var(--text3)]">
+                        {restoreFile
+                          ? `${formatBytes(restoreFile.size)}`
+                          : t("backup.restore.fileHint", "JSON, GZ, or encrypted backup files are supported.")}
+                      </span>
+                    </span>
+                  </span>
+                  <span className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--text1)] shadow-sm transition group-hover:border-emerald-300 group-hover:text-emerald-700 dark:group-hover:text-emerald-200">
+                    <LuUpload size={15} />
+                    {restoreFile
+                      ? t("backup.restore.changeFile", "Change file")
+                      : t("backup.restore.browseFile", "Browse")}
+                  </span>
+                  <input
+                    className="sr-only"
+                    type="file"
+                    accept=".json,.gz,.enc,application/json,application/gzip"
+                    onChange={(event) => setRestoreFile(event.target.files?.[0] || null)}
+                  />
+                </label>
               </Field>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label={t("backup.fields.restoreType")}>
@@ -575,7 +598,7 @@ export default function BackupManagement() {
                     <option value="">{t("backup.placeholders.tenant")}</option>
                     {tenants.map((tenant) => (
                       <option key={tenant.id} value={tenant.id}>
-                        {tenant.businessName}
+                        {tenant.systemName || tenant.businessName}
                       </option>
                     ))}
                   </select>

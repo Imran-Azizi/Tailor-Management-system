@@ -125,11 +125,7 @@ export function MonthProvider({ children }) {
       }
     };
 
-    // Only load policy if we have valid credentials (check for auth token)
-    const authToken = localStorage.getItem("authToken");
-    if (authToken) {
-      loadPolicy();
-    }
+    loadPolicy();
 
     return () => {
       cancelled = true;

@@ -410,17 +410,23 @@ export default function AssignOrders() {
               </Field>
             </div>
           </div>
-        </Card>
 
+          <div className="assign-orders-unified-body">
         {loadingResult ? (
-          <Card title={t("assignment.searchResult", "Search Result")}>
+          <section className="assign-orders-unified-section">
+            <h3 className="assign-orders-section-title">
+              {t("assignment.searchResult", "Search Result")}
+            </h3>
             <div className="assign-orders-loading">
               <Spinner />
               <p>{t("common.loading", "Loading...")}</p>
             </div>
-          </Card>
+          </section>
         ) : !lookupResult ? (
-          <Card title={t("assignment.searchResult", "Search Result")} noPad>
+          <section className="assign-orders-unified-section">
+            <h3 className="assign-orders-section-title">
+              {t("assignment.searchResult", "Search Result")}
+            </h3>
             <div className="assign-orders-empty">
               <EmptyState
                 message={t(
@@ -430,12 +436,13 @@ export default function AssignOrders() {
                 Icon={AfCurrencyIcon}
               />
             </div>
-          </Card>
+          </section>
         ) : (
           <>
-            <Card
-              title={t("assignment.customerInfo", "Customer & Order Selection")}
-            >
+            <section className="assign-orders-unified-section">
+              <h3 className="assign-orders-section-title">
+                {t("assignment.customerInfo", "Customer & Order Selection")}
+              </h3>
               <div className="assign-orders-results">
                 <div className="assign-orders-customer-strip">
                   <div className="assign-orders-info-tile">
@@ -573,7 +580,14 @@ export default function AssignOrders() {
                                 <span className="assign-orders-selected-label">
                                   {t("assignment.selected", "Selected")}
                                 </span>
-                              ) : null}
+                              ) : (
+                                <span className="assign-orders-ready-label">
+                                  {t(
+                                    "assignment.readyToAssign",
+                                    "Ready to assign",
+                                  )}
+                                </span>
+                              )}
                             </div>
                             <div className="assign-orders-record-card__meta">
                               <span>
@@ -595,15 +609,16 @@ export default function AssignOrders() {
                   </div>
                 )}
               </div>
-            </Card>
+            </section>
 
             {selectedOrder && (
-              <Card
-                title={t(
+              <section className="assign-orders-unified-section">
+                <h3 className="assign-orders-section-title">
+                  {t(
                   "assignment.selectedOrderSummary",
                   "Selected Order Summary",
-                )}
-              >
+                  )}
+                </h3>
                 <div className="assign-orders-assignment-panel">
                   <div className="assign-orders-assignment-grid">
                     <div className="assign-orders-worker-card">
@@ -687,10 +702,12 @@ export default function AssignOrders() {
                     </div>
                   </div>
                 </div>
-              </Card>
+              </section>
             )}
           </>
         )}
+          </div>
+        </Card>
       </div>
     </div>
   );

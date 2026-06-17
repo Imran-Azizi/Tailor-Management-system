@@ -49,6 +49,6 @@ export const upsertOrderDraftSchema = z.object({
   billing: z.record(z.any()).default({}),
   orderItems: z.array(z.record(z.any())).default([]),
   entryMonth: z.number().int().min(1).max(12).optional().nullable(),
-  entryYear: z.number().int().min(2000).max(2100).optional().nullable(),
+  entryYear: z.number().int().min(1300).max(2200).optional().nullable(),
   prefillOrderId: optionalText,
 });

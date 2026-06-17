@@ -609,6 +609,38 @@ export function CustomerBill({ customer, order, shop }) {
         }
       : {}),
   };
+  const rakhtInfoFields = [
+    {
+      key: "color",
+      label: t("rakht.color", { defaultValue: "Color" }),
+      value: rakhtDetails.color,
+      show: hasPrintableBillValue(rakhtDetails.color),
+      render: () =>
+        renderRakhtColorValue(rakhtDetails.color, rakhtDetails.colorHex),
+    },
+    {
+      key: "brand",
+      label: t("rakht.brandName", { defaultValue: "Brand" }),
+      value: rakhtDetails.brand,
+      show: hasPrintableBillValue(rakhtDetails.brand),
+      render: () => rakhtDetails.brand,
+    },
+    {
+      key: "company",
+      label: t("rakht.companyName", { defaultValue: "Company" }),
+      value: rakhtDetails.company,
+      show: hasPrintableBillValue(rakhtDetails.company),
+      render: () => rakhtDetails.company,
+    },
+    {
+      key: "meters",
+      label: t("rakht.requiredMeters", { defaultValue: "Meters" }),
+      value: rakhtDetails.meters,
+      show: hasPrintableBillValue(rakhtDetails.meters),
+      className: "[direction:ltr] [unicode-bidi:embed]",
+      render: () => rakhtDetails.meters,
+    },
+  ].filter((field) => field.show);
   const detailColumns = [
     {
       key: "billNo",
@@ -665,14 +697,6 @@ export function CustomerBill({ customer, order, shop }) {
       align: alignClass,
       show: hasPrintableBillValue(boxName),
       render: () => boxName,
-    },
-    {
-      key: "rakht",
-      header: t("createOrder.rakhtSelection", { defaultValue: "Rakht" }),
-      width: "19%",
-      align: alignClass,
-      show: rakhtDetails.hasData,
-      render: () => <RakhtSummary details={rakhtDetails} />,
     },
     {
       key: "itemPrice",
@@ -770,6 +794,44 @@ export function CustomerBill({ customer, order, shop }) {
           </tbody>
         </table>
       </div>
+
+      {rakhtInfoFields.length > 0 ? (
+        <div className="print-customer-rakht-section border-b border-slate-800">
+          <div
+            className={`${
+              settings.isRtl
+                ? "print-bill-section-head"
+                : "print-bill-section-head print-bill-section-head--upper"
+            } ${alignClass}`}
+          >
+            {t("createOrder.rakhtSelection", {
+              defaultValue: "Rakht / Fabric",
+            })}
+          </div>
+          <div
+            className="print-customer-rakht-grid grid text-[9px] text-slate-800"
+            style={{
+              gridTemplateColumns: `repeat(${rakhtInfoFields.length}, minmax(0, 1fr))`,
+            }}
+          >
+            {rakhtInfoFields.map((field, index) => (
+              <div
+                key={field.key}
+                className={`${getBorderClass(index, rakhtInfoFields)} px-2 py-1.5 ${alignClass}`}
+              >
+                <p className={tableHeadClass}>{field.label}</p>
+                <p
+                  className={`print-bill-kv-value mt-0.5 ${
+                    field.className || ""
+                  }`}
+                >
+                  {field.render()}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className={`print-bill-section-head ${alignClass}`}>
         {txt.financialSummary}
@@ -905,6 +967,49 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
         }
       : {}),
   };
+  const rakhtInfoRows = rowItems
+    .filter((row) => row.rakhtDetails?.hasData)
+    .map((row) => {
+      const details = row.rakhtDetails;
+      const fields = [
+        {
+          key: "color",
+          label: t("rakht.color", { defaultValue: "Color" }),
+          value: details.color,
+          show: hasPrintableBillValue(details.color),
+          render: () => renderRakhtColorValue(details.color, details.colorHex),
+        },
+        {
+          key: "brand",
+          label: t("rakht.brandName", { defaultValue: "Brand" }),
+          value: details.brand,
+          show: hasPrintableBillValue(details.brand),
+          render: () => details.brand,
+        },
+        {
+          key: "company",
+          label: t("rakht.companyName", { defaultValue: "Company" }),
+          value: details.company,
+          show: hasPrintableBillValue(details.company),
+          render: () => details.company,
+        },
+        {
+          key: "meters",
+          label: t("rakht.requiredMeters", { defaultValue: "Meters" }),
+          value: details.meters,
+          show: hasPrintableBillValue(details.meters),
+          className: "[direction:ltr] [unicode-bidi:embed]",
+          render: () => details.meters,
+        },
+      ].filter((field) => field.show);
+
+      return {
+        key: row.order?.id || `${row.typeKey}-${row.index}`,
+        itemLabel: row.itemLabel,
+        fields,
+      };
+    })
+    .filter((row) => row.fields.length > 0);
   const detailColumns = [
     {
       key: "billNo",
@@ -961,14 +1066,6 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
       align: alignClass,
       show: rowItems.some((row) => hasPrintableBillValue(row.boxName)),
       render: (row) => row.boxName,
-    },
-    {
-      key: "rakht",
-      header: t("createOrder.rakhtSelection", { defaultValue: "Rakht" }),
-      width: "19%",
-      align: alignClass,
-      show: rowItems.some((row) => row.rakhtDetails.hasData),
-      render: (row) => <RakhtSummary details={row.rakhtDetails} />,
     },
     {
       key: "itemPrice",
@@ -1081,6 +1178,57 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
           </tbody>
         </table>
       </div>
+
+      {rakhtInfoRows.length > 0 ? (
+        <div className="print-customer-rakht-section border-b border-slate-800">
+          <div
+            className={`${
+              settings.isRtl
+                ? "print-bill-section-head"
+                : "print-bill-section-head print-bill-section-head--upper"
+            } ${alignClass}`}
+          >
+            {t("createOrder.rakhtSelection", {
+              defaultValue: "Rakht / Fabric",
+            })}
+          </div>
+          <div className="print-customer-rakht-stack">
+            {rakhtInfoRows.map((row) => (
+              <div key={row.key} className="print-customer-rakht-row">
+                {rakhtInfoRows.length > 1 ? (
+                  <div
+                    className={`border-b border-slate-800 bg-amber-50 px-2 py-1 text-[8px] font-bold text-amber-800 ${alignClass}`}
+                  >
+                    {row.itemLabel}
+                  </div>
+                ) : null}
+                <div
+                  className="print-customer-rakht-grid grid text-[9px] text-slate-800"
+                  style={{
+                    gridTemplateColumns: `repeat(${row.fields.length}, minmax(0, 1fr))`,
+                  }}
+                >
+                  {row.fields.map((field, index) => (
+                    <div
+                      key={field.key}
+                      className={`${getBorderClass(index, row.fields, false)} px-2 py-1.5 ${alignClass}`}
+                    >
+                      <p className={tableHeadClass}>{field.label}</p>
+                      <p
+                        className={`print-bill-kv-value mt-0.5 ${
+                          field.className || ""
+                        }`}
+                      >
+                        {field.render()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className={`print-bill-section-head ${alignClass}`}>
         {safeTxt("financialSummary")}

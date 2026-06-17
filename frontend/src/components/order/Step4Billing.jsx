@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
 import { parseNumberLocale } from "../../lib/normalize.js";
 import { useTranslation } from "react-i18next";
 import { formatCurrency } from "../../lib/currency.js";
@@ -297,14 +297,14 @@ function BillingCard({ entry, value, onChange, billingKey }) {
   );
 }
 
-export default function Step4Billing({
+const Step4Billing = forwardRef(function Step4Billing({
   onNext,
   onBack,
   orderTypes = [],
   orderItems = [],
   initial = {},
   loading = false,
-}) {
+}, ref) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
   const billingEntries = useMemo(
@@ -341,7 +341,7 @@ export default function Step4Billing({
     setBilling((current) => ({ ...current, [billingKey]: nextValue }));
   };
 
-  const validateAndContinue = () => {
+  const buildNormalizedBilling = () => {
     const normalizedBilling = {};
 
     for (let index = 0; index < billingEntries.length; index += 1) {
@@ -363,6 +363,16 @@ export default function Step4Billing({
       };
     }
 
+    return normalizedBilling;
+  };
+
+  useImperativeHandle(ref, () => ({
+    getDraftData: () => ({ billing }),
+  }));
+
+  const validateAndContinue = () => {
+    const normalizedBilling = buildNormalizedBilling();
+
     setError("");
     onNext({ billing: normalizedBilling });
   };
@@ -377,7 +387,12 @@ export default function Step4Billing({
       </p>
 
       {error && (
-        <div className="info-box ib-red" style={{ marginBottom: 16 }}>
+        <div
+          className="info-box ib-red"
+          style={{ marginBottom: 16 }}
+          role="alert"
+          aria-live="polite"
+        >
           {error}
         </div>
       )}
@@ -460,4 +475,6 @@ export default function Step4Billing({
       </div>
     </div>
   );
-}
+});
+
+export default Step4Billing;

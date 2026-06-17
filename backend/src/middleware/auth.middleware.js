@@ -1,6 +1,12 @@
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma.js';
 import { runTenantContext } from '../lib/tenantContext.js';
+import {
+  ACCESS_COOKIE_NAME,
+  REFRESH_COOKIE_NAME,
+  getCookie,
+  hashSessionToken,
+} from '../lib/sessionCookies.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'tailor-secret-key-change-in-prod';
 
@@ -8,11 +14,14 @@ const JWT_SECRET = process.env.JWT_SECRET || 'tailor-secret-key-change-in-prod';
 export async function authenticate(req, res, next) {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    const cookieToken = getCookie(req, ACCESS_COOKIE_NAME);
+    const token = bearerToken || cookieToken;
+
+    if (!token) {
       return res.status(401).json({ error: 'Authentication required.' });
     }
 
-    const token = authHeader.slice(7);
     let payload;
     try {
       payload = jwt.verify(token, JWT_SECRET);
@@ -29,6 +38,7 @@ export async function authenticate(req, res, next) {
         phoneNumber: true,
         accountType: true,
         isActive: true,
+        refreshToken: true,
         tenant: {
           select: {
             id: true,
@@ -46,6 +56,20 @@ export async function authenticate(req, res, next) {
 
     if (!user || !user.isActive) {
       return res.status(401).json({ error: 'Account not found or deactivated.' });
+    }
+
+    if (payload.tenantId !== undefined && (payload.tenantId || null) !== (user.tenantId || null)) {
+      return res.status(401).json({ error: 'Session tenant mismatch.' });
+    }
+
+    if (!bearerToken && cookieToken) {
+      const refreshToken = getCookie(req, REFRESH_COOKIE_NAME);
+      if (!refreshToken || !user.refreshToken || user.refreshToken !== refreshToken) {
+        return res.status(401).json({ error: 'Session expired. Please sign in again.' });
+      }
+      if (payload.sid && payload.sid !== hashSessionToken(refreshToken)) {
+        return res.status(401).json({ error: 'Session expired. Please sign in again.' });
+      }
     }
 
     const isSuperAdmin = user.accountType === 'SUPER_ADMIN';
@@ -68,6 +92,7 @@ export async function authenticate(req, res, next) {
     }
 
     req.user = user;
+    delete req.user.refreshToken;
     req.tenant = user.tenant || null;
     runTenantContext(
       { tenantId: user.tenantId, userId: user.id, isSuperAdmin },

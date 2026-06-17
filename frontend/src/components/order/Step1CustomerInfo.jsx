@@ -1,3 +1,4 @@
+import { forwardRef, useImperativeHandle } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -5,7 +6,10 @@ import { useTranslation } from "react-i18next";
 import { LuUser, LuPhone } from "react-icons/lu";
 import { Field } from "../ui/index.jsx";
 
-export default function Step1CustomerInfo({ onNext, initial = {} }) {
+const Step1CustomerInfo = forwardRef(function Step1CustomerInfo(
+  { onNext, initial = {} },
+  ref,
+) {
   const { t } = useTranslation();
   const schema = z.object({
     firstName: z.string().optional(),
@@ -15,6 +19,7 @@ export default function Step1CustomerInfo({ onNext, initial = {} }) {
   const {
     register,
     handleSubmit,
+    getValues,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
@@ -22,7 +27,13 @@ export default function Step1CustomerInfo({ onNext, initial = {} }) {
       firstName: initial.firstName || "",
       phoneNumber: initial.phoneNumber || "",
     },
+    mode: "onChange",
+    reValidateMode: "onChange",
   });
+
+  useImperativeHandle(ref, () => ({
+    getDraftData: () => getValues(),
+  }));
 
   return (
     <form onSubmit={handleSubmit(onNext)}>
@@ -82,4 +93,6 @@ export default function Step1CustomerInfo({ onNext, initial = {} }) {
 
     </form>
   );
-}
+});
+
+export default Step1CustomerInfo;

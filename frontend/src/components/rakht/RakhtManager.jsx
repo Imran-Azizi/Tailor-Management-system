@@ -34,8 +34,8 @@ import { useMonth } from "../../context/MonthContext.jsx";
 import {
   TON_QTY_OPTIONS,
   buildTonsForQuantity,
-  rakhtSchema,
-  addMoreTonsSchema,
+  makeRakhtSchema,
+  makeAddMoreTonsSchema,
   emptyForm,
   emptyAddMoreTonsForm,
   sanitizeIntegerInput,
@@ -48,6 +48,8 @@ export default function RakhtManager() {
   const { isAdmin } = useAuth();
   const { viewMonth, viewYear } = useMonth();
   const qc = useQueryClient();
+  const rakhtSchema = useMemo(() => makeRakhtSchema(t), [t]);
+  const addMoreTonsSchema = useMemo(() => makeAddMoreTonsSchema(t), [t]);
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteItem, setDeleteItem] = useState(null);

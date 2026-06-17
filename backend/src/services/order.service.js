@@ -6,6 +6,7 @@ import {
   toAsciiDigits,
 } from "../lib/normalize.js";
 import { createCustomerWithSequentialBill } from "../lib/billNumber.js";
+import { getTenantContext } from "../lib/tenantContext.js";
 import {
   getMonthPolicy,
   assertMonthWritable,
@@ -23,6 +24,16 @@ import {
   decimalLt,
   sumScaled,
 } from "../lib/decimal.js";
+
+function requireActiveTenantId() {
+  const tenantId = getTenantContext()?.tenantId;
+  if (!tenantId) {
+    throw Object.assign(new Error("Tenant context is required for this operation."), {
+      status: 403,
+    });
+  }
+  return tenantId;
+}
 
 const NUMERIC_MEASUREMENT_FIELDS = new Set([
   "height",
@@ -1780,6 +1791,7 @@ export const markCompletedWorkerOrdersAsReceived = async ({
   }
 
   const results = await prisma.$transaction(async (tx) => {
+    const tenantId = requireActiveTenantId();
     const output = [];
 
     for (const item of uniqueItems) {
@@ -1858,6 +1870,7 @@ export const markCompletedWorkerOrdersAsReceived = async ({
           },
         },
         create: {
+          tenantId,
           orderId: order.id,
           workerId: worker.id,
           workerRole: item.workerRole,
@@ -1867,6 +1880,7 @@ export const markCompletedWorkerOrdersAsReceived = async ({
           status: "RECEIVED",
         },
         update: {
+          tenantId,
           workerId: worker.id,
           paidAmount,
           receiptDate: now,
@@ -1881,6 +1895,7 @@ export const markCompletedWorkerOrdersAsReceived = async ({
 
       await tx.userNotification.create({
         data: {
+          tenantId,
           userId: worker.id,
           orderId: order.id,
           type: "WORKER_PAYMENT",
@@ -2202,6 +2217,7 @@ const notifyAdminsToCreateBox = async (
   tx,
   { orderId, orderType, customerName, billNumber, boxName, reason },
 ) => {
+  const tenantId = requireActiveTenantId();
   const admins = await tx.user.findMany({
     where: { accountType: "ADMIN" },
     select: { id: true },
@@ -2226,6 +2242,7 @@ const notifyAdminsToCreateBox = async (
     admins.map((admin) =>
       tx.userNotification.create({
         data: {
+          tenantId,
           userId: admin.id,
           orderId,
           message,
@@ -2357,6 +2374,7 @@ export const createOrder = async ({
   createdByRole,
 }) => {
   return prisma.$transaction(async (tx) => {
+    const tenantId = requireActiveTenantId();
     const monthPolicy = await getMonthPolicy({ tx });
 
     const resolvedEntryMonth = Number(monthPolicy.currentMonth);
@@ -2566,6 +2584,7 @@ export const createOrder = async ({
 
       const order = await tx.order.create({
         data: {
+          tenantId,
           customerId: customer.id,
           billNumber: orderBillNumber,
           type,
@@ -2607,23 +2626,23 @@ export const createOrder = async ({
 
       if (type === "OUTFIT") {
         await tx.outfit.create({
-          data: { orderId: order.id, ...persistedMeasurements },
+          data: { tenantId, orderId: order.id, ...persistedMeasurements },
         });
       } else if (type === "WASKAT") {
         await tx.waskat.create({
-          data: { orderId: order.id, ...persistedMeasurements },
+          data: { tenantId, orderId: order.id, ...persistedMeasurements },
         });
       } else if (type === "KORTY") {
         await tx.korty.create({
-          data: { orderId: order.id, ...persistedMeasurements },
+          data: { tenantId, orderId: order.id, ...persistedMeasurements },
         });
       } else if (type === "YAKHANQAQ") {
         await tx.yakhanQaq.create({
-          data: { orderId: order.id, ...persistedMeasurements },
+          data: { tenantId, orderId: order.id, ...persistedMeasurements },
         });
       } else if (type === "READY_MADE") {
         await tx.readyMadeOrder.create({
-          data: { orderId: order.id, ...persistedMeasurements },
+          data: { tenantId, orderId: order.id, ...persistedMeasurements },
         });
         if (item.readyMadeClothingId) {
           await tx.readyMadeClothing.updateMany({
@@ -2638,7 +2657,7 @@ export const createOrder = async ({
         }
       } else if (type === "READY_MADE_WASKAT") {
         await tx.readyMadeWaskatOrder.create({
-          data: { orderId: order.id, ...persistedMeasurements },
+          data: { tenantId, orderId: order.id, ...persistedMeasurements },
         });
         if (item.readyMadeWaskatClothingId) {
           await tx.readyMadeWaskatClothing.updateMany({
@@ -2657,6 +2676,7 @@ export const createOrder = async ({
       if (isEmergency) {
         await tx.notification.create({
           data: {
+            tenantId,
             orderId: order.id,
             message: buildEmergencyAlertMessage({
               orderType: type,
@@ -2675,6 +2695,7 @@ export const createOrder = async ({
       if (isForeignOrder && !isEmergency) {
         await tx.notification.create({
           data: {
+            tenantId,
             orderId: order.id,
             message: `🌍 Foreign Country order for ${customer.firstName} (Bill #${orderBillNumber}) has been assigned to Foreign Country box`,
             nextAlert: new Date(Date.now() + 24 * 60 * 60 * 1000),
@@ -2854,44 +2875,45 @@ const computeRemaining = ({ totalPrice, discount, paidAmount }) =>
   Number(totalPrice || 0) - Number(discount || 0) - Number(paidAmount || 0);
 
 const upsertMeasurementsForType = async (tx, type, orderId, measurements) => {
+  const tenantId = requireActiveTenantId();
   const normalized = sanitizeMeasurements(measurements, type);
   const persistedForCreate = withRequiredMeasurementDefaults(type, normalized);
 
   if (type === "OUTFIT") {
     await tx.outfit.upsert({
       where: { orderId },
-      update: normalized,
-      create: { orderId, ...persistedForCreate },
+      update: { tenantId, ...normalized },
+      create: { tenantId, orderId, ...persistedForCreate },
     });
   } else if (type === "WASKAT") {
     await tx.waskat.upsert({
       where: { orderId },
-      update: normalized,
-      create: { orderId, ...persistedForCreate },
+      update: { tenantId, ...normalized },
+      create: { tenantId, orderId, ...persistedForCreate },
     });
   } else if (type === "KORTY") {
     await tx.korty.upsert({
       where: { orderId },
-      update: normalized,
-      create: { orderId, ...persistedForCreate },
+      update: { tenantId, ...normalized },
+      create: { tenantId, orderId, ...persistedForCreate },
     });
   } else if (type === "YAKHANQAQ") {
     await tx.yakhanQaq.upsert({
       where: { orderId },
-      update: normalized,
-      create: { orderId, ...persistedForCreate },
+      update: { tenantId, ...normalized },
+      create: { tenantId, orderId, ...persistedForCreate },
     });
   } else if (type === "READY_MADE") {
     await tx.readyMadeOrder.upsert({
       where: { orderId },
-      update: normalized,
-      create: { orderId, ...normalized },
+      update: { tenantId, ...normalized },
+      create: { tenantId, orderId, ...normalized },
     });
   } else if (type === "READY_MADE_WASKAT") {
     await tx.readyMadeWaskatOrder.upsert({
       where: { orderId },
-      update: normalized,
-      create: { orderId, ...normalized },
+      update: { tenantId, ...normalized },
+      create: { tenantId, orderId, ...normalized },
     });
   }
 };
@@ -3198,6 +3220,7 @@ export const updateOrderBill = async (
 
       const created = await tx.order.create({
         data: {
+          tenantId: requireActiveTenantId(),
           customerId: seed.customerId,
           type,
           orderName: orderName || null,
@@ -3365,6 +3388,7 @@ export const markComplete = async (id) => {
           admins.map((admin) =>
             tx.userNotification.create({
               data: {
+                tenantId: requireActiveTenantId(),
                 userId: admin.id,
                 orderId: id,
                 message: `Capacity available in ${boxRecord.boxName} (${order.type})`,

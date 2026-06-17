@@ -14,7 +14,9 @@ const TMP_ROOT = path.resolve(process.cwd(), "tmp", "backups");
 const SYSTEM_NAME = "tailor-system";
 const SCHEDULE_ID = "default";
 
-const GLOBAL_MODELS = [
+const GLOBAL_MODELS = [];
+
+const TENANT_DESIGN_MODELS = [
   "yakhan",
   "astin",
   "shoulderState",
@@ -36,6 +38,15 @@ const GLOBAL_MODELS = [
   "yakhanQaqPantShip",
 ];
 
+const TENANT_ORDER_DETAIL_MODELS = [
+  "outfit",
+  "waskat",
+  "korty",
+  "yakhanQaq",
+  "readyMadeOrder",
+  "readyMadeWaskatOrder",
+];
+
 const TENANT_BASE_MODELS = [
   "tenant",
   "user",
@@ -45,14 +56,10 @@ const TENANT_BASE_MODELS = [
   "readyMadeClothing",
   "readyMadeWaskatClothing",
   "box",
+  ...TENANT_DESIGN_MODELS,
   "contributor",
   "order",
-  "outfit",
-  "waskat",
-  "korty",
-  "yakhanQaq",
-  "readyMadeOrder",
-  "readyMadeWaskatOrder",
+  ...TENANT_ORDER_DETAIL_MODELS,
   "workerPaymentReceipt",
   "orderDraft",
   "rakhtPaymentHistory",
@@ -364,9 +371,9 @@ async function tenantData(tenantId, { includeSecrets = true, onlyUserIds = null 
   ]);
 
   const orderIds = orders.map((order) => order.id);
-  const [outfits, waskats, korties, yakhanQaqs, readyMadeOrders, readyMadeWaskatOrders, receipts] =
+  const [orderDetailRows, designEntries] = await Promise.all([
     orderIds.length
-      ? await Promise.all([
+      ? Promise.all([
           prisma.outfit.findMany({ where: { orderId: { in: orderIds } } }),
           prisma.waskat.findMany({ where: { orderId: { in: orderIds } } }),
           prisma.korty.findMany({ where: { orderId: { in: orderIds } } }),
@@ -375,7 +382,17 @@ async function tenantData(tenantId, { includeSecrets = true, onlyUserIds = null 
           prisma.readyMadeWaskatOrder.findMany({ where: { orderId: { in: orderIds } } }),
           prisma.workerPaymentReceipt.findMany({ where: { orderId: { in: orderIds } } }),
         ])
-      : [[], [], [], [], [], [], []];
+      : [[], [], [], [], [], [], []],
+    Promise.all(
+      TENANT_DESIGN_MODELS.map(async (model) => [
+        model,
+        await prisma[model].findMany({ where: { tenantId } }),
+      ]),
+    ),
+  ]);
+  const [outfits, waskats, korties, yakhanQaqs, readyMadeOrders, readyMadeWaskatOrders, receipts] =
+    orderDetailRows;
+  const designData = Object.fromEntries(designEntries);
 
   return {
     tenant: [tenant],
@@ -386,6 +403,7 @@ async function tenantData(tenantId, { includeSecrets = true, onlyUserIds = null 
     readyMadeClothing: readyMadeClothes,
     readyMadeWaskatClothing: readyMadeWaskatClothes,
     box: boxes,
+    ...designData,
     contributor: contributors,
     order: orders,
     outfit: outfits,
@@ -683,9 +701,20 @@ function reviveDateFields(model, rows = []) {
   });
 }
 
-async function createRows(tx, model, rows = []) {
+function prepareRowsForRestore(model, rows = [], { fallbackTenantId = "default-tenant" } = {}) {
+  const revived = reviveDateFields(model, rows);
+  if (!TENANT_DESIGN_MODELS.includes(model) && !TENANT_ORDER_DETAIL_MODELS.includes(model)) {
+    return revived;
+  }
+  return revived.map((row) => ({
+    ...row,
+    tenantId: row.tenantId || fallbackTenantId,
+  }));
+}
+
+async function createRows(tx, model, rows = [], options = {}) {
   if (!rows.length || !tx[model]) return;
-  await tx[model].createMany({ data: reviveDateFields(model, rows), skipDuplicates: true });
+  await tx[model].createMany({ data: prepareRowsForRestore(model, rows, options), skipDuplicates: true });
 }
 
 async function restoreFullSystem(archive) {
@@ -719,7 +748,7 @@ async function restoreTenant(archive, tenantId) {
         if (error.code !== "P2025") throw error;
       });
       for (const model of RESTORE_ORDER.filter((name) => !GLOBAL_MODELS.includes(name))) {
-        await createRows(tx, model, archive.data[model] || []);
+        await createRows(tx, model, archive.data[model] || [], { fallbackTenantId: tenantId });
       }
     },
     { timeout: 120000 },

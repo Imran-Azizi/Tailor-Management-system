@@ -103,7 +103,10 @@ export default function Boxes() {
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm();
+  } = useForm({
+    mode: "onChange",
+    reValidateMode: "onChange",
+  });
 
   const { data: boxes, isLoading } = useQuery({
     queryKey: ["boxes"],

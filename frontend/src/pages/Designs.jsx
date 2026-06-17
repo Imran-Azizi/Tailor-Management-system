@@ -869,7 +869,9 @@ function ContributorSection() {
           )}
 
           {formError ? (
-            <p className="contributor-form-error">{formError}</p>
+            <p className="contributor-form-error" role="alert" aria-live="polite">
+              {formError}
+            </p>
           ) : null}
 
           <div style={{ display: "flex", gap: 10 }}>
@@ -919,7 +921,9 @@ function ContributorSection() {
           </div>
 
           {authError ? (
-            <p className="contributor-form-error">{authError}</p>
+            <p className="contributor-form-error" role="alert" aria-live="polite">
+              {authError}
+            </p>
           ) : null}
 
           <div style={{ display: "flex", gap: 10 }}>
@@ -1487,7 +1491,11 @@ function ReadyMadeClothingSection() {
         }
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {formError && <div className="info-box ib-red">{formError}</div>}
+          {formError && (
+            <div className="info-box ib-red" role="alert" aria-live="polite">
+              {formError}
+            </div>
+          )}
           <div>
             <label className="lbl">
               {t("designs.readyMade.clothingCode", {
@@ -1865,7 +1873,11 @@ function ReadyMadeWaskatSection() {
         }
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {formError && <div className="info-box ib-red">{formError}</div>}
+          {formError && (
+            <div className="info-box ib-red" role="alert" aria-live="polite">
+              {formError}
+            </div>
+          )}
           <div>
             <label className="lbl">
               {t("designs.readyMadeWaskat.waskatCode", {

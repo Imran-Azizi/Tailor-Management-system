@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -156,7 +156,10 @@ function ReadyMadeCatalogDropdown({
   );
 }
 
-export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
+const Step2OrderTypes = forwardRef(function Step2OrderTypes(
+  { onNext, onBack, initial = [] },
+  ref,
+) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
   const initialEntries = initial.length ? initial : [];
@@ -283,6 +286,24 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
     setBillEmergencyError("");
   };
 
+  const buildNormalizedEntries = () =>
+    entries.map((entry) => ({
+      ...entry,
+      isEmergency: billEmergency,
+      emergencyExpiry: billEmergency ? billEmergencyExpiry : "",
+      emergencyHour: billEmergency
+        ? normalizeEmergencyHour(billEmergencyHour)
+        : "08",
+      isForeignOrder:
+        entry.type === "READY_MADE" || entry.type === "READY_MADE_WASKAT"
+          ? false
+          : isForeignOrder,
+    }));
+
+  useImperativeHandle(ref, () => ({
+    getDraftData: () => ({ orderTypes: buildNormalizedEntries() }),
+  }));
+
   const validateBeforeContinue = () => {
     if (!entries.length) {
       setSelectionError(t("createOrder.selectAtLeastOne"));
@@ -336,18 +357,7 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
       }
     }
 
-    const normalizedEntries = entries.map((entry) => ({
-      ...entry,
-      isEmergency: billEmergency,
-      emergencyExpiry: billEmergency ? billEmergencyExpiry : "",
-      emergencyHour: billEmergency
-        ? normalizeEmergencyHour(billEmergencyHour)
-        : "08",
-      isForeignOrder:
-        entry.type === "READY_MADE" || entry.type === "READY_MADE_WASKAT"
-          ? false
-          : isForeignOrder,
-    }));
+    const normalizedEntries = buildNormalizedEntries();
 
     setSelectionError("");
     setBillEmergencyError("");
@@ -458,7 +468,11 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
         })}
       </div>
 
-      {selectionError ? <p className="err-msg">{selectionError}</p> : null}
+      {selectionError ? (
+        <p className="err-msg" role="alert" aria-live="polite">
+          {selectionError}
+        </p>
+      ) : null}
 
       {entries.length > 0 && (
         <div className="selected-order-stack" style={{ marginBottom: 18 }}>
@@ -534,7 +548,13 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
                           }}
                         />
                         {billEmergencyError && (
-                          <p className="err-msg">{billEmergencyError}</p>
+                          <p
+                            className="err-msg"
+                            role="alert"
+                            aria-live="polite"
+                          >
+                            {billEmergencyError}
+                          </p>
                         )}
                       </div>
 
@@ -790,4 +810,6 @@ export default function Step2OrderTypes({ onNext, onBack, initial = [] }) {
       </div>
     </div>
   );
-}
+});
+
+export default Step2OrderTypes;

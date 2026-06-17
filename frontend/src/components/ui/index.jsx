@@ -462,7 +462,11 @@ export const Field = ({ label, error, children, required, hint }) => (
         {hint}
       </p>
     )}
-    {error && <p className="err-msg">{error}</p>}
+    {error && (
+      <p className="err-msg" role="alert" aria-live="polite">
+        {error}
+      </p>
+    )}
   </div>
 );
 

@@ -386,7 +386,12 @@ export default function EditOrder() {
 
       <div className="card step-shell-card" style={{ padding: 28 }}>
         {error && (
-          <div className="info-box ib-red" style={{ marginBottom: 20 }}>
+          <div
+            className="info-box ib-red"
+            style={{ marginBottom: 20 }}
+            role="alert"
+            aria-live="polite"
+          >
             {error}
           </div>
         )}

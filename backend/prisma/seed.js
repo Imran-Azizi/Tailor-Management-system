@@ -54,9 +54,9 @@ async function main() {
 
   const upsertByName = (model, name) =>
     model.upsert({
-      where: { name },
+      where: { tenantId_name: { tenantId: defaultTenant.id, name } },
       update: {},
-      create: { name },
+      create: { tenantId: defaultTenant.id, name },
     });
 
   // Seed sequentially to avoid exhausting limited DB pool connections in hosted environments.
@@ -79,38 +79,47 @@ async function main() {
   console.log("✅ Design styles seeded");
 
   // Seed a sample customer
-  const nextBillNumber = await getNextSequentialBillNumber(prisma);
-  const customer = await prisma.customer.upsert({
+  const nextBillNumber = await getNextSequentialBillNumber(prisma, {
+    tenantId: defaultTenant.id,
+  });
+  const existingCustomer = await prisma.customer.findFirst({
     where: {
-      tenantId_phoneNumber: {
-        tenantId: defaultTenant.id,
-        phoneNumber: "0700000001",
-      },
-    },
-    update: { tenantId: defaultTenant.id },
-    create: {
       tenantId: defaultTenant.id,
-      firstName: "Ahmad",
       phoneNumber: "0700000001",
-      billNumber: nextBillNumber,
     },
   });
+  const customer =
+    existingCustomer ||
+    (await prisma.customer.create({
+      data: {
+        tenantId: defaultTenant.id,
+        firstName: "Ahmad",
+        phoneNumber: "0700000001",
+        billNumber: nextBillNumber,
+      },
+    }));
 
   console.log("✅ Sample customer created:", customer.firstName);
 
   // Seed default admin user (password: admin123)
   const adminPassword = await bcrypt.hash("admin123", 12);
-  const admin = await prisma.user.upsert({
-    where: { phoneNumber: "0789577024" },
-    update: { tenantId: defaultTenant.id },
-    create: {
-      tenantId: defaultTenant.id,
-      name: "Admin",
-      phoneNumber: "0789577024",
-      accountType: "ADMIN",
-      password: adminPassword,
-    },
+  const existingAdmin = await prisma.user.findFirst({
+    where: { tenantId: defaultTenant.id, phoneNumber: "0789577024" },
   });
+  const admin = existingAdmin
+    ? await prisma.user.update({
+        where: { id: existingAdmin.id },
+        data: { tenantId: defaultTenant.id },
+      })
+    : await prisma.user.create({
+        data: {
+          tenantId: defaultTenant.id,
+          name: "Admin",
+          phoneNumber: "0789577024",
+          accountType: "ADMIN",
+          password: adminPassword,
+        },
+      });
   console.log(
     "✅ Default admin created:",
     admin.name,
@@ -122,17 +131,23 @@ async function main() {
     process.env.SUPER_ADMIN_PASSWORD || "superadmin123",
     12,
   );
-  const superAdmin = await prisma.user.upsert({
-    where: { phoneNumber: superAdminPhone },
-    update: { accountType: "SUPER_ADMIN", tenantId: null },
-    create: {
-      tenantId: null,
-      name: process.env.SUPER_ADMIN_NAME || "Super Admin",
-      phoneNumber: superAdminPhone,
-      accountType: "SUPER_ADMIN",
-      password: superAdminPassword,
-    },
+  const existingSuperAdmin = await prisma.user.findFirst({
+    where: { accountType: "SUPER_ADMIN", phoneNumber: superAdminPhone },
   });
+  const superAdmin = existingSuperAdmin
+    ? await prisma.user.update({
+        where: { id: existingSuperAdmin.id },
+        data: { accountType: "SUPER_ADMIN", tenantId: null },
+      })
+    : await prisma.user.create({
+        data: {
+          tenantId: null,
+          name: process.env.SUPER_ADMIN_NAME || "Super Admin",
+          phoneNumber: superAdminPhone,
+          accountType: "SUPER_ADMIN",
+          password: superAdminPassword,
+        },
+      });
   console.log(
     "Super admin ready:",
     superAdmin.name,

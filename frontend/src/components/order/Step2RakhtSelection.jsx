@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import Select from "react-select";
@@ -57,13 +57,13 @@ const sanitizeDecimalInput = (raw, { maxFractionDigits } = {}) => {
   return `${parts[0]}.${safeFraction}`;
 };
 
-export default function Step2RakhtSelection({
+const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
   onNext,
   onBack,
   initial = {},
   orderTypes = [],
   orderItems = [],
-}) {
+}, ref) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
   const isRtlLanguage = detectRtlLanguage(language);
@@ -185,10 +185,7 @@ export default function Step2RakhtSelection({
     return map;
   }, [selections]);
 
-  const handleSubmit = (event) => {
-    event.preventDefault();
-    setValidationError("");
-
+  const buildRakhtSelections = ({ validate = false } = {}) => {
     const rakhtSelections = [];
     // Cumulative per-ton allocation to prevent combined over-selection
     const tonAllocated = {};
@@ -226,78 +223,113 @@ export default function Step2RakhtSelection({
       );
 
       if (!selectedRakht) {
-        setValidationError(
-          t("createOrder.rakhtSelectionRequired", {
-            defaultValue: "Please select a valid Rakht company and brand.",
-          }),
-        );
-        return;
+        if (validate) {
+          setValidationError(
+            t("createOrder.rakhtSelectionRequired", {
+              defaultValue: "Please select a valid Rakht company and brand.",
+            }),
+          );
+          return null;
+        }
+
+        rakhtSelections.push({
+          orderId: item.orderId || undefined,
+          type: item.type,
+          orderItemKey: item.key,
+          rakhtId: undefined,
+          rakhtTonId,
+          rakhtCompanyName: companyName,
+          rakhtBrandName: brandName,
+          requiredMeters: current.requiredMeters || "",
+          piecePrice: current.piecePrice || "",
+          priceForCustomer: current.priceForCustomer || "",
+        });
+        continue;
       }
 
       const ton = (selectedRakht.tons || []).find(
         (entry) => entry.id === rakhtTonId,
       );
       if (!ton) {
-        setValidationError(
-          t("createOrder.rakhtTonSelectionRequired", {
-            defaultValue: "Please select a Rakht ton/color.",
-          }),
-        );
-        return;
+        if (validate) {
+          setValidationError(
+            t("createOrder.rakhtTonSelectionRequired", {
+              defaultValue: "Please select a Rakht ton/color.",
+            }),
+          );
+          return null;
+        }
       }
 
-      const tonAvailable = getTonRemainingMeters(ton);
+      const tonAvailable = ton ? getTonRemainingMeters(ton) : 0;
       const safeRequiredMeters = maxScaled(requiredMeters, 0, METER_SCALE);
       const safePiecePrice = maxScaled(piecePrice, 0, MONEY_SCALE);
       const safePriceForCustomer = maxScaled(priceForCustomer, 0, MONEY_SCALE);
 
-      if (safeRequiredMeters <= 0) {
+      if (validate && safeRequiredMeters <= 0) {
         setValidationError(
           t("createOrder.requiredMetersPositive", {
             defaultValue: "Required meters must be greater than zero.",
           }),
         );
-        return;
+        return null;
       }
 
       // Validate against effective available (DB remaining minus already allocated in this form)
-      const alreadyAllocated = tonAllocated[ton.id] || 0;
+      const alreadyAllocated = ton ? tonAllocated[ton.id] || 0 : 0;
       const tonAvailableNet = maxScaled(
         subScaled(tonAvailable, alreadyAllocated, METER_SCALE),
         0,
         METER_SCALE,
       );
-      if (safeRequiredMeters > tonAvailableNet) {
+      if (validate && safeRequiredMeters > tonAvailableNet) {
         setValidationError(
           t("createOrder.insufficientRakhtMeters", {
             available: formatScaled(tonAvailableNet, { scale: 2 }),
             defaultValue: `Insufficient meters. Available: ${formatScaled(tonAvailableNet, { scale: 2 })}`,
           }),
         );
-        return;
+        return null;
       }
-      tonAllocated[ton.id] = alreadyAllocated + safeRequiredMeters;
+      if (ton) {
+        tonAllocated[ton.id] = alreadyAllocated + safeRequiredMeters;
+      }
 
       rakhtSelections.push({
         orderId: item.orderId || undefined,
         type: item.type,
         orderItemKey: item.key,
         rakhtId: selectedRakht.id,
-        rakhtTonId: ton.id,
+        rakhtTonId: ton?.id || rakhtTonId,
         rakhtCompanyName: selectedRakht.companyName,
         rakhtBrandName: selectedRakht.brandName,
-        rakhtColor: ton.name,
-        rakhtColorHex: ton.colorHex,
-        requiredMeters: safeRequiredMeters,
-        piecePrice: safePiecePrice,
-        priceForCustomer: safePriceForCustomer,
-        totalPriceForCustomer: mulScaled(
-          safePriceForCustomer,
-          safeRequiredMeters,
-          MONEY_SCALE,
-        ),
+        rakhtColor: ton?.name || "",
+        rakhtColorHex: ton?.colorHex || "",
+        requiredMeters: validate ? safeRequiredMeters : current.requiredMeters || "",
+        piecePrice: validate ? safePiecePrice : current.piecePrice || "",
+        priceForCustomer: validate
+          ? safePriceForCustomer
+          : current.priceForCustomer || "",
+        totalPriceForCustomer:
+          validate
+            ? mulScaled(safePriceForCustomer, safeRequiredMeters, MONEY_SCALE)
+            : "",
       });
     }
+
+    return rakhtSelections;
+  };
+
+  useImperativeHandle(ref, () => ({
+    getDraftData: () => ({ rakhtSelections: buildRakhtSelections() }),
+  }));
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    setValidationError("");
+
+    const rakhtSelections = buildRakhtSelections({ validate: true });
+    if (!rakhtSelections) return;
 
     onNext({ rakhtSelections });
   };
@@ -321,7 +353,12 @@ export default function Step2RakhtSelection({
       ) : null}
 
       {selectionItems.length === 0 ? (
-        <div className="info-box ib-red" style={{ marginBottom: 14 }}>
+        <div
+          className="info-box ib-red"
+          style={{ marginBottom: 14 }}
+          role="alert"
+          aria-live="polite"
+        >
           {t("createOrder.selectAtLeastOne", {
             defaultValue: "Please select at least one order type.",
           })}
@@ -928,7 +965,12 @@ export default function Step2RakhtSelection({
       )}
 
       {validationError ? (
-        <div className="info-box ib-red" style={{ marginTop: 12 }}>
+        <div
+          className="info-box ib-red"
+          style={{ marginTop: 12 }}
+          role="alert"
+          aria-live="polite"
+        >
           {validationError}
         </div>
       ) : null}
@@ -948,4 +990,6 @@ export default function Step2RakhtSelection({
       </div>
     </form>
   );
-}
+});
+
+export default Step2RakhtSelection;

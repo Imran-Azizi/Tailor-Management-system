@@ -58,7 +58,11 @@ export default function Customers({ openCreate = false }) {
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm({ resolver: zodResolver(schema) });
+  } = useForm({
+    resolver: zodResolver(schema),
+    mode: "onChange",
+    reValidateMode: "onChange",
+  });
 
   const saveMut = useMutation({
     mutationFn: (body) =>

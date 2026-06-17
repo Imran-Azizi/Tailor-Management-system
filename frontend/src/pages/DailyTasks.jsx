@@ -128,6 +128,8 @@ function DailyTaskForm({ onSuccess }) {
   } = useForm({
     resolver: zodResolver(schema),
     defaultValues: { taskDate: nowLocalInput(), forRakht: "NO" },
+    mode: "onChange",
+    reValidateMode: "onChange",
   });
 
   const [orderBillSearch, setOrderBillSearch] = useState("");

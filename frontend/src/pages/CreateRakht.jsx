@@ -14,7 +14,7 @@ import { PageHeader } from "../components/ui/index.jsx";
 import {
   TON_QTY_OPTIONS,
   buildTonsForQuantity,
-  rakhtSchema,
+  makeRakhtSchema,
   emptyForm,
   sanitizeIntegerInput,
 } from "../components/rakht/rakhtFormConfig.js";
@@ -25,11 +25,14 @@ export default function CreateRakht() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [form, setForm] = useState(emptyForm());
+  const rakhtSchema = useMemo(() => makeRakhtSchema(t), [t]);
 
   const saveMut = useMutation({
     mutationFn: (payload) => api.post("/rakhts", payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["rakht-list"] });
+      qc.invalidateQueries({ queryKey: ["rakht-list-company-options"] });
+      qc.invalidateQueries({ queryKey: ["rakht-payment-history-page"] });
       toast.success(t("rakht.created", { defaultValue: "Rakht created." }));
       navigate("/rakhts");
     },
@@ -54,6 +57,7 @@ export default function CreateRakht() {
     if (!Number.isFinite(total) || !Number.isFinite(qty) || qty <= 0) return 0;
     return total / qty;
   }, [form.totalPrice, form.tonQuantity]);
+  const hasTotalPrice = Number(form.totalPrice || 0) > 0;
 
   const handleTonQtyChange = (option) => {
     const qty = option?.value || 0;
@@ -294,36 +298,41 @@ export default function CreateRakht() {
                     </div>
                   </div>
 
-                  <div
-                    className="info-box ib-gold"
-                    style={{
-                      marginTop: 2,
-                      display: "grid",
-                      gridTemplateColumns:
-                        "repeat(auto-fit, minmax(180px, 1fr))",
-                      gap: 8,
-                    }}
-                  >
-                    <span>
-                      {t("rakht.tonTotalPrice", {
-                        defaultValue: "Total price of this ton",
-                      })}
-                      : {tonPrice > 0 ? formatCurrency(tonPrice, language) : "-"}
-                    </span>
-                    <span>
-                      {t("rakht.purchasePricePerMeter", {
-                        defaultValue: "Price per meter (cost)",
-                      })}
-                      :{" "}
-                      {tonPrice > 0 && Number(ton.totalMeters || 0) > 0
-                        ? formatCurrency(
-                            tonPrice / Number(ton.totalMeters || 0),
-                            language,
-                            { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-                          )
-                        : "-"}
-                    </span>
-                  </div>
+                  {hasTotalPrice ? (
+                    <div
+                      className="info-box ib-gold"
+                      style={{
+                        marginTop: 2,
+                        display: "grid",
+                        gridTemplateColumns:
+                          "repeat(auto-fit, minmax(180px, 1fr))",
+                        gap: 8,
+                      }}
+                    >
+                      <span>
+                        {t("rakht.tonTotalPrice", {
+                          defaultValue: "Total price of this ton",
+                        })}
+                        : {formatCurrency(tonPrice, language)}
+                      </span>
+                      <span>
+                        {t("rakht.purchasePricePerMeter", {
+                          defaultValue: "Price per meter (cost)",
+                        })}
+                        :{" "}
+                        {tonPrice > 0 && Number(ton.totalMeters || 0) > 0
+                          ? formatCurrency(
+                              tonPrice / Number(ton.totalMeters || 0),
+                              language,
+                              {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              },
+                            )
+                          : "-"}
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>

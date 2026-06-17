@@ -442,7 +442,14 @@
     "allTypes": "All Types",
     "searchPlaceholder": "Search by user name...",
     "createdBy": "Created By",
-    "loanOption": "Loan"
+    "loanOption": "Loan",
+    "validation": {
+      "accountTypeRequired": "Please select an account type.",
+      "userRequired": "Please select a user.",
+      "amountRequired": "Please enter the amount.",
+      "amountPositive": "Amount must be greater than zero.",
+      "dateRequired": "Please select the transaction date."
+    }
   },
   "delivery": {
     "notFullyPaidBadge": "Not Completed",
@@ -540,8 +547,11 @@
     "qichikarFallback": "Qichikar",
     "dokhtFallback": "Dokht worker",
     "qichikarCompleted": "Qichikar {{name}} completed work on this order.",
+    "qichikarCompletedShort": "Qichikar completed",
     "dokhtCompleted": "Dokht worker {{name}} completed work on this order.",
+    "dokhtCompletedShort": "Dokht completed",
     "bothCompleted": "Qichikar {{qichikarName}} and Dokht worker {{dokhtName}} completed work on this order.",
+    "bothCompletedShort": "Ready for delivery",
     "readyForDelivery": "Work on this order is complete and ready for delivery to the customer."
   },
   "dailyTasks": {
@@ -732,6 +742,21 @@
     "updated": "Rakht updated.",
     "saveFailed": "Unable to save Rakht.",
     "validationError": "Please fill all required fields with valid values.",
+    "validation": {
+      "companyNameRequired": "Please enter the company name.",
+      "brandNameRequired": "Please enter the brand name.",
+      "tonQuantityRequired": "Please select ton quantity.",
+      "tonQuantityMax": "Ton quantity is higher than the allowed limit.",
+      "tonNameRequired": "Please enter the ton color name.",
+      "tonColorInvalid": "Please select a valid color.",
+      "tonMetersInvalid": "Total meters must be a valid number.",
+      "tonMetersPositive": "Total meters must be greater than zero.",
+      "totalPriceInvalid": "Total price must be zero or greater.",
+      "givenMoneyInvalid": "Given money must be zero or greater.",
+      "tonCountMismatch": "Number of ton details must match the selected ton quantity.",
+      "givenMoneyTooHigh": "Given money cannot exceed total price.",
+      "addMoreTonsRequired": "Please add at least one ton."
+    },
     "companyDeleted": "Company deleted.",
     "companyDeleteFailed": "Failed to delete company.",
     "empty": "No Rakht records yet.",
@@ -1011,8 +1036,8 @@
     "badge": "SaaS Control Center",
     "title": "Super Admin Dashboard",
     "subtitle": "Manage tenant workspaces, subscription access, branding, and tenant-level operational health from one secure console.",
-    "createTenant": "Create Tenant",
-    "editTenant": "Edit Tenant",
+    "createTenant": "Create Customer System",
+    "editTenant": "Edit Customer System",
     "saveChanges": "Save Changes",
     "saving": "Saving...",
     "refresh": "Refresh",
@@ -1025,8 +1050,10 @@
     "noTenants": "No tenants found.",
     "modalCreateSubtitle": "Provision a new tenant workspace",
     "modalEditSubtitle": "Update tenant workspace",
-    "modalHelp": "Business identity, subscription access, and owner credentials are managed here.",
+    "modalHelp": "System identity, subscription access, and owner credentials are managed here.",
     "ownerPasswordPlaceholder": "Leave blank to keep current password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
     "activeHelp": "Inactive tenants cannot use their workspace.",
     "deleteConfirmTitle": "Confirm Tenant Delete",
     "deleteConfirmHeading": "Delete {{name}}?",
@@ -1046,17 +1073,17 @@
       "orders": "Orders"
     },
     "groups": {
-      "business": "Business",
+      "business": "System Information",
       "owner": "Owner Account",
       "localization": "Localization",
       "subscription": "Subscription"
     },
     "fields": {
-      "businessName": "Business Name",
+      "businessName": "System Name",
       "systemName": "System Name",
       "address": "Address",
-      "phone": "Phone",
-      "mobile": "Mobile",
+      "phone": "Contact Number",
+      "mobile": "Contact Number",
       "email": "Email",
       "logoFile": "Tenant Logo",
       "currency": "Currency",
@@ -1092,7 +1119,6 @@
       "SUSPENDED": "Suspended"
     },
     "validation": {
-      "businessName": "Business name is required.",
       "systemName": "System name is required.",
       "ownerName": "Owner name is required.",
       "ownerPhone": "Owner phone is required.",

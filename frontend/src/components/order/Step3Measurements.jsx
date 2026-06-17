@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { forwardRef, useImperativeHandle, useState } from "react";
 import { parseNumberLocale } from "../../lib/normalize.js";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -277,7 +277,11 @@ function MeasureBlock({
                   onChange={(e) => setField(key, e.target.value)}
                   placeholder={getMeasurementFieldLabel(t, label)}
                 />
-                {errors[key] && <p className="err-msg">{errors[key]}</p>}
+                {errors[key] && (
+                  <p className="err-msg" role="alert" aria-live="polite">
+                    {errors[key]}
+                  </p>
+                )}
               </div>
             ))}
           </div>
@@ -342,7 +346,11 @@ function MeasureBlock({
                         menuPosition="fixed"
                       />
                     )}
-                    {errors[key] && <p className="err-msg">{errors[key]}</p>}
+                    {errors[key] && (
+                      <p className="err-msg" role="alert" aria-live="polite">
+                        {errors[key]}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -391,12 +399,12 @@ function MeasureBlock({
   );
 }
 
-export default function Step3Measurements({
+const Step3Measurements = forwardRef(function Step3Measurements({
   onNext,
   onBack,
   orderTypes = [],
   initial = {},
-}) {
+}, ref) {
   const orderTypeEntries = Array.isArray(orderTypes) ? orderTypes : [];
   const typeList = orderTypeEntries.map((entry) => entry?.type);
   const hasReadyMadeClothes = typeList.some((type) =>
@@ -446,6 +454,10 @@ export default function Step3Measurements({
 
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
+
+  useImperativeHandle(ref, () => ({
+    getDraftData: () => ({ measurements: data }),
+  }));
 
   const setMeasure = (typeIdx, setIdx, nextValue) => {
     setError("");
@@ -572,7 +584,12 @@ export default function Step3Measurements({
       </p>
 
       {error && (
-        <div className="info-box ib-red" style={{ marginBottom: 16 }}>
+        <div
+          className="info-box ib-red"
+          style={{ marginBottom: 16 }}
+          role="alert"
+          aria-live="polite"
+        >
           {error}
         </div>
       )}
@@ -742,4 +759,6 @@ export default function Step3Measurements({
       </div>
     </div>
   );
-}
+});
+
+export default Step3Measurements;

@@ -173,6 +173,7 @@ export default function CreateOrder() {
   const [isDraftLoading, setIsDraftLoading] = useState(false);
   const [isSavingDraftRedirect, setIsSavingDraftRedirect] = useState(false);
   const submitInFlightRef = useRef(false);
+  const activeStepRef = useRef(null);
   const draftParam = searchParams.get("draft") || "";
 
   const mutation = useMutation({ mutationFn: (d) => api.post("/orders", d) });
@@ -261,26 +262,47 @@ export default function CreateOrder() {
     };
   }, [draftParam, prefillData, setSearchParams]);
 
+  const getCurrentStepDraftPatch = () => {
+    const snapshot = activeStepRef.current?.getDraftData?.();
+    return snapshot && typeof snapshot === "object" ? snapshot : {};
+  };
+
+  const buildDraftMergedState = () => {
+    const patch = getCurrentStepDraftPatch();
+    const merged = { ...form, ...patch };
+
+    if (patch.orderTypes || patch.measurements) {
+      merged.orderItems = buildOrderItems(
+        merged.orderTypes || [],
+        merged.measurements || {},
+      );
+    }
+
+    return merged;
+  };
+
   const saveDraft = async () => {
+    const merged = buildDraftMergedState();
     const hasCustomer =
-      Boolean(String(form.firstName || "").trim()) ||
-      Boolean(String(form.phoneNumber || "").trim()) ||
-      Boolean(String(form.customerId || "").trim());
+      Boolean(String(merged.firstName || "").trim()) ||
+      Boolean(String(merged.phoneNumber || "").trim()) ||
+      Boolean(String(merged.customerId || "").trim());
     const hasOrderTypes =
-      Array.isArray(form.orderTypes) && form.orderTypes.length > 0;
+      Array.isArray(merged.orderTypes) && merged.orderTypes.length > 0;
     const hasMeasurements =
-      form.measurements &&
-      typeof form.measurements === "object" &&
-      Object.keys(form.measurements).length > 0;
+      merged.measurements &&
+      typeof merged.measurements === "object" &&
+      Object.keys(merged.measurements).length > 0;
 
     if (!hasCustomer && !hasOrderTypes && !hasMeasurements) {
       toast.error(t("orders.emptyDraftNotAllowed", "Nothing to save as draft"));
       return;
     }
 
+    setForm(merged);
     setDraftSaveLabel(t("orders.savingDraft", "Saving draft..."));
     const payload = buildFullDraftPayload({
-      merged: form,
+      merged,
       draftId,
       draftClientKey,
       step,
@@ -832,7 +854,12 @@ export default function CreateOrder() {
           </button>
         </div>
         {error && (
-          <div className="info-box ib-red" style={{ marginBottom: 20 }}>
+          <div
+            className="info-box ib-red"
+            style={{ marginBottom: 20 }}
+            role="alert"
+            aria-live="polite"
+          >
             {error}
           </div>
         )}
@@ -850,9 +877,16 @@ export default function CreateOrder() {
           </div>
         ) : null}
         <div key={step} className="step-panel">
-          {step === 0 && <Step1CustomerInfo onNext={next} initial={form} />}
+          {step === 0 && (
+            <Step1CustomerInfo
+              ref={activeStepRef}
+              onNext={next}
+              initial={form}
+            />
+          )}
           {step === 1 && (
             <Step2OrderTypes
+              ref={activeStepRef}
               onNext={next}
               onBack={back}
               initial={form.orderTypes}
@@ -860,6 +894,7 @@ export default function CreateOrder() {
           )}
           {step === 2 && !skipMeasurements && (
             <Step3Measurements
+              ref={activeStepRef}
               onNext={(d) => {
                 const orderItems = buildOrderItems(
                   form.orderTypes || [],
@@ -874,6 +909,7 @@ export default function CreateOrder() {
           )}
           {step === 3 && !skipRakht && (
             <Step2RakhtSelection
+              ref={activeStepRef}
               onNext={next}
               onBack={back}
               initial={form}
@@ -883,6 +919,7 @@ export default function CreateOrder() {
           )}
           {step === 4 && (
             <Step4Billing
+              ref={activeStepRef}
               onNext={(d) => {
                 const merged = { ...form, ...d };
                 merge(d);

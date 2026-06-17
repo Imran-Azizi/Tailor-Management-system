@@ -442,7 +442,14 @@
     "allTypes": "ټول ډولونه",
     "searchPlaceholder": "د کارونکي نوم له مخې پلټنه...",
     "createdBy": "ثبت کوونکی",
-    "loanOption": "پور"
+    "loanOption": "پور",
+    "validation": {
+      "accountTypeRequired": "مهرباني وکړئ د حساب ډول وټاکئ.",
+      "userRequired": "مهرباني وکړئ کارونکی وټاکئ.",
+      "amountRequired": "مهرباني وکړئ مبلغ ولیکئ.",
+      "amountPositive": "مبلغ باید له صفر څخه زیات وي.",
+      "dateRequired": "مهرباني وکړئ د پور نېټه وټاکئ."
+    }
   },
   "delivery": {
     "notFullyPaidBadge": "ټولی نه ورکړل شوی",
@@ -680,8 +687,11 @@
     "qichikarFallback": "قیچي‌کار",
     "dokhtFallback": "د دوخت کارګر",
     "qichikarCompleted": "قیچي‌کار {{name}} په دې فرمایش کار بشپړ کړی دی.",
+    "qichikarCompletedShort": "قیچي بشپړ شو",
     "dokhtCompleted": "د دوخت کارګر {{name}} په دې فرمایش کار بشپړ کړی دی.",
+    "dokhtCompletedShort": "دوخت بشپړ شو",
     "bothCompleted": "قیچي‌کار {{qichikarName}} او د دوخت کارګر {{dokhtName}} په دې فرمایش کار بشپړ کړ.",
+    "bothCompletedShort": "سپارلو ته چمتو",
     "readyForDelivery": "په دې فرمایش کار بشپړ شوی او مشتری ته د سپارلو لپاره چمتو دی."
   },
   "ui": {
@@ -734,8 +744,10 @@
     "noTenants": "هیڅ مشتری ونه موندل شو.",
     "modalCreateSubtitle": "د نوي مشتری لپاره کاري ځای جوړول",
     "modalEditSubtitle": "د مشتری کاري ځای تازه کول",
-    "modalHelp": "د کاروبار هویت، د ګډون لاسرسی او د مالک حساب دلته اداره کېږي.",
+    "modalHelp": "د سیستم هویت، د ګډون لاسرسی او د مالک حساب دلته اداره کېږي.",
     "ownerPasswordPlaceholder": "د اوسني رمز ساتلو لپاره تش پرېږدئ",
+    "showPassword": "رمز ښکاره کول",
+    "hidePassword": "رمز پټول",
     "activeHelp": "غیرفعال مشتریان خپل سیستم نه شي کارولی.",
     "deleteConfirmTitle": "د مشتری حذف تایید",
     "deleteConfirmHeading": "{{name}} حذف شي؟",
@@ -755,17 +767,17 @@
       "orders": "فرمایشونه"
     },
     "groups": {
-      "business": "د کاروبار معلومات",
+      "business": "د سیستم معلومات",
       "owner": "د مالک حساب",
       "localization": "ژبه او سیمه",
       "subscription": "ګډون"
     },
     "fields": {
-      "businessName": "د کاروبار نوم",
+      "businessName": "د سیستم نوم",
       "systemName": "د سیستم نوم",
       "address": "پته",
-      "phone": "تلیفون",
-      "mobile": "موبایل",
+      "phone": "د تماس شمېره",
+      "mobile": "د تماس شمېره",
       "email": "ایمیل",
       "logoFile": "د مشتری لوګو",
       "currency": "اسعار",
@@ -801,7 +813,6 @@
       "SUSPENDED": "ځنډول شوی"
     },
     "validation": {
-      "businessName": "د کاروبار نوم اړین دی.",
       "systemName": "د سیستم نوم اړین دی.",
       "ownerName": "د مالک نوم اړین دی.",
       "ownerPhone": "د مالک شمېره اړینه ده.",
@@ -820,10 +831,10 @@
     }
   },
   "tenantSettings": {
-    "badge": "د کاري ځای تنظیمات",
+    "badge": "د سیستم تنظیمات",
     "title": "د سیستم تنظیمات",
     "subtitle": "د کاروبار هویت، لوګو او د تماس معلومات د بلونو، راپورونو او سیستم سرلیکونو لپاره اداره کړئ.",
-    "loading": "د مشتری تنظیمات بارېږي...",
+    "loading": "د سیستم تنظیمات بارېږي...",
     "errorTitle": "تنظیمات بار نه شول",
     "refresh": "تازه کول",
     "save": "تنظیمات ثبتول",
@@ -832,11 +843,11 @@
     "upToDate": "تنظیمات تازه دي.",
     "branding": {
       "title": "برانډینګ",
-      "subtitle": "هغه لوګو اپلوډ کړئ چې په اسنادو او د مشتری په پاڼو کې ښکاري."
+      "subtitle": "هغه لوګو اپلوډ کړئ چې په اسنادو او د سیستم په پاڼو کې ښکاري."
     },
     "business": {
-      "title": "د کاروبار معلومات",
-      "subtitle": "دا معلومات د مشتریانو په اسنادو، راپورونو او د کاري ځای په نومونو کې ښکاري."
+      "title": "د سیستم معلومات",
+      "subtitle": "دا معلومات په اسنادو، راپورونو او د سیستم په سرلیکونو کې ښکاري."
     },
     "fields": {
       "businessName": "د کاروبار نوم",

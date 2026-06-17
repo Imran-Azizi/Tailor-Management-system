@@ -5,6 +5,7 @@ import rateLimit from "express-rate-limit";
 import path from "path";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { normalizeDigitsMiddleware } from "./middleware/normalizeDigits.middleware.js";
+import { csrfProtection } from "./middleware/csrf.middleware.js";
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import customerRoutes from "./routes/customer.routes.js";
@@ -125,6 +126,7 @@ app.use(
   }),
 );
 app.use(normalizeDigitsMiddleware);
+app.use("/api", csrfProtection);
 app.use(
   "/uploads",
   express.static(path.join(process.cwd(), "uploads"), {

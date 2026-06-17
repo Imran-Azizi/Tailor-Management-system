@@ -226,7 +226,12 @@ export const getPaymentHistoryPdf = async (req, res, next) => {
 export const create = async (req, res, next) => {
   try {
     const body = createRakhtSchema.parse(req.body);
-    res.status(201).json(await service.createRakht(body));
+    res.status(201).json(
+      await service.createRakht({
+        ...body,
+        paidById: req.user.id,
+      }),
+    );
   } catch (error) {
     next(error);
   }

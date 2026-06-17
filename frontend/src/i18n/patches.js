@@ -781,9 +781,12 @@
       qichikarFallback: "Qichikar",
       dokhtFallback: "Dokht worker",
       qichikarCompleted: "Qichikar {{name}} completed work on this order.",
+      qichikarCompletedShort: "Qichikar completed",
       dokhtCompleted: "Dokht worker {{name}} completed work on this order.",
+      dokhtCompletedShort: "Dokht completed",
       bothCompleted:
         "Qichikar {{qichikarName}} and Dokht worker {{dokhtName}} completed work on this order.",
+      bothCompletedShort: "Ready for delivery",
       readyForDelivery:
         "Work on this order is complete and ready for delivery to the customer.",
     },
@@ -856,6 +859,22 @@
       revenueDetails: "Revenue Details",
       piecePrice: "Cost / Meter",
       meterUnitShort: "m",
+      validation: {
+        companyNameRequired: "Please enter the company name.",
+        brandNameRequired: "Please enter the brand name.",
+        tonQuantityRequired: "Please select ton quantity.",
+        tonQuantityMax: "Ton quantity is higher than the allowed limit.",
+        tonNameRequired: "Please enter the ton color name.",
+        tonColorInvalid: "Please select a valid color.",
+        tonMetersInvalid: "Total meters must be a valid number.",
+        tonMetersPositive: "Total meters must be greater than zero.",
+        totalPriceInvalid: "Total price must be zero or greater.",
+        givenMoneyInvalid: "Given money must be zero or greater.",
+        tonCountMismatch:
+          "Number of ton details must match the selected ton quantity.",
+        givenMoneyTooHigh: "Given money cannot exceed total price.",
+        addMoreTonsRequired: "Please add at least one ton.",
+      },
     },
     createOrder: {
       foreignShort: "FOREIGN",
@@ -1859,10 +1878,13 @@
       dokhtFallback: "کارگر دوخت",
       qichikarCompleted:
         "قیچیکار {{name}} کار روی این سفارش را تکمیل کرده است.",
+      qichikarCompletedShort: "قیچی تکمیل شد",
       dokhtCompleted:
         "کارگر دوخت {{name}} کار روی این سفارش را تکمیل کرده است.",
+      dokhtCompletedShort: "دوخت تکمیل شد",
       bothCompleted:
         "قیچیکار {{qichikarName}} و کارگر دوخت {{dokhtName}} کار روی این سفارش را تکمیل کردند.",
+      bothCompletedShort: "آماده تحویل",
       readyForDelivery:
         "کار روی این سفارش تکمیل شده و آماده برای تحویل به مشتری است.",
     },
@@ -1991,6 +2013,23 @@
       totalTons: "مجموع تُن ها",
       updated: "رخت به روزرسانی شد.",
       validationError: "لطفاً فیلدهای لازم را به درستی تکمیل کنید.",
+      validation: {
+        companyNameRequired: "لطفاً نام شرکت را وارد کنید.",
+        brandNameRequired: "لطفاً نام برند را وارد کنید.",
+        tonQuantityRequired: "لطفاً تعداد تُن را انتخاب کنید.",
+        tonQuantityMax: "تعداد تُن از حد مجاز بیشتر است.",
+        tonNameRequired: "لطفاً نام رنگ تُن را وارد کنید.",
+        tonColorInvalid: "لطفاً یک رنگ معتبر انتخاب کنید.",
+        tonMetersInvalid: "متر مجموعی باید عدد معتبر باشد.",
+        tonMetersPositive: "متر مجموعی باید بیشتر از صفر باشد.",
+        totalPriceInvalid: "قیمت مجموعی باید صفر یا بیشتر باشد.",
+        givenMoneyInvalid: "مبلغ پرداخت شده باید صفر یا بیشتر باشد.",
+        tonCountMismatch:
+          "تعداد جزئیات تُن باید با تعداد انتخاب شده برابر باشد.",
+        givenMoneyTooHigh:
+          "مبلغ پرداخت شده نمی‌تواند بیشتر از قیمت مجموعی باشد.",
+        addMoreTonsRequired: "لطفاً حداقل یک تُن اضافه کنید.",
+      },
     },
     createOrder: {
       completeRakhtSelectionForItem:
@@ -2913,10 +2952,13 @@
       dokhtFallback: "د دوخت کارګر",
       qichikarCompleted:
         "قیچي‌کار {{name}} په دې فرمایش کار بشپړ کړی دی.",
+      qichikarCompletedShort: "قیچي بشپړ شو",
       dokhtCompleted:
         "د دوخت کارګر {{name}} په دې فرمایش کار بشپړ کړی دی.",
+      dokhtCompletedShort: "دوخت بشپړ شو",
       bothCompleted:
         "قیچي‌کار {{qichikarName}} او د دوخت کارګر {{dokhtName}} په دې فرمایش کار بشپړ کړ.",
+      bothCompletedShort: "سپارلو ته چمتو",
       readyForDelivery:
         "په دې فرمایش کار بشپړ شوی او مشتری ته د سپارلو لپاره چمتو دی.",
     },
@@ -3039,6 +3081,23 @@
       totalTons: "ټول ټنونه",
       updated: "رخت تازه شو.",
       validationError: "مهرباني وکړئ اړین فیلډونه سم بشپړ کړئ.",
+      validation: {
+        companyNameRequired: "مهرباني وکړئ د شرکت نوم ولیکئ.",
+        brandNameRequired: "مهرباني وکړئ د برانډ نوم ولیکئ.",
+        tonQuantityRequired: "مهرباني وکړئ د ټن تعداد وټاکئ.",
+        tonQuantityMax: "د ټن تعداد له اجازې زیات دی.",
+        tonNameRequired: "مهرباني وکړئ د ټن رنګ نوم ولیکئ.",
+        tonColorInvalid: "مهرباني وکړئ سم رنګ وټاکئ.",
+        tonMetersInvalid: "ټول متر باید سم عدد وي.",
+        tonMetersPositive: "ټول متر باید له صفر څخه زیات وي.",
+        totalPriceInvalid: "ټوله بیه باید صفر یا له هغې زیاته وي.",
+        givenMoneyInvalid: "ورکړې پیسې باید صفر یا له هغې زیاتې وي.",
+        tonCountMismatch:
+          "د ټن جزییات باید له ټاکل شوي تعداد سره برابر وي.",
+        givenMoneyTooHigh:
+          "ورکړې پیسې له ټولې بیې څخه زیاتې نه شي کېدای.",
+        addMoreTonsRequired: "مهرباني وکړئ لږ تر لږه یو ټن اضافه کړئ.",
+      },
     },
     createOrder: {
       completeRakhtSelectionForItem:
@@ -3209,6 +3268,10 @@ const LOCALIZATION_COMPLETION_PATCHES = {
         system: "Full system restore",
         tenant: "Single tenant restore",
         uploadButton: "Validate & Restore",
+        chooseFile: "Choose backup file",
+        fileHint: "JSON, GZ, or encrypted backup files are supported.",
+        changeFile: "Change file",
+        browseFile: "Browse",
         confirmTitle: "Confirm Restore",
         confirmBody:
           "Restore can overwrite existing data. The backup file will be validated before restore, and tenant backups can only be restored to the matching tenant.",
@@ -3533,6 +3596,10 @@ const LOCALIZATION_COMPLETION_PATCHES = {
         system: "بازیابی کامل سیستم",
         tenant: "بازیابی یک مشتری",
         uploadButton: "اعتبارسنجی و بازیابی",
+        chooseFile: "فایل بک اپ را انتخاب کنید",
+        fileHint: "فایل‌های JSON، GZ یا بک اپ رمزگذاری‌شده پشتیبانی می‌شوند.",
+        changeFile: "تغییر فایل",
+        browseFile: "انتخاب فایل",
         confirmTitle: "تأیید بازیابی",
         confirmBody:
           "بازیابی می‌تواند معلومات موجود را بازنویسی کند. فایل پیش از بازیابی بررسی می‌شود و بک اپ مشتری فقط به همان مشتری بازیابی می‌گردد.",
@@ -3858,6 +3925,10 @@ const LOCALIZATION_COMPLETION_PATCHES = {
         system: "د ټول سیستم بیا راګرځول",
         tenant: "د یوه مشتری بیا راګرځول",
         uploadButton: "تایید او بیا راګرځول",
+        chooseFile: "د بک اپ فایل وټاکئ",
+        fileHint: "JSON، GZ یا کوډ شوي بک اپ فایلونه ملاتړ کېږي.",
+        changeFile: "فایل بدلول",
+        browseFile: "فایل ټاکل",
         confirmTitle: "بیا راګرځول تایید کړئ",
         confirmBody:
           "بیا راګرځول موجود معلومات بدلولی شي. فایل له بیا راګرځولو مخکې تاییدېږي، او د مشتری بک اپ یوازې هماغه مشتری ته بیا راګرځي.",

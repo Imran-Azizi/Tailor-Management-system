@@ -49,7 +49,9 @@ const getRoleWorker = (order, role) => {
   return null;
 };
 
-export function getOrderCompletionStatus(order, t) {
+export function getOrderCompletionStatus(order, t, options = {}) {
+  const variant = options?.variant === "long" ? "long" : "short";
+  const showLongText = variant === "long";
   const qichikarDone = Boolean(order?.qichikarCompletedAt);
   const dokhtDone = Boolean(order?.dokhtCompletedAt);
   const qichikarName =
@@ -72,16 +74,22 @@ export function getOrderCompletionStatus(order, t) {
     return {
       key: "readyForDelivery",
       ...ROLE_STATUS.ready,
-      label: t("orderCompletion.bothCompleted", {
-        qichikarName,
-        dokhtName,
-        defaultValue:
-          "Qichikar {{qichikarName}} and Dokht worker {{dokhtName}} completed work on this order.",
-      }),
-      detail: t("orderCompletion.readyForDelivery", {
-        defaultValue:
-          "Work on this order is complete and ready for delivery to the customer.",
-      }),
+      label: showLongText
+        ? t("orderCompletion.bothCompleted", {
+            qichikarName,
+            dokhtName,
+            defaultValue:
+              "Qichikar {{qichikarName}} and Dokht worker {{dokhtName}} completed work on this order.",
+          })
+        : t("orderCompletion.bothCompletedShort", {
+            defaultValue: "Ready for delivery",
+          }),
+      detail: showLongText
+        ? t("orderCompletion.readyForDelivery", {
+            defaultValue:
+              "Work on this order is complete and ready for delivery to the customer.",
+          })
+        : "",
     };
   }
 
@@ -89,11 +97,14 @@ export function getOrderCompletionStatus(order, t) {
     return {
       key: "qichikarCompleted",
       ...ROLE_STATUS.qichikar,
-      label: t("orderCompletion.qichikarCompleted", {
-        name: qichikarName,
-        defaultValue:
-          "Qichikar {{name}} completed work on this order.",
-      }),
+      label: showLongText
+        ? t("orderCompletion.qichikarCompleted", {
+            name: qichikarName,
+            defaultValue: "Qichikar {{name}} completed work on this order.",
+          })
+        : t("orderCompletion.qichikarCompletedShort", {
+            defaultValue: "Qichikar completed",
+          }),
       detail: "",
     };
   }
@@ -102,11 +113,14 @@ export function getOrderCompletionStatus(order, t) {
     return {
       key: "dokhtCompleted",
       ...ROLE_STATUS.dokht,
-      label: t("orderCompletion.dokhtCompleted", {
-        name: dokhtName,
-        defaultValue:
-          "Dokht worker {{name}} completed work on this order.",
-      }),
+      label: showLongText
+        ? t("orderCompletion.dokhtCompleted", {
+            name: dokhtName,
+            defaultValue: "Dokht worker {{name}} completed work on this order.",
+          })
+        : t("orderCompletion.dokhtCompletedShort", {
+            defaultValue: "Dokht completed",
+          }),
       detail: "",
     };
   }

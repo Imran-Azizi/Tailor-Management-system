@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,24 +11,46 @@ import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { Field } from "../components/ui/index.jsx";
 
-const schema = z.object({
-  accountType: z
-    .object({ value: z.string(), label: z.string() })
-    .nullable()
-    .refine((v) => v !== null, { message: "Account type is required" }),
-  user: z
-    .object({ value: z.string(), label: z.string() })
-    .nullable()
-    .refine((v) => v !== null, { message: "User is required" }),
-  amount: z
-    .string()
-    .min(1, "Amount is required")
-    .refine((v) => !isNaN(Number(v)) && Number(v) > 0, {
-      message: "Amount must be a positive number",
-    }),
-  transactionDate: z.string().min(1, "Transaction date is required"),
-  note: z.string().optional(),
-});
+function makeSchema(t) {
+  return z.object({
+    accountType: z
+      .object({ value: z.string(), label: z.string() })
+      .nullable()
+      .refine((v) => v !== null, {
+        message: t("transaction.validation.accountTypeRequired", {
+          defaultValue: "Please select an account type.",
+        }),
+      }),
+    user: z
+      .object({ value: z.string(), label: z.string() })
+      .nullable()
+      .refine((v) => v !== null, {
+        message: t("transaction.validation.userRequired", {
+          defaultValue: "Please select a user.",
+        }),
+      }),
+    amount: z
+      .string()
+      .min(
+        1,
+        t("transaction.validation.amountRequired", {
+          defaultValue: "Please enter the amount.",
+        }),
+      )
+      .refine((v) => !isNaN(Number(v)) && Number(v) > 0, {
+        message: t("transaction.validation.amountPositive", {
+          defaultValue: "Amount must be greater than zero.",
+        }),
+      }),
+    transactionDate: z.string().min(
+      1,
+      t("transaction.validation.dateRequired", {
+        defaultValue: "Please select the transaction date.",
+      }),
+    ),
+    note: z.string().optional(),
+  });
+}
 
 function buildSelectStyles(hasError, isRtl = false) {
   return {
@@ -97,6 +119,7 @@ export default function MakeTransaction() {
   const [selectedAccountType, setSelectedAccountType] = useState(null);
   const language = i18n.resolvedLanguage || i18n.language || "en";
   const isRtl = i18n.dir?.(language) === "rtl";
+  const schema = useMemo(() => makeSchema(t), [t]);
 
   const {
     register,
@@ -114,6 +137,8 @@ export default function MakeTransaction() {
       transactionDate: today(),
       note: "",
     },
+    mode: "onChange",
+    reValidateMode: "onChange",
   });
 
   const watchedAccountType = watch("accountType");

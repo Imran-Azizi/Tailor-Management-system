@@ -7,7 +7,6 @@ import {
   LuPhone,
   LuSearch,
   LuSquareCheck,
-  LuWalletCards,
 } from "react-icons/lu";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import api from "../lib/api.js";
@@ -327,144 +326,160 @@ export default function ClothesDeliveryToCustomer() {
                     <EmptyState message={t("delivery.noResults")} />
                   </div>
                 ) : (
-                  <div className="delivery-results-card-grid">
-                    {orders.map((o, idx) => {
-                      const orderLabel = getOrderLabelParts(o, language);
-                      const itemDisplayName = getOrderPrimaryDisplayName(
-                        o,
-                        result.customer?.firstName,
-                        language,
-                      );
-                      const remaining = Number(o.remaining || 0);
-                      const isCompleted = Boolean(o.isCompleted);
-                      const readyToReceive = !isCompleted && remaining <= 0.001;
-                      const statusLabel = isCompleted
-                        ? completedStatusText
-                        : readyToReceive
-                          ? t("delivery.readyToReceive", "Ready to receive")
-                          : t("delivery.notFullyPaidBadge", "Not Completed");
-                      const statusTone = isCompleted
-                        ? "completed"
-                        : readyToReceive
-                          ? "ready"
-                          : "pending";
-                      const StatusIcon = isCompleted
-                        ? LuCircleCheck
-                        : readyToReceive
-                          ? LuSquareCheck
-                          : LuClock;
-                      const stats = [
-                        {
-                          label: t("common.total", "Total"),
-                          value: formatMoney(o.totalPrice, language),
-                          tone: "default",
-                        },
-                        {
-                          label: t("createOrder.discount", "Discount"),
-                          value: formatMoney(o.discount, language),
-                          tone: "muted",
-                        },
-                        {
-                          label: t("common.paid", "Paid"),
-                          value: formatMoney(o.paidAmount, language),
-                          tone: "success",
-                        },
-                        {
-                          label: t("common.remaining", "Remaining"),
-                          value: formatMoney(o.remaining, language),
-                          tone: remaining > 0.001 ? "danger" : "success",
-                        },
-                      ];
+                  <div
+                    className="delivery-results-table"
+                    tabIndex={0}
+                    aria-label={t("delivery.resultsTitle")}
+                  >
+                    <table className="tbl delivery-results-grid-table">
+                      <colgroup>
+                        <col style={{ width: "92px" }} />
+                        <col style={{ width: "240px" }} />
+                        <col style={{ width: "190px" }} />
+                        <col style={{ width: "120px" }} />
+                        <col style={{ width: "120px" }} />
+                        <col style={{ width: "120px" }} />
+                        <col style={{ width: "130px" }} />
+                        <col style={{ width: "170px" }} />
+                        <col style={{ width: "260px" }} />
+                      </colgroup>
+                      <thead>
+                        <tr>
+                          <th>{t("delivery.orderHeader", "Order #")}</th>
+                          <th>{t("common.customer", "Customer")}</th>
+                          <th>{t("orders.orderType", "Order Type")}</th>
+                          <th>{t("common.total", "Total")}</th>
+                          <th>{t("createOrder.discount", "Discount")}</th>
+                          <th>{t("common.paid", "Paid")}</th>
+                          <th>{t("common.remaining", "Remaining")}</th>
+                          <th>{t("common.status", "Status")}</th>
+                          <th>{t("delivery.remainingPayment")}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {orders.map((o, idx) => {
+                          const orderLabel = getOrderLabelParts(o, language);
+                          const itemDisplayName = getOrderPrimaryDisplayName(
+                            o,
+                            result.customer?.firstName,
+                            language,
+                          );
+                          const remaining = Number(o.remaining || 0);
+                          const isCompleted = Boolean(o.isCompleted);
+                          const readyToReceive =
+                            !isCompleted && remaining <= 0.001;
+                          const statusLabel = isCompleted
+                            ? completedStatusText
+                            : readyToReceive
+                              ? t(
+                                  "delivery.readyToReceive",
+                                  "Ready to receive",
+                                )
+                              : t(
+                                  "delivery.notFullyPaidBadge",
+                                  "Not Completed",
+                                );
+                          const statusTone = isCompleted
+                            ? "completed"
+                            : readyToReceive
+                              ? "ready"
+                              : "pending";
+                          const StatusIcon = isCompleted
+                            ? LuCircleCheck
+                            : readyToReceive
+                              ? LuSquareCheck
+                              : LuClock;
 
-                      return (
-                        <article
-                          key={o.id}
-                          className="delivery-order-card"
-                          dir={dir}
-                        >
-                          <div className="delivery-order-card-head">
-                            <div className="delivery-order-card-title-wrap">
-                              <span className="delivery-order-card-kicker">
-                                {t("delivery.orderLabel", {
-                                  number: idx + 1,
-                                })}
-                              </span>
-                              <h3 className="delivery-order-card-title">
-                                {itemDisplayName}
-                              </h3>
-                              <p className="delivery-order-card-type">
+                          return (
+                            <tr key={o.id}>
+                              <td className="[direction:ltr]">
+                                {idx + 1}
+                              </td>
+                              <td className="delivery-results-text-cell">
+                                <strong className="delivery-table-primary">
+                                  {itemDisplayName}
+                                </strong>
+                              </td>
+                              <td className="delivery-results-text-cell">
                                 {orderLabel.typeWithSequenceLabel}
-                              </p>
-                            </div>
-                            <span
-                              className={`delivery-status-pill delivery-status-pill--${statusTone}`}
-                            >
-                              <StatusIcon size={14} />
-                              {statusLabel}
-                            </span>
-                          </div>
-
-                          <div className="delivery-order-card-stats">
-                            {stats.map((stat) => (
-                              <div
-                                key={stat.label}
-                                className={`delivery-order-card-stat delivery-order-card-stat--${stat.tone}`}
+                              </td>
+                              <td className="[direction:ltr]">
+                                {formatMoney(o.totalPrice, language)}
+                              </td>
+                              <td className="[direction:ltr]">
+                                {formatMoney(o.discount, language)}
+                              </td>
+                              <td className="[direction:ltr] text-emerald-700 dark:text-emerald-300">
+                                {formatMoney(o.paidAmount, language)}
+                              </td>
+                              <td
+                                className={`[direction:ltr] ${
+                                  remaining > 0.001
+                                    ? "text-red-700 dark:text-red-300"
+                                    : "text-emerald-700 dark:text-emerald-300"
+                                }`}
                               >
-                                <span>{stat.label}</span>
-                                <strong>{stat.value}</strong>
-                              </div>
-                            ))}
-                          </div>
-
-                          <div className="delivery-order-card-actions">
-                            <div className="delivery-payment-context">
-                              <LuWalletCards size={16} />
-                              <span>{t("delivery.remainingPayment")}</span>
-                            </div>
-                            {isCompleted ? (
-                              <span className="delivery-payment-complete">
-                                {completedStatusText}
-                              </span>
-                            ) : readyToReceive ? (
-                              <button
-                                type="button"
-                                className="delivery-receive-button inline-flex h-10 items-center justify-center rounded-lg bg-amber-500 px-4 text-sm font-semibold text-white hover:bg-amber-600 dark:bg-amber-500 dark:hover:bg-amber-400 disabled:opacity-50"
-                                onClick={() => submitPayment(o)}
-                                disabled={paying}
-                              >
-                                {receiveButtonText}
-                              </button>
-                            ) : (
-                              <div className="delivery-payment-controls">
-                                <input
-                                  className="delivery-payment-input h-10 w-full rounded-lg border border-amber-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-amber-400 dark:focus:ring-amber-500/20"
-                                  value={payments[o.id] ?? ""}
-                                  onChange={(e) =>
-                                    setPayments((p) => ({
-                                      ...p,
-                                      [o.id]: e.target.value,
-                                    }))
-                                  }
-                                  inputMode="decimal"
-                                  dir="ltr"
-                                  data-field-direction="ltr"
-                                  placeholder={String(remaining)}
-                                  disabled={paying}
-                                />
-                                <button
-                                  type="button"
-                                  className="delivery-receive-button inline-flex h-10 items-center justify-center rounded-lg bg-amber-500 px-4 text-sm font-semibold text-white hover:bg-amber-600 dark:bg-amber-500 dark:hover:bg-amber-400 disabled:opacity-50"
-                                  onClick={() => submitPayment(o)}
-                                  disabled={paying}
+                                {formatMoney(o.remaining, language)}
+                              </td>
+                              <td className="delivery-results-status-cell">
+                                <span
+                                  className={`delivery-status-pill delivery-status-pill--${statusTone}`}
                                 >
-                                  {receiveButtonText}
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </article>
-                      );
-                    })}
+                                  <StatusIcon size={14} />
+                                  {statusLabel}
+                                </span>
+                              </td>
+                              <td className="delivery-results-payment-cell">
+                                <div
+                                  className={`delivery-payment-cell ${isRtl ? "delivery-payment-cell--rtl" : ""}`}
+                                >
+                                  {isCompleted ? (
+                                    <span className="delivery-payment-complete">
+                                      {completedStatusText}
+                                    </span>
+                                  ) : readyToReceive ? (
+                                    <button
+                                      type="button"
+                                      className="delivery-receive-button inline-flex h-10 items-center justify-center rounded-lg bg-amber-500 px-4 text-sm font-semibold text-white hover:bg-amber-600 dark:bg-amber-500 dark:hover:bg-amber-400 disabled:opacity-50"
+                                      onClick={() => submitPayment(o)}
+                                      disabled={paying}
+                                    >
+                                      {receiveButtonText}
+                                    </button>
+                                  ) : (
+                                    <div className="delivery-payment-controls">
+                                      <input
+                                        className="delivery-payment-input h-10 w-full rounded-lg border border-amber-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-amber-400 dark:focus:ring-amber-500/20"
+                                        value={payments[o.id] ?? ""}
+                                        onChange={(e) =>
+                                          setPayments((p) => ({
+                                            ...p,
+                                            [o.id]: e.target.value,
+                                          }))
+                                        }
+                                        inputMode="decimal"
+                                        dir="ltr"
+                                        data-field-direction="ltr"
+                                        placeholder={String(remaining)}
+                                        disabled={paying}
+                                      />
+                                      <button
+                                        type="button"
+                                        className="delivery-receive-button inline-flex h-10 items-center justify-center rounded-lg bg-amber-500 px-4 text-sm font-semibold text-white hover:bg-amber-600 dark:bg-amber-500 dark:hover:bg-amber-400 disabled:opacity-50"
+                                        onClick={() => submitPayment(o)}
+                                        disabled={paying}
+                                      >
+                                        {receiveButtonText}
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>

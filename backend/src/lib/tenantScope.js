@@ -5,6 +5,12 @@ const TENANT_SCOPED_MODELS = new Set([
   "UserNotification",
   "Customer",
   "Order",
+  "Outfit",
+  "Waskat",
+  "Korty",
+  "YakhanQaq",
+  "ReadyMadeOrder",
+  "ReadyMadeWaskatOrder",
   "WorkerPaymentReceipt",
   "OrderDraft",
   "Rakht",
@@ -20,6 +26,48 @@ const TENANT_SCOPED_MODELS = new Set([
   "DamagedClothesPenalty",
   "Item",
   "ItemSale",
+  "AuditLog",
+  "Yakhan",
+  "Astin",
+  "ShoulderState",
+  "NeckOutfit",
+  "NeckWaskat",
+  "Daman",
+  "JibRow",
+  "JibBaghle",
+  "JibTenban",
+  "PatyShip",
+  "ButtonShip",
+  "TenbanShip",
+  "OutfitDesign",
+  "YakhanQaqNeck",
+  "YakhanQaqSleeve",
+  "YakhanQaqSkirt",
+  "YakhanQaqDesignOption",
+  "YakhanQaqButtonShip",
+  "YakhanQaqPantShip",
+]);
+
+const TENANT_NAMED_MODELS = new Set([
+  "Yakhan",
+  "Astin",
+  "ShoulderState",
+  "NeckOutfit",
+  "NeckWaskat",
+  "Daman",
+  "JibRow",
+  "JibBaghle",
+  "JibTenban",
+  "PatyShip",
+  "ButtonShip",
+  "TenbanShip",
+  "OutfitDesign",
+  "YakhanQaqNeck",
+  "YakhanQaqSleeve",
+  "YakhanQaqSkirt",
+  "YakhanQaqDesignOption",
+  "YakhanQaqButtonShip",
+  "YakhanQaqPantShip",
 ]);
 
 const WRITE_OPERATIONS = new Set(["create", "createMany"]);
@@ -57,6 +105,17 @@ function withTenantWhere(args, tenantId) {
 }
 
 function withTenantFindUniqueWhere(model, args, tenantId) {
+  if (TENANT_NAMED_MODELS.has(model) && args?.where?.name !== undefined) {
+    const { name, tenantId: _tenantId, ...rest } = args.where;
+    return {
+      ...args,
+      where: {
+        ...rest,
+        tenantId_name: { tenantId, name },
+      },
+    };
+  }
+
   if (model === "Customer") {
     if (args?.where?.billNumber !== undefined) {
       const { billNumber, tenantId: _tenantId, ...rest } = args.where;
@@ -111,7 +170,7 @@ function withTenantData(args, tenantId) {
   if (Array.isArray(args?.data)) {
     return {
       ...args,
-      data: args.data.map((entry) => ({ ...entry, tenantId: entry.tenantId || tenantId })),
+      data: args.data.map((entry) => ({ ...entry, tenantId })),
     };
   }
 
@@ -119,7 +178,34 @@ function withTenantData(args, tenantId) {
     ...args,
     data: {
       ...(args?.data || {}),
-      tenantId: args?.data?.tenantId || tenantId,
+      tenantId,
+    },
+  };
+}
+
+function withTenantUpsertArgs(model, args, tenantId) {
+  const where =
+    TENANT_NAMED_MODELS.has(model) && args?.where?.name !== undefined
+      ? {
+          ...Object.fromEntries(
+            Object.entries(args.where || {}).filter(
+              ([key]) => key !== "name" && key !== "tenantId",
+            ),
+          ),
+          tenantId_name: { tenantId, name: args.where.name },
+        }
+      : args?.where || {};
+
+  return {
+    ...args,
+    where,
+    create: {
+      ...(args?.create || {}),
+      tenantId,
+    },
+    update: {
+      ...(args?.update || {}),
+      tenantId,
     },
   };
 }
@@ -139,17 +225,7 @@ export async function tenantScopeQuery({ model, operation, args, query }) {
   }
 
   if (operation === "upsert") {
-    return query({
-      ...args,
-      where: {
-        ...(args?.where || {}),
-        tenantId: args?.where?.tenantId || tenantId,
-      },
-      create: {
-        ...(args?.create || {}),
-        tenantId: args?.create?.tenantId || tenantId,
-      },
-    });
+    return query(withTenantUpsertArgs(model, args, tenantId));
   }
 
   if (operation === "findUnique" || operation === "findUniqueOrThrow") {

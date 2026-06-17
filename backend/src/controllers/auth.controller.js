@@ -1,18 +1,44 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma.js';
+import {
+  clearAuthCookies,
+  createCsrfToken,
+  getCookie,
+  REFRESH_COOKIE_NAME,
+  setAuthCookies,
+  setCsrfCookie,
+  hashSessionToken,
+} from '../lib/sessionCookies.js';
 import { JWT_SECRET } from '../middleware/auth.middleware.js';
 
 const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'tailor-refresh-secret-change-in-prod';
 const ACCESS_EXP = '15m';
 const REFRESH_EXP = '7d';
 
-function signAccess(userId) {
-  return jwt.sign({ sub: userId }, JWT_SECRET, { expiresIn: ACCESS_EXP });
+function signAccess(user, refreshToken) {
+  return jwt.sign(
+    {
+      sub: user.id,
+      tenantId: user.tenantId || null,
+      accountType: user.accountType,
+      sid: hashSessionToken(refreshToken),
+    },
+    JWT_SECRET,
+    { expiresIn: ACCESS_EXP },
+  );
 }
 
-function signRefresh(userId) {
-  return jwt.sign({ sub: userId }, REFRESH_SECRET, { expiresIn: REFRESH_EXP });
+function signRefresh(user) {
+  return jwt.sign(
+    {
+      sub: user.id,
+      tenantId: user.tenantId || null,
+      accountType: user.accountType,
+    },
+    REFRESH_SECRET,
+    { expiresIn: REFRESH_EXP },
+  );
 }
 
 function tenantSelect() {
@@ -65,6 +91,62 @@ function getRequestedTenant(req) {
   );
 }
 
+function matchesRequestedTenant(user, requestedTenant) {
+  if (!requestedTenant || user.accountType === 'SUPER_ADMIN') return false;
+  return (
+    user.tenantId === requestedTenant ||
+    user.tenant?.id === requestedTenant ||
+    user.tenant?.slug === requestedTenant ||
+    user.tenant?.tenantId === requestedTenant
+  );
+}
+
+async function findValidLoginUser({ phoneNumber, password, requestedTenant }) {
+  const candidates = await prisma.user.findMany({
+    where: {
+      phoneNumber,
+      ...(requestedTenant
+        ? {
+            OR: [
+              { accountType: 'SUPER_ADMIN' },
+              { tenantId: requestedTenant },
+              { tenant: { slug: requestedTenant } },
+              { tenant: { tenantId: requestedTenant } },
+            ],
+          }
+        : {}),
+    },
+    include: { tenant: { select: tenantSelect() } },
+    orderBy: { createdAt: 'asc' },
+    take: 25,
+  });
+
+  const validUsers = [];
+  for (const candidate of candidates) {
+    if (await bcrypt.compare(password, candidate.password)) {
+      validUsers.push(candidate);
+    }
+  }
+
+  if (!validUsers.length) return { user: null };
+
+  if (requestedTenant) {
+    return {
+      user:
+        validUsers.find((candidate) => matchesRequestedTenant(candidate, requestedTenant)) ||
+        validUsers.find((candidate) => candidate.accountType === 'SUPER_ADMIN') ||
+        validUsers[0],
+    };
+  }
+
+  if (validUsers.length === 1) return { user: validUsers[0] };
+
+  return {
+    user: null,
+    requiresTenant: true,
+  };
+}
+
 /** POST /api/auth/login */
 export async function login(req, res, next) {
   try {
@@ -74,22 +156,17 @@ export async function login(req, res, next) {
     }
 
     const requestedTenant = String(getRequestedTenant(req) || '').trim();
-    const user = await prisma.user.findFirst({
-      where: {
-        phoneNumber: phoneNumber.trim(),
-        ...(requestedTenant
-          ? {
-              OR: [
-                { accountType: 'SUPER_ADMIN' },
-                { tenantId: requestedTenant },
-                { tenant: { slug: requestedTenant } },
-                { tenant: { tenantId: requestedTenant } },
-              ],
-            }
-          : {}),
-      },
-      include: { tenant: { select: tenantSelect() } },
+    const { user, requiresTenant } = await findValidLoginUser({
+      phoneNumber: phoneNumber.trim(),
+      password,
+      requestedTenant,
     });
+    if (requiresTenant) {
+      return res.status(409).json({
+        code: 'TENANT_REQUIRED',
+        error: 'Please select your tenant before signing in.',
+      });
+    }
     if (!user) return res.status(401).json({ error: 'Invalid credentials.' });
     if (!user.isActive) return res.status(403).json({ error: 'Account is deactivated. Contact admin.' });
     if (user.accountType !== 'SUPER_ADMIN') {
@@ -101,17 +178,13 @@ export async function login(req, res, next) {
       }
     }
 
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) return res.status(401).json({ error: 'Invalid credentials.' });
-
-    const accessToken = signAccess(user.id);
-    const refreshToken = signRefresh(user.id);
+    const refreshToken = signRefresh(user);
+    const accessToken = signAccess(user, refreshToken);
 
     await prisma.user.update({ where: { id: user.id }, data: { refreshToken } });
+    setAuthCookies(res, { accessToken, refreshToken });
 
     res.json({
-      accessToken,
-      refreshToken,
       user: serializeUser(user),
     });
   } catch (err) {
@@ -122,7 +195,7 @@ export async function login(req, res, next) {
 /** POST /api/auth/refresh */
 export async function refresh(req, res, next) {
   try {
-    const { refreshToken } = req.body;
+    const refreshToken = getCookie(req, REFRESH_COOKIE_NAME) || req.body?.refreshToken;
     if (!refreshToken) return res.status(400).json({ error: 'Refresh token required.' });
 
     let payload;
@@ -148,11 +221,12 @@ export async function refresh(req, res, next) {
       }
     }
 
-    const newAccess = signAccess(user.id);
-    const newRefresh = signRefresh(user.id);
+    const newRefresh = signRefresh(user);
+    const newAccess = signAccess(user, newRefresh);
     await prisma.user.update({ where: { id: user.id }, data: { refreshToken: newRefresh } });
+    setAuthCookies(res, { accessToken: newAccess, refreshToken: newRefresh });
 
-    res.json({ accessToken: newAccess, refreshToken: newRefresh, user: serializeUser(user) });
+    res.json({ user: serializeUser(user) });
   } catch (err) {
     next(err);
   }
@@ -161,9 +235,21 @@ export async function refresh(req, res, next) {
 /** POST /api/auth/logout */
 export async function logout(req, res, next) {
   try {
+    const refreshToken = getCookie(req, REFRESH_COOKIE_NAME) || req.body?.refreshToken;
     if (req.user) {
       await prisma.user.update({ where: { id: req.user.id }, data: { refreshToken: null } });
+    } else if (refreshToken) {
+      try {
+        const payload = jwt.verify(refreshToken, REFRESH_SECRET);
+        await prisma.user.updateMany({
+          where: { id: payload.sub, refreshToken },
+          data: { refreshToken: null },
+        });
+      } catch {
+        // Expired or malformed sessions are still cleared client-side below.
+      }
     }
+    clearAuthCookies(res);
     res.json({ message: 'Logged out successfully.' });
   } catch (err) {
     next(err);
@@ -173,4 +259,11 @@ export async function logout(req, res, next) {
 /** GET /api/auth/me */
 export async function me(req, res) {
   res.json(serializeUser(req.user));
+}
+
+/** GET /api/auth/csrf */
+export function csrf(req, res) {
+  const csrfToken = createCsrfToken();
+  setCsrfCookie(res, csrfToken);
+  res.json({ csrfToken });
 }

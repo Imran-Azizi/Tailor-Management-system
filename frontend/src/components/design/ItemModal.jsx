@@ -103,7 +103,11 @@ export default function ItemModal({
       bodyClassName="item-modal-body"
     >
       <div className="items-form">
-        {error ? <div className="info-box ib-red">{error}</div> : null}
+        {error ? (
+          <div className="info-box ib-red" role="alert" aria-live="polite">
+            {error}
+          </div>
+        ) : null}
 
         <div className="items-form-grid">
           <label className="items-field">

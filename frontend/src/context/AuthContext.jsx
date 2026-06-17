@@ -5,47 +5,70 @@ import {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
 } from "react";
-import api from "../lib/api.js";
+import { useQueryClient } from "@tanstack/react-query";
+import api, {
+  clearCsrfToken,
+  setAuthSessionExpiredHandler,
+} from "../lib/api.js";
 
 const AuthContext = createContext(null);
-
-function loadUser() {
-  try {
-    const raw = localStorage.getItem("authUser");
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
+const AUTH_CHANNEL_NAME = "tailor-auth-session";
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(loadUser);
+  const queryClient = useQueryClient();
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const channelRef = useRef(null);
 
-  // Verify token on mount
+  const clearSessionState = useCallback(() => {
+    setUser(null);
+    clearCsrfToken();
+    queryClient.clear();
+  }, [queryClient]);
+
   useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+    setAuthSessionExpiredHandler(clearSessionState);
+    return () => setAuthSessionExpiredHandler(null);
+  }, [clearSessionState]);
+
+  useEffect(() => {
+    if (!("BroadcastChannel" in window)) return undefined;
+
+    const channel = new BroadcastChannel(AUTH_CHANNEL_NAME);
+    channelRef.current = channel;
+    channel.onmessage = (event) => {
+      if (event.data?.type === "logout" || event.data?.type === "session-expired") {
+        clearSessionState();
+      }
+    };
+
+    return () => {
+      channel.close();
+      channelRef.current = null;
+    };
+  }, [clearSessionState]);
+
+  useEffect(() => {
+    let cancelled = false;
 
     api
-      .get("/auth/me")
+      .get("/auth/me", { skipAuthRedirect: true })
       .then(({ data }) => {
-        setUser(data);
-        localStorage.setItem("authUser", JSON.stringify(data));
+        if (!cancelled) setUser(data);
       })
       .catch(() => {
-        // Token invalid — clear everything
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        localStorage.removeItem("authUser");
-        setUser(null);
+        if (!cancelled) clearSessionState();
       })
-      .finally(() => setLoading(false));
-  }, []);
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clearSessionState]);
 
   useEffect(() => {
     document.title =
@@ -57,9 +80,6 @@ export function AuthProvider({ children }) {
       phoneNumber,
       password,
     });
-    localStorage.setItem("accessToken", data.accessToken);
-    localStorage.setItem("refreshToken", data.refreshToken);
-    localStorage.setItem("authUser", JSON.stringify(data.user));
     setUser(data.user);
     return data.user;
   }, []);
@@ -70,18 +90,14 @@ export function AuthProvider({ children }) {
     } catch {
       /* ignore */
     }
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("authUser");
-    setUser(null);
-  }, []);
+    clearSessionState();
+    channelRef.current?.postMessage({ type: "logout" });
+  }, [clearSessionState]);
 
   const updateTenant = useCallback((tenant) => {
     setUser((current) => {
       if (!current) return current;
-      const next = { ...current, tenant };
-      localStorage.setItem("authUser", JSON.stringify(next));
-      return next;
+      return { ...current, tenant };
     });
   }, []);
 
@@ -94,7 +110,6 @@ export function AuthProvider({ children }) {
   const isWorker = isDokht || isQichikar;
   const canManageOrders = isAdmin || isDokan;
 
-  // Helper to check if user has a specific role
   const hasRole = useCallback(
     (...roles) => roles.includes(user?.accountType),
     [user?.accountType],

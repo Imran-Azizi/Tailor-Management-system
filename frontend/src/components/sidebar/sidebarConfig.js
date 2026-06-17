@@ -303,8 +303,8 @@ const ADMIN_SECTIONS = [
       },
       {
         key: "tenantSettings",
-        label: "Tenant Settings",
-        fallback: "Tenant Settings",
+        label: "tenantSettings.title",
+        fallback: "System Settings",
         path: "/tenant-settings",
         icon: LuSettings,
       },
