@@ -31,6 +31,13 @@ const ROLE_COLORS = {
 };
 
 const ROLES = ["ADMIN", "DOKAN", "DOKHT", "QICHIKAR", "FINANCE"];
+const EMPTY_NEW_USER_FORM = {
+  name: "",
+  phoneNumber: "",
+  accountType: "",
+  password: "",
+  isActive: true,
+};
 
 function getRoleLabel(role, t) {
   return t(`users.roles.${String(role || "").toLowerCase()}`, {
@@ -56,15 +63,19 @@ function RoleBadge({ role, label }) {
   );
 }
 
-function UserModal({ user, onClose, onSaved }) {
+function UserModal({ user, hasAdmin, onClose, onSaved }) {
   const { t } = useTranslation();
-  const [form, setForm] = useState({
-    name: user?.name || "",
-    phoneNumber: user?.phoneNumber || "",
-    accountType: user?.accountType || "DOKAN",
-    password: "",
-    isActive: user?.isActive ?? true,
-  });
+  const [form, setForm] = useState(() =>
+    user
+      ? {
+          name: user.name || "",
+          phoneNumber: user.phoneNumber || "",
+          accountType: user.accountType || "",
+          password: "",
+          isActive: user.isActive ?? true,
+        }
+      : { ...EMPTY_NEW_USER_FORM },
+  );
   const [showPw, setShowPw] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -72,8 +83,20 @@ function UserModal({ user, onClose, onSaved }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!user && !form.password) {
+      toast.error(t("users.passwordRequired"));
+      return;
+    }
     if (form.password && form.password.length < 6) {
       toast.error(t("users.passwordMin"));
+      return;
+    }
+    if (
+      form.accountType === "ADMIN" &&
+      hasAdmin &&
+      user?.accountType !== "ADMIN"
+    ) {
+      toast.error(t("users.singleAdminOnly"));
       return;
     }
     setSaving(true);
@@ -96,7 +119,11 @@ function UserModal({ user, onClose, onSaved }) {
       }
       onClose();
     } catch (err) {
-      toast.error(getApiErrorMessage(err, t("users.saveFailed")));
+      toast.error(
+        err?.response?.data?.code === "TENANT_ADMIN_EXISTS"
+          ? t("users.singleAdminOnly")
+          : getApiErrorMessage(err, t("users.saveFailed")),
+      );
     } finally {
       setSaving(false);
     }
@@ -174,6 +201,7 @@ function UserModal({ user, onClose, onSaved }) {
         </div>
         <form
           onSubmit={handleSubmit}
+          autoComplete="off"
           style={{ display: "flex", flexDirection: "column", gap: 14 }}
         >
           {/* Name */}
@@ -190,6 +218,8 @@ function UserModal({ user, onClose, onSaved }) {
               {t("users.name", "Full Name")}
             </label>
             <input
+              name={user ? `edit-user-name-${user.id}` : "new-user-name"}
+              autoComplete="off"
               style={inputStyle}
               value={form.name}
               onChange={(e) => set("name", e.target.value)}
@@ -222,6 +252,8 @@ function UserModal({ user, onClose, onSaved }) {
                 }}
               />
               <input
+                name={user ? `edit-user-phone-${user.id}` : "new-user-phone"}
+                autoComplete="off"
                 className="inp with-leading-icon"
                 style={inputStyle}
                 value={form.phoneNumber}
@@ -245,12 +277,28 @@ function UserModal({ user, onClose, onSaved }) {
               {t("users.role", "Role")}
             </label>
             <select
+              name={user ? `edit-user-role-${user.id}` : "new-user-role"}
+              autoComplete="off"
               style={inputStyle}
               value={form.accountType}
               onChange={(e) => set("accountType", e.target.value)}
+              required
             >
+              {!form.accountType && (
+                <option value="" disabled>
+                  {t("users.selectRole")}
+                </option>
+              )}
               {ROLES.map((r) => (
-                <option key={r} value={r}>
+                <option
+                  key={r}
+                  value={r}
+                  disabled={
+                    r === "ADMIN" &&
+                    hasAdmin &&
+                    user?.accountType !== "ADMIN"
+                  }
+                >
                   {getRoleLabel(r, t)}
                 </option>
               ))}
@@ -272,7 +320,7 @@ function UserModal({ user, onClose, onSaved }) {
                   (
                   {user
                     ? t("users.leaveBlank")
-                    : t("users.defaultPasswordHint")}
+                    : t("users.passwordRequired")}
                   )
                 </span>
               </label>
@@ -296,9 +344,18 @@ function UserModal({ user, onClose, onSaved }) {
                     paddingRight: isRtl ? 36 : 36,
                   }}
                   type={showPw ? "text" : "password"}
+                  name={
+                    user
+                      ? `edit-user-password-${user.id}`
+                      : "new-user-password"
+                  }
+                  autoComplete="new-password"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
                   value={form.password}
                   onChange={(e) => set("password", e.target.value)}
                   placeholder="******"
+                  required={!user}
                 />
                 <button
                   type="button"
@@ -422,6 +479,7 @@ export default function UserManagement() {
   });
 
   const handleSaved = () => qc.invalidateQueries({ queryKey: ["users"] });
+  const hasAdmin = users.some((user) => user.accountType === "ADMIN");
 
   const confirmDelete = (u) => {
     if (u.id === me?.id) {
@@ -664,7 +722,9 @@ export default function UserManagement() {
       {/* Modal */}
       {modal && (
         <UserModal
+          key={modal === "new" ? "new-user" : modal.id}
           user={modal === "new" ? null : modal}
+          hasAdmin={hasAdmin}
           onClose={() => setModal(null)}
           onSaved={handleSaved}
         />

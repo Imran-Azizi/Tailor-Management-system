@@ -13,6 +13,9 @@ export default defineConfig(({ mode }) => {
         "@": fileURLToPath(new URL("./src", import.meta.url)),
       },
     },
+    optimizeDeps: {
+      include: ["react-hook-form", "@hookform/resolvers/zod", "zod"],
+    },
     build: {
       rollupOptions: {
         output: {

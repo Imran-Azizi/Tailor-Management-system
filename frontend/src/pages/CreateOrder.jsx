@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { parseNumberLocale } from "../lib/normalize.js";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -345,6 +345,8 @@ export default function CreateOrder() {
       : [];
     const hasReadyMade = types.includes("READY_MADE");
     const hasReadyMadeWaskat = types.includes("READY_MADE_WASKAT");
+    const hasOnlyReadyMadeWaskat =
+      hasReadyMadeWaskat && types.filter(Boolean).length === 1;
     const hasRakhtSelectionType = types.some((type) =>
       RAKHT_SELECTION_TYPES.has(type),
     );
@@ -359,15 +361,28 @@ export default function CreateOrder() {
     if (hasReadyMade) {
       return withRakhtStep([0, 1, 2, 4]); // Customer, Order Types, Measurements, Billing
     }
-    if (hasReadyMadeWaskat) {
+    if (hasOnlyReadyMadeWaskat) {
       return withRakhtStep([0, 1, 4]); // Customer, Order Types, Billing
     }
     // Default: show all steps
     return withRakhtStep([0, 1, 2, 4]);
   };
 
-  const visibleStepIndices = getVisibleStepIndices(form.orderTypes);
+  const visibleStepIndices = useMemo(
+    () => getVisibleStepIndices(form.orderTypes),
+    [form.orderTypes],
+  );
   const activeVisibleStepIndex = Math.max(0, visibleStepIndices.indexOf(step));
+
+  useEffect(() => {
+    if (visibleStepIndices.includes(step)) return;
+
+    const nextVisibleStep =
+      visibleStepIndices.find((stepIndex) => stepIndex > step) ??
+      visibleStepIndices[visibleStepIndices.length - 1] ??
+      0;
+    setStep(nextVisibleStep);
+  }, [step, visibleStepIndices]);
 
   // Step skipping helpers for rendering
   const types = Array.isArray(form.orderTypes)
@@ -375,30 +390,46 @@ export default function CreateOrder() {
     : [];
   const hasReadyMade = types.includes("READY_MADE");
   const hasReadyMadeWaskat = types.includes("READY_MADE_WASKAT");
+  const hasOnlyReadyMadeWaskat =
+    hasReadyMadeWaskat && types.filter(Boolean).length === 1;
   const hasRakhtSelectionType = types.some((type) =>
     RAKHT_SELECTION_TYPES.has(type),
   );
-  const skipMeasurements = hasReadyMadeWaskat && !hasReadyMade;
+  const skipMeasurements = hasOnlyReadyMadeWaskat && !hasReadyMade;
   const skipRakht = !hasRakhtSelectionType;
 
   const next = (d) => {
-    merge(d);
-    const mergedOrderTypes = d?.orderTypes ?? form.orderTypes;
+    const patch = d || {};
+    const merged = { ...form, ...patch };
+    const mergedOrderTypes = merged.orderTypes || [];
     // If skipping measurements (READY_MADE_WASKAT only), build orderItems
     const types = Array.isArray(mergedOrderTypes)
       ? mergedOrderTypes.map((e) => e?.type)
       : [];
     const hasReadyMade = types.includes("READY_MADE");
     const hasReadyMadeWaskat = types.includes("READY_MADE_WASKAT");
-    const skipMeasurements = hasReadyMadeWaskat && !hasReadyMade;
+    const hasOnlyReadyMadeWaskat =
+      hasReadyMadeWaskat && types.filter(Boolean).length === 1;
+    const skipMeasurements = hasOnlyReadyMadeWaskat && !hasReadyMade;
+    const nextForm = { ...merged };
     if (skipMeasurements) {
-      const builtOrderItems = buildOrderItems(mergedOrderTypes, {});
-      merge({ orderItems: builtOrderItems });
+      nextForm.measurements = {};
+      nextForm.orderItems = buildOrderItems(mergedOrderTypes, {});
     }
+    setForm(nextForm);
+
+    const nextVisibleStepIndices = getVisibleStepIndices(mergedOrderTypes);
     setStep((s) => {
-      const idx = visibleStepIndices.indexOf(s);
-      if (idx === -1 || idx === visibleStepIndices.length - 1) return s;
-      return visibleStepIndices[idx + 1];
+      const idx = nextVisibleStepIndices.indexOf(s);
+      if (idx === -1) {
+        return (
+          nextVisibleStepIndices.find((stepIndex) => stepIndex > s) ??
+          nextVisibleStepIndices[nextVisibleStepIndices.length - 1] ??
+          s
+        );
+      }
+      if (idx === nextVisibleStepIndices.length - 1) return s;
+      return nextVisibleStepIndices[idx + 1];
     });
   };
 

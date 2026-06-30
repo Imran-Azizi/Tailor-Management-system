@@ -27,6 +27,7 @@ import {
   LuCalendarCheck,
   LuDownload,
   LuLock,
+  LuSettings,
 } from "react-icons/lu";
 import { useTheme } from "../context/ThemeContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -80,6 +81,7 @@ function useOutside(ref, fn) {
 }
 
 const ROLE_COLORS = {
+  SUPER_ADMIN: "#4F46E5",
   ADMIN: "#2563EB",
   DOKAN: "#7C3AED",
   DOKHT: "#DB2777",
@@ -829,7 +831,7 @@ function LangDropdown({ onClose }) {
 
 function UserDropdown({ onClose }) {
   const { t, i18n } = useTranslation();
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, isSuperAdmin } = useAuth();
   const navigate = useNavigate();
   const roleColor = ROLE_COLORS[user?.accountType] || "var(--text3)";
   const isRtl = (i18n.dir?.() || "ltr") === "rtl";
@@ -904,6 +906,18 @@ function UserDropdown({ onClose }) {
         >
           <LuShieldCheck size={14} />
           <span>{t("users.title")}</span>
+        </div>
+      )}
+      {isSuperAdmin && (
+        <div
+          className="dd-item user-dd-item"
+          onClick={() => {
+            navigate("/super-admin/settings");
+            onClose();
+          }}
+        >
+          <LuSettings size={14} />
+          <span>{t("superAdminSettings.title")}</span>
         </div>
       )}
       <div
@@ -1121,7 +1135,11 @@ export default function Navbar({ onHamburger, pageTitle }) {
 
   return (
     <>
-      <header className="navbar no-print">
+      <header
+        className={`navbar no-print${
+          user?.accountType === "SUPER_ADMIN" ? " superadmin-navbar" : ""
+        }`}
+      >
         <button
           className="nav-btn nav-ham-btn"
           onClick={onHamburger}

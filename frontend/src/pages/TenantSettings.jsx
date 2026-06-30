@@ -5,19 +5,24 @@ import toast from "react-hot-toast";
 import {
   LuBuilding2,
   LuCircleCheck,
+  LuEye,
+  LuEyeOff,
   LuImage,
+  LuLockKeyhole,
   LuMail,
   LuMapPin,
   LuPhone,
   LuRefreshCw,
   LuSave,
   LuUpload,
+  LuUser,
   LuX,
 } from "react-icons/lu";
 import api from "../lib/api.js";
 import { assetUrl } from "../lib/assets.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { isRtlLanguage } from "../lib/locale.js";
 
 const emptyForm = {
   businessName: "",
@@ -29,6 +34,11 @@ const emptyForm = {
   logoUrl: "",
   logoFile: null,
   removeLogo: false,
+  ownerName: "",
+  ownerPhone: "",
+  currentPassword: "",
+  newPassword: "",
+  confirmPassword: "",
 };
 
 const logoTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/svg+xml"];
@@ -68,6 +78,11 @@ function normalizeForm(settings) {
     mobile: settings?.mobile || "",
     email: settings?.email || "",
     logoUrl: settings?.logoUrl || "",
+    ownerName: settings?.owner?.name || "",
+    ownerPhone: settings?.owner?.phoneNumber || "",
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
   };
 }
 
@@ -77,6 +92,18 @@ function validate(form, t) {
   if (!form.systemName.trim()) errors.systemName = t("tenantSettings.validation.systemName");
   if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
     errors.email = t("tenantSettings.validation.email");
+  }
+  if (!form.ownerName.trim()) errors.ownerName = t("tenantSettings.validation.ownerName");
+  if (!form.ownerPhone.trim()) errors.ownerPhone = t("tenantSettings.validation.ownerPhone");
+  if (form.currentPassword || form.newPassword || form.confirmPassword) {
+    if (!form.currentPassword) errors.currentPassword = t("tenantSettings.validation.currentPassword");
+    if (!form.newPassword) errors.newPassword = t("tenantSettings.validation.newPassword");
+    if (form.newPassword && form.newPassword.length < 6) {
+      errors.newPassword = t("tenantSettings.validation.passwordLength");
+    }
+    if (form.newPassword !== form.confirmPassword) {
+      errors.confirmPassword = t("tenantSettings.validation.passwordMatch");
+    }
   }
   if (form.logoFile) {
     if (!logoTypes.includes(form.logoFile.type)) {
@@ -89,8 +116,9 @@ function validate(form, t) {
 }
 
 function Field({ icon: Icon, label, error, isRtl, ...inputProps }) {
+  const isReadableLtr = inputProps.inputMode === "tel" || inputProps.inputMode === "email";
   return (
-    <label className="flex min-w-0 flex-col gap-1.5">
+    <label className="tenant-settings-field flex min-w-0 flex-col gap-1.5">
       <span className={cn("text-xs font-bold text-[var(--text2)]", !isRtl && "uppercase tracking-wide")}>
         {label}
       </span>
@@ -98,12 +126,22 @@ function Field({ icon: Icon, label, error, isRtl, ...inputProps }) {
         <Icon
           size={15}
           className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-[var(--text3)]"
-          style={{ insetInlineStart: 12 }}
+          style={isRtl ? { insetInlineEnd: 12 } : { insetInlineStart: 12 }}
         />
         <input
           className={cn("inp w-full", error && "err")}
           aria-invalid={error ? "true" : undefined}
-          style={{ paddingInlineStart: 38 }}
+          dir={isRtl ? (isReadableLtr ? "ltr" : "rtl") : "ltr"}
+          style={
+            isRtl
+              ? {
+                  paddingInlineStart: 12,
+                  paddingInlineEnd: 38,
+                  textAlign: "right",
+                  unicodeBidi: "plaintext",
+                }
+              : { paddingInlineStart: 38 }
+          }
           {...inputProps}
         />
       </span>
@@ -116,14 +154,80 @@ function Field({ icon: Icon, label, error, isRtl, ...inputProps }) {
   );
 }
 
+function PasswordField({
+  icon: Icon,
+  label,
+  error,
+  isRtl,
+  visible,
+  onToggleVisible,
+  showLabel,
+  hideLabel,
+  ...inputProps
+}) {
+  return (
+    <label className="tenant-settings-field flex min-w-0 flex-col gap-1.5">
+      <span className={cn("text-xs font-bold text-[var(--text2)]", !isRtl && "uppercase tracking-wide")}>
+        {label}
+      </span>
+      <span className="relative block">
+        <Icon
+          size={15}
+          className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-[var(--text3)]"
+          style={isRtl ? { insetInlineEnd: 12 } : { insetInlineStart: 12 }}
+        />
+        <input
+          className={cn("inp w-full", error && "err")}
+          aria-invalid={error ? "true" : undefined}
+          type={visible ? "text" : "password"}
+          dir={isRtl ? "ltr" : "ltr"}
+          style={
+            isRtl
+              ? {
+                  paddingInlineStart: 42,
+                  paddingInlineEnd: 38,
+                  textAlign: "right",
+                  unicodeBidi: "plaintext",
+                }
+              : { paddingInlineStart: 38, paddingInlineEnd: 42 }
+          }
+          autoComplete="new-password"
+          {...inputProps}
+        />
+        <button
+          type="button"
+          className="absolute top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-[var(--text3)] transition hover:bg-[var(--surface2)] hover:text-[var(--text1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30"
+          style={isRtl ? { insetInlineStart: 6 } : { insetInlineEnd: 6 }}
+          onClick={onToggleVisible}
+          disabled={inputProps.disabled}
+          aria-label={visible ? hideLabel : showLabel}
+        >
+          {visible ? <LuEyeOff size={16} /> : <LuEye size={16} />}
+        </button>
+      </span>
+      {error ? (
+        <span className="err-msg" role="alert" aria-live="polite">
+          {error}
+        </span>
+      ) : null}
+    </label>
+  );
+}
+
 export default function TenantSettings() {
   const { t, i18n } = useTranslation();
-  const isRtl = (i18n.dir?.() || "ltr") === "rtl";
+  const language = i18n.resolvedLanguage || i18n.language || "en";
+  const isRtl = isRtlLanguage(language);
   const qc = useQueryClient();
-  const { user, loading: authLoading, updateTenant } = useAuth();
+  const { user, loading: authLoading, updateTenant, updateUser } = useAuth();
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
   const [logoPreview, setLogoPreview] = useState("");
+  const [passwordVisibility, setPasswordVisibility] = useState({
+    currentPassword: false,
+    newPassword: false,
+    confirmPassword: false,
+  });
 
   const {
     data: settings,
@@ -165,6 +269,8 @@ export default function TenantSettings() {
       ["businessName", "systemName", "address", "phone", "mobile", "email"].some(
         (key) => (form[key] || "") !== (base[key] || ""),
       ) ||
+      ["ownerName", "ownerPhone"].some((key) => (form[key] || "") !== (base[key] || "")) ||
+      Boolean(form.currentPassword || form.newPassword || form.confirmPassword) ||
       Boolean(form.logoFile) ||
       Boolean(form.removeLogo)
     );
@@ -176,11 +282,32 @@ export default function TenantSettings() {
       toast.success(t("tenantSettings.toast.saved"));
       qc.setQueryData(["tenant-settings", user?.tenantId], data);
       updateTenant(data);
+      if (data?.owner) {
+        updateUser({
+          name: data.owner.name,
+          phoneNumber: data.owner.phoneNumber,
+        });
+      }
       document.title = data.systemName || "Tailoring Management System";
       setForm(normalizeForm(data));
       setErrors({});
+      setPasswordVisibility({
+        currentPassword: false,
+        newPassword: false,
+        confirmPassword: false,
+      });
     },
-    onError: (error) => toast.error(getApiErrorMessage(error, t("tenantSettings.toast.saveFailed"))),
+    onError: (error) => {
+      if (error?.response?.data?.code === "INVALID_CURRENT_PASSWORD") {
+        toast.error(t("tenantSettings.validation.invalidCurrentPassword"));
+        return;
+      }
+      if (error?.response?.data?.code === "PHONE_IN_USE") {
+        toast.error(t("tenantSettings.validation.phoneInUse"));
+        return;
+      }
+      toast.error(getApiErrorMessage(error, t("tenantSettings.toast.saveFailed")));
+    },
   });
 
   const setValue = (key, value) => {
@@ -207,7 +334,14 @@ export default function TenantSettings() {
       phone: form.phone.trim(),
       mobile: form.mobile.trim(),
       email: form.email.trim(),
+      ownerName: form.ownerName.trim(),
+      ownerPhone: form.ownerPhone.trim(),
     };
+    if (form.currentPassword || form.newPassword || form.confirmPassword) {
+      payload.currentPassword = form.currentPassword;
+      payload.newPassword = form.newPassword;
+      payload.confirmPassword = form.confirmPassword;
+    }
     if (form.logoFile) {
       payload.logoUpload = await fileToLogoUpload(form.logoFile);
     } else if (form.removeLogo) {
@@ -218,7 +352,7 @@ export default function TenantSettings() {
 
   if (authLoading || isLoading) {
     return (
-      <div className="page">
+      <div className={cn("page tenant-settings-page", isRtl ? "text-right" : "text-left")} dir={isRtl ? "rtl" : "ltr"}>
         <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6 text-sm font-semibold text-[var(--text2)]">
           {t("tenantSettings.loading")}
         </div>
@@ -228,7 +362,7 @@ export default function TenantSettings() {
 
   if (isError) {
     return (
-      <div className="page">
+      <div className={cn("page tenant-settings-page", isRtl ? "text-right" : "text-left")} dir={isRtl ? "rtl" : "ltr"}>
         <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
           <h1 className="text-base font-bold">{t("tenantSettings.errorTitle")}</h1>
           <p className="mt-1">
@@ -248,10 +382,17 @@ export default function TenantSettings() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-var(--nav-h,0px))] bg-[var(--bg)] px-4 py-5 sm:px-6 lg:px-8">
+    <div
+      className={cn(
+        "min-h-[calc(100vh-var(--nav-h,0px))] bg-[var(--bg)] px-4 py-5 sm:px-6 lg:px-8",
+        "tenant-settings-page",
+        isRtl ? "text-right" : "text-left",
+      )}
+      dir={isRtl ? "rtl" : "ltr"}
+    >
       <div className="mx-auto flex max-w-6xl flex-col gap-5">
         <section className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_18px_45px_-34px_rgba(15,23,42,.65)] sm:p-6">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="tenant-settings-hero-row flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
               <div className={cn("inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200", !isRtl && "uppercase tracking-[0.14em]")}>
                 <LuCircleCheck size={13} />
@@ -266,7 +407,7 @@ export default function TenantSettings() {
             </div>
             <button
               type="button"
-              className="btn btn-outline h-10"
+              className="tenant-settings-refresh-btn btn btn-outline h-10"
               onClick={() => qc.invalidateQueries({ queryKey: ["tenant-settings", user?.tenantId] })}
               disabled={isFetching || updateMut.isPending}
             >
@@ -276,9 +417,9 @@ export default function TenantSettings() {
           </div>
         </section>
 
-        <form onSubmit={submit} className="grid grid-cols-1 gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
+        <form onSubmit={submit} className="tenant-settings-form-grid grid grid-cols-1 gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
           <section className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_18px_45px_-34px_rgba(15,23,42,.65)]">
-            <div className="flex items-start gap-3">
+            <div className="tenant-settings-section-head flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
                 <LuImage size={18} />
               </div>
@@ -288,8 +429,8 @@ export default function TenantSettings() {
               </div>
             </div>
 
-            <div className="mt-5 rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface2)] p-4">
-              <div className="flex flex-col items-center text-center">
+            <div className="tenant-settings-logo-card mt-5 rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface2)] p-4">
+              <div className="tenant-settings-logo-preview flex flex-col items-center text-center">
                 <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text3)]">
                   {visibleLogo ? (
                     <img src={visibleLogo} alt="" className="h-full w-full object-contain" />
@@ -303,7 +444,7 @@ export default function TenantSettings() {
                 <p className="mt-1 text-xs text-[var(--text3)]">{t("tenantSettings.logo.allowed")}</p>
               </div>
 
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <div className="tenant-settings-logo-actions mt-4 flex flex-col gap-2 sm:flex-row">
                 <label className="btn btn-outline flex-1 cursor-pointer justify-center">
                   <LuUpload size={15} />
                   {visibleLogo ? t("tenantSettings.logo.replace") : t("tenantSettings.logo.upload")}
@@ -348,7 +489,7 @@ export default function TenantSettings() {
               <p className="mt-1 text-xs leading-5 text-[var(--text3)]">{t("tenantSettings.business.subtitle")}</p>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
+            <div className="tenant-settings-fields-grid grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
               <Field
                 icon={LuBuilding2}
                 label={t("tenantSettings.fields.businessName")}
@@ -405,7 +546,101 @@ export default function TenantSettings() {
               />
             </div>
 
-            <div className="flex flex-col-reverse gap-3 border-t border-[var(--border)] bg-[var(--surface2)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="border-t border-[var(--border)] bg-[var(--surface)]">
+              <div className="tenant-settings-section-head flex items-start gap-3 border-b border-[var(--border)] bg-[var(--surface2)] px-5 py-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
+                  <LuUser size={18} />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-[var(--text1)]">
+                    {t("tenantSettings.owner.title")}
+                  </h2>
+                  <p className="mt-1 text-xs leading-5 text-[var(--text3)]">
+                    {t("tenantSettings.owner.subtitle")}
+                  </p>
+                </div>
+              </div>
+              <div className="tenant-settings-fields-grid grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
+                <Field
+                  icon={LuUser}
+                  label={t("tenantSettings.fields.ownerName")}
+                  value={form.ownerName}
+                  onChange={(event) => setValue("ownerName", event.target.value)}
+                  error={errors.ownerName}
+                  disabled={updateMut.isPending}
+                  isRtl={isRtl}
+                />
+                <Field
+                  icon={LuPhone}
+                  label={t("tenantSettings.fields.ownerPhone")}
+                  value={form.ownerPhone}
+                  onChange={(event) => setValue("ownerPhone", event.target.value)}
+                  error={errors.ownerPhone}
+                  disabled={updateMut.isPending}
+                  isRtl={isRtl}
+                  inputMode="tel"
+                />
+                <PasswordField
+                  icon={LuLockKeyhole}
+                  label={t("tenantSettings.fields.currentPassword")}
+                  value={form.currentPassword}
+                  onChange={(event) => setValue("currentPassword", event.target.value)}
+                  error={errors.currentPassword}
+                  disabled={updateMut.isPending}
+                  isRtl={isRtl}
+                  visible={passwordVisibility.currentPassword}
+                  showLabel={t("tenantSettings.showPassword")}
+                  hideLabel={t("tenantSettings.hidePassword")}
+                  onToggleVisible={() =>
+                    setPasswordVisibility((prev) => ({
+                      ...prev,
+                      currentPassword: !prev.currentPassword,
+                    }))
+                  }
+                />
+                <PasswordField
+                  icon={LuLockKeyhole}
+                  label={t("tenantSettings.fields.newPassword")}
+                  value={form.newPassword}
+                  onChange={(event) => setValue("newPassword", event.target.value)}
+                  error={errors.newPassword}
+                  disabled={updateMut.isPending}
+                  isRtl={isRtl}
+                  visible={passwordVisibility.newPassword}
+                  showLabel={t("tenantSettings.showPassword")}
+                  hideLabel={t("tenantSettings.hidePassword")}
+                  onToggleVisible={() =>
+                    setPasswordVisibility((prev) => ({
+                      ...prev,
+                      newPassword: !prev.newPassword,
+                    }))
+                  }
+                />
+                <PasswordField
+                  icon={LuLockKeyhole}
+                  label={t("tenantSettings.fields.confirmPassword")}
+                  value={form.confirmPassword}
+                  onChange={(event) => setValue("confirmPassword", event.target.value)}
+                  error={errors.confirmPassword}
+                  disabled={updateMut.isPending}
+                  isRtl={isRtl}
+                  visible={passwordVisibility.confirmPassword}
+                  showLabel={t("tenantSettings.showPassword")}
+                  hideLabel={t("tenantSettings.hidePassword")}
+                  onToggleVisible={() =>
+                    setPasswordVisibility((prev) => ({
+                      ...prev,
+                      confirmPassword: !prev.confirmPassword,
+                    }))
+                  }
+                />
+                <p className="tenant-settings-owner-help rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold leading-5 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200 sm:col-span-2">
+                  {t("tenantSettings.owner.passwordHelp")}
+                </p>
+              </div>
+            </div>
+
+            <div className="tenant-settings-actions flex flex-col-reverse gap-3 border-t border-[var(--border)] bg-[var(--surface2)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs text-[var(--text3)]">
                 {hasChanges ? t("tenantSettings.unsaved") : ""}
               </p>

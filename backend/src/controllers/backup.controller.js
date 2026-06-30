@@ -117,9 +117,11 @@ export async function removeBackup(req, res, next) {
   try {
     const { id, key } = req.query;
     const backupKey = id || key;
-    if (!backupKey) return res.status(400).json({ error: "Backup id is required." });
-    await deleteBackup(backupKey, { req });
-    res.json({ success: true });
+    if (typeof backupKey !== "string" || !backupKey.trim() || backupKey.length > 500) {
+      return res.status(400).json({ error: "A valid backup id is required." });
+    }
+    const result = await deleteBackup(backupKey, { req });
+    res.json(result);
   } catch (error) {
     next(error);
   }

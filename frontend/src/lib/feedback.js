@@ -6,7 +6,10 @@ import {
 
 export function getApiErrorMessage(
   error,
-  fallback = "Something went wrong. Please try again.",
+  fallback = i18n.t(
+    "feedback.genericError",
+    "Something went wrong. Please try again.",
+  ),
 ) {
   const language = i18n.resolvedLanguage || i18n.language || "en";
   const firstDetail = error?.response?.data?.details?.[0];

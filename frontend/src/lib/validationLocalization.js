@@ -302,6 +302,41 @@ export function localizeValidationMessage(message, language) {
   if (!raw) return raw;
 
   const lang = normalizeLanguage(language);
+
+  if (
+    /network error|failed to fetch|connection refused|err_network|load failed/i.test(
+      raw,
+    )
+  ) {
+    if (lang === "dari") {
+      return "ارتباط با سرور برقرار نشد. اتصال اینترنت را بررسی کرده و دوباره کوشش کنید.";
+    }
+    if (lang === "pashto") {
+      return "له سرور سره اړیکه ونه نیول شوه. د انټرنېټ اړیکه وګورئ او بیا هڅه وکړئ.";
+    }
+    return "The server could not be reached. Check your connection and try again.";
+  }
+
+  if (/timeout|timed out|etimedout|econnaborted/i.test(raw)) {
+    if (lang === "dari") {
+      return "درخواست بیش از حد طول کشید. لطفاً دوباره کوشش کنید.";
+    }
+    if (lang === "pashto") {
+      return "غوښتنې ډېر وخت ونیو. مهرباني وکړئ بیا هڅه وکړئ.";
+    }
+    return "The request took too long. Please try again.";
+  }
+
+  if (/^request failed with status code \d+$/i.test(raw)) {
+    if (lang === "dari") {
+      return "درخواست انجام نشد. لطفاً دوباره کوشش کنید.";
+    }
+    if (lang === "pashto") {
+      return "غوښتنه بشپړه نه شوه. مهرباني وکړئ بیا هڅه وکړئ.";
+    }
+    return "The request could not be completed. Please try again.";
+  }
+
   if (lang === "en") return raw;
 
   const bundle = VALIDATION_TRANSLATIONS[lang] || {};

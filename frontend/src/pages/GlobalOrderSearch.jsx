@@ -17,6 +17,7 @@ import toast from "react-hot-toast";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { formatCurrency } from "../lib/currency.js";
+import { getOrderGrossTotal } from "../lib/orderFinancials.js";
 import { MONEY_SCALE } from "../lib/decimal.js";
 import { getOrderTypeLabel } from "../lib/orderType.js";
 import { getMonthLabel } from "../lib/months.js";
@@ -541,7 +542,7 @@ export default function GlobalOrderSearch() {
                         }}
                       >
                         {formatCurrency(
-                          order.totalPrice ?? 0,
+                          getOrderGrossTotal(order),
                           MONEY_SCALE,
                           language,
                         )}
@@ -646,7 +647,7 @@ export default function GlobalOrderSearch() {
                   <div className="global-order-search__mobile-actions">
                     <span style={{ fontWeight: 600, fontSize: 13 }}>
                       {formatCurrency(
-                        order.totalPrice ?? 0,
+                        getOrderGrossTotal(order),
                         MONEY_SCALE,
                         language,
                       )}

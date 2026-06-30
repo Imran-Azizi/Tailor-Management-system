@@ -90,15 +90,35 @@ export const getTransactionSummaryForUser = async (
   const completedPaymentWhere =
     accountType === "DOKHT"
       ? {
-          dokhtAssignedToId: userId,
-          dokhtCompletedAt: { not: null },
+          OR: [
+            { dokhtAssignedToId: userId, dokhtCompletedAt: { not: null } },
+            { dokhtReceivedById: userId, dokhtCompletedAt: { not: null } },
+            {
+              damagedClothesPenalties: {
+                some: { userId, roleType: "DOKHT" },
+              },
+            },
+          ],
           dokhtPaymentStatus: "PAID_TO_WORKER",
           ...(paidDateFilter ? { dokhtPaidAt: paidDateFilter } : {}),
         }
       : accountType === "QICHIKAR"
         ? {
-            qichikarAssignedToId: userId,
-            qichikarCompletedAt: { not: null },
+            OR: [
+              {
+                qichikarAssignedToId: userId,
+                qichikarCompletedAt: { not: null },
+              },
+              {
+                qichikarReceivedById: userId,
+                qichikarCompletedAt: { not: null },
+              },
+              {
+                damagedClothesPenalties: {
+                  some: { userId, roleType: "QICHIKAR" },
+                },
+              },
+            ],
             qichikarPaymentStatus: "PAID_TO_WORKER",
             ...(paidDateFilter ? { qichikarPaidAt: paidDateFilter } : {}),
           }

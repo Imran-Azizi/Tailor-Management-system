@@ -74,6 +74,11 @@ router.post("/", authorize("ADMIN", "DOKAN", "FINANCE"), ctrl.create);
 router.put("/:id", authorize("ADMIN", "FINANCE"), ctrl.update);
 router.put("/:id/bill", authorize("ADMIN"), ctrl.updateBill);
 router.patch(
+  "/:id/settle",
+  authorize("ADMIN", "FINANCE"),
+  ctrl.settle,
+);
+router.patch(
   "/:id/complete",
   authorize("ADMIN", "QICHIKAR", "DOKHT", "FINANCE"),
   ctrl.markComplete,

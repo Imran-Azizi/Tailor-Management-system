@@ -6,6 +6,7 @@ import {
   REFRESH_COOKIE_NAME,
   getCookie,
   hashSessionToken,
+  hashRefreshToken,
 } from '../lib/sessionCookies.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'tailor-secret-key-change-in-prod';
@@ -64,12 +65,20 @@ export async function authenticate(req, res, next) {
 
     if (!bearerToken && cookieToken) {
       const refreshToken = getCookie(req, REFRESH_COOKIE_NAME);
-      if (!refreshToken || !user.refreshToken || user.refreshToken !== refreshToken) {
+      if (!refreshToken || !user.refreshToken) {
+        return res.status(401).json({ error: 'Session expired. Please sign in again.' });
+      }
+      const hashedRefresh = hashRefreshToken(refreshToken);
+      if (user.refreshToken !== hashedRefresh) {
         return res.status(401).json({ error: 'Session expired. Please sign in again.' });
       }
       if (payload.sid && payload.sid !== hashSessionToken(refreshToken)) {
         return res.status(401).json({ error: 'Session expired. Please sign in again.' });
       }
+    }
+
+    if (bearerToken && !user.refreshToken) {
+      return res.status(401).json({ error: 'Session expired. Please sign in again.' });
     }
 
     const isSuperAdmin = user.accountType === 'SUPER_ADMIN';

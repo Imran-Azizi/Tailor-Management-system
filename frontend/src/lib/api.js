@@ -8,6 +8,7 @@ const SAFE_METHODS = new Set(["get", "head", "options"]);
 let csrfToken = null;
 let csrfPromise = null;
 let onAuthSessionExpired = null;
+let refreshPromise = null;
 
 const csrfClient = axios.create({
   baseURL: API_BASE_URL,
@@ -49,6 +50,7 @@ function shouldRedirectToLogin(config = {}) {
 export function clearCsrfToken() {
   csrfToken = null;
   csrfPromise = null;
+  refreshPromise = null;
 }
 
 export function setAuthSessionExpiredHandler(handler) {
@@ -140,18 +142,31 @@ api.interceptors.response.use(
       !isAuthLoginRequest(original)
     ) {
       original._retry = true;
-      try {
-        const token = await ensureCsrfToken();
-        await csrfClient.post(
-          "/auth/refresh",
-          {},
-          { headers: token ? { [CSRF_HEADER_NAME]: token } : undefined },
-        );
+
+      if (!refreshPromise) {
+        refreshPromise = (async () => {
+          try {
+            const token = await ensureCsrfToken();
+            await csrfClient.post(
+              "/auth/refresh",
+              {},
+              { headers: token ? { [CSRF_HEADER_NAME]: token } : undefined },
+            );
+            return true;
+          } catch {
+            return false;
+          } finally {
+            refreshPromise = null;
+          }
+        })();
+      }
+
+      const succeeded = await refreshPromise;
+      if (succeeded) {
         delete original.headers?.Authorization;
         return api(original);
-      } catch {
-        // Refresh failed; clear in-memory auth state and redirect.
       }
+
       expireAuthSession();
       if (shouldRedirectToLogin(original)) {
         window.location.href = "/login";

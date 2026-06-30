@@ -209,7 +209,7 @@ export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
 
   return (
     <aside
-      className={`sidebar ${collapsed ? "collapsed" : ""} ${open ? "open" : ""} no-print`}
+      className={`sidebar ${role === "SUPER_ADMIN" ? "superadmin-sidebar " : ""}${collapsed ? "collapsed" : ""} ${open ? "open" : ""} no-print`}
     >
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(255,255,255,0.08),transparent_30%,transparent)]" />
 

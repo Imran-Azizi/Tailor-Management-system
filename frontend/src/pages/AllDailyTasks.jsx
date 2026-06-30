@@ -1176,7 +1176,11 @@ export default function AllDailyTasks() {
   }, [reportMenuOpen, isRtl]);
 
   return (
-    <div className="page" style={{ paddingBottom: 40 }}>
+    <div
+      className="page report-root professional-report-page daily-tasks-report-page"
+      dir={isRtl ? "rtl" : "ltr"}
+      style={{ paddingBottom: 40 }}
+    >
       <PageHeader
         title={t("dailyTasks.allTitle")}
         subtitle={t("dailyTasks.allSubtitle")}
@@ -1439,8 +1443,8 @@ export default function AllDailyTasks() {
           <EmptyTasksState t={t} />
         ) : (
           <>
-            <div className="tbl-wrap dt-desktop-table">
-              <table className="tbl dt-table">
+            <div className="tbl-wrap professional-report-table-wrap dt-desktop-table">
+              <table className="tbl professional-report-table dt-table">
                 <thead>
                   <tr>
                     <th style={{ width: 44 }}>

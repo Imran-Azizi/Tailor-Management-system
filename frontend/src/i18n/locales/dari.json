@@ -1,4 +1,4 @@
-﻿{
+{
   "appName": "خیاطی هوشمند صافی",
   "appSubtitle": "سیستم مدیریت خیاطی",
   "common": {
@@ -118,13 +118,13 @@
     "leaveBlank": "خالی بگذارید تا تغییر نکند",
     "passwordRequired": "رمز عبور برای کاربر جدید ضروری است.",
     "passwordMin": "حداقل ۶ کاراکتر",
-    "defaultPasswordHint": "رمز عبور پیش‌فرض شماره تلفن خواهد بود.",
+    "defaultPasswordHint": "یک رمز عبور امن وارد کنید.",
+    "selectRole": "یک نقش را انتخاب کنید",
+    "singleAdminOnly": "این مجموعه قبلاً یک ادمین دارد. برای هر مجموعه فقط یک ادمین مجاز است.",
     "roles": {
       "admin": "ادمین",
-      "dokan": "دکان",
-    "dokan": "دوکان",
-      "dokht": "دخت",
-    "dokht": "دوخت",
+      "dokan": "دوکان",
+      "dokht": "دوخت",
       "qichikar": "قیچی‌کار",
       "finance": "مالی"
     }
@@ -166,6 +166,7 @@
     "yearOrders": "{{count}} سفارش امسال",
     "collected": "جمع‌آوری‌شده",
     "discount": "تخفیف",
+    "totalDiscounts": "مجموع تخفیف‌ها",
     "outstanding": "باقی‌مانده",
     "remainingBalance": "موجودی باقی‌مانده",
     "totalDailyExpenses": "مجموع مصارف روزانه",
@@ -191,7 +192,9 @@
     "orders": "سفارش‌ها",
     "recentOrders": "سفارش‌های اخیر",
     "statusDone": "تکمیل",
-    "statusPending": "در انتظار"
+    "statusPending": "در انتظار",
+    "damagedClothesMoney": "مجموع پول سفارش‌های خراب",
+    "damagedClothesMoneySub": "جدا از محاسبات مجموع قرضه"
   },
   "assignment": {
     "assignOrder": "واگذاری سفارش",
@@ -225,11 +228,11 @@
   },
   "myTasks": {
     "title": "وظایف من",
-    "noTasks": "هنوز هیچ وظیفه‌ای واگذار نشده.",
-    "totalAssigned": "مجموع واگذارشده",
-    "newAssignments": "{{count}} واگذاری جدید",
+    "noTasks": "هنوز هیچ سفارشی دریافت نشده.",
+    "totalAssigned": "مجموع دریافت‌شده",
+    "newAssignments": "{{count}} سفارش جدید",
     "markAllRead": "همه را خوانده علامت بزن",
-    "assigned": "واگذار شده",
+    "assigned": "دریافت شده",
     "inProgress": "در حال انجام",
     "startWorking": "شروع کار",
     "stopWorking": "توقف کار",
@@ -237,7 +240,7 @@
     "measurements": "اندازه‌ها",
     "customerInfo": "اطلاعات مشتری",
     "paymentInfo": "پرداخت",
-    "assignmentInfo": "واگذاری",
+    "assignmentInfo": "اطلاعات دریافت",
     "statusUpdated": "وضعیت به‌روز شد.",
     "statusFailed": "به‌روزرسانی وضعیت ناموفق بود.",
     "viewDetails": "مشاهده جزئیات",
@@ -287,7 +290,16 @@
     "viewingMonth": "مشاهده داده‌های ماه",
     "noDataThisMonth": "هیچ سفارشی برای این ماه یافت نشد",
     "financeCreatedTotal": "ثبت‌شده توسط شما",
-    "financeCreatedTotalSub": "همه سفارش‌های ثبت‌شده از حساب مالی شما"
+    "financeCreatedTotalSub": "همه سفارش‌های ثبت‌شده از حساب مالی شما",
+    "completedOrderLockedTitle": "سفارش قفل شده",
+    "completedOrderLocked": "سفارش تکمیل‌شده قابل ویرایش یا حذف نیست.",
+    "completedEditExpired": "پنجره ۲۴ ساعته ویرایش سفارش تکمیل‌شده به پایان رسیده است. سفارش اکنون فقط خواندنی است.",
+    "completedEditWindowRemaining": "پنجره ویرایش در {{time}} منقضی می‌شود",
+    "completedOrderReadonly": "این سفارش تکمیل‌شده اکنون فقط خواندنی است.",
+    "backToAllOrders": "بازگشت به همه سفارش‌ها",
+    "damageOrderStatus": "این سفارش خراب شده است",
+    "readyMadeOriginalPrice": "قیمت اصلی لباس آماده",
+    "readyMadeWaskatOriginalPrice": "قیمت اصلی واسکت آماده"
   },
   "createOrder": {
     "customerInfo": "معلومات مشتری",
@@ -606,7 +618,7 @@
       "rakhtExpense": "مصرف رخت/پارچه",
       "dokhtExpense": "مصرف دخت",
       "qichikarExpense": "مصرف قیچی‌کار",
-      "dailyTaskExpense": "مصرف وظیفه روزانه",
+      "dailyTaskExpense": "مصرف روزانه",
       "totalPenalty": "مجموع جریمه محاسبه‌شده"
     },
     "validation": {
@@ -618,8 +630,8 @@
   "workerPanel": {
     "statusCompleted": "تکمیل شد",
     "statusInProgress": "در حال کار",
-    "statusAssigned": "سپارده شد",
-    "notAssigned": "سپارده نشده",
+    "statusAssigned": "دریافت شده",
+    "notAssigned": "دریافت نشده",
     "greeting": "خوش آمدید",
     "dokhtLabel": "دخت",
     "qichikarLabel": "قیچی‌کار",
@@ -627,7 +639,7 @@
     "price": "قیمت",
     "updatedOn": "به‌روز شد",
     "receiveOrder": "دریافت سفارش",
-    "receiveOrderConfirmMsg": "این سفارش را دریافت کنید تا به لیست سپارده‌شده‌های شما اضافه شود. ادمین خبر می‌شود.",
+    "receiveOrderConfirmMsg": "این سفارش را دریافت کنید تا به لیست سفارش‌های دریافت‌شده شما اضافه شود. ادمین خبر می‌شود.",
     "receive": "دریافت",
     "processing": "در حال پردازش...",
     "startWork": "شروع کار",
@@ -649,9 +661,9 @@
     "sameRoleClaimConflict": "این سفارش توسط کارگر دیگری دریافت شده",
     "allOrders": "همه سفارش‌ها",
     "receivedOn": "دریافت شده در",
-    "assignedBy": "سپارده شده توسط",
+    "assignedBy": "دریافت شده از",
     "on": "در",
-    "assignedPrice": "سپارده",
+    "assignedPrice": "قیمت سفارش",
     "view": "مشاهده",
     "receivedByLabel": "سفارش قبلاً توسط {{name}} دریافت شده",
     "anotherWorker": "کارگر دیگر",
@@ -678,10 +690,14 @@
     "finalPayable": "مبلغ قابل پرداخت",
     "extraExpenses": "مصارف دیگر",
     "appliedBy": "اعمال شده توسط",
-    "newAssignments": "سپارش‌های جدید",
+    "newAssignments": "سفارش‌های جدید",
+    "orderSummary": "خلاصه سفارش",
     "markAllRead": "همه را خوانده‌شده علامت بزن",
     "loadingOrders": "در حال بارگذاری سفارش‌ها...",
     "noOrdersInCategory": "هیچ سفارشی در این دسته‌بندی وجود ندارد.",
+    "receiveOrders": "دریافت سفارش‌ها",
+    "receiveOrdersDescription": "برای دریافت سفارش، با شماره بل جستجو کنید.",
+    "billNumberLabel": "شماره بل",
     "searchBillPlaceholder": "جستجو با شماره بل",
     "noOrderFoundByBill": "هیچ سفارشی برای این شماره بل یافت نشد."
   },
@@ -819,6 +835,7 @@
       "ownerName": "نام مالک ضروری است.",
       "ownerPhone": "شماره مالک ضروری است.",
       "passwordLength": "رمز باید حداقل ۶ حرف باشد.",
+      "ownerPasswordRequired": "رمز عبور مالک ضروری است.",
       "email": "ایمیل معتبر وارد کنید.",
       "logoType": "لوگو باید PNG، JPG، JPEG، WEBP یا SVG باشد.",
       "logoSize": "لوگو باید ۲MB یا کمتر باشد."
@@ -841,6 +858,8 @@
     "refresh": "تازه‌سازی",
     "save": "ذخیره تنظیمات",
     "saving": "در حال ذخیره...",
+    "showPassword": "نمایش رمز",
+    "hidePassword": "پنهان کردن رمز",
     "unsaved": "تغییرات ذخیره‌نشده دارید.",
     "upToDate": "تنظیمات به‌روز است.",
     "branding": {
@@ -857,7 +876,17 @@
       "address": "آدرس",
       "phone": "تلفن",
       "mobile": "موبایل",
-      "email": "ایمیل"
+      "email": "ایمیل",
+      "ownerName": "نام مالک",
+      "ownerPhone": "شماره مالک",
+      "currentPassword": "رمز فعلی",
+      "newPassword": "رمز جدید",
+      "confirmPassword": "تأیید رمز"
+    },
+    "owner": {
+      "title": "حساب مالک",
+      "subtitle": "معلومات ورود مالک سیستم و رمز عبور را به‌صورت امن به‌روزرسانی کنید.",
+      "passwordHelp": "برای تغییر رمز، رمز فعلی و رمز جدید را وارد کنید. اگر نمی‌خواهید رمز تغییر کند، فیلدهای رمز را خالی بگذارید."
     },
     "logo": {
       "allowed": "PNG، JPG، JPEG، WEBP یا SVG تا ۲MB.",
@@ -874,6 +903,14 @@
     "validation": {
       "businessName": "نام تجارت ضروری است.",
       "systemName": "نام سیستم ضروری است.",
+      "ownerName": "نام مالک ضروری است.",
+      "ownerPhone": "شماره مالک ضروری است.",
+      "currentPassword": "رمز فعلی ضروری است.",
+      "newPassword": "رمز جدید ضروری است.",
+      "passwordLength": "رمز باید حداقل ۶ حرف باشد.",
+      "passwordMatch": "رمز جدید و تأیید رمز یکسان نیست.",
+      "invalidCurrentPassword": "رمز فعلی نادرست است.",
+      "phoneInUse": "این شماره تماس قبلاً استفاده شده است.",
       "email": "ایمیل معتبر وارد کنید.",
       "logoType": "لوگو باید PNG، JPG، JPEG، WEBP یا SVG باشد.",
       "logoSize": "لوگو باید ۲MB یا کمتر باشد."
@@ -883,5 +920,21 @@
       "loadFailed": "بارگذاری تنظیمات ناکام شد",
       "saveFailed": "ذخیره ناکام شد"
     }
+  },
+  "readyMade": {
+    "selectCode": "انتخاب کود لباس آماده",
+    "noItems": "هیچ لباس آماده‌ای یافت نشد. موارد را در صفحه دیزاین، بخش لباس آماده اضافه کنید.",
+    "chooseCode": "- یک کود لباس را انتخاب کنید -",
+    "originalPrice": "قیمت اصلی",
+    "code": "کود",
+    "selectCodeRequired": "لطفاً برای سفارش لباس آماده یک کود لباس انتخاب کنید."
+  },
+  "readyMadeWaskat": {
+    "selectCode": "انتخاب کود واسکت آماده",
+    "noItems": "هیچ واسکت آماده‌ای یافت نشد. موارد را در صفحه دیزاین، بخش واسکت آماده اضافه کنید.",
+    "chooseCode": "- یک کود واسکت را انتخاب کنید -",
+    "originalPrice": "قیمت اصلی",
+    "code": "کود",
+    "selectCodeRequired": "لطفاً برای سفارش واسکت آماده یک کود واسکت انتخاب کنید."
   }
 }

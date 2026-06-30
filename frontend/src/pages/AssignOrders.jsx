@@ -8,6 +8,7 @@ import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { parseNumberLocale } from "../lib/normalize.js";
 import { formatCurrency } from "../lib/currency.js";
+import { getOrderGrossTotal } from "../lib/orderFinancials.js";
 import {
   getOrderLabelParts,
   getOrderTypeLabel,
@@ -21,6 +22,7 @@ import {
   PageHeader,
   Spinner,
 } from "../components/ui/index.jsx";
+import "./AssignOrders.css";
 
 const WORKER_TYPES = [
   { value: "DOKHT", labelKey: "assignment.dokhtLabel", fallback: "Dokht" },
@@ -412,55 +414,46 @@ export default function AssignOrders() {
           </div>
 
           <div className="assign-orders-unified-body">
-        {loadingResult ? (
-          <section className="assign-orders-unified-section">
-            <h3 className="assign-orders-section-title">
-              {t("assignment.searchResult", "Search Result")}
-            </h3>
-            <div className="assign-orders-loading">
-              <Spinner />
-              <p>{t("common.loading", "Loading...")}</p>
-            </div>
-          </section>
-        ) : !lookupResult ? (
-          <section className="assign-orders-unified-section">
-            <h3 className="assign-orders-section-title">
-              {t("assignment.searchResult", "Search Result")}
-            </h3>
-            <div className="assign-orders-empty">
-              <EmptyState
-                message={t(
-                  "assignment.searchResultHint",
-                  "Select clothes type and search by bill number to start assignment.",
-                )}
-                Icon={AfCurrencyIcon}
-              />
-            </div>
-          </section>
-        ) : (
-          <>
-            <section className="assign-orders-unified-section">
-              <h3 className="assign-orders-section-title">
-                {t("assignment.customerInfo", "Customer & Order Selection")}
-              </h3>
-              <div className="assign-orders-results">
-                <div className="assign-orders-customer-strip">
-                  <div className="assign-orders-info-tile">
-                    <span>{t("common.customer", "Customer")}</span>
-                    <strong>{lookupResult.customer?.firstName || "-"}</strong>
+            {loadingResult ? (
+              <div className="ao-card">
+                <div className="ao-loading">
+                  <Spinner />
+                  <p>{t("common.loading", "Loading...")}</p>
+                </div>
+              </div>
+            ) : !lookupResult ? (
+              <div className="ao-card">
+                <EmptyState
+                  message={t(
+                    "assignment.searchResultHint",
+                    "Select clothes type and search by bill number to start assignment.",
+                  )}
+                  Icon={AfCurrencyIcon}
+                />
+              </div>
+            ) : (
+              <div className="ao-card">
+                <div className="ao-card-head">
+                  <div className="ao-head-left">
+                    <span className="ao-head-label">
+                      {t("common.customer", "Customer")}
+                    </span>
+                    <strong className="ao-head-name">
+                      {lookupResult.customer?.firstName || "-"}
+                    </strong>
                   </div>
-                  <div className="assign-orders-info-tile">
-                    <span>{t("orders.billNumber", "Bill Number")}</span>
-                    <strong>#{lookupResult.customer?.billNumber || "-"}</strong>
-                  </div>
-                  <div className="assign-orders-info-tile">
-                    <span>{t("assignment.clothesType", "Clothes type")}</span>
-                    <strong>{selectedClothesTypeLabel}</strong>
+                  <div className="ao-head-right">
+                    <span className="ao-pill ao-pill--neutral">
+                      {t("orders.billNumber", "Bill")} #{lookupResult.customer?.billNumber || "-"}
+                    </span>
+                    <span className="ao-pill ao-pill--info">
+                      {selectedClothesTypeLabel}
+                    </span>
                   </div>
                 </div>
 
                 {!matchedOrders.length ? (
-                  <div className="assign-orders-empty">
+                  <div className="ao-empty">
                     <EmptyState
                       message={t(
                         "assignment.noMatchingPendingOrders",
@@ -469,226 +462,155 @@ export default function AssignOrders() {
                     />
                   </div>
                 ) : (
-                  <div className="assign-orders-records">
-                    <div className="assign-orders-records-table-wrap">
-                      <table className="assign-orders-records-table">
-                        <thead>
-                          <tr>
-                            <th>{t("common.type", "Type")}</th>
-                            <th>{t("common.customer", "Customer")}</th>
-                            <th>{t("assignment.quantity", "Quantity")}</th>
-                            <th>{t("common.total", "Total")}</th>
-                            <th>{t("common.action", "Action")}</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {matchedOrders.map((order, idx) => {
-                            const orderLabel = getOrderLabelParts(
-                              order,
-                              language,
-                            );
-                            const active = selectedOrderId === order.id;
-                            const orderName =
-                              orderLabel.customName ||
-                              order.customer?.firstName ||
-                              t("assignment.noOrderName", "No custom name");
+                  <div className="ao-table-wrap">
+                    <table className="ao-table">
+                      <thead>
+                        <tr>
+                          <th className="ao-th-num">#</th>
+                          <th className="ao-th-customer">{t("common.customer", "Customer")}</th>
+                          <th className="ao-th-type">{t("assignment.clothesType", "Type")}</th>
+                          <th className="ao-th-qty">{t("assignment.quantity", "Qty")}</th>
+                          <th className="ao-th-amount">{t("common.amount", "Amount")}</th>
+                          <th className="ao-th-status">{t("assignment.status", "Status")}</th>
+                          <th className="ao-th-action">{t("assignment.actions", "Actions")}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {matchedOrders.map((order, idx) => {
+                          const orderLabel = getOrderLabelParts(order, language);
+                          const active = selectedOrderId === order.id;
+                          const orderName =
+                            orderLabel.customName ||
+                            order.customer?.firstName ||
+                            t("assignment.noOrderName", "No name");
 
-                            return (
-                              <tr
-                                key={order.id}
-                                className={
-                                  active
-                                    ? "assign-orders-record-row--active"
-                                    : ""
-                                }
-                              >
-                                <td>
-                                  <strong>
-                                    {t(
-                                      "assignment.orderLabelWithNumber",
-                                      "Order #{{number}}",
-                                      { number: idx + 1 },
-                                    )}
-                                  </strong>
-                                  <span>{orderLabel.typeWithSequenceLabel}</span>
-                                </td>
-                                <td>{orderName}</td>
-                                <td>{order.quantity || 1}</td>
-                                <td>
-                                  <span className="assign-orders-money">
-                                    <AfCurrencyIcon size={13} />
-                                    {formatMoney(order.totalPrice, language)}
+                          return (
+                            <tr
+                              key={order.id}
+                              className={active ? "ao-row--active" : ""}
+                            >
+                              <td className="ao-td-num">{idx + 1}</td>
+                              <td className="ao-td-customer">
+                                <span className="ao-customer-name">
+                                  {order.customer?.firstName ||
+                                    lookupResult.customer?.firstName ||
+                                    "-"}
+                                </span>
+                                {orderName !==
+                                  (order.customer?.firstName ||
+                                    lookupResult.customer?.firstName) && (
+                                  <span className="ao-customer-sub">{orderName}</span>
+                                )}
+                              </td>
+                              <td className="ao-td-type">
+                                <span className="ao-type-label">{orderLabel.typeWithSequenceLabel}</span>
+                              </td>
+                              <td className="ao-td-qty">{order.quantity || 1}</td>
+                              <td className="ao-td-amount">
+                                <AfCurrencyIcon size={12} />
+                                <span>{formatMoney(getOrderGrossTotal(order), language)}</span>
+                              </td>
+                              <td className="ao-td-status">
+                                {active ? (
+                                  <span className="ao-badge ao-badge--selected">
+                                    <span className="ao-badge-dot" />
+                                    {t("assignment.selected", "Selected")}
                                   </span>
-                                </td>
-                                <td>
-                                  <button
-                                    type="button"
-                                    className={
-                                      active
-                                        ? "btn btn-gold btn-sm"
-                                        : "btn btn-outline btn-sm"
-                                    }
-                                    onClick={() => setSelectedOrderId(order.id)}
-                                  >
-                                    <span>
-                                      {active
-                                        ? t("assignment.selected", "Selected")
-                                        : t("common.select", "Select")}
-                                    </span>
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    <div className="assign-orders-record-cards">
-                      {matchedOrders.map((order, idx) => {
-                        const orderLabel = getOrderLabelParts(order, language);
-                        const active = selectedOrderId === order.id;
-                        const orderName =
-                          orderLabel.customName ||
-                          order.customer?.firstName ||
-                          t("assignment.noOrderName", "No custom name");
-
-                        return (
-                          <button
-                            key={order.id}
-                            type="button"
-                            className={`assign-orders-record-card ${
-                              active ? "assign-orders-record-card--active" : ""
-                            }`}
-                            onClick={() => setSelectedOrderId(order.id)}
-                          >
-                            <div className="assign-orders-record-card__head">
-                              <div>
-                                <span className="assign-orders-record-kicker">
-                                  {t(
-                                    "assignment.orderLabelWithNumber",
-                                    "Order #{{number}}",
-                                    { number: idx + 1 },
-                                  )}
-                                </span>
-                                <strong>
-                                  {orderLabel.typeWithSequenceLabel}
-                                </strong>
-                                <p>{orderName}</p>
-                              </div>
-                              {active ? (
-                                <span className="assign-orders-selected-label">
-                                  {t("assignment.selected", "Selected")}
-                                </span>
-                              ) : (
-                                <span className="assign-orders-ready-label">
-                                  {t(
-                                    "assignment.readyToAssign",
-                                    "Ready to assign",
-                                  )}
-                                </span>
-                              )}
-                            </div>
-                            <div className="assign-orders-record-card__meta">
-                              <span>
-                                {t("assignment.quantity", "Quantity")}
-                                <strong>{order.quantity || 1}</strong>
-                              </span>
-                              <span>
-                                {t("common.total", "Total")}
-                                <strong className="assign-orders-money">
-                                  <AfCurrencyIcon size={13} />
-                                  {formatMoney(order.totalPrice, language)}
-                                </strong>
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
+                                ) : (
+                                  <span className="ao-badge ao-badge--ready">
+                                    {t("assignment.readyToAssign", "Ready")}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="ao-td-action">
+                                <button
+                                  type="button"
+                                  className={active ? "ao-btn ao-btn--active" : "ao-btn ao-btn--outline"}
+                                  onClick={() => setSelectedOrderId(order.id)}
+                                >
+                                  {active
+                                    ? t("assignment.selected", "Selected")
+                                    : t("common.select", "Select")}
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 )}
-              </div>
-            </section>
 
-            {selectedOrder && (
-              <section className="assign-orders-unified-section">
-                <h3 className="assign-orders-section-title">
-                  {t(
-                  "assignment.selectedOrderSummary",
-                  "Selected Order Summary",
-                  )}
-                </h3>
-                <div className="assign-orders-assignment-panel">
-                  <div className="assign-orders-assignment-grid">
-                    <div className="assign-orders-worker-card">
-                      <span>{selectedWorkerTypeLabel}</span>
-                      <strong>
-                        {selectedWorker?.name ||
-                          t("assignment.chooseAccount", "Choose account")}
-                      </strong>
-                      {selectedWorker?.phoneNumber ? (
-                        <p>{selectedWorker.phoneNumber}</p>
-                      ) : null}
+                {selectedOrder && (
+                  <div className="ao-assign">
+                    <div className="ao-assign-sep" />
+                    <div className="ao-assign-head">
+                      <h4 className="ao-assign-title">
+                        {t("assignment.send", "Assign Order")}
+                      </h4>
                     </div>
-
-                    <div className="assign-orders-selected-card">
-                      <span>{t("common.type", "Type")}</span>
-                      <strong>
-                        {selectedOrderLabel?.typeWithSequenceLabel}
-                      </strong>
-                      <p>
-                        {selectedOrderLabel?.customName ||
-                          selectedOrder.customer?.firstName ||
-                          t("assignment.noOrderName", "No custom name")}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="assign-orders-assignment-form">
-                    <Field
-                      label={t("assignment.priceForWorker", "Price for worker")}
-                      required
-                    >
-                      <div className="assign-orders-money-field">
-                        <span className="assign-orders-money-field__icon">
-                          <AfCurrencyIcon size={13} />
-                        </span>
-                        <input
-                          className="inp"
-                          value={assignmentPrice}
-                          onChange={(e) => setAssignmentPrice(e.target.value)}
-                          placeholder={t(
-                            "assignment.pricePlaceholder",
-                            "Enter assignment price",
+                    <div className="ao-assign-body">
+                      <div className="ao-assign-cards">
+                        <div className="ao-assign-card">
+                          <span className="ao-assign-card-label">{selectedWorkerTypeLabel}</span>
+                          <strong className="ao-assign-card-value">
+                            {selectedWorker?.name ||
+                              t("assignment.chooseAccount", "Choose account")}
+                          </strong>
+                          {selectedWorker?.phoneNumber && (
+                            <p className="ao-assign-card-sub">{selectedWorker.phoneNumber}</p>
                           )}
-                          inputMode="decimal"
-                        />
+                        </div>
+                        <div className="ao-assign-card">
+                          <span className="ao-assign-card-label">{t("common.type", "Type")}</span>
+                          <strong className="ao-assign-card-value">
+                            {selectedOrderLabel?.typeWithSequenceLabel}
+                          </strong>
+                          <p className="ao-assign-card-sub">
+                            {selectedOrderLabel?.customName ||
+                              selectedOrder.customer?.firstName ||
+                              t("assignment.noOrderName", "No name")}
+                          </p>
+                        </div>
                       </div>
-                    </Field>
-
-                    <Field label={t("assignment.note", "Note")}>
-                      <textarea
-                        className="inp"
-                        rows={3}
-                        value={assignmentNote}
-                        onChange={(e) => setAssignmentNote(e.target.value)}
-                        placeholder={t(
-                          "assignment.notePlaceholder",
-                          "Add note (optional)",
-                        )}
-                        style={{ resize: "vertical" }}
-                      />
-                    </Field>
-
-                    <div className="assign-orders-submit-wrap">
+                      <div className="ao-assign-fields">
+                        <div className="ao-field">
+                          <label className="ao-field-label">
+                            {t("assignment.priceForWorker", "Price")}
+                            <span className="ao-required">*</span>
+                          </label>
+                          <div className="ao-money-input">
+                            <AfCurrencyIcon size={13} />
+                            <input
+                              className="inp"
+                              value={assignmentPrice}
+                              onChange={(e) => setAssignmentPrice(e.target.value)}
+                              placeholder={t("assignment.pricePlaceholder", "Enter price")}
+                              inputMode="decimal"
+                            />
+                          </div>
+                        </div>
+                        <div className="ao-field">
+                          <label className="ao-field-label">
+                            {t("assignment.note", "Note")}
+                          </label>
+                          <textarea
+                            className="inp"
+                            rows={2}
+                            value={assignmentNote}
+                            onChange={(e) => setAssignmentNote(e.target.value)}
+                            placeholder={t("assignment.notePlaceholder", "Optional note")}
+                            style={{ resize: "vertical" }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="ao-assign-footer">
                       <button
                         type="button"
                         className="btn btn-gold"
                         onClick={() => assignMutation.mutate()}
-                        disabled={
-                          assignMutation.isPending || !workerType || !workerId
-                        }
+                        disabled={assignMutation.isPending || !workerType || !workerId}
                       >
                         {assignMutation.isPending ? (
                           t("common.loading", "Loading...")
@@ -701,11 +623,9 @@ export default function AssignOrders() {
                       </button>
                     </div>
                   </div>
-                </div>
-              </section>
+                )}
+              </div>
             )}
-          </>
-        )}
           </div>
         </Card>
       </div>

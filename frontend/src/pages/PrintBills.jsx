@@ -30,7 +30,6 @@ import { useAuth } from "../context/AuthContext.jsx";
 export default function PrintBills() {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
-  const shop = user?.tenant || null;
   const location = useLocation();
   const navigate = useNavigate();
   const resolvedLanguage = i18n.resolvedLanguage || i18n.language;
@@ -47,6 +46,7 @@ export default function PrintBills() {
   const [customer, setCustomer] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [loading, setLoading] = useState(false);
+  const shop = customer?.tenant || user?.tenant || null;
 
   const setSelectedCustomer = (full, { showToast = true } = {}) => {
     if (!full || !Array.isArray(full.orders) || full.orders.length === 0) {
@@ -76,6 +76,7 @@ export default function PrintBills() {
       return {
         ...payload.customer,
         orders: payload.orders,
+        tenant: payload.tenant || payload.customer.tenant || null,
       };
     }
 

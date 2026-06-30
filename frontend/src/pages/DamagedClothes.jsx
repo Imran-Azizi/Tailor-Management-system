@@ -796,10 +796,44 @@ function OrderCard({
 }) {
   const isDamageOrder = Boolean(order?.isDamageOrder);
   const selectedRoleValue = selectedRole?.value;
-  const dokhtExpenseValue =
-    selectedRoleValue === "DOKHT" ? 0 : Number(order.dokhtExpense || 0);
-  const qichikarExpenseValue =
-    selectedRoleValue === "QICHIKAR" ? 0 : Number(order.qichikarExpense || 0);
+  const expenseBreakdownCards = [
+    {
+      key: "totalOrderAmount",
+      label: t("damagedClothes.details.totalOrderAmount"),
+      value: formatCurrency(order.totalOrderAmount || 0, language),
+      color: "green",
+    },
+    {
+      key: "rakhtExpense",
+      label: t("damagedClothes.details.rakhtExpense"),
+      value: formatCurrency(order.rakhtExpense || 0, language),
+      color: "neutral",
+    },
+    ...(selectedRoleValue === "DOKHT"
+      ? []
+      : [
+          {
+            key: "dokhtExpense",
+            label: t("damagedClothes.details.dokhtExpense"),
+            value: formatCurrency(order.dokhtExpense || 0, language),
+            color: "neutral",
+          },
+        ]),
+    ...(selectedRoleValue === "QICHIKAR"
+      ? []
+      : [
+          {
+            key: "qichikarExpense",
+            label: t("damagedClothes.details.qichikarExpense"),
+            value: formatCurrency(order.qichikarExpense || 0, language),
+            color: "neutral",
+          },
+        ]),
+  ];
+  const expenseGridClassName =
+    expenseBreakdownCards.length === 4
+      ? "grid grid-cols-2 gap-3 sm:grid-cols-4"
+      : "grid grid-cols-1 gap-3 sm:grid-cols-3";
 
   return (
     <div
@@ -889,27 +923,15 @@ function OrderCard({
       {/* Financial stats */}
       <div style={{ padding: "12px 16px", display: "grid", gap: 10 }}>
         {/* Expense breakdown: 4 columns */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatPill
-            label={t("damagedClothes.details.totalOrderAmount")}
-            value={formatCurrency(order.totalOrderAmount || 0, language)}
-            color="green"
-          />
-          <StatPill
-            label={t("damagedClothes.details.rakhtExpense")}
-            value={formatCurrency(order.rakhtExpense || 0, language)}
-            color="neutral"
-          />
-          <StatPill
-            label={t("damagedClothes.details.dokhtExpense")}
-            value={formatCurrency(dokhtExpenseValue, language)}
-            color="neutral"
-          />
-          <StatPill
-            label={t("damagedClothes.details.qichikarExpense")}
-            value={formatCurrency(qichikarExpenseValue, language)}
-            color="neutral"
-          />
+        <div className={expenseGridClassName}>
+          {expenseBreakdownCards.map((card) => (
+            <StatPill
+              key={card.key}
+              label={card.label}
+              value={card.value}
+              color={card.color}
+            />
+          ))}
         </div>
 
         {/* Daily task + total penalty (last, full-width highlight) */}

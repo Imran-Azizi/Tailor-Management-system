@@ -305,7 +305,7 @@ export default function OtherItems() {
                 <label className="items-field">
                   <span>
                     {t("items.sell.quantitySold", {
-                      defaultValue: "Quantity Sold",
+                      defaultValue: "Quantity",
                     })}
                   </span>
                   <input
@@ -339,19 +339,6 @@ export default function OtherItems() {
                     tabIndex={-1}
                     readOnly
                   />
-                  {unitProfit !== 0 && (
-                    <small
-                      style={{
-                        display: "block",
-                        marginTop: 2,
-                        color: "var(--text3)",
-                        fontWeight: 400,
-                      }}
-                    >
-                      {formatCurrency(unitProfit, language)}{" "}
-                      {t("items.sell.perItem", { defaultValue: "per item" })}
-                    </small>
-                  )}
                 </label>
                 <button
                   type="button"
@@ -371,13 +358,6 @@ export default function OtherItems() {
                   {t("items.stock.outWarning", {
                     defaultValue:
                       "This item is out of stock and cannot be sold.",
-                  })}
-                </div>
-              ) : selectedItem.quantity <= 5 ? (
-                <div className="info-box ib-yellow">
-                  {t("items.stock.lowWarning", {
-                    defaultValue:
-                      "Low stock warning. Please review inventory soon.",
                   })}
                 </div>
               ) : null}

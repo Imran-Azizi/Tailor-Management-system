@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -24,6 +24,7 @@ import {
   formatNumberLocale,
   formatSystemDate,
   formatSystemDateTime,
+  isRtlLanguage,
 } from "../../lib/locale.js";
 import { formatCurrency } from "../../lib/currency.js";
 import { formatMeters } from "../../lib/meters.js";
@@ -31,6 +32,7 @@ import { Modal, ConfirmDeleteModal, StatCard } from "../ui/index.jsx";
 import MobileFilterPanel from "../ui/MobileFilterPanel.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useMonth } from "../../context/MonthContext.jsx";
+import "./RakhtManager.css";
 import {
   TON_QTY_OPTIONS,
   buildTonsForQuantity,
@@ -41,10 +43,276 @@ import {
   sanitizeIntegerInput,
 } from "./rakhtFormConfig.js";
 
+const RAKHT_SCROLL_THUMB_MIN = 64;
+let cachedRakhtRtlScrollType = null;
+
+function detectRakhtRtlScrollType() {
+  if (typeof document === "undefined") return "negative";
+  if (cachedRakhtRtlScrollType) return cachedRakhtRtlScrollType;
+
+  const scroller = document.createElement("div");
+  const content = document.createElement("div");
+  scroller.dir = "rtl";
+  scroller.style.cssText =
+    "position:absolute;top:-9999px;width:4px;height:1px;overflow:scroll;visibility:hidden;";
+  content.style.cssText = "width:8px;height:1px;";
+  scroller.appendChild(content);
+  document.body.appendChild(scroller);
+
+  if (scroller.scrollLeft > 0) {
+    cachedRakhtRtlScrollType = "default";
+  } else {
+    scroller.scrollLeft = 1;
+    cachedRakhtRtlScrollType =
+      scroller.scrollLeft === 0 ? "negative" : "reverse";
+  }
+
+  document.body.removeChild(scroller);
+  return cachedRakhtRtlScrollType;
+}
+
+function getRakhtScrollLeft(element) {
+  const maxScroll = Math.max(0, element.scrollWidth - element.clientWidth);
+  const direction = window.getComputedStyle(element).direction;
+  const scrollLeft = element.scrollLeft;
+
+  if (direction !== "rtl") {
+    return Math.min(maxScroll, Math.max(0, scrollLeft));
+  }
+
+  switch (detectRakhtRtlScrollType()) {
+    case "negative":
+      return Math.min(maxScroll, Math.max(0, maxScroll + scrollLeft));
+    case "reverse":
+      return Math.min(maxScroll, Math.max(0, maxScroll - scrollLeft));
+    default:
+      return Math.min(maxScroll, Math.max(0, scrollLeft));
+  }
+}
+
+function setRakhtScrollLeft(element, value) {
+  const maxScroll = Math.max(0, element.scrollWidth - element.clientWidth);
+  const nextValue = Math.min(maxScroll, Math.max(0, value));
+  const direction = window.getComputedStyle(element).direction;
+
+  if (direction !== "rtl") {
+    element.scrollLeft = nextValue;
+    return;
+  }
+
+  switch (detectRakhtRtlScrollType()) {
+    case "negative":
+      element.scrollLeft = nextValue - maxScroll;
+      break;
+    case "reverse":
+      element.scrollLeft = maxScroll - nextValue;
+      break;
+    default:
+      element.scrollLeft = nextValue;
+  }
+}
+
+function RakhtHorizontalScrollArea({ children, direction, ariaLabel }) {
+  const viewportRef = useRef(null);
+  const trackRef = useRef(null);
+  const dragRef = useRef(null);
+  const rafRef = useRef(0);
+  const metricsRef = useRef({
+    canScroll: false,
+    maxScroll: 0,
+    thumbLeft: 0,
+    thumbWidth: RAKHT_SCROLL_THUMB_MIN,
+  });
+  const [metrics, setMetrics] = useState(metricsRef.current);
+
+  useEffect(() => {
+    metricsRef.current = metrics;
+  }, [metrics]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return undefined;
+
+    const update = () => {
+      const trackWidth = trackRef.current?.clientWidth || viewport.clientWidth;
+      const maxScroll = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+      const canScroll = maxScroll > 1 && trackWidth > 0;
+      const thumbWidth = canScroll
+        ? Math.max(
+            RAKHT_SCROLL_THUMB_MIN,
+            Math.round((viewport.clientWidth / viewport.scrollWidth) * trackWidth),
+          )
+        : trackWidth;
+      const maxThumbLeft = Math.max(0, trackWidth - thumbWidth);
+      const scrollLeft = getRakhtScrollLeft(viewport);
+      const thumbLeft =
+        canScroll && maxScroll > 0
+          ? Math.round((scrollLeft / maxScroll) * maxThumbLeft)
+          : 0;
+
+      setMetrics({ canScroll, maxScroll, thumbLeft, thumbWidth });
+    };
+
+    const scheduleUpdate = () => {
+      window.cancelAnimationFrame(rafRef.current);
+      rafRef.current = window.requestAnimationFrame(update);
+    };
+
+    scheduleUpdate();
+    viewport.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate);
+
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(scheduleUpdate);
+    resizeObserver?.observe(viewport);
+    if (viewport.firstElementChild) {
+      resizeObserver?.observe(viewport.firstElementChild);
+    }
+
+    return () => {
+      viewport.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
+      window.cancelAnimationFrame(rafRef.current);
+      resizeObserver?.disconnect();
+    };
+  }, []);
+
+  const scrollToThumbLeft = (thumbLeft) => {
+    const viewport = viewportRef.current;
+    const track = trackRef.current;
+    if (!viewport || !track) return;
+
+    const maxThumbLeft = Math.max(
+      1,
+      track.clientWidth - metricsRef.current.thumbWidth,
+    );
+    const ratio = Math.min(1, Math.max(0, thumbLeft / maxThumbLeft));
+    setRakhtScrollLeft(viewport, ratio * metricsRef.current.maxScroll);
+  };
+
+  const handlePointerDown = (event) => {
+    if (event.button !== undefined && event.button !== 0) return;
+    const track = trackRef.current;
+    if (!track || !metricsRef.current.canScroll) return;
+
+    event.preventDefault();
+    const rect = track.getBoundingClientRect();
+    const onThumb = Boolean(
+      event.target.closest(".rakht-manager-scrollbar__thumb"),
+    );
+    const nextThumbLeft = onThumb
+      ? metricsRef.current.thumbLeft
+      : event.clientX - rect.left - metricsRef.current.thumbWidth / 2;
+
+    if (!onThumb) scrollToThumbLeft(nextThumbLeft);
+
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startThumbLeft: Math.min(
+        Math.max(0, nextThumbLeft),
+        Math.max(0, track.clientWidth - metricsRef.current.thumbWidth),
+      ),
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+
+  const handlePointerMove = (event) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    scrollToThumbLeft(drag.startThumbLeft + event.clientX - drag.startX);
+  };
+
+  const stopDragging = (event) => {
+    if (dragRef.current?.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+  };
+
+  const handleKeyDown = (event) => {
+    const viewport = viewportRef.current;
+    if (!viewport || !metricsRef.current.canScroll) return;
+
+    const current = getRakhtScrollLeft(viewport);
+    const step = Math.max(48, Math.round(viewport.clientWidth * 0.18));
+    let next = current;
+
+    if (event.key === "ArrowLeft") next = current - step;
+    else if (event.key === "ArrowRight") next = current + step;
+    else if (event.key === "PageUp") next = current - viewport.clientWidth * 0.8;
+    else if (event.key === "PageDown")
+      next = current + viewport.clientWidth * 0.8;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = metricsRef.current.maxScroll;
+    else return;
+
+    event.preventDefault();
+    setRakhtScrollLeft(viewport, next);
+  };
+
+  return (
+    <div className="rakht-manager-scroll-shell">
+      <div
+        ref={viewportRef}
+        className="rakht-manager-records-wrap"
+        dir={direction}
+        role="region"
+        aria-label={ariaLabel}
+        tabIndex={0}
+      >
+        {children}
+      </div>
+      <div
+        className={`rakht-manager-scrollbar${
+          metrics.canScroll ? " is-scrollable" : ""
+        }`}
+        aria-hidden={!metrics.canScroll}
+      >
+          <div
+            ref={trackRef}
+            className="rakht-manager-scrollbar__track"
+            role="scrollbar"
+            aria-label={ariaLabel}
+            aria-orientation="horizontal"
+            aria-valuemin={0}
+            aria-valuemax={Math.round(metrics.maxScroll)}
+            aria-valuenow={Math.round(
+              metrics.maxScroll > 0
+                ? (metrics.thumbLeft /
+                    Math.max(
+                      1,
+                      (trackRef.current?.clientWidth || 0) - metrics.thumbWidth,
+                    )) *
+                    metrics.maxScroll
+                : 0,
+            )}
+            tabIndex={metrics.canScroll ? 0 : -1}
+            onKeyDown={handleKeyDown}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={stopDragging}
+            onPointerCancel={stopDragging}
+          >
+            <div
+              className="rakht-manager-scrollbar__thumb"
+              style={{
+                width: `${metrics.thumbWidth}px`,
+                transform: `translateX(${metrics.thumbLeft}px)`,
+              }}
+            />
+          </div>
+      </div>
+    </div>
+  );
+}
+
 export default function RakhtManager() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language || "en";
-  const isRtl = (i18n.dir?.() || "ltr") === "rtl";
+  const isRtl = isRtlLanguage(language);
   const { isAdmin } = useAuth();
   const { viewMonth, viewYear } = useMonth();
   const qc = useQueryClient();
@@ -66,6 +334,22 @@ export default function RakhtManager() {
     label: t("common.all", { defaultValue: "All" }),
   });
   const [form, setForm] = useState(emptyForm());
+  const [isSmallScreen, setIsSmallScreen] = useState(() =>
+    typeof window === "undefined"
+      ? false
+      : window.matchMedia("(max-width: 768px)").matches,
+  );
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 768px)");
+    const updateSmallScreen = (event) => setIsSmallScreen(event.matches);
+    setIsSmallScreen(mediaQuery.matches);
+    mediaQuery.addEventListener?.("change", updateSmallScreen);
+
+    return () => {
+      mediaQuery.removeEventListener?.("change", updateSmallScreen);
+    };
+  }, []);
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["rakht-list", { viewMonth, viewYear }],
@@ -480,6 +764,113 @@ export default function RakhtManager() {
     });
   };
 
+  const renderRowActions = (item) => (
+    <div className="rakht-manager-row-actions">
+      <button
+        className="btn btn-outline btn-sm"
+        onClick={() => setViewItemId(item.id)}
+        title={t("common.view", { defaultValue: "View" })}
+      >
+        <LuEye size={12} />
+      </button>
+      <button className="btn btn-outline btn-sm" onClick={() => openEdit(item)}>
+        <LuPencil size={12} />
+      </button>
+      {isAdmin && (
+        <button
+          className="btn btn-outline btn-sm"
+          onClick={() => openAddMoreTons(item)}
+          title={t("rakht.addMoreTons", {
+            defaultValue: "Add More Tons",
+          })}
+        >
+          <LuPlus size={12} />
+          <span>
+            {t("rakht.addMoreTons", {
+              defaultValue: "Add More Tons",
+            })}
+          </span>
+        </button>
+      )}
+      <button
+        className="btn btn-outline btn-sm"
+        style={{ color: "#DC2626", borderColor: "#fecaca" }}
+        onClick={() => setDeleteItem(item)}
+      >
+        <LuTrash2 size={12} />
+      </button>
+    </div>
+  );
+
+  const rakhtTableColumns = [
+    {
+      key: "company",
+      header: t("rakht.companyName", { defaultValue: "Company" }),
+      render: (item) => item.companyName,
+    },
+    {
+      key: "brand",
+      header: t("rakht.brandName", { defaultValue: "Brand" }),
+      render: (item) => item.brandName,
+    },
+    {
+      key: "tons",
+      header: t("rakht.tonQuantity", { defaultValue: "Tons" }),
+      render: (item) => item.tonQuantity,
+    },
+    {
+      key: "totalPrice",
+      header: t("rakht.totalPrice", { defaultValue: "Total Price" }),
+      render: (item) =>
+        formatCurrency(Math.round(Number(item.totalPrice || 0)), language),
+    },
+    {
+      key: "givenMoney",
+      header: t("rakht.givenMoney", { defaultValue: "Given" }),
+      render: (item) =>
+        formatCurrency(Math.round(Number(item.givenMoney || 0)), language),
+    },
+    {
+      key: "remainingMoney",
+      header: t("rakht.remainingMoney", { defaultValue: "Remaining" }),
+      render: (item) =>
+        formatCurrency(
+          Math.round(
+            item.remainingMoney ??
+              Math.max(
+                0,
+                (item.totalPrice || 0) - (item.givenMoney || 0),
+              ),
+          ),
+          language,
+        ),
+    },
+    {
+      key: "date",
+      header: t("rakht.date", { defaultValue: "Date" }),
+      render: (item) =>
+        item.date ? formatSystemDate(item.date, language) : "-",
+    },
+    {
+      key: "actions",
+      header: t("common.actions", "Actions"),
+      render: renderRowActions,
+    },
+  ];
+  const mobileColumnKeys = new Set([
+    "company",
+    "brand",
+    "tons",
+    "remainingMoney",
+    "actions",
+  ]);
+  const responsiveRakhtTableColumns = isSmallScreen
+    ? rakhtTableColumns.filter((column) => mobileColumnKeys.has(column.key))
+    : rakhtTableColumns;
+  const visibleRakhtTableColumns = isRtl
+    ? [...responsiveRakhtTableColumns].reverse()
+    : responsiveRakhtTableColumns;
+
   return (
     <div className="card" style={{ padding: 18 }}>
       <section className="all-rakht-stats-grid" dir={isRtl ? "rtl" : "ltr"}>
@@ -516,6 +907,7 @@ export default function RakhtManager() {
       </section>
 
       <div
+        className="rakht-manager-heading"
         style={{
           display: "flex",
           justifyContent: "space-between",
@@ -535,8 +927,14 @@ export default function RakhtManager() {
             })}
           </p>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <Link to="/rakhts/payment-history" className="btn btn-outline">
+        <div
+          className="rakht-manager-actions"
+          style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
+        >
+          <Link
+            to="/rakhts/payment-history"
+            className="btn btn-outline rakht-manager-action"
+          >
             <LuHistory size={13} />
             {t("rakht.paymentHistory", { defaultValue: "Payment History" })}
           </Link>
@@ -547,7 +945,7 @@ export default function RakhtManager() {
                 setPaymentModalOpen(true);
                 setPayAmount("");
               }}
-              className="btn btn-gold"
+              className="btn btn-gold rakht-manager-action"
               style={{ gap: 6 }}
             >
               <AfCurrencyIcon size={13} />
@@ -642,102 +1040,54 @@ export default function RakhtManager() {
           {t("rakht.empty", { defaultValue: "No Rakht records yet." })}
         </p>
       ) : (
-        <div className="tbl-wrap" style={{ overflowX: "auto" }}>
-          <table className="tbl">
+        <RakhtHorizontalScrollArea
+          direction={isRtl ? "rtl" : "ltr"}
+          ariaLabel={t("rakht.title", { defaultValue: "Rakht Inventory" })}
+        >
+          <table
+            className="tbl rakht-manager-records-table"
+            data-language-direction={isRtl ? "rtl" : "ltr"}
+          >
+            <colgroup>
+              {visibleRakhtTableColumns.map((column) => (
+                <col
+                  key={column.key}
+                  className={`rakht-manager-col--${column.key}`}
+                />
+              ))}
+            </colgroup>
             <thead>
               <tr>
-                <th>{t("rakht.companyName", { defaultValue: "Company" })}</th>
-                <th>{t("rakht.brandName", { defaultValue: "Brand" })}</th>
-                <th>{t("rakht.tonQuantity", { defaultValue: "Tons" })}</th>
-                <th>
-                  {t("rakht.totalPrice", { defaultValue: "Total Price" })}
-                </th>
-                <th>{t("rakht.givenMoney", { defaultValue: "Given" })}</th>
-                <th>
-                  {t("rakht.remainingMoney", { defaultValue: "Remaining" })}
-                </th>
-                <th>{t("rakht.date", { defaultValue: "Date" })}</th>
-                <th>{t("common.actions", "Actions")}</th>
+                {visibleRakhtTableColumns.map((column) => (
+                  <th
+                    key={column.key}
+                    className={`rakht-manager-column--${column.key}`}
+                  >
+                    {column.header}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {filteredRows.map((item) => (
                 <tr key={item.id}>
-                  <td>{item.companyName}</td>
-                  <td>{item.brandName}</td>
-                  <td>{item.tonQuantity}</td>
-                  <td>
-                    {formatCurrency(
-                      Math.round(Number(item.totalPrice || 0)),
-                      language,
-                    )}
-                  </td>
-                  <td>
-                    {formatCurrency(
-                      Math.round(Number(item.givenMoney || 0)),
-                      language,
-                    )}
-                  </td>
-                  <td>
-                    {formatCurrency(
-                      Math.round(
-                        item.remainingMoney ??
-                          Math.max(
-                            0,
-                            (item.totalPrice || 0) - (item.givenMoney || 0),
-                          ),
-                      ),
-                      language,
-                    )}
-                  </td>
-                  <td>
-                    {item.date ? formatSystemDate(item.date, language) : "-"}
-                  </td>
-                  <td>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button
-                        className="btn btn-outline btn-sm"
-                        onClick={() => setViewItemId(item.id)}
-                        title={t("common.view", { defaultValue: "View" })}
-                      >
-                        <LuEye size={12} />
-                      </button>
-                      <button
-                        className="btn btn-outline btn-sm"
-                        onClick={() => openEdit(item)}
-                      >
-                        <LuPencil size={12} />
-                      </button>
-                      {isAdmin && (
-                        <button
-                          className="btn btn-outline btn-sm"
-                          onClick={() => openAddMoreTons(item)}
-                          title={t("rakht.addMoreTons", {
-                            defaultValue: "Add More Tons",
-                          })}
-                        >
-                          <LuPlus size={12} />
-                          <span>
-                            {t("rakht.addMoreTons", {
-                              defaultValue: "Add More Tons",
-                            })}
-                          </span>
-                        </button>
-                      )}
-                      <button
-                        className="btn btn-outline btn-sm"
-                        style={{ color: "#DC2626", borderColor: "#fecaca" }}
-                        onClick={() => setDeleteItem(item)}
-                      >
-                        <LuTrash2 size={12} />
-                      </button>
-                    </div>
-                  </td>
+                  {visibleRakhtTableColumns.map((column) => (
+                    <td
+                      key={column.key}
+                      className={`rakht-manager-column--${column.key}${
+                        column.key === "actions"
+                          ? " rakht-manager-actions-cell"
+                          : ""
+                      }`}
+                    >
+                      {column.render(item)}
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </RakhtHorizontalScrollArea>
       )}
 
       <Modal

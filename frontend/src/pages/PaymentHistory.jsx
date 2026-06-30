@@ -20,7 +20,7 @@ import { formatCurrency } from "../lib/currency.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
 import { formatMonthYearLabel } from "../lib/months.js";
-import { formatSystemDateTime } from "../lib/locale.js";
+import { formatSystemDateTime, isRtlLanguage } from "../lib/locale.js";
 import {
   Badge,
   Card,
@@ -30,6 +30,7 @@ import {
 } from "../components/ui/index.jsx";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import MobileFilterPanel from "../components/ui/MobileFilterPanel.jsx";
+import "./PaymentHistory.css";
 
 const PAGE_SIZE = 20;
 
@@ -91,7 +92,8 @@ function downloadBlob(blob, fileName) {
 export default function PaymentHistory() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
-  const isRtl = i18n.dir?.(language) === "rtl";
+  const isRtl = isRtlLanguage(language);
+  const isTableRtl = isRtl;
   const { isAdmin } = useAuth();
   const { viewMonth, viewYear } = useMonth();
   const [page, setPage] = useState(1);
@@ -242,9 +244,84 @@ export default function PaymentHistory() {
     }
   };
 
+  const paymentHistoryColumnOrder = [
+    "companyName",
+    "totalPrice",
+    "paidAmount",
+    "remainingAmount",
+    "status",
+    "paidAt",
+    "user",
+  ];
+
+  const paymentHistoryHeaders = {
+    companyName: (
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm"
+        style={{ padding: 0, fontWeight: 700 }}
+        onClick={() => handleSort("companyName")}
+      >
+        {t("rakht.companyName", { defaultValue: "Company Name" })}
+        <LuArrowUpDown size={13} />
+      </button>
+    ),
+    totalPrice: (
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm"
+        style={{ padding: 0, fontWeight: 700 }}
+        onClick={() => handleSort("totalPriceBefore")}
+      >
+        {t("rakht.totalPrice", { defaultValue: "Total Price" })}
+        <LuArrowUpDown size={13} />
+      </button>
+    ),
+    paidAmount: (
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm"
+        style={{ padding: 0, fontWeight: 700 }}
+        onClick={() => handleSort("paidAmount")}
+      >
+        {t("rakht.paidAmount", { defaultValue: "Paid Amount" })}
+        <LuArrowUpDown size={13} />
+      </button>
+    ),
+    remainingAmount: (
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm"
+        style={{ padding: 0, fontWeight: 700 }}
+        onClick={() => handleSort("remainingAfter")}
+      >
+        {t("rakht.remainingMoney", {
+          defaultValue: "Remaining Amount",
+        })}
+        <LuArrowUpDown size={13} />
+      </button>
+    ),
+    status: t("common.status", { defaultValue: "Status" }),
+    paidAt: (
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm"
+        style={{ padding: 0, fontWeight: 700 }}
+        onClick={() => handleSort("paidAt")}
+      >
+        {t("rakht.dateTime", {
+          defaultValue: "Payment Date & Time",
+        })}
+        <LuArrowUpDown size={13} />
+      </button>
+    ),
+    user: t("common.user", { defaultValue: "User" }),
+  };
+
   return (
     <div
-      className="page"
+      className="page report-root professional-report-page payment-history-page"
+      dir={isRtl ? "rtl" : "ltr"}
       style={{ display: "grid", gap: 16, paddingBottom: 28 }}
     >
       <PageHeader
@@ -325,6 +402,7 @@ export default function PaymentHistory() {
       >
         <Card>
           <div
+            className="payment-history-filter-grid"
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
@@ -470,6 +548,7 @@ export default function PaymentHistory() {
           </div>
 
           <div
+            className="payment-history-active-filters"
             style={{
               marginTop: 12,
               display: "flex",
@@ -502,14 +581,7 @@ export default function PaymentHistory() {
       </MobileFilterPanel>
 
       <Card>
-        <div
-          style={{
-            display: "flex",
-            gap: 12,
-            flexWrap: "wrap",
-            alignItems: "center",
-          }}
-        >
+        <div className="payment-history-summary">
           <span className="badge bg-gray">
             {t("rakht.totalRecords", { defaultValue: "Total Records" })}:{" "}
             {total}
@@ -530,7 +602,7 @@ export default function PaymentHistory() {
 
       <div
         className="payment-history-table-section"
-        dir={isRtl ? "rtl" : "ltr"}
+        dir={isTableRtl ? "rtl" : "ltr"}
       >
         <Card
           title={t("rakht.paymentHistory", { defaultValue: "Payment History" })}
@@ -552,89 +624,87 @@ export default function PaymentHistory() {
             })}
           />
         ) : (
-          <div className="tbl-wrap" style={{ overflowX: "auto" }}>
-            <table className="tbl">
+          <div
+            className="tbl-wrap professional-report-table-wrap payment-history-records-wrap"
+            style={{ overflowX: "auto" }}
+          >
+            <table className="tbl professional-report-table payment-history-records-table">
               <thead>
                 <tr>
-                  <th>
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      style={{ padding: 0, fontWeight: 700 }}
-                      onClick={() => handleSort("companyName")}
+                  {paymentHistoryColumnOrder.map((columnKey) => (
+                    <th
+                      key={columnKey}
+                      className={`payment-history-col--${columnKey}`}
                     >
-                      {t("rakht.companyName", { defaultValue: "Company Name" })}
-                      <LuArrowUpDown size={13} />
-                    </button>
-                  </th>
-                  <th>
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      style={{ padding: 0, fontWeight: 700 }}
-                      onClick={() => handleSort("totalPriceBefore")}
-                    >
-                      {t("rakht.totalPrice", { defaultValue: "Total Price" })}
-                      <LuArrowUpDown size={13} />
-                    </button>
-                  </th>
-                  <th>
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      style={{ padding: 0, fontWeight: 700 }}
-                      onClick={() => handleSort("paidAmount")}
-                    >
-                      {t("rakht.paidAmount", { defaultValue: "Paid Amount" })}
-                      <LuArrowUpDown size={13} />
-                    </button>
-                  </th>
-                  <th>
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      style={{ padding: 0, fontWeight: 700 }}
-                      onClick={() => handleSort("remainingAfter")}
-                    >
-                      {t("rakht.remainingMoney", {
-                        defaultValue: "Remaining Amount",
-                      })}
-                      <LuArrowUpDown size={13} />
-                    </button>
-                  </th>
-                  <th>{t("common.status", { defaultValue: "Status" })}</th>
-                  <th>
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      style={{ padding: 0, fontWeight: 700 }}
-                      onClick={() => handleSort("paidAt")}
-                    >
-                      {t("rakht.dateTime", {
-                        defaultValue: "Payment Date & Time",
-                      })}
-                      <LuArrowUpDown size={13} />
-                    </button>
-                  </th>
-                  <th>{t("common.user", { defaultValue: "User" })}</th>
+                      {paymentHistoryHeaders[columnKey]}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row) => {
                   const status = getPaymentStatus(row, t);
-                  return (
-                    <tr key={row.id}>
-                      <td style={{ fontWeight: 700 }}>
+                  const cells = {
+                    companyName: (
+                      <td
+                        key="companyName"
+                        className="payment-history-col--companyName"
+                        style={{ fontWeight: 700 }}
+                      >
                         {row.companyName || "-"}
                       </td>
-                      <td>{formatMoney(row.totalPriceAfter, language)}</td>
-                      <td>{formatMoney(row.paidAmount, language)}</td>
-                      <td>{formatMoney(row.remainingAfter, language)}</td>
-                      <td>
+                    ),
+                    totalPrice: (
+                      <td
+                        key="totalPrice"
+                        className="payment-history-col--totalPrice"
+                      >
+                        <span className="payment-history-number">
+                          {formatMoney(row.totalPriceAfter, language)}
+                        </span>
+                      </td>
+                    ),
+                    paidAmount: (
+                      <td
+                        key="paidAmount"
+                        className="payment-history-col--paidAmount"
+                      >
+                        <span className="payment-history-number">
+                          {formatMoney(row.paidAmount, language)}
+                        </span>
+                      </td>
+                    ),
+                    remainingAmount: (
+                      <td
+                        key="remainingAmount"
+                        className="payment-history-col--remainingAmount"
+                      >
+                        <span className="payment-history-number">
+                          {formatMoney(row.remainingAfter, language)}
+                        </span>
+                      </td>
+                    ),
+                    status: (
+                      <td key="status" className="payment-history-col--status">
                         <Badge v={status.variant}>{status.label}</Badge>
                       </td>
-                      <td>{formatDateTime(row.paidAt, language)}</td>
-                      <td>{row.paidBy?.name || "-"}</td>
+                    ),
+                    paidAt: (
+                      <td key="paidAt" className="payment-history-col--paidAt">
+                        {formatDateTime(row.paidAt, language)}
+                      </td>
+                    ),
+                    user: (
+                      <td key="user" className="payment-history-col--user">
+                        {row.paidBy?.name || "-"}
+                      </td>
+                    ),
+                  };
+                  return (
+                    <tr key={row.id}>
+                      {paymentHistoryColumnOrder.map(
+                        (columnKey) => cells[columnKey],
+                      )}
                     </tr>
                   );
                 })}
@@ -643,17 +713,67 @@ export default function PaymentHistory() {
           </div>
         )}
 
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 12,
-            padding: 16,
-            borderTop: "1px solid var(--border)",
-            flexWrap: "wrap",
-          }}
-        >
+        {!isLoading && rows.length > 0 ? (
+          <div className="payment-history-mobile-records">
+            {rows.map((row) => {
+              const status = getPaymentStatus(row, t);
+              return (
+                <article className="payment-history-mobile-card" key={row.id}>
+                  <div className="payment-history-mobile-card__head">
+                    <strong>{row.companyName || "-"}</strong>
+                    <Badge v={status.variant}>{status.label}</Badge>
+                  </div>
+                  <dl className="payment-history-mobile-card__details">
+                    <div>
+                      <dt>
+                        {t("rakht.totalPrice", {
+                          defaultValue: "Total Price",
+                        })}
+                      </dt>
+                      <dd className="payment-history-number">
+                        {formatMoney(row.totalPriceAfter, language)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>
+                        {t("rakht.paidAmount", {
+                          defaultValue: "Paid Amount",
+                        })}
+                      </dt>
+                      <dd className="payment-history-number">
+                        {formatMoney(row.paidAmount, language)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>
+                        {t("rakht.remainingMoney", {
+                          defaultValue: "Remaining Amount",
+                        })}
+                      </dt>
+                      <dd className="payment-history-number">
+                        {formatMoney(row.remainingAfter, language)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>
+                        {t("rakht.dateTime", {
+                          defaultValue: "Payment Date & Time",
+                        })}
+                      </dt>
+                      <dd>{formatDateTime(row.paidAt, language)}</dd>
+                    </div>
+                    <div>
+                      <dt>{t("common.user", { defaultValue: "User" })}</dt>
+                      <dd>{row.paidBy?.name || "-"}</dd>
+                    </div>
+                  </dl>
+                </article>
+              );
+            })}
+          </div>
+        ) : null}
+
+        <div className="payment-history-pagination">
           <span style={{ fontSize: 13, color: "var(--text3)" }}>
             {t("ui.pageSummary", {
               page,
@@ -662,7 +782,7 @@ export default function PaymentHistory() {
               defaultValue: "Page {{page}} of {{pages}} · {{total}} total",
             })}
           </span>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div className="payment-history-pagination__actions">
             <button
               type="button"
               className="btn btn-outline btn-sm"

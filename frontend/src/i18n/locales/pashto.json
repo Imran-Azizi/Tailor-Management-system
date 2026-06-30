@@ -1,4 +1,4 @@
-﻿{
+{
   "appName": "هوشمند صافی خیاطی",
   "appSubtitle": "د مدیریت سیستم",
   "common": {
@@ -117,7 +117,9 @@
     "leaveBlank": "خالي پریږدئ چې بدل نه شي",
     "passwordRequired": "د نوي کاروونکي لپاره پاسورډ ضروري دی.",
     "passwordMin": "لږ تر لږه ۶ توري",
-    "defaultPasswordHint": "د ډیفالټ پاسورډ به د تلیفون شمیره وي.",
+    "defaultPasswordHint": "یو خوندي پاسورډ ولیکئ.",
+    "selectRole": "یو رول وټاکئ",
+    "singleAdminOnly": "دا اداره لا دمخه یو ادمین لري. هرې ادارې ته یوازې یو ادمین اجازه لري.",
     "email": "ایمیل",
     "roles": {
       "admin": "ادمین",
@@ -159,11 +161,11 @@
   },
   "myTasks": {
     "title": "زما دندې",
-    "noTasks": "تراوسه هیڅ دنده نه ده سپارل شوې.",
-    "totalAssigned": "ټوله سپارل شوې",
-    "newAssignments": "{{count}} نوې سپارنه",
+    "noTasks": "تر اوسه هیڅ فرمایش نه دی ترلاسه شوی.",
+    "totalAssigned": "ټول ترلاسه شوي",
+    "newAssignments": "{{count}} نوی فرمایش",
     "markAllRead": "ټولې لوستل شوې",
-    "assigned": "سپارل شوی",
+    "assigned": "ترلاسه شوی",
     "inProgress": "روان",
     "startWorking": "کار پیل کول",
     "stopWorking": "کار بند کول",
@@ -171,7 +173,7 @@
     "measurements": "اندازې",
     "customerInfo": "د پیرودونکي معلومات",
     "paymentInfo": "تادیه",
-    "assignmentInfo": "سپارنه",
+    "assignmentInfo": "د ترلاسه کولو معلومات",
     "statusUpdated": "حالت تازه شو.",
     "statusFailed": "حالت تازه نه شو.",
     "viewDetails": "توضیحات وګورئ",
@@ -221,7 +223,16 @@
     "viewingMonth": "د میاشتې ډیټا لیدل",
     "noDataThisMonth": "د دې میاشتې لپاره هیڅ فرمایش ونه موندل شو",
     "financeCreatedTotal": "ستاسو له خوا ثبت شوي",
-    "financeCreatedTotalSub": "ستاسو د مالي حساب ټول ثبت شوي فرمایشونه"
+    "financeCreatedTotalSub": "ستاسو د مالي حساب ټول ثبت شوي فرمایشونه",
+    "completedOrderLockedTitle": "فرمایش بند شوی",
+    "completedOrderLocked": "بشپړ شوي فرمایشونه سمون یا حذف کېدای ندي.",
+    "completedEditExpired": "د بشپړ شوي فرمایش د ۲۴ ساعتو سمون پیریزه پای ته رسیده. فرمایش اوس یوازې لوستنکی دی.",
+    "completedEditWindowRemaining": "سمون پیریزه په {{time}} بندېږي",
+    "completedOrderReadonly": "دا بشپړ شوي فرمایش اوس یوازې لوستنکی دی.",
+    "backToAllOrders": "شاته د ټولو فرمایشونو ته",
+    "damageOrderStatus": "دا فرمایش خراب شوی دی",
+    "readyMadeOriginalPrice": "د چمتو جامو اصلي بیه",
+    "readyMadeWaskatOriginalPrice": "د چمتو واسکټ اصلي بیه"
   },
   "createOrder": {
     "customerInfo": "د پیرودونکي معلومات",
@@ -392,6 +403,7 @@
     "yearOrders": "{{count}} فرمایښونه دا کال",
     "collected": "راټول ښوي",
     "discount": "تخفیف",
+    "totalDiscounts": "ټول تخفیفونه",
     "outstanding": "پاتې",
     "remainingBalance": "پاتې موجودي",
     "totalDailyExpenses": "ټول ورږني مصارف",
@@ -417,7 +429,9 @@
     "orders": "فرمایښونه",
     "recentOrders": "وروستي فرمایښونه",
     "statusDone": "بښپړ ښوۍ",
-    "statusPending": "نا بښپړ"
+    "statusPending": "نا بښپړ",
+    "damagedClothesMoney": "د خرابو فرمایشونو ټولې پیسې",
+    "damagedClothesMoneySub": "له ټول پور څخه جلا محاسبه کېږي"
   },
   "transaction": {
     "title": "پور ثبت کړئ",
@@ -604,7 +618,7 @@
       "rakhtExpense": "د رخت/ټوکر مصرف",
       "dokhtExpense": "د دوخت مصرف",
       "qichikarExpense": "د قیچي کار مصرف",
-      "dailyTaskExpense": "د ورځني کار مصرف",
+      "dailyTaskExpense": "ورځنی مصرف",
       "totalPenalty": "ټول محاسبه شوی جریمه"
     },
     "validation": {
@@ -616,8 +630,8 @@
   "workerPanel": {
     "statusCompleted": "بښپړ ښوۍ",
     "statusInProgress": "روان",
-    "statusAssigned": "سپارل ښوۍ",
-    "notAssigned": "نه سپارل ښوۍ",
+    "statusAssigned": "ترلاسه شوی",
+    "notAssigned": "نه دی ترلاسه شوی",
     "greeting": "ښه راغلاست",
     "dokhtLabel": "دوخت",
     "qichikarLabel": "قیچي‌کار",
@@ -625,7 +639,7 @@
     "price": "بیه",
     "updatedOn": "تازه ښوۍ",
     "receiveOrder": "فرمایښ ترلاسه کول",
-    "receiveOrderConfirmMsg": "دا فرمایښ ترلاسه کړیت ترۚو ستاسو د سپارل ښوو لیست ته زیات ښي. ادمین خبریەے.",
+    "receiveOrderConfirmMsg": "دا فرمایش ترلاسه کړئ تر څو ستاسو د ترلاسه شوو فرمایشونو لیست ته زیات شي. ادمین به خبر شي.",
     "receive": "ترلاسه کول",
     "processing": "پروسس کیەے...",
     "startWork": "کار پیل کول",
@@ -647,9 +661,9 @@
     "sameRoleClaimConflict": "دا فرمایښ لا بل کارګر ترلاسه کړۍ",
     "allOrders": "ټول فرمایښونه",
     "receivedOn": "ترلاسه ښوۍ",
-    "assignedBy": "چا سپارلۍ",
+    "assignedBy": "له چا ترلاسه شوی",
     "on": "د",
-    "assignedPrice": "سپارنه",
+    "assignedPrice": "د فرمایش بیه",
     "view": "کتل",
     "receivedByLabel": "فرمایښ مخکې له {{name}} ترلاسه ښوۍ",
     "anotherWorker": "بل کارګر",
@@ -676,10 +690,14 @@
     "finalPayable": "د تادیې وړ مبلغ",
     "extraExpenses": "نور مصارف",
     "appliedBy": "د چا لخوا اعمال ښوۍ",
-    "newAssignments": "نوې سپارنې",
+    "newAssignments": "نوي فرمایشونه",
+    "orderSummary": "د فرمایش لنډیز",
     "markAllRead": "ټولې لوستل ښوې",
     "loadingOrders": "فرمایښونه بارول کیەے...",
     "noOrdersInCategory": "د دې کټګوړیې کې هیہۍ فرمایښ ونه موندل ښو.",
+    "receiveOrders": "فرمایشونه ترلاسه کړئ",
+    "receiveOrdersDescription": "د فرمایش ترلاسه کولو لپاره د بل شمېرې له لارې لټون وکړئ.",
+    "billNumberLabel": "د بل شمېره",
     "searchBillPlaceholder": "د بل ښمیره سره لټون",
     "noOrderFoundByBill": "د دې بل ښمیرې لپاره فرمایښ ونه موندل ښو."
   },
@@ -817,6 +835,7 @@
       "ownerName": "د مالک نوم اړین دی.",
       "ownerPhone": "د مالک شمېره اړینه ده.",
       "passwordLength": "رمز باید لږ تر لږه ۶ توري وي.",
+      "ownerPasswordRequired": "د مالک پاسورډ ضروري دی.",
       "email": "سم ایمیل ولیکئ.",
       "logoType": "لوګو باید PNG، JPG، JPEG، WEBP یا SVG وي.",
       "logoSize": "لوګو باید ۲MB یا له هغې کم وي."
@@ -839,6 +858,8 @@
     "refresh": "تازه کول",
     "save": "تنظیمات ثبتول",
     "saving": "ثبتېږي...",
+    "showPassword": "رمز ښکاره کول",
+    "hidePassword": "رمز پټول",
     "unsaved": "ناسپمول شوي بدلونونه لرئ.",
     "upToDate": "تنظیمات تازه دي.",
     "branding": {
@@ -855,7 +876,17 @@
       "address": "پته",
       "phone": "تلیفون",
       "mobile": "موبایل",
-      "email": "ایمیل"
+      "email": "ایمیل",
+      "ownerName": "د مالک نوم",
+      "ownerPhone": "د مالک شمېره",
+      "currentPassword": "اوسنی رمز",
+      "newPassword": "نوی رمز",
+      "confirmPassword": "د رمز تایید"
+    },
+    "owner": {
+      "title": "د مالک حساب",
+      "subtitle": "د سیستم د مالک د ننوتلو معلومات او رمز په خوندي ډول تازه کړئ.",
+      "passwordHelp": "د رمز بدلولو لپاره اوسنی رمز او نوی رمز ولیکئ. که رمز نه بدلوئ، د رمز فیلډونه تش پرېږدئ."
     },
     "logo": {
       "allowed": "PNG، JPG، JPEG، WEBP یا SVG تر ۲MB پورې.",
@@ -872,6 +903,14 @@
     "validation": {
       "businessName": "د کاروبار نوم اړین دی.",
       "systemName": "د سیستم نوم اړین دی.",
+      "ownerName": "د مالک نوم اړین دی.",
+      "ownerPhone": "د مالک شمېره اړینه ده.",
+      "currentPassword": "اوسنی رمز اړین دی.",
+      "newPassword": "نوی رمز اړین دی.",
+      "passwordLength": "رمز باید لږ تر لږه ۶ توري وي.",
+      "passwordMatch": "نوی رمز او تایید یې یو شان نه دي.",
+      "invalidCurrentPassword": "اوسنی رمز ناسم دی.",
+      "phoneInUse": "دا د تلیفون شمېره مخکې کارول شوې ده.",
       "email": "سم ایمیل ولیکئ.",
       "logoType": "لوګو باید PNG، JPG، JPEG، WEBP یا SVG وي.",
       "logoSize": "لوګو باید ۲MB یا له هغې کم وي."
@@ -881,5 +920,21 @@
       "loadFailed": "د تنظیماتو بارول ناکام شول",
       "saveFailed": "ثبتول ناکام شول"
     }
+  },
+  "readyMade": {
+    "selectCode": "د چمتو جامو کوډ وټاکئ",
+    "noItems": "هیڅ چمتو جامې ونه موندل شوې. توکي د ډیزاین پاڼې د چمتو جامو برخې کې اضافه کړئ.",
+    "chooseCode": "- د جامو کوډ وټاکئ -",
+    "originalPrice": "اصلي بیه",
+    "code": "کوډ",
+    "selectCodeRequired": "مهرباني وکړئ د چمتو جامو فرمایش لپاره د جامو کوډ وټاکئ."
+  },
+  "readyMadeWaskat": {
+    "selectCode": "د چمتو واسکټ کوډ وټاکئ",
+    "noItems": "هیڅ چمتو واسکټ ونه موندل شو. توکي د ډیزاین پاڼې د چمتو واسکټ برخې کې اضافه کړئ.",
+    "chooseCode": "- د واسکټ کوډ وټاکئ -",
+    "originalPrice": "اصلي بیه",
+    "code": "کوډ",
+    "selectCodeRequired": "مهرباني وکړئ د چمتو واسکټ فرمایش لپاره د واسکټ کوډ وټاکئ."
   }
 }

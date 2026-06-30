@@ -101,6 +101,13 @@ export function AuthProvider({ children }) {
     });
   }, []);
 
+  const updateUser = useCallback((nextUser) => {
+    setUser((current) => {
+      if (!current) return nextUser;
+      return typeof nextUser === "function" ? nextUser(current) : { ...current, ...nextUser };
+    });
+  }, []);
+
   const isAdmin = user?.accountType === "ADMIN";
   const isSuperAdmin = user?.accountType === "SUPER_ADMIN";
   const isDokan = user?.accountType === "DOKAN";
@@ -122,6 +129,7 @@ export function AuthProvider({ children }) {
       login,
       logout,
       updateTenant,
+      updateUser,
       isAdmin,
       isSuperAdmin,
       isDokan,
@@ -138,6 +146,7 @@ export function AuthProvider({ children }) {
       login,
       logout,
       updateTenant,
+      updateUser,
       isAdmin,
       isSuperAdmin,
       isDokan,

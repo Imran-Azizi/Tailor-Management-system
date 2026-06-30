@@ -11,6 +11,10 @@ import api from "../lib/api.js";
 import { getOrderLabelParts } from "../lib/orderType.js";
 import { formatSystemDate } from "../lib/locale.js";
 import { formatCurrency } from "../lib/currency.js";
+import {
+  getOrderGrossTotal,
+  getOrderNetTotal,
+} from "../lib/orderFinancials.js";
 import { getOrderCompletionStatus } from "../lib/orderCompletionStatus.js";
 import {
   Spinner,
@@ -31,10 +35,30 @@ function CustomerRow({ customer, expanded, onToggle }) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
   const orders = customer.orders || [];
-  const totalBilled = orders.reduce((s, o) => s + (o.totalPrice || 0), 0);
-  const totalPaid = orders.reduce((s, o) => s + (o.paidAmount || 0), 0);
-  const totalDiscount = orders.reduce((s, o) => s + (o.discount || 0), 0);
-  const totalRemaining = orders.reduce((s, o) => s + (o.remaining || 0), 0);
+  const hasLoadedOrders = orders.length > 0;
+  const financialOrders = orders.filter((order) => !order?.isDamageOrder);
+  const totalBilled = hasLoadedOrders
+    ? financialOrders.reduce((sum, order) => sum + getOrderNetTotal(order), 0)
+    : Number(customer._sum?.netTotal || 0);
+  const totalPaid = hasLoadedOrders
+    ? financialOrders.reduce(
+        (sum, order) => sum + Number(order.paidAmount || 0),
+        0,
+      )
+    : Number(customer._sum?.paidAmount || 0);
+  const totalDiscount = hasLoadedOrders
+    ? financialOrders.reduce(
+        (sum, order) => sum + Number(order.discount || 0),
+        0,
+      )
+    : Number(customer._sum?.discount || 0);
+  const totalRemaining = hasLoadedOrders
+    ? financialOrders.reduce(
+        (sum, order) => sum + Number(order.remaining || 0),
+        0,
+      )
+    : Number(customer._sum?.remaining || 0);
+  const orderCount = Number(customer._count?.orders || orders.length);
 
   return (
     <>
@@ -96,7 +120,7 @@ function CustomerRow({ customer, expanded, onToggle }) {
           </span>
         </td>
         <td style={{ padding: "13px 16px", fontSize: 13, fontWeight: 600 }}>
-          {orders.length}
+          {orderCount}
         </td>
         <td style={{ padding: "13px 16px", fontSize: 13, fontWeight: 700 }}>
           {formatMoney(totalBilled, language)}
@@ -222,7 +246,7 @@ function CustomerRow({ customer, expanded, onToggle }) {
                         ) : null}
                       </td>
                       <td style={{ padding: "8px 10px", fontWeight: 600 }}>
-                        {formatMoney(o.totalPrice, language)}
+                        {formatMoney(getOrderGrossTotal(o), language)}
                       </td>
                       <td style={{ padding: "8px 10px", color: "#16a34a" }}>
                         {formatMoney(o.paidAmount, language)}
@@ -305,7 +329,7 @@ export default function CustomerTransactions() {
 
   // Summary totals from current page
   const totalBilled = customers.reduce(
-    (s, c) => s + (c._sum?.totalPrice || 0),
+    (sum, customer) => sum + (customer._sum?.netTotal || 0),
     0,
   );
   const totalRemaining = customers.reduce(
@@ -314,7 +338,11 @@ export default function CustomerTransactions() {
   );
 
   return (
-    <div style={{ padding: "0 0 40px" }}>
+    <div
+      className="report-root professional-report-page customer-transactions-report-page"
+      style={{ padding: "0 0 40px" }}
+      dir={i18n.dir?.() === "rtl" ? "rtl" : "ltr"}
+    >
       {/* Header */}
       <div
         style={{
@@ -463,8 +491,14 @@ export default function CustomerTransactions() {
           <Spinner />
         ) : (
           <>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <div
+              className="professional-report-table-wrap"
+              style={{ overflowX: "auto" }}
+            >
+              <table
+                className="professional-report-table"
+                style={{ width: "100%", borderCollapse: "collapse" }}
+              >
                 <thead>
                   <tr style={{ background: "var(--surface2)" }}>
                     {[

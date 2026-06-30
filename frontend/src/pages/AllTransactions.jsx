@@ -8,7 +8,6 @@ import {
   LuBuilding2,
   LuCalendarCheck,
   LuCalendarDays,
-  LuDownload,
   LuFilter,
   LuFileText,
   LuRefreshCcw,
@@ -21,7 +20,7 @@ import { getApiErrorMessage } from "../lib/feedback.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
 import { formatMonthYearLabel } from "../lib/months.js";
-import { formatSystemDate } from "../lib/locale.js";
+import { formatSystemDate, isRtlLanguage } from "../lib/locale.js";
 import { formatCurrency } from "../lib/currency.js";
 import {
   Badge,
@@ -34,6 +33,7 @@ import {
 } from "../components/ui/index.jsx";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import MobileFilterPanel from "../components/ui/MobileFilterPanel.jsx";
+import "./AllTransactions.css";
 
 const ACCOUNT_TYPE_COLOR = {
   ADMIN: "#2563EB",
@@ -73,7 +73,7 @@ function getAmountColor(kind) {
 export default function AllTransactions() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
-  const isRtl = i18n.dir?.(language) === "rtl";
+  const isRtl = isRtlLanguage(language);
   const { isAdmin } = useAuth();
   const { viewMonth, viewYear } = useMonth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -127,6 +127,53 @@ export default function AllTransactions() {
     Boolean(typeFilter),
     Boolean(kindFilter),
   ].filter(Boolean).length;
+  const transactionColumns = useMemo(() => {
+    const columns = [
+      { key: "index", heading: "#", className: "index" },
+      {
+        key: "user",
+        heading: t("transaction.userName", "User Name"),
+        className: "user",
+      },
+      {
+        key: "account",
+        heading: t("transaction.accountType", "Account Type"),
+        className: "account",
+      },
+      {
+        key: "type",
+        heading: t("transaction.type", "Type"),
+        className: "type",
+      },
+      {
+        key: "amount",
+        heading: t("transaction.amount", "Amount"),
+        className: "amount",
+      },
+      {
+        key: "transactionDate",
+        heading: t("transaction.transactionDate", "Transaction Date"),
+        className: "transaction-date",
+      },
+      {
+        key: "note",
+        heading: t("transaction.note", "Note"),
+        className: "note",
+      },
+      {
+        key: "creator",
+        heading: t("transaction.createdBy", "Created By"),
+        className: "creator",
+      },
+      {
+        key: "createdDate",
+        heading: t("common.date", "Date"),
+        className: "created-date",
+      },
+    ];
+
+    return isRtl ? [...columns].reverse() : columns;
+  }, [isRtl, t]);
 
   useEffect(() => {
     const nextKind = (searchParams.get("kind") || "").trim();
@@ -186,7 +233,9 @@ export default function AllTransactions() {
 
   return (
     <div
-      className="page"
+      className={`page report-root professional-report-page all-transactions-page ${
+        isRtl ? "all-transactions-page--rtl" : "all-transactions-page--ltr"
+      }`}
       style={{ display: "grid", gap: 16, paddingBottom: 28 }}
     >
       <PageHeader
@@ -223,7 +272,7 @@ export default function AllTransactions() {
 
       {isAdmin && (
         <div
-          className="month-info-banner"
+          className="month-info-banner all-transactions-month-banner"
           style={{
             display: "flex",
             alignItems: "center",
@@ -257,6 +306,7 @@ export default function AllTransactions() {
       )}
 
       <div
+        className="all-transactions-stats"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
@@ -284,10 +334,11 @@ export default function AllTransactions() {
         clearDisabled={activeFilterCount === 0}
         isApplying={isFetching}
         onClear={clearFilters}
+        className="all-transactions-filter-panel"
         title={t("common.filters", "Filters")}
       >
         <Card>
-          <div style={{ marginBottom: 12 }}>
+          <div className="all-transactions-filter-summary">
             <span className="badge bg-gray">
               {t("common.filters", "Filters")}: {activeFilterCount}
             </span>
@@ -297,6 +348,7 @@ export default function AllTransactions() {
             </span>
           </div>
           <div
+            className="all-transactions-filter-grid"
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
@@ -374,7 +426,7 @@ export default function AllTransactions() {
               type="button"
               className="btn btn-outline"
               onClick={clearFilters}
-              disabled={!search && !typeFilter}
+              disabled={activeFilterCount === 0}
             >
               <LuX size={14} />
               {t("common.clear", "Clear")}
@@ -382,6 +434,7 @@ export default function AllTransactions() {
           </div>
 
           <div
+            className="all-transactions-active-filters"
             style={{
               marginTop: 12,
               display: "flex",
@@ -403,6 +456,11 @@ export default function AllTransactions() {
             {typeFilter ? (
               <span className="badge bg-gray">{typeFilter}</span>
             ) : null}
+            {kindFilter ? (
+              <span className="badge bg-gray">
+                {formatTransactionKind(kindFilter, t)}
+              </span>
+            ) : null}
           </div>
         </Card>
       </MobileFilterPanel>
@@ -419,215 +477,153 @@ export default function AllTransactions() {
           }
           noPad
         >
-        {isLoading ? (
-          <Spinner />
-        ) : transactions.length === 0 ? (
-          <EmptyState
-            message={t("common.noData", "No data found")}
-            Icon={LuArrowRightLeft}
-          />
-        ) : (
-          <div className="tbl-wrap">
-            <table
-              className="tbl"
-              style={{
-                width: "100%",
-                borderCollapse: "separate",
-                borderSpacing: 0,
-                minWidth: 760,
-              }}
-            >
-              <thead>
-                <tr style={{ background: "var(--surface2)" }}>
-                  {[
-                    "#",
-                    t("transaction.userName", "User Name"),
-                    t("transaction.accountType", "Account Type"),
-                    t("transaction.type", "Type"),
-                    t("transaction.amount", "Amount"),
-                    t("transaction.transactionDate", "Transaction Date"),
-                    t("transaction.note", "Note"),
-                    t("transaction.createdBy", "Created By"),
-                    t("common.date", "Date"),
-                  ].map((h, i) => (
-                    <th
-                      key={i}
-                      style={{
-                        position: "sticky",
-                        top: 0,
-                        zIndex: 1,
-                        padding: "12px 14px",
-                        textAlign: "start",
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: "var(--text3)",
-                        borderBottom: "1px solid var(--border)",
-                        whiteSpace: "nowrap",
-                        background: "var(--surface2)",
-                      }}
-                    >
-                      {h}
-                    </th>
+          {isLoading ? (
+            <Spinner />
+          ) : transactions.length === 0 ? (
+            <EmptyState
+              message={t("common.noData", "No data found")}
+              Icon={LuArrowRightLeft}
+            />
+          ) : (
+            <div className="tbl-wrap professional-report-table-wrap all-transactions-table-wrap">
+              <table className="tbl professional-report-table all-transactions-table">
+                <colgroup>
+                  {transactionColumns.map((column) => (
+                    <col
+                      key={column.key}
+                      className={`all-transactions-col all-transactions-col--${column.className}`}
+                    />
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                {transactions.map((tx, i) => (
-                  <tr
-                    key={tx.id}
-                    style={{ borderBottom: "1px solid var(--border)" }}
-                  >
-                    <td
-                      style={{
-                        padding: "12px 14px",
-                        color: "var(--text3)",
-                        fontSize: 12,
-                      }}
-                    >
-                      {(page - 1) * 20 + i + 1}
-                    </td>
-
-                    <td style={{ padding: "12px 14px" }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 10,
-                        }}
-                      >
-                        <div
+                </colgroup>
+                <thead>
+                  <tr>
+                    {transactionColumns.map((column) => (
+                      <th key={column.key}>{column.heading}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.map((tx, i) => {
+                    const cells = {
+                      index: (
+                        <td
+                          key="index"
+                          className="all-transactions-index-cell"
+                        >
+                          {(page - 1) * 20 + i + 1}
+                        </td>
+                      ),
+                      user: (
+                        <td key="user">
+                          <div className="all-transactions-user">
+                            <div
+                              className="all-transactions-user__avatar"
+                              style={{
+                                background:
+                                  (ACCOUNT_TYPE_COLOR[tx.user?.accountType] ||
+                                    "#64748B") + "20",
+                              }}
+                            >
+                              <LuUser
+                                size={14}
+                                style={{
+                                  color:
+                                    ACCOUNT_TYPE_COLOR[tx.user?.accountType] ||
+                                    "#64748B",
+                                }}
+                              />
+                            </div>
+                            <div className="all-transactions-user__copy">
+                              <p className="all-transactions-user__name">
+                                {tx.user?.name || "-"}
+                              </p>
+                              <p className="all-transactions-user__phone">
+                                {tx.user?.phoneNumber || "-"}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                      ),
+                      account: (
+                        <td key="account">
+                          <Badge v={BADGE_V[tx.accountType] || "gray"}>
+                            {tx.accountType}
+                          </Badge>
+                        </td>
+                      ),
+                      type: (
+                        <td key="type">
+                          <Badge v="amber">
+                            {formatTransactionKind(tx.kind, t)}
+                          </Badge>
+                        </td>
+                      ),
+                      amount: (
+                        <td
+                          key="amount"
+                          className="all-transactions-money"
                           style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: "50%",
-                            background:
-                              (ACCOUNT_TYPE_COLOR[tx.user?.accountType] ||
-                                "#64748B") + "20",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            flexShrink: 0,
+                            color: getAmountColor(tx.kind),
                           }}
                         >
-                          <LuUser
-                            size={14}
-                            style={{
-                              color:
-                                ACCOUNT_TYPE_COLOR[tx.user?.accountType] ||
-                                "#64748B",
-                            }}
-                          />
-                        </div>
-                        <div style={{ minWidth: 0 }}>
-                          <p
-                            style={{
-                              fontWeight: 700,
-                              fontSize: 13,
-                              color: "var(--text1)",
-                            }}
-                          >
-                            {tx.user?.name || "-"}
-                          </p>
-                          <p style={{ fontSize: 11, color: "var(--text3)" }}>
-                            {tx.user?.phoneNumber || "-"}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
+                          {formatMoney(tx.amount, language)}
+                        </td>
+                      ),
+                      transactionDate: (
+                        <td key="transactionDate">
+                          <div className="all-transactions-date">
+                            <LuCalendarDays size={13} />
+                            {formatDate(tx.transactionDate, language)}
+                          </div>
+                        </td>
+                      ),
+                      note: (
+                        <td
+                          key="note"
+                          className="all-transactions-note-cell"
+                        >
+                          <span className="all-transactions-note">
+                            {tx.note || "-"}
+                          </span>
+                        </td>
+                      ),
+                      creator: (
+                        <td
+                          key="creator"
+                          className="all-transactions-secondary-cell"
+                        >
+                          {tx.createdBy?.name || "-"}
+                        </td>
+                      ),
+                      createdDate: (
+                        <td
+                          key="createdDate"
+                          className="all-transactions-created-cell"
+                        >
+                          {formatDate(tx.createdAt, language)}
+                        </td>
+                      ),
+                    };
 
-                    <td style={{ padding: "12px 14px" }}>
-                      <Badge v={BADGE_V[tx.accountType] || "gray"}>
-                        {tx.accountType}
-                      </Badge>
-                    </td>
+                    return (
+                      <tr key={tx.id}>
+                        {transactionColumns.map((column) => cells[column.key])}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-                    <td style={{ padding: "12px 14px" }}>
-                      <Badge v="amber">
-                        {formatTransactionKind(tx.kind, t)}
-                      </Badge>
-                    </td>
-
-                    <td
-                      style={{
-                        padding: "12px 14px",
-                        fontWeight: 800,
-                        fontSize: 14,
-                        color: getAmountColor(tx.kind),
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {formatMoney(tx.amount, language)}
-                    </td>
-
-                    <td
-                      style={{
-                        padding: "12px 14px",
-                        fontSize: 13,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                          color: "var(--text2)",
-                        }}
-                      >
-                        <LuCalendarDays size={13} />
-                        {formatDate(tx.transactionDate, language)}
-                      </div>
-                    </td>
-
-                    <td
-                      style={{
-                        padding: "12px 14px",
-                        fontSize: 12,
-                        color: "var(--text2)",
-                        maxWidth: 260,
-                        whiteSpace: "normal",
-                        lineHeight: 1.45,
-                      }}
-                    >
-                      {tx.note || "-"}
-                    </td>
-
-                    <td
-                      style={{
-                        padding: "12px 14px",
-                        fontSize: 12,
-                        color: "var(--text2)",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {tx.createdBy?.name || "-"}
-                    </td>
-
-                    <td
-                      style={{
-                        padding: "12px 14px",
-                        fontSize: 12,
-                        color: "var(--text3)",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {formatDate(tx.createdAt, language)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="all-transactions-pagination">
+            <Pagination
+              page={page}
+              total={data?.total || 0}
+              limit={20}
+              onChange={setPage}
+            />
           </div>
-        )}
-
-        <div style={{ padding: "12px 18px 16px" }}>
-          <Pagination
-            page={page}
-            total={data?.total || 0}
-            limit={20}
-            onChange={setPage}
-          />
-        </div>
         </Card>
       </div>
     </div>

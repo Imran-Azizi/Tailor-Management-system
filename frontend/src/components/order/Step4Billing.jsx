@@ -2,6 +2,7 @@ import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
 import { parseNumberLocale } from "../../lib/normalize.js";
 import { useTranslation } from "react-i18next";
 import { formatCurrency } from "../../lib/currency.js";
+import { isRtlLanguage } from "../../lib/locale.js";
 import {
   getOrderDisplayName,
   getOrderTypeLabel,
@@ -37,16 +38,37 @@ function sanitizeWholeInput(raw = "") {
   );
 }
 
+function cleanDuplicateOrderTypeLabel(label, type, language = "en") {
+  const cleanLabel = String(label || "").replace(/\s+/g, " ").trim();
+  const typeLabel = getOrderTypeLabel(type, language);
+  const cleanTypeLabel = String(typeLabel || "").replace(/\s+/g, " ").trim();
+
+  if (!cleanLabel) return cleanTypeLabel || "-";
+  if (!cleanTypeLabel || cleanTypeLabel === "-") return cleanLabel;
+
+  const repeatedTypeLabel = `${cleanTypeLabel} ${cleanTypeLabel}`;
+  if (cleanLabel === repeatedTypeLabel) return cleanTypeLabel;
+
+  return cleanLabel;
+}
+
 function getDisplayLabel(entry, index, language = "en") {
-  if (entry?.displayName?.trim()) return entry.displayName.trim();
-  return getOrderDisplayName(
-    {
-      ...entry,
-      orderName: entry?.name?.trim() || entry?.orderName?.trim() || "",
-      orderTypeSequence:
-        Number(entry?.orderTypeSequence ?? entry?.sequence) || index + 1,
-      orderTypeTotal: Number(entry?.orderTypeTotal) || 1,
-    },
+  const label = entry?.displayName?.trim()
+    ? entry.displayName.trim()
+    : getOrderDisplayName(
+        {
+          ...entry,
+          orderName: entry?.name?.trim() || entry?.orderName?.trim() || "",
+          orderTypeSequence:
+            Number(entry?.orderTypeSequence ?? entry?.sequence) || index + 1,
+          orderTypeTotal: Number(entry?.orderTypeTotal) || 1,
+        },
+        language,
+      );
+
+  return cleanDuplicateOrderTypeLabel(
+    label,
+    entry?.type,
     language,
   );
 }
@@ -96,6 +118,7 @@ function normalizeInitial(entries, initial) {
 function BillingCard({ entry, value, onChange, billingKey }) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
+  const isRtl = isRtlLanguage(language);
   const pricePerItem = toWholeAmount(parseNumberLocale(value.totalPrice));
   const discount = toWholeAmount(parseNumberLocale(value.discount));
   const paidAmount = toWholeAmount(parseNumberLocale(value.paidAmount));
@@ -139,13 +162,12 @@ function BillingCard({ entry, value, onChange, billingKey }) {
         }}
       >
         <span className="badge bg-gold" style={{ fontSize: 11 }}>
-          {getOrderTypeLabel(entry.type, language)}
+          {cleanDuplicateOrderTypeLabel(
+            entry.displayName,
+            entry.type,
+            language,
+          )}
         </span>
-        {entry.displayName && (
-          <span style={{ fontSize: 13, fontWeight: 600 }}>
-            {entry.displayName}
-          </span>
-        )}
         {entry.isEmergency && (
           <span className="badge bg-red" style={{ fontSize: 10 }}>
             {t("createOrder.emergencyShort")}
@@ -162,20 +184,29 @@ function BillingCard({ entry, value, onChange, billingKey }) {
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
+              gap: 12,
               padding: "8px 14px",
               borderRadius: 8,
               background: "var(--surface)",
               border: "1px solid var(--border)",
               marginBottom: 12,
+              direction: isRtl ? "rtl" : "ltr",
+              textAlign: isRtl ? "right" : "left",
             }}
           >
             <span
               style={{ fontSize: 12, color: "var(--text3)", fontWeight: 600 }}
             >
-              {t("createOrder.originalPrice", "Original Price")}
+              {t("readyMade.originalPrice", "Original Price")}
             </span>
             <span
-              style={{ fontSize: 15, fontWeight: 700, color: "var(--text2)" }}
+              style={{
+                fontSize: 15,
+                fontWeight: 700,
+                color: "var(--text2)",
+                direction: "ltr",
+                unicodeBidi: "isolate",
+              }}
             >
               {formatCurrency(
                 Number(

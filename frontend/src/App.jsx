@@ -10,10 +10,12 @@ import {
 } from "./components/ProtectedRoute.jsx";
 import { useAuth } from "./context/AuthContext.jsx";
 import ScrollToTop from "./components/ScrollToTop.jsx";
+import SystemHorizontalScrollbars from "./components/SystemHorizontalScrollbars.jsx";
 
 const Layout = lazy(() => import("./components/Layout.jsx"));
 const WorkerLayout = lazy(() => import("./components/WorkerLayout.jsx"));
 const WorkerPanel = lazy(() => import("./pages/WorkerPanel.jsx"));
+const WorkerDashboard = lazy(() => import("./pages/WorkerDashboard.jsx"));
 const Login = lazy(() => import("./pages/Login.jsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.jsx"));
 const CreateOrder = lazy(() => import("./pages/CreateOrder.jsx"));
@@ -56,6 +58,7 @@ const OtherItems = lazy(() => import("./pages/OtherItems.jsx"));
 const ItemSalesRecords = lazy(() => import("./pages/ItemSalesRecords.jsx"));
 const SupportTeam = lazy(() => import("./pages/SupportTeam.jsx"));
 const SuperAdminDashboard = lazy(() => import("./pages/SuperAdminDashboard.jsx"));
+const SuperAdminSettings = lazy(() => import("./pages/SuperAdminSettings.jsx"));
 const TenantSettings = lazy(() => import("./pages/TenantSettings.jsx"));
 const SubscriptionExpired = lazy(() => import("./pages/SubscriptionExpired.jsx"));
 
@@ -79,6 +82,7 @@ export default function App() {
             }}
           >
             <ScrollToTop />
+            <SystemHorizontalScrollbars />
             <Suspense fallback={null}>
               <Routes>
                 {/* Public */}
@@ -108,6 +112,14 @@ export default function App() {
                     element={
                       <RoleRoute roles={["SUPER_ADMIN"]}>
                         <BackupManagement />
+                      </RoleRoute>
+                    }
+                  />
+                  <Route
+                    path="super-admin/settings"
+                    element={
+                      <RoleRoute roles={["SUPER_ADMIN"]}>
+                        <SuperAdminSettings />
                       </RoleRoute>
                     }
                   />
@@ -423,7 +435,9 @@ export default function App() {
                     </WorkerProtectedRoute>
                   }
                 >
-                  <Route index element={<WorkerPanel />} />
+                  <Route index element={<Navigate to="/panel/dashboard" replace />} />
+                  <Route path="dashboard" element={<WorkerDashboard />} />
+                  <Route path="orders" element={<WorkerPanel />} />
                 </Route>
 
                 {/* Fallback */}

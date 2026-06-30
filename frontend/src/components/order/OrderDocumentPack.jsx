@@ -15,6 +15,10 @@ import {
 import { assetUrl } from "../../lib/assets.js";
 import { toAsciiDigits } from "../../lib/normalize.js";
 import { formatCurrency } from "../../lib/currency.js";
+import {
+  getOrderGrossTotal,
+  getOrderNetTotal,
+} from "../../lib/orderFinancials.js";
 import { formatMeters } from "../../lib/meters.js";
 import { resolveRakhtColorHex } from "../../lib/rakhtColors.js";
 import {
@@ -29,7 +33,6 @@ import {
 import {
   getOrderDisplayName as getLocalizedOrderDisplayName,
   getOrderLabelParts as getLocalizedOrderLabelParts,
-  getOrderPrimaryDisplayName as getLocalizedOrderPrimaryDisplayName,
   getOrderTypeLabel as getLocalizedOrderTypeLabel,
 } from "../../lib/orderType.js";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -212,13 +215,8 @@ function getOrderLabelParts(order, language, options) {
   return getLocalizedOrderLabelParts(order, language, options);
 }
 
-function getOrderPrimaryDisplayName(order, customerName, language, options) {
-  return getLocalizedOrderPrimaryDisplayName(
-    order,
-    customerName,
-    language,
-    options,
-  );
+function getCustomerDisplayName(customer) {
+  return String(customer?.firstName || "").trim() || "-";
 }
 
 function formatMoney(amount, language) {
@@ -459,6 +457,12 @@ function getPrintableText(value, settings, fallback = "-") {
   return fallback;
 }
 
+function resolvePrintShop(...sources) {
+  return (
+    sources.find((source) => source && typeof source === "object") || null
+  );
+}
+
 function PrintBillHeader({ settings, title, date, time, shop }) {
   const alignClass = settings.isRtl ? "text-right" : "text-left";
   const rowDirClass = settings.isRtl ? "flex-row-reverse" : "flex-row";
@@ -466,7 +470,9 @@ function PrintBillHeader({ settings, title, date, time, shop }) {
     ? "items-end text-right"
     : "items-start text-left";
   const shopName = shop?.businessName || shop?.systemName || PRINT_SHOP_HEADER_NAME;
-  const logoUrl = assetUrl(shop?.logoUrl || SHOP_CONFIG.logoUrl || SHOP_CONFIG.logo || "");
+  const tenantLogoUrl = String(shop?.logoUrl || "").trim();
+  const defaultLogoUrl = SHOP_CONFIG.logoUrl || SHOP_CONFIG.logo || "";
+  const logoUrl = assetUrl(tenantLogoUrl || defaultLogoUrl);
   const shopAddress = shop?.address || getPrintableText(SHOP_CONFIG.address, settings, "");
   const shopPhones = [shop?.phone, shop?.mobile].filter(Boolean);
   const fallbackPhones = SHOP_CONFIG.phones || [];
@@ -565,18 +571,15 @@ export function CustomerBill({ customer, order, shop }) {
   const settings = getBillLanguageSettings(
     i18n.resolvedLanguage || i18n.language,
   );
-  const total = order?.totalPrice || 0;
+  const grossTotal = getOrderGrossTotal(order);
+  const netTotal = getOrderNetTotal(order);
   const discount = order?.discount || 0;
   const paid = order?.paidAmount || 0;
-  const remaining = Math.max(0, order?.remaining ?? total - discount - paid);
+  const remaining = Math.max(0, order?.remaining ?? netTotal - paid);
   const qty = order?.quantity || 1;
   const orderLabelParts = getOrderLabelParts(order, settings.langCode);
   const orderTypeLabel = orderLabelParts.typeWithSequenceLabel;
-  const customerNameLabel = getOrderPrimaryDisplayName(
-    order,
-    customer?.firstName,
-    settings.langCode,
-  );
+  const customerNameLabel = getCustomerDisplayName(customer);
   const { date, time } = getPrintDateTime(
     settings,
     order?.createdAt || Date.now(),
@@ -703,10 +706,10 @@ export function CustomerBill({ customer, order, shop }) {
       header: extraTxt.itemPrice,
       width: "16%",
       align: "[direction:ltr]",
-      show: hasPrintableBillValue(total),
+      show: hasPrintableBillValue(grossTotal),
       className:
         "text-center font-black text-slate-900 [direction:ltr] [unicode-bidi:embed]",
-      render: () => formatMoney(total, settings.langCode),
+      render: () => formatMoney(grossTotal, settings.langCode),
     },
   ].filter((column) => column.show);
   const financeColumns = [
@@ -715,7 +718,7 @@ export function CustomerBill({ customer, order, shop }) {
       header: txt.totalPrice,
       colorClass: "text-blue-900",
       show: true,
-      render: () => formatMoney(total, settings.langCode),
+      render: () => formatMoney(grossTotal, settings.langCode),
     },
     {
       key: "discount",
@@ -891,9 +894,7 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
   const billNo = hasPrintableBillValue(customer?.billNumber)
     ? toEnglishDigits(customer.billNumber)
     : "";
-  const customerName = hasPrintableBillValue(customer?.firstName)
-    ? customer.firstName
-    : "";
+  const customerName = getCustomerDisplayName(customer);
   const customerPhone = hasPrintableBillValue(customer?.phoneNumber)
     ? toEnglishDigits(customer.phoneNumber)
     : "";
@@ -915,24 +916,15 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
         sequenceByType: typeIndex[typeKey],
       },
     );
-    const customerNameLabel = getOrderPrimaryDisplayName(
-      order,
-      customerName,
-      settings.langCode,
-      {
-        totalByType: typeCountTotals[typeKey],
-        sequenceByType: typeIndex[typeKey],
-      },
-    );
-    const totalPrice = Number(order?.totalPrice || 0);
+    const grossTotal = getOrderGrossTotal(order);
     return {
       order,
       index,
       typeKey,
       itemLabel: typeWithSequenceLabel,
-      customerNameLabel,
+      customerNameLabel: customerName,
       qty: Number(order?.quantity || 1),
-      amount: totalPrice,
+      amount: grossTotal,
       boxName:
         order?.box?.boxName ||
         order?.foreignBox?.boxName ||
@@ -943,14 +935,15 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
 
   const totals = safeOrders.reduce(
     (acc, item) => {
-      acc.total += Number(item?.totalPrice || 0);
+      acc.grossTotal += getOrderGrossTotal(item);
+      acc.netTotal += getOrderNetTotal(item);
       acc.discount += Number(item?.discount || 0);
       acc.paid += Number(item?.paidAmount || 0);
       return acc;
     },
-    { total: 0, discount: 0, paid: 0 },
+    { grossTotal: 0, netTotal: 0, discount: 0, paid: 0 },
   );
-  const remaining = Math.max(0, totals.total - totals.discount - totals.paid);
+  const remaining = Math.max(0, totals.netTotal - totals.paid);
   const billIsEmergency = safeOrders.some((order) => order?.isEmergency);
   const alignClass = settings.isRtl ? "text-right" : "text-left";
   const tableHeadClass = settings.isRtl
@@ -1084,7 +1077,7 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
       header: safeExtraTxt("totalAllClothes"),
       colorClass: "text-blue-900",
       show: true,
-      render: () => formatMoney(totals.total, settings.langCode),
+      render: () => formatMoney(totals.grossTotal, settings.langCode),
     },
     {
       key: "discount",
@@ -1349,11 +1342,7 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
   const { date, time } = getPrintDateTime(settings, dateValue);
   const orderLabelParts = getOrderLabelParts(order, settings.langCode);
   const orderTypeLabel = orderLabelParts.typeWithSequenceLabel;
-  const customerNameLabel = getOrderPrimaryDisplayName(
-    order,
-    customer?.firstName,
-    settings.langCode,
-  );
+  const customerNameLabel = getCustomerDisplayName(customer);
   const orderBoxName = order?.box?.boxName || order?.foreignBox?.boxName || "";
   const alignClass = settings.isRtl ? "text-right" : "text-left";
   const tableHeadClass = settings.isRtl
@@ -2109,7 +2098,11 @@ export async function exportPdf(id, filename) {
     pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, width, height);
     pdf.save(filename);
   } catch (error) {
-    toast.error(`PDF export failed: ${error.message}`);
+    toast.error(
+      i18n.t("orders.pdfExportFailed", {
+        defaultValue: "The PDF could not be created. Please try again.",
+      }),
+    );
   }
 }
 
@@ -2132,7 +2125,7 @@ function DetailField({ label, value, Icon }) {
 export function OrderDocumentPack({ customer, order, previewId }) {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
-  const shop = user?.tenant || null;
+  const shop = resolvePrintShop(customer?.tenant, order?.tenant, user?.tenant);
   const settings = getBillLanguageSettings(
     i18n.resolvedLanguage || i18n.language,
   );

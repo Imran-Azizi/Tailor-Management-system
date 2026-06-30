@@ -93,6 +93,11 @@ export const updateOrderSchema = z.object({
   foreignBoxId: z.number().int().optional().nullable(),
 });
 
+export const settleOrderSchema = z.object({
+  receivedAmount: z.number().min(0),
+  deliveryReceive: z.boolean().optional(),
+});
+
 export const updateOrderBillSchema = z.object({
   customerInfo: z.object({
     customerId: optionalText,

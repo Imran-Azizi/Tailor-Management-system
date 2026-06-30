@@ -9,6 +9,12 @@ import {
   resolveReportText,
 } from "./reportLocale.js";
 import {
+  getOrderFinancialPaid,
+  getOrderFinancialRemaining,
+  getOrderFinancialTotal,
+  getOrderGrossTotal,
+} from "./orderFinancials.js";
+import {
   AFGHANISTAN_TIMEZONE,
   getAfghanMonthDateRange,
 } from "./afghanistanDate.js";
@@ -609,7 +615,7 @@ function drawRow(
     width: c.qty.w,
     align: "center",
   });
-  doc.text(fmt(order.totalPrice, language), c.total.x, y + 12, {
+  doc.text(fmt(getOrderGrossTotal(order), language), c.total.x, y + 12, {
     width: c.total.w - 4,
     align: "right",
   });
@@ -776,6 +782,16 @@ function drawDashboardStatsCards(
     {
       label: statLabels.totalLoan,
       value: formatAfCurrency(stats.totalLoan || 0, language, isRtl),
+    },
+    {
+      label:
+        statLabels.totalDamagedClothesMoney ||
+        "Total Money of Damaged Orders",
+      value: formatAfCurrency(
+        stats.totalDamagedClothesMoney || 0,
+        language,
+        isRtl,
+      ),
     },
     {
       label: statLabels.totalQichikarUsersMoney,
@@ -970,15 +986,24 @@ export async function buildMonthlyReportPdf({
         : `${formatRangeDate(monthRange.start, language, isRtl)} - ${formatRangeDate(monthRange.end, language, isRtl)}`
       : "-";
 
-    // ── Totals ──────────────────────────────────────────────────────────────
-    const totalRevenue = safeOrders.reduce(
-      (s, o) => s + (o.totalPrice || 0),
+    // Totals exclude damaged orders from normal financial summaries.
+    const financialOrders = safeOrders.filter(
+      (order) => !Boolean(order?.isDamageOrder),
+    );
+    const totalRevenue = financialOrders.reduce(
+      (sum, order) => sum + getOrderFinancialTotal(order),
       0,
     );
-    const totalDiscount = safeOrders.reduce((s, o) => s + (o.discount || 0), 0);
-    const totalPaid = safeOrders.reduce((s, o) => s + (o.paidAmount || 0), 0);
-    const totalRemaining = safeOrders.reduce(
-      (s, o) => s + (o.remaining || 0),
+    const totalDiscount = financialOrders.reduce(
+      (s, o) => s + (o.discount || 0),
+      0,
+    );
+    const totalPaid = financialOrders.reduce(
+      (s, o) => s + getOrderFinancialPaid(o),
+      0,
+    );
+    const totalRemaining = financialOrders.reduce(
+      (s, o) => s + getOrderFinancialRemaining(o),
       0,
     );
     // Header
@@ -1080,6 +1105,7 @@ export async function buildMonthlyReportPdf({
         netBenefit: totalRevenue,
         totalRakhtPrice: 0,
         totalLoan: 0,
+        totalDamagedClothesMoney: 0,
         totalQichikarUsersMoney: 0,
         totalDokhtUsersMoney: 0,
         emergencyOrders: 0,

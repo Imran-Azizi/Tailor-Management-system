@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { LuCheck } from "react-icons/lu";
+import { LuArrowLeft, LuCheck, LuLockKeyhole } from "react-icons/lu";
 import toast from "react-hot-toast";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
@@ -16,6 +16,11 @@ import Step2OrderTypes from "../components/order/Step2OrderTypes.jsx";
 import Step3Measurements from "../components/order/Step3Measurements.jsx";
 import Step4Billing from "../components/order/Step4Billing.jsx";
 import { getMeasurementsFromOrder } from "../components/order/OrderDocumentPack.jsx";
+import { isRtlLanguage } from "../lib/locale.js";
+import {
+  getCompletedOrderProtection,
+  formatRemainingTime,
+} from "../lib/orderProtection.js";
 
 const NUMERIC_MEASUREMENT_FIELDS = new Set([
   "height",
@@ -137,15 +142,21 @@ export default function EditOrder() {
   useEffect(() => {
     if (!data?.customer || !Array.isArray(data?.orders)) return;
     const { customer, orders } = data;
+    const requestedOrder = orders.find((order) => order.id === id);
+    if (requestedOrder?.isCompleted) {
+      setForm(null);
+      return;
+    }
+    const editableOrders = orders.filter((order) => !order.isCompleted);
     const byType = new Map();
 
-    orders.forEach((order) => {
+    editableOrders.forEach((order) => {
       const list = byType.get(order.type) || [];
       list.push(order);
       byType.set(order.type, list);
     });
 
-    const emergencyOrder = orders.find((o) => o.isEmergency);
+    const emergencyOrder = editableOrders.find((o) => o.isEmergency);
     const emergencyDate = emergencyOrder?.emergencyExpiry
       ? new Date(emergencyOrder.emergencyExpiry)
       : null;
@@ -196,12 +207,14 @@ export default function EditOrder() {
     });
 
     const orderItems = buildOrderItems(orderTypes, measurements);
-    const orderById = new Map(orders.map((order) => [order.id, order]));
+    const orderById = new Map(
+      editableOrders.map((order) => [order.id, order]),
+    );
     const rakhtSelections = orderItems
       .map((item) => {
         const source =
           orderById.get(item.orderId) ||
-          orders.find((order) => order.type === item.type) ||
+          editableOrders.find((order) => order.type === item.type) ||
           null;
         if (!source) return null;
         return {
@@ -239,9 +252,9 @@ export default function EditOrder() {
       orderItems,
       rakhtSelections,
       billing,
-      existingBill: data,
+      existingBill: { ...data, orders: editableOrders },
     });
-  }, [data]);
+  }, [data, id]);
 
   const merge = (d) => setForm((prev) => ({ ...(prev || {}), ...d }));
   const next = (d) => {
@@ -325,13 +338,72 @@ export default function EditOrder() {
     }
   };
 
-  if (isLoading || !form) return <Spinner />;
+  const completedOrder = data?.orders?.find((order) => order.id === id);
+  const language = i18n.resolvedLanguage || i18n.language || "en";
+  const isRtl = isRtlLanguage(language);
+  const completedProtection = getCompletedOrderProtection(completedOrder);
+
+  if (isLoading) return <Spinner />;
+
+  if (completedProtection.isProtected && completedProtection.isExpired) {
+    return (
+      <div
+        className="page completed-order-lock-page"
+        dir={isRtl ? "rtl" : "ltr"}
+      >
+        <div className="completed-order-lock-card" role="alert">
+          <span className="completed-order-lock-icon" aria-hidden="true">
+            <LuLockKeyhole size={28} />
+          </span>
+          <h1>{t("orders.completedOrderLockedTitle")}</h1>
+          <p>
+            {t("orders.completedEditExpired", {
+              defaultValue: "The 24-hour edit window for this completed order has expired.",
+            })}
+          </p>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => navigate("/orders")}
+          >
+            <LuArrowLeft size={16} />
+            {t("orders.backToAllOrders")}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!form) return <Spinner />;
 
   return (
     <div
       className="page create-order-shell"
       style={{ maxWidth: 920, margin: "0 auto" }}
     >
+      {completedProtection.isProtected && completedProtection.canEdit && (
+        <div
+          style={{
+            background: "rgba(245, 158, 11, 0.1)",
+            border: "1px solid rgba(245, 158, 11, 0.3)",
+            borderRadius: 8,
+            padding: "10px 16px",
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 13,
+            fontWeight: 600,
+            color: "#D97706",
+          }}
+        >
+          <LuLockKeyhole size={14} />
+          {t("orders.completedEditWindowRemaining", {
+            time: formatRemainingTime(completedProtection.remainingMs),
+            defaultValue: `Edit window expires in ${formatRemainingTime(completedProtection.remainingMs)}`,
+          })}
+        </div>
+      )}
       <div
         className="step-progress-wrap"
         style={{ display: "flex", alignItems: "center", marginBottom: 32 }}

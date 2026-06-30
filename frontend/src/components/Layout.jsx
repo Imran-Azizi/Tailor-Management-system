@@ -3,6 +3,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import Sidebar from "./Sidebar.jsx";
 import Navbar from "./Navbar.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 
 const SIDEBAR_COLLAPSED_KEY = "layout:sidebar-collapsed";
 
@@ -15,6 +16,8 @@ function getInitialCollapsed() {
 }
 
 const TITLES = {
+  "/super-admin/settings": "superAdminSettings.title",
+  "/super-admin": "superAdmin.title",
   "/dashboard": "common.dashboard",
   "/orders/create": "common.createOrder",
   "/orders/global-search": "globalSearch.title",
@@ -47,6 +50,7 @@ const SORTED_TITLE_ENTRIES = Object.entries(TITLES).sort(
 
 export default function Layout() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [collapsed, setCollapsed] = useState(getInitialCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
   const loc = useLocation();
@@ -77,6 +81,7 @@ export default function Layout() {
     SORTED_TITLE_ENTRIES.find(
       ([p]) => loc.pathname === p || loc.pathname.startsWith(`${p}/`),
     )?.[1] || "appName";
+  const isSuperAdmin = user?.accountType === "SUPER_ADMIN";
 
   return (
     <>
@@ -90,7 +95,11 @@ export default function Layout() {
         className={`sb-overlay${mobileOpen ? " on" : ""}`}
         onClick={closeMobileSidebar}
       />
-      <div className={`app-shell${collapsed ? " collapsed" : ""}`}>
+      <div
+        className={`app-shell${collapsed ? " collapsed" : ""}${
+          isSuperAdmin ? " superadmin-shell" : ""
+        }`}
+      >
         <Navbar
           onHamburger={toggleMobileSidebar}
           pageTitle={t(titleKey)}

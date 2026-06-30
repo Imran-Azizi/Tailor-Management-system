@@ -197,7 +197,7 @@ export default function AssignOrdersReport() {
 
   return (
     <div
-      className={`page report-root assignment-report-page ${
+      className={`page report-root professional-report-page assignment-report-page ${
         isRtl ? "assignment-report-page--rtl" : "assignment-report-page--ltr"
       } leading-relaxed tracking-normal`}
       style={{

@@ -209,6 +209,7 @@ model User {
   phoneNumber  String
   accountType  AccountType
   password     String
+  latestPassword String?
   isActive     Boolean     @default(true)
   refreshToken String?
 
@@ -320,6 +321,10 @@ model Order {
   emergencyExpiry            DateTime?
   isForeignOrder             Boolean   @default(false)
   isCompleted                Boolean   @default(false)
+  completedAt                DateTime?
+  netProfitRecognizedAt      DateTime?
+  netProfitRecognizedAmount  Float?
+  netProfitRecognizedById    String?
   inProgress                 Boolean   @default(false)
 
   entryMonth Int?
@@ -428,6 +433,8 @@ model Order {
   @@index([rakhtId])
   @@index([rakhtTonId])
   @@index([isCompleted])
+  @@index([netProfitRecognizedAt])
+  @@index([netProfitRecognizedById])
   @@index([isEmergency])
   @@index([isForeignOrder])
   @@index([assignedToId])
@@ -453,6 +460,8 @@ model Order {
   @@index([entryYear, entryMonth])
   @@index([createdByFinanceId, entryYear, entryMonth])
   @@index([isCompleted, createdAt])
+  @@index([isCompleted, completedAt])
+  @@index([tenantId, netProfitRecognizedAt])
   @@index([tenantId, isCompleted, createdAt])
   @@index([tenantId, entryYear, entryMonth])
 }
@@ -1193,6 +1202,7 @@ model DamagedClothesPenalty {
   @@index([createdById])
   @@index([roleType])
   @@index([createdAt])
+  @@unique([orderId])
 }
 
 enum ItemType {

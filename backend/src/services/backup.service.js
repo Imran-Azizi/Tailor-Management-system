@@ -168,12 +168,20 @@ function ensureInside(root, target) {
   return resolvedTarget;
 }
 
-function normalizeKey(key) {
-  return String(key || "").replace(/\\/g, "/").replace(/\.\./g, "");
-}
-
 function storagePathFromKey(storageKey) {
-  return ensureInside(BACKUP_ROOT, path.join(BACKUP_ROOT, normalizeKey(storageKey)));
+  const rawKey = String(storageKey || "").trim().replace(/\\/g, "/");
+  const segments = rawKey.split("/");
+  if (
+    !rawKey ||
+    rawKey.includes("\0") ||
+    path.posix.isAbsolute(rawKey) ||
+    /^[a-zA-Z]:/.test(rawKey) ||
+    segments.some((segment) => segment === "..")
+  ) {
+    throw Object.assign(new Error("Invalid backup storage key."), { status: 400 });
+  }
+  const normalizedKey = path.posix.normalize(rawKey).replace(/^\.\/+/, "");
+  return ensureInside(BACKUP_ROOT, path.join(BACKUP_ROOT, normalizedKey));
 }
 
 function relativeStorageKey(filePath) {
@@ -275,8 +283,8 @@ async function sendBackupEmail({ record, filePath, manifest }) {
   return { status: "SENT", message: "Email sent." };
 }
 
-async function writeAudit({ req, action, entityId, metadata, tenantId = null }) {
-  await prisma.auditLog.create({
+async function writeAudit({ req, action, entityId, metadata, tenantId = null, client = prisma }) {
+  await client.auditLog.create({
     data: {
       tenantId,
       actorId: req?.user?.id,
@@ -288,6 +296,94 @@ async function writeAudit({ req, action, entityId, metadata, tenantId = null }) 
       userAgent: req?.headers?.["user-agent"],
     },
   });
+}
+
+async function permanentlyDeleteBackupFile(record) {
+  const filePath = storagePathFromKey(record.storageKey);
+  let fileWasMissing = false;
+
+  try {
+    const fileStat = await fsp.lstat(filePath);
+    if (fileStat.isDirectory()) {
+      throw Object.assign(new Error("Backup storage path points to a directory."), {
+        status: 409,
+      });
+    }
+    await fsp.unlink(filePath);
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      fileWasMissing = true;
+    } else {
+      throw Object.assign(
+        new Error(`Could not permanently delete backup file: ${error?.message || "Unknown storage error."}`),
+        { status: error?.status || 500, cause: error },
+      );
+    }
+  }
+
+  try {
+    await fsp.lstat(filePath);
+    throw Object.assign(new Error("Backup file still exists after deletion."), { status: 500 });
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+
+  return {
+    filePath,
+    fileDeleted: !fileWasMissing,
+    fileWasMissing,
+  };
+}
+
+export async function prepareTenantBackupDeletion(tenantId) {
+  const records = await prisma.backupRecord.findMany({
+    where: { scopeType: "TENANT", scopeId: tenantId },
+    select: { id: true, backupId: true, storageKey: true },
+  });
+  const stagedFiles = [];
+
+  try {
+    for (const record of records) {
+      const originalPath = storagePathFromKey(record.storageKey);
+      const stagedPath = `${originalPath}.deleting-${crypto.randomUUID()}`;
+      try {
+        const stat = await fsp.lstat(originalPath);
+        if (stat.isDirectory()) {
+          throw Object.assign(new Error("Tenant backup path points to a directory."), { status: 409 });
+        }
+        await fsp.rename(originalPath, stagedPath);
+        stagedFiles.push({ originalPath, stagedPath, backupId: record.backupId });
+      } catch (error) {
+        if (error?.code !== "ENOENT") throw error;
+      }
+    }
+  } catch (error) {
+    await Promise.allSettled(
+      stagedFiles.map(({ originalPath, stagedPath }) => fsp.rename(stagedPath, originalPath)),
+    );
+    throw error;
+  }
+
+  return {
+    recordIds: records.map((record) => record.id),
+    async rollback() {
+      await Promise.allSettled(
+        stagedFiles.map(({ originalPath, stagedPath }) => fsp.rename(stagedPath, originalPath)),
+      );
+    },
+    async commit() {
+      const results = await Promise.allSettled(
+        stagedFiles.map(({ stagedPath }) => fsp.unlink(stagedPath)),
+      );
+      return results
+        .map((result, index) => ({ result, file: stagedFiles[index] }))
+        .filter(({ result }) => result.status === "rejected")
+        .map(({ result, file }) => ({
+          backupId: file.backupId,
+          error: result.reason?.message || "Could not remove staged backup file.",
+        }));
+    },
+  };
 }
 
 function sanitizeRowForExport(model, row, { includeSecrets = true } = {}) {
@@ -578,7 +674,7 @@ async function saveArchive({ type, scope, data, req, optionsOverride = {} }) {
 export async function createBackup({ trigger = "manual", initiatedBy = "system", req = null } = {}) {
   const data = await fullSystemData();
   return saveArchive({
-    type: trigger === "scheduled" ? "SYSTEM_BACKUP" : "SYSTEM_BACKUP",
+    type: trigger === "scheduled" ? "DAILY_BACKUP" : "SYSTEM_BACKUP",
     scope: { type: "SYSTEM", name: "All System" },
     data,
     req: req || { user: { id: initiatedBy, name: initiatedBy } },
@@ -665,14 +761,37 @@ export async function getTenantUsers(tenantId) {
 }
 
 export async function deleteBackup(keyOrId, { req } = {}) {
-  const record = await findBackupRecord(keyOrId);
-  const filePath = storagePathFromKey(record.storageKey);
-  await fsp.unlink(filePath).catch((error) => {
-    if (error.code !== "ENOENT") throw error;
+  const identifier = String(keyOrId || "").trim();
+  if (!identifier || identifier.length > 500) {
+    throw Object.assign(new Error("A valid backup id is required."), { status: 400 });
+  }
+
+  const record = await findBackupRecord(identifier);
+  const fileResult = await permanentlyDeleteBackupFile(record);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.backupRecord.delete({ where: { id: record.id } });
+    await writeAudit({
+      req,
+      client: tx,
+      action: "BACKUP_DELETED",
+      entityId: record.backupId,
+      metadata: {
+        fileName: record.fileName,
+        storageKey: record.storageKey,
+        sizeBytes: record.sizeBytes,
+        fileDeleted: fileResult.fileDeleted,
+        fileWasMissing: fileResult.fileWasMissing,
+      },
+    });
   });
-  await prisma.backupRecord.delete({ where: { id: record.id } });
-  await writeAudit({ req, action: "BACKUP_DELETED", entityId: record.backupId, metadata: { fileName: record.fileName } });
-  return { success: true };
+
+  return {
+    success: true,
+    backupId: record.backupId,
+    fileDeleted: fileResult.fileDeleted,
+    fileWasMissing: fileResult.fileWasMissing,
+  };
 }
 
 async function findBackupRecord(keyOrId) {
@@ -921,9 +1040,12 @@ export async function cleanupExpiredBackups() {
   const oldRecords = await prisma.backupRecord.findMany({ where: { createdAt: { lt: cutoff } } });
   let deleted = 0;
   for (const record of oldRecords) {
-    await fsp.unlink(storagePathFromKey(record.storageKey)).catch(() => {});
-    await prisma.backupRecord.delete({ where: { id: record.id } }).catch(() => {});
-    deleted += 1;
+    try {
+      await deleteBackup(record.id);
+      deleted += 1;
+    } catch (error) {
+      console.error(`[Backup] Failed to delete expired backup ${record.backupId}:`, error?.message || error);
+    }
   }
   return deleted;
 }

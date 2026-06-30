@@ -29,6 +29,7 @@ import {
 import { useTranslation } from "react-i18next";
 import api from "../lib/api.js";
 import { formatCurrency } from "../lib/currency.js";
+import { getOrderGrossTotal } from "../lib/orderFinancials.js";
 import {
   formatAfghanistanReportDate,
   formatDateLocale,
@@ -69,6 +70,8 @@ function formatMoney(value, language) {
 }
 
 function getOrderRevenue(order) {
+  if (order?.isDamageOrder) return 0;
+
   const finalTotalBenefit = Number(order?.finalTotalBenefit);
   if (Number.isFinite(finalTotalBenefit)) return finalTotalBenefit;
 
@@ -202,10 +205,6 @@ export default function Dashboard() {
         "Other Items Total Profit",
       ),
       value: formatMoney(otherItemsTotalProfit, language),
-      sub: t(
-        "dashboardPage.otherItemsTotalProfitSub",
-        "From item sales records",
-      ),
       Icon: LuFactory,
       accent: "#F59E42",
       adminOnly: true,
@@ -217,7 +216,6 @@ export default function Dashboard() {
       key: "totalOrders",
       label: t("dashboardPage.totalOrders"),
       value: formatNumberLocale(data.totalOrders || 0, language),
-      sub: `${t("dashboardPage.today")}: ${formatNumberLocale(data.todayOrders || 0, language)} | ${t("dashboardPage.month")}: ${formatNumberLocale(data.monthOrders || 0, language)}`,
       Icon: LuShoppingBag,
       accent: "#2563EB",
       ltrOrder: 1,
@@ -227,7 +225,6 @@ export default function Dashboard() {
       key: "completedOrders",
       label: t("common.completedOrders", "Completed Orders"),
       value: formatNumberLocale(data.completedOrders || 0, language),
-      sub: t("sidebar.completed", "Completed"),
       Icon: LuCircleCheck,
       accent: "#16A34A",
       onClick: () => navigate("/orders/completed"),
@@ -238,7 +235,6 @@ export default function Dashboard() {
       key: "pendingOrders",
       label: t("common.pendingOrders", "Pending Orders"),
       value: formatNumberLocale(data.allPendingOrders || 0, language),
-      sub: `${t("dashboardPage.month")}: ${formatNumberLocale(data.pendingOrders || 0, language)}`,
       Icon: LuClock,
       accent: "#D97706",
       onClick: () => navigate("/orders/pending"),
@@ -248,10 +244,10 @@ export default function Dashboard() {
     {
       key: "totalAmount",
       label: t("dashboardPage.totalAmount"),
-      value: formatMoney(data.totalRevenue, language),
-      sub: t("dashboardPage.yearOrders", {
-        count: formatNumberLocale(data.yearOrders || 0, language),
-      }),
+      value: formatMoney(
+        data.totalGrossOrderPrice ?? data.totalRevenue ?? 0,
+        language,
+      ),
       Icon: AfCurrencyIcon,
       accent: "#0891B2",
       ltrOrder: 4,
@@ -261,22 +257,33 @@ export default function Dashboard() {
       key: "collected",
       label: t("dashboardPage.collected"),
       value: formatMoney(data.totalPaid, language),
-      sub: `${t("dashboardPage.discount")}: ${formatMoney(data.totalDiscount, language)}`,
       Icon: AfCurrencyIcon,
       accent: "#0891B2",
       ltrOrder: 5,
       rtlOrder: 5,
     },
     {
+      key: "totalDiscounts",
+      label: t("dashboardPage.totalDiscounts", "Total Discounts"),
+      value: formatMoney(
+        data.totalDiscountAllOrders ?? data.totalDiscount ?? 0,
+        language,
+      ),
+      Icon: AfCurrencyIcon,
+      accent: "#9333EA",
+      adminOnly: true,
+      ltrOrder: 6,
+      rtlOrder: 6,
+    },
+    {
       key: "outstanding",
       label: t("dashboardPage.outstanding"),
       value: formatMoney(data.totalRemaining, language),
-      sub: t("dashboardPage.remainingBalance"),
       Icon: AfCurrencyIcon,
       accent: "#DC2626",
       onClick: () => navigate("/orders/remaining"),
-      ltrOrder: 6,
-      rtlOrder: 6,
+      ltrOrder: 7,
+      rtlOrder: 7,
     },
     {
       key: "rakhtRevenue",
@@ -284,9 +291,6 @@ export default function Dashboard() {
         defaultValue: "Total Rakht Revenue",
       }),
       value: formatMoney(totalRakhtRevenue, language),
-      sub: t("rakht.totalRevenueSubtitle", {
-        defaultValue: "Revenue from fabric sales to customers",
-      }),
       Icon: AfCurrencyIcon,
       accent: "#0F766E",
       adminOnly: true,
@@ -300,7 +304,6 @@ export default function Dashboard() {
         defaultValue: "Total Order Benefit",
       }),
       value: formatMoney(totalOrderBenefit, language),
-      sub: t("common.total", "Total"),
       Icon: AfCurrencyIcon,
       accent: "#7C3AED",
       adminOnly: true,
@@ -314,9 +317,6 @@ export default function Dashboard() {
         defaultValue: "Total Ready-Made Profit (After Expenses)",
       }),
       value: formatMoney(totalReadyMadeProfitAfterExpenses, language),
-      sub: t("dashboardPage.afterAllExpenses", {
-        defaultValue: "After all expenses",
-      }),
       Icon: AfCurrencyIcon,
       accent: "#059669",
       adminOnly: true,
@@ -330,9 +330,6 @@ export default function Dashboard() {
         defaultValue: "Total Ready-Made Waskat Profit (After Expenses)",
       }),
       value: formatMoney(totalReadyMadeWaskatProfitAfterExpenses, language),
-      sub: t("dashboardPage.afterAllExpenses", {
-        defaultValue: "After all expenses",
-      }),
       Icon: AfCurrencyIcon,
       accent: "#0284C7",
       adminOnly: true,
@@ -347,9 +344,6 @@ export default function Dashboard() {
         "Total Expenses",
       ),
       value: formatMoney(totalExpenses, language),
-      sub: t("dashboardPage.totalExpensesSub", {
-        defaultValue: "Daily expenses deducted from net profit",
-      }),
       Icon: AfCurrencyIcon,
       accent: "#2563EB",
       onClick: () => navigate("/daily-tasks/all"),
@@ -360,12 +354,25 @@ export default function Dashboard() {
       key: "totalLoan",
       label: t("dashboardPage.totalLoan", "Total Loan"),
       value: formatMoney(data.totalLoan ?? 0, language),
-      sub: t("transaction.loanOption", "Loan"),
       Icon: AfCurrencyIcon,
       accent: "#D97706",
       onClick: () => navigate("/transactions?kind=LOAN"),
       ltrOrder: 31,
       rtlOrder: 31,
+    },
+    {
+      key: "damagedClothesMoney",
+      label: t(
+        "dashboardPage.damagedClothesMoney",
+        "Total Money of Damaged Orders",
+      ),
+      value: formatMoney(data.totalDamagedClothesMoney ?? 0, language),
+      Icon: AfCurrencyIcon,
+      accent: "#B91C1C",
+      adminOnly: true,
+      onClick: () => navigate("/damaged-clothes"),
+      ltrOrder: 32,
+      rtlOrder: 32,
     },
     {
       key: "qichikarMoney",
@@ -374,7 +381,6 @@ export default function Dashboard() {
         "Total Money for Qichikar Workers",
       ),
       value: formatMoney(data.totalQichikarUsersMoney ?? 0, language),
-      sub: t("assignment.qichikarLabel", "Qichikar"),
       Icon: AfCurrencyIcon,
       accent: "#DB2777",
       onClick: () => navigate("/orders/completed-workers?workerRole=QICHIKAR"),
@@ -388,7 +394,6 @@ export default function Dashboard() {
         "Total Money for Dokht Workers",
       ),
       value: formatMoney(data.totalDokhtUsersMoney ?? 0, language),
-      sub: t("assignment.dokhtLabel", "Dokht"),
       Icon: AfCurrencyIcon,
       accent: "#7C3AED",
       onClick: () => navigate("/orders/completed-workers?workerRole=DOKHT"),
@@ -399,26 +404,22 @@ export default function Dashboard() {
       key: "emergency",
       label: t("dashboardPage.emergency"),
       value: formatNumberLocale(data.emergencyOrders || 0, language),
-      sub: t("dashboardPage.active"),
       Icon: LuTriangleAlert,
       accent: "#DC2626",
       hideWhenZero: true,
-      ltrOrder: 7,
-      rtlOrder: 7,
+      ltrOrder: 8,
+      rtlOrder: 8,
     },
     {
       key: "damagedClothes",
       label: t("dashboardPage.damagedClothes", "Damaged Clothes"),
       value: formatNumberLocale(data.damagedClothesTotal || 0, language),
-      sub: t("dashboardPage.damagedClothesSub", {
-        defaultValue: "Recorded damaged clothes cases",
-      }),
       Icon: LuShieldAlert,
       accent: "#B91C1C",
       adminOnly: true,
       onClick: () => navigate("/damaged-clothes"),
-      ltrOrder: 8,
-      rtlOrder: 8,
+      ltrOrder: 9,
+      rtlOrder: 9,
     },
   ];
 
@@ -479,7 +480,7 @@ export default function Dashboard() {
       width: "10rem",
       isNumeric: true,
       cellClassName: "whitespace-nowrap font-medium",
-      render: (order) => formatMoney(order.totalPrice, language),
+      render: (order) => formatMoney(getOrderGrossTotal(order), language),
     },
     {
       key: "revenue",
@@ -567,7 +568,7 @@ export default function Dashboard() {
 
   return (
     <div
-      className={`page report-root dashboard-shell leading-relaxed tracking-normal ${
+      className={`page report-root professional-report-page dashboard-shell leading-relaxed tracking-normal ${
         isRtl ? "dashboard-shell--rtl" : "dashboard-shell--ltr"
       }`}
       dir={isRtl ? "rtl" : "ltr"}
@@ -602,10 +603,6 @@ export default function Dashboard() {
           className="md:col-span-2 xl:col-span-3"
           label={t("dashboardPage.netBenefit", "Net Benefit")}
           value={formatMoney(netBenefit, language)}
-          sub={t(
-            "dashboardPage.netBenefitSub",
-            "Total Revenue - Total Expenses",
-          )}
           Icon={AfCurrencyIcon}
           accent={netBenefitIsPositive ? "#16A34A" : "#DC2626"}
           emphasize
@@ -616,7 +613,6 @@ export default function Dashboard() {
             key={card.key}
             label={card.label}
             value={card.value}
-            sub={card.sub}
             Icon={card.Icon}
             accent={card.accent}
             onClick={card.onClick}

@@ -27,9 +27,16 @@ export default function ReportRoot({
     : "'Inter', 'Segoe UI', Arial, sans-serif";
   return (
     <div
-      className={`report-root ${className}`}
+      className={`report-root professional-report-page ${className}`.trim()}
+      dir={isRtl ? "rtl" : "ltr"}
+      lang={
+        isRtl
+          ? l.startsWith("pashto") || l.startsWith("ps")
+            ? "ps-AF"
+            : "fa-AF"
+          : "en"
+      }
       style={{
-        direction: isRtl ? "rtl" : "ltr",
         textAlign: isRtl ? "right" : "left",
         fontFamily,
         ...style,

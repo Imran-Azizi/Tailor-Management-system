@@ -128,6 +128,28 @@ const buildDamagedAssignmentNotification = ({
     `Note: ${reason || "Damaged clothes record assigned to you."}`,
   ].join(" | ");
 
+const toAuditIso = (value) => {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+};
+
+const buildOrderFinancialSnapshot = (order) => ({
+  totalPrice: Number(order?.totalPrice || 0),
+  discount: Number(order?.discount || 0),
+  paidAmount: Number(order?.paidAmount || 0),
+  remaining: Number(order?.remaining || 0),
+  totalBenefit: Number(order?.totalBenefit || 0),
+  isCompleted: Boolean(order?.isCompleted),
+  completedAt: toAuditIso(order?.completedAt),
+  netProfitRecognizedAt: toAuditIso(order?.netProfitRecognizedAt),
+  netProfitRecognizedAmount:
+    order?.netProfitRecognizedAmount == null
+      ? null
+      : Number(order.netProfitRecognizedAmount),
+  netProfitRecognizedById: order?.netProfitRecognizedById || null,
+});
+
 export const getWorkersByRole = async (roleType) => {
   if (!WORKER_ROLES.includes(roleType)) {
     throw Object.assign(new Error("Invalid worker role."), { status: 400 });
@@ -478,7 +500,9 @@ export const createDamagedClothesPenalty = async (
     totalExpense: orderExpense.totalExpense,
   });
 
-  const result = await prisma.$transaction(async (tx) => {
+  let result;
+  try {
+    result = await prisma.$transaction(async (tx) => {
     const existingOrderPenalty = await tx.damagedClothesPenalty.findFirst({
       where: { orderId },
       include: { user: { select: USER_SELECT } },
@@ -499,11 +523,29 @@ export const createDamagedClothesPenalty = async (
     const paymentStatusOrder = await tx.order.findUnique({
       where: { id: orderId },
       select: {
+        id: true,
+        tenantId: true,
+        billNumber: true,
+        totalPrice: true,
+        discount: true,
+        paidAmount: true,
+        remaining: true,
+        totalBenefit: true,
+        isCompleted: true,
+        completedAt: true,
+        netProfitRecognizedAt: true,
+        netProfitRecognizedAmount: true,
+        netProfitRecognizedById: true,
         dokhtPaymentStatus: true,
         qichikarPaymentStatus: true,
         workerPaymentStatus: true,
       },
     });
+    if (!paymentStatusOrder) {
+      throw Object.assign(new Error("Order not found."), { status: 404 });
+    }
+    const financialSnapshotBefore =
+      buildOrderFinancialSnapshot(paymentStatusOrder);
     const workerPaymentStatus = getRolePaymentStatusForOrder(
       paymentStatusOrder,
       roleType,
@@ -515,7 +557,7 @@ export const createDamagedClothesPenalty = async (
         userId,
         orderId,
         kind: "LOAN",
-        source: "MANUAL",
+        source: "DAMAGE_PENALTY",
         amount: Number(orderExpense.totalExpense),
         transactionDate: now,
         note,
@@ -553,6 +595,49 @@ export const createDamagedClothesPenalty = async (
       },
     });
 
+    await tx.order.update({
+      where: { id: orderId },
+      data: {
+        totalBenefit: 0,
+        netProfitRecognizedAt: null,
+        netProfitRecognizedAmount: null,
+        netProfitRecognizedById: null,
+        isEmergency: false,
+        emergencyExpiry: null,
+        inProgress: false,
+        qichikarInProgress: false,
+        dokhtInProgress: false,
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        tenantId: paymentStatusOrder.tenantId || null,
+        actorId: adminUserId || null,
+        action: "DAMAGED_ORDER_FINANCIAL_RESET",
+        entity: "Order",
+        entityId: orderId,
+        metadata: {
+          billNumber:
+            orderExpense.billNumber ?? paymentStatusOrder.billNumber ?? null,
+          roleType,
+          assignedUserId: userId,
+          penaltyId: penalty.id,
+          transactionId: transaction.id,
+          financialSnapshotBefore,
+          financialSnapshotAfter: {
+            ...financialSnapshotBefore,
+            totalBenefit: 0,
+            netProfitRecognizedAt: null,
+            netProfitRecognizedAmount: null,
+            netProfitRecognizedById: null,
+          },
+          excludedFromNormalFinancialSummaries: true,
+          preservedInDamagedClothesRecords: true,
+        },
+      },
+    });
+
     await tx.userNotification.create({
       data: {
         userId,
@@ -572,7 +657,33 @@ export const createDamagedClothesPenalty = async (
       penalty,
       orderExpense,
     };
-  });
+    });
+  } catch (error) {
+    const uniqueTarget = Array.isArray(error?.meta?.target)
+      ? error.meta.target
+      : [];
+    if (error?.code === "P2002" && uniqueTarget.includes("orderId")) {
+      const existingOrderPenalty = await prisma.damagedClothesPenalty.findFirst({
+        where: { orderId },
+        include: { user: { select: USER_SELECT } },
+      });
+      throw Object.assign(
+        new Error(buildDuplicateMessage(existingOrderPenalty)),
+        {
+          status: 409,
+          code: "DUPLICATE_DAMAGED_CLOTHES_PENALTY",
+          existingPenalty: existingOrderPenalty
+            ? {
+                id: existingOrderPenalty.id,
+                workerName: existingOrderPenalty.user?.name || null,
+                roleType: existingOrderPenalty.roleType,
+              }
+            : null,
+        },
+      );
+    }
+    throw error;
+  }
 
   return result;
 };
@@ -675,9 +786,9 @@ export const getMyDamagedClothesPenalties = async (
   const data = rows.map((penalty) => {
     const order = penalty.order;
     const orderStatus = "DAMAGE_ORDER";
-    const totalOrderPrice = Number(order?.totalPrice || 0);
+    const grossOrderPrice = Number(order?.totalPrice || 0);
     const discount = Number(order?.discount || 0);
-    const finalPayable = totalOrderPrice - discount;
+    const finalPayable = Math.max(0, grossOrderPrice - discount);
     const extraExpense = Math.max(
       0,
       Number(penalty.totalExpense || 0) -
@@ -697,7 +808,8 @@ export const getMyDamagedClothesPenalties = async (
       createdAt: penalty.createdAt,
       createdBy: penalty.createdBy,
       // billing (customer-facing)
-      totalOrderPrice,
+      grossOrderPrice,
+      totalOrderPrice: finalPayable,
       discount,
       paidAmount: Number(order?.paidAmount || 0),
       remaining: Number(order?.remaining || 0),

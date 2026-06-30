@@ -12,6 +12,11 @@ import {
   subScaled,
   addScaled,
 } from "../lib/decimal.js";
+import {
+  getOrderFinancialPaid,
+  getOrderFinancialRemaining,
+  getOrderFinancialTotal,
+} from "../lib/orderFinancials.js";
 
 const AFGHAN_MONTH_LABELS_EN = [
   "January",
@@ -27,6 +32,47 @@ const AFGHAN_MONTH_LABELS_EN = [
   "November",
   "December",
 ];
+
+const NON_DAMAGED_ORDER_WHERE = {
+  damagedClothesPenalties: { none: {} },
+};
+
+const withNonDamagedOrders = (where = {}) => ({
+  ...where,
+  ...NON_DAMAGED_ORDER_WHERE,
+});
+
+const computeFinancialSummary = async (where) => {
+  const rows = await prisma.order.findMany({
+    where,
+    select: {
+      totalPrice: true,
+      discount: true,
+      paidAmount: true,
+    },
+  });
+
+  return rows.reduce(
+    (summary, order) => ({
+      revenue: addScaled(
+        summary.revenue,
+        getOrderFinancialTotal(order),
+        MONEY_SCALE,
+      ),
+      paid: addScaled(
+        summary.paid,
+        getOrderFinancialPaid(order),
+        MONEY_SCALE,
+      ),
+      remaining: addScaled(
+        summary.remaining,
+        getOrderFinancialRemaining(order),
+        MONEY_SCALE,
+      ),
+    }),
+    { revenue: 0, paid: 0, remaining: 0 },
+  );
+};
 
 const computeRakhtBenefitRevenue = async (where) => {
   const rows = await prisma.order.findMany({
@@ -96,12 +142,12 @@ export const getDashboardStats = async ({
   const monthStart = monthRange?.start || null;
   const monthEnd = monthRange?.end || null;
 
-  // Finance user data isolation — scope all order queries to their created orders
+  // Finance user data isolation: scope all order queries to their created orders.
   const financeWhere = financeUserId
     ? { createdByFinanceId: String(financeUserId) }
     : {};
 
-  // Base where clause — when month/year are supplied, scope ALL counts to that month
+  // Base where clause: when month/year are supplied, scope all counts to that month.
   // Use OR to handle legacy orders (entryMonth=null) via createdAt fallback
   let monthWhere;
   if (hasMonthFilter) {
@@ -115,6 +161,19 @@ export const getDashboardStats = async ({
   } else {
     monthWhere = { ...financeWhere };
   }
+
+  const recognizedProfitDateWhere = hasMonthFilter
+    ? {
+        gte: monthStart,
+        lte: monthEnd,
+      }
+    : { not: null };
+
+  const recognizedProfitWhere = {
+    ...financeWhere,
+    ...NON_DAMAGED_ORDER_WHERE,
+    netProfitRecognizedAt: recognizedProfitDateWhere,
+  };
 
   const carryForwardPendingWhere = hasMonthFilter
     ? {
@@ -162,8 +221,18 @@ export const getDashboardStats = async ({
       }
     : monthWhere;
 
+  const financialMonthWhere = withNonDamagedOrders(monthWhere);
+  const financialCarryForwardRemainingWhere = withNonDamagedOrders(
+    carryForwardRemainingWhere,
+  );
+
   const now = new Date();
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const damagedClothesWhere = hasMonthFilter
+    ? {
+        createdAt: { gte: monthStart, lte: monthEnd },
+      }
+    : {};
 
   const [
     totalOrders,
@@ -173,11 +242,13 @@ export const getDashboardStats = async ({
     emergencyOrders,
     todayOrders,
     revenueData,
-    paidData,
-    remainingData,
+    totalDiscountAllOrdersAggregate,
     recentOrders,
     ordersByType,
     damagedClothesTotal,
+    damagedClothesAmountAggregate,
+    financialMonthSummary,
+    financialRemainingSummary,
   ] = await Promise.all([
     prisma.order.count({ where: monthWhere }),
     prisma.order.count({ where: { ...monthWhere, isCompleted: true } }),
@@ -193,18 +264,14 @@ export const getDashboardStats = async ({
         })
       : prisma.order.count({
           where: { ...financeWhere, createdAt: { gte: startOfDay } },
-        }),
+    }),
     prisma.order.aggregate({
-      where: monthWhere,
+      where: financialMonthWhere,
       _sum: { totalPrice: true, discount: true },
     }),
     prisma.order.aggregate({
-      where: monthWhere,
-      _sum: { paidAmount: true, remaining: true },
-    }),
-    prisma.order.aggregate({
-      where: carryForwardRemainingWhere,
-      _sum: { remaining: true },
+      where: financeWhere,
+      _sum: { discount: true },
     }),
     prisma.order.findMany({
       where: recentOrdersWhere,
@@ -219,6 +286,7 @@ export const getDashboardStats = async ({
         dokhtAssignedTo: {
           select: { id: true, name: true, accountType: true },
         },
+        damagedClothesPenalties: { select: { id: true }, take: 1 },
       },
     }),
     prisma.order.groupBy({
@@ -226,11 +294,13 @@ export const getDashboardStats = async ({
       where: monthWhere,
       _count: { type: true },
     }),
-    prisma.damagedClothesPenalty.count({
-      where: hasMonthFilter
-        ? { createdAt: { gte: monthStart, lte: monthEnd } }
-        : {},
+    prisma.damagedClothesPenalty.count({ where: damagedClothesWhere }),
+    prisma.damagedClothesPenalty.aggregate({
+      where: damagedClothesWhere,
+      _sum: { totalExpense: true },
     }),
+    computeFinancialSummary(financialMonthWhere),
+    computeFinancialSummary(financialCarryForwardRemainingWhere),
   ]);
 
   // Daily expense and rakht totals are month-scoped when filters are active.
@@ -245,6 +315,10 @@ export const getDashboardStats = async ({
         }
       : {}),
   };
+  const financialDailyTaskWhere = {
+    ...dailyTaskWhere,
+    OR: [{ orderId: null }, { order: { is: NON_DAMAGED_ORDER_WHERE } }],
+  };
 
   const rakhtWhere = hasMonthFilter
     ? {
@@ -258,6 +332,7 @@ export const getDashboardStats = async ({
   const loanWhere = {
     source: "MANUAL",
     kind: "LOAN",
+    damagedClothesPenalty: null,
     ...(financeUserId ? { createdById: String(financeUserId) } : {}),
     ...(hasMonthFilter
       ? {
@@ -273,7 +348,7 @@ export const getDashboardStats = async ({
     await Promise.all([
       prisma.dailyTask.count({ where: dailyTaskWhere }),
       prisma.dailyTask.aggregate({
-        where: dailyTaskWhere,
+        where: financialDailyTaskWhere,
         _sum: { amount: true },
       }),
       prisma.rakht.aggregate({
@@ -296,10 +371,6 @@ export const getDashboardStats = async ({
     : undefined;
 
   const [
-    qichikarPaidAggregate,
-    dokhtPaidAggregate,
-    legacyQichikarPaidAggregate,
-    legacyDokhtPaidAggregate,
     allOrdersBenefitAggregate,
     readyMadeBenefitAggregate,
     readyMadeFinalProfitAggregate,
@@ -308,7 +379,72 @@ export const getDashboardStats = async ({
     totalRakhtRevenue,
     linkedDailyExpenseAggregate,
     otherItemsProfitAggregate,
+    qichikarPaidAggregate,
+    dokhtPaidAggregate,
+    legacyQichikarPaidAggregate,
+    legacyDokhtPaidAggregate,
   ] = await Promise.all([
+    prisma.order.aggregate({
+      where: {
+        ...recognizedProfitWhere,
+        type: { notIn: ["READY_MADE", "READY_MADE_WASKAT"] },
+      },
+      _sum: { netProfitRecognizedAmount: true },
+    }),
+    prisma.order.aggregate({
+      where: {
+        ...recognizedProfitWhere,
+        type: "READY_MADE",
+      },
+      _sum: { netProfitRecognizedAmount: true },
+    }),
+    prisma.order.aggregate({
+      where: {
+        ...recognizedProfitWhere,
+        type: "READY_MADE",
+      },
+      _sum: { netProfitRecognizedAmount: true, readyMadeOriginalPrice: true },
+    }),
+    prisma.order.aggregate({
+      where: {
+        ...recognizedProfitWhere,
+        type: "READY_MADE_WASKAT",
+      },
+      _sum: { netProfitRecognizedAmount: true },
+    }),
+    prisma.order.aggregate({
+      where: {
+        ...recognizedProfitWhere,
+        type: "READY_MADE_WASKAT",
+      },
+      _sum: {
+        netProfitRecognizedAmount: true,
+        readyMadeWaskatOriginalPrice: true,
+      },
+    }),
+    computeRakhtBenefitRevenue(recognizedProfitWhere),
+    prisma.dailyTask.aggregate({
+      where: {
+        ...(financeUserId ? { createdById: String(financeUserId) } : {}),
+        orderId: { not: null },
+        order: { is: recognizedProfitWhere },
+      },
+      _sum: { amount: true },
+    }),
+    prisma.itemSale.aggregate({
+      where: {
+        ...(financeUserId ? { createdById: String(financeUserId) } : {}),
+        ...(hasMonthFilter
+          ? {
+              createdAt: {
+                gte: monthStart,
+                lte: monthEnd,
+              },
+            }
+          : {}),
+      },
+      _sum: { profit: true },
+    }),
     prisma.order.aggregate({
       where: {
         ...(financeUserId ? { createdByFinanceId: String(financeUserId) } : {}),
@@ -345,83 +481,27 @@ export const getDashboardStats = async ({
       },
       _sum: { workerPaymentAmount: true },
     }),
-    prisma.order.aggregate({
-      where: {
-        ...monthWhere,
-        type: { notIn: ["READY_MADE", "READY_MADE_WASKAT"] },
-      },
-      _sum: { totalBenefit: true },
-    }),
-    prisma.order.aggregate({
-      where: {
-        ...monthWhere,
-        type: "READY_MADE",
-      },
-      _sum: { totalBenefit: true },
-    }),
-    prisma.order.aggregate({
-      where: {
-        ...monthWhere,
-        type: "READY_MADE",
-      },
-      _sum: { totalBenefit: true, readyMadeOriginalPrice: true },
-    }),
-    prisma.order.aggregate({
-      where: {
-        ...monthWhere,
-        type: "READY_MADE_WASKAT",
-      },
-      _sum: { totalBenefit: true },
-    }),
-    prisma.order.aggregate({
-      where: {
-        ...monthWhere,
-        type: "READY_MADE_WASKAT",
-      },
-      _sum: { totalBenefit: true, readyMadeWaskatOriginalPrice: true },
-    }),
-    computeRakhtBenefitRevenue(monthWhere),
-    prisma.dailyTask.aggregate({
-      where: {
-        ...dailyTaskWhere,
-        orderId: { not: null },
-      },
-      _sum: { amount: true },
-    }),
-    prisma.itemSale.aggregate({
-      where: {
-        ...(financeUserId ? { createdById: String(financeUserId) } : {}),
-        ...(hasMonthFilter
-          ? {
-              createdAt: {
-                gte: monthStart,
-                lte: monthEnd,
-              },
-            }
-          : {}),
-      },
-      _sum: { profit: true },
-    }),
   ]);
 
   const totalOrderBenefit = Number(
-    allOrdersBenefitAggregate._sum?.totalBenefit || 0,
+    allOrdersBenefitAggregate._sum?.netProfitRecognizedAmount || 0,
   );
   const totalReadyMadeProfit = Number(
-    readyMadeBenefitAggregate._sum?.totalBenefit || 0,
+    readyMadeBenefitAggregate._sum?.netProfitRecognizedAmount || 0,
   );
-  const totalReadyMadeProfitAfterExpenses =
-    Number(readyMadeFinalProfitAggregate._sum?.totalBenefit || 0) -
-    Number(readyMadeFinalProfitAggregate._sum?.readyMadeOriginalPrice || 0);
+  const totalReadyMadeProfitAfterExpenses = subScaled(
+    readyMadeFinalProfitAggregate._sum?.netProfitRecognizedAmount || 0,
+    readyMadeFinalProfitAggregate._sum?.readyMadeOriginalPrice || 0,
+    MONEY_SCALE,
+  );
   const totalReadyMadeWaskatProfit = Number(
-    readyMadeWaskatBenefitAggregate._sum?.totalBenefit || 0,
+    readyMadeWaskatBenefitAggregate._sum?.netProfitRecognizedAmount || 0,
   );
-  const totalReadyMadeWaskatProfitAfterExpenses =
-    Number(readyMadeWaskatFinalProfitAggregate._sum?.totalBenefit || 0) -
-    Number(
-      readyMadeWaskatFinalProfitAggregate._sum
-        ?.readyMadeWaskatOriginalPrice || 0,
-    );
+  const totalReadyMadeWaskatProfitAfterExpenses = subScaled(
+    readyMadeWaskatFinalProfitAggregate._sum?.netProfitRecognizedAmount || 0,
+    readyMadeWaskatFinalProfitAggregate._sum?.readyMadeWaskatOriginalPrice || 0,
+    MONEY_SCALE,
+  );
   const totalRakhtRevenueNumber = Number(totalRakhtRevenue || 0);
   const otherItemsTotalProfit = Number(
     otherItemsProfitAggregate._sum?.profit || 0,
@@ -439,20 +519,15 @@ export const getDashboardStats = async ({
   const netProfit = totalProfitBeforeDailyExpenses - dailyTaskExpenseTotal;
 
   const recentOrdersWithRevenue = recentOrders.map((order) => {
-    const readyMadeOriginalPrice =
-      order?.type === "READY_MADE"
-        ? Number(order?.readyMadeOriginalPrice || 0)
-        : order?.type === "READY_MADE_WASKAT"
-          ? Number(order?.readyMadeWaskatOriginalPrice || 0)
-          : 0;
     const baseBenefit = Number(order?.totalBenefit || 0);
-    const finalTotalBenefit =
-      order?.type === "READY_MADE" || order?.type === "READY_MADE_WASKAT"
-        ? baseBenefit - readyMadeOriginalPrice
-        : baseBenefit;
+    const isDamageOrder = Array.isArray(order?.damagedClothesPenalties)
+      ? order.damagedClothesPenalties.length > 0
+      : false;
+    const finalTotalBenefit = isDamageOrder ? 0 : baseBenefit;
 
     return {
       ...order,
+      isDamageOrder,
       customer: order.customer
         ? {
             ...order.customer,
@@ -475,14 +550,19 @@ export const getDashboardStats = async ({
     allPendingOrders,
     emergencyOrders,
     damagedClothesTotal,
+    totalDamagedClothesMoney:
+      damagedClothesAmountAggregate._sum?.totalExpense || 0,
     todayOrders,
     // Legacy fields kept for non-filtered views
     monthOrders: hasMonthFilter ? totalOrders : completedOrders,
     yearOrders: totalOrders,
-    totalRevenue: revenueData._sum.totalPrice || 0,
+    totalRevenue: financialMonthSummary.revenue,
+    totalGrossOrderPrice: revenueData._sum.totalPrice || 0,
     totalDiscount: revenueData._sum.discount || 0,
-    totalPaid: paidData._sum.paidAmount || 0,
-    totalRemaining: remainingData._sum.remaining || 0,
+    totalDiscountAllOrders:
+      totalDiscountAllOrdersAggregate._sum?.discount || 0,
+    totalPaid: financialMonthSummary.paid,
+    totalRemaining: financialRemainingSummary.remaining,
     recentOrders: recentOrdersWithRevenue,
     monthlyRevenue,
     ordersByType: ordersByType.map((o) => ({
@@ -540,17 +620,20 @@ const getMonthlyRevenue = async (
       year: parsedYear,
     });
 
-    const result = await prisma.order.aggregate({
-      where: {
-        ...financeWhere,
-        OR: [
-          { entryMonth: parsedMonth, entryYear: parsedYear },
-          { entryMonth: null, createdAt: { gte: monthStart, lte: monthEnd } },
-        ],
-      },
-      _sum: { totalPrice: true, paidAmount: true },
-      _count: true,
+    const where = withNonDamagedOrders({
+      ...financeWhere,
+      OR: [
+        { entryMonth: parsedMonth, entryYear: parsedYear },
+        { entryMonth: null, createdAt: { gte: monthStart, lte: monthEnd } },
+      ],
     });
+    const [result, financialSummary] = await Promise.all([
+      prisma.order.aggregate({
+        where,
+        _count: true,
+      }),
+      computeFinancialSummary(where),
+    ]);
 
     const afghanLabel =
       AFGHAN_MONTH_LABELS_EN[(parsedMonth || 1) - 1] || String(parsedMonth);
@@ -560,8 +643,8 @@ const getMonthlyRevenue = async (
         month: `${afghanLabel} ${parsedYear}`,
         monthNumber: parsedMonth,
         monthYear: parsedYear,
-        revenue: result._sum.totalPrice || 0,
-        paid: result._sum.paidAmount || 0,
+        revenue: financialSummary.revenue,
+        paid: financialSummary.paid,
         count: result._count,
       },
     ];
@@ -578,16 +661,25 @@ const getMonthlyRevenue = async (
 
   const results = await Promise.all(
     monthContexts.map(({ start, end }) =>
-      prisma.order.aggregate({
-        where: { ...financeWhere, createdAt: { gte: start, lte: end } },
-        _sum: { totalPrice: true, paidAmount: true },
-        _count: true,
-      }),
+      (async () => {
+        const where = withNonDamagedOrders({
+          ...financeWhere,
+          createdAt: { gte: start, lte: end },
+        });
+        const [summary, financialSummary] = await Promise.all([
+          prisma.order.aggregate({
+            where,
+            _count: true,
+          }),
+          computeFinancialSummary(where),
+        ]);
+        return { summary, financialSummary };
+      })(),
     ),
   );
 
   return monthContexts.map(({ start }, index) => {
-    const result = results[index];
+    const { summary: result, financialSummary } = results[index];
     const afghan = getCurrentAfghanMonthYear(start);
     const afghanLabel =
       AFGHAN_MONTH_LABELS_EN[(Number(afghan.month) || 1) - 1] ||
@@ -597,8 +689,8 @@ const getMonthlyRevenue = async (
       month: `${afghanLabel} ${afghan.year}`,
       monthNumber: afghan.month,
       monthYear: afghan.year,
-      revenue: result._sum.totalPrice || 0,
-      paid: result._sum.paidAmount || 0,
+      revenue: financialSummary.revenue,
+      paid: financialSummary.paid,
       count: result._count,
     };
   });

@@ -3,6 +3,7 @@ import {
   createOrderSchema,
   updateOrderSchema,
   updateOrderBillSchema,
+  settleOrderSchema,
 } from "../validators/order.validator.js";
 import { prisma } from "../lib/prisma.js";
 import { parseNumberLocale } from "../lib/normalize.js";
@@ -400,6 +401,22 @@ export const updateBill = async (req, res, next) => {
   try {
     const body = updateOrderBillSchema.parse(req.body);
     res.json(await service.updateOrderBill(req.params.id, body));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const settle = async (req, res, next) => {
+  try {
+    await assertFinanceOrderAccess(req.params.id, req.user);
+    const body = settleOrderSchema.parse(req.body);
+    const result = await service.settleOrder({
+      id: req.params.id,
+      ...body,
+      actor: req.user,
+      requestMeta: { ip: req.ip, userAgent: req.headers["user-agent"] },
+    });
+    res.json(result);
   } catch (error) {
     next(error);
   }

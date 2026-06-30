@@ -12,17 +12,7 @@ import {
 import { FaWhatsapp } from "react-icons/fa";
 import { getLocalizedShopValue } from "../config/shopConfig.js";
 import { SUPPORT_TEAM_CONFIG } from "../config/supportConfig.js";
-
-function resolveDirection(i18n, language) {
-  if (i18n.dir?.(language) === "rtl") return "rtl";
-  const lang = String(language || "").toLowerCase();
-  return lang.startsWith("fa") ||
-    lang.startsWith("ps") ||
-    lang.startsWith("dari") ||
-    lang.startsWith("pashto")
-    ? "rtl"
-    : "ltr";
-}
+import { isRtlLanguage } from "../lib/locale.js";
 
 function cleanPhoneHref(phone) {
   return `tel:${String(phone || "").replace(/[^\d+]/g, "")}`;
@@ -130,7 +120,9 @@ function ContactRow({
           </span>
         </div>
         <div
-          className="support-row-value"
+          className={`support-row-value ${
+            valueDir === "ltr" ? "support-row-value--ltr" : ""
+          }`.trim()}
           dir={valueDir || undefined}
           lang={valueDir === "ltr" ? "en" : undefined}
         >
@@ -144,7 +136,7 @@ function ContactRow({
 export default function SupportTeam() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language || "en";
-  const dir = resolveDirection(i18n, language);
+  const dir = isRtlLanguage(language) ? "rtl" : "ltr";
 
   const address = getLocalizedShopValue(SUPPORT_TEAM_CONFIG.address, language);
   const website = SUPPORT_TEAM_CONFIG.website || "";
@@ -179,10 +171,12 @@ export default function SupportTeam() {
     }
   };
 
-  const pageAlignClass = dir === "rtl" ? "text-right" : "text-left";
-
   return (
-    <div className={`support-page ${pageAlignClass}`} dir={dir} lang={language}>
+    <div
+      className={`support-page support-page--${dir}`}
+      dir={dir}
+      lang={language}
+    >
       <section className="support-card-shell" aria-labelledby="support-card-title">
         <article className="support-card">
           <header className="support-card-head">
@@ -315,12 +309,14 @@ export default function SupportTeam() {
         }
 
         .support-card-head {
-          display: flex;
+          display: grid;
+          grid-template-columns: 46px minmax(0, 1fr);
           align-items: center;
           gap: .85rem;
           padding: clamp(1rem, 2.5vw, 1.35rem);
           border-bottom: 1px solid color-mix(in srgb, var(--border, #e2e8f0) 82%, transparent);
           background: color-mix(in srgb, var(--surface2, #f8fafc) 58%, var(--surface, #ffffff));
+          direction: ltr;
         }
 
         .support-card-mark {
@@ -336,6 +332,7 @@ export default function SupportTeam() {
         }
 
         .support-card h1 {
+          min-width: 0;
           margin: 0;
           color: var(--text1, #0f172a);
           font-size: clamp(1.2rem, 2vw, 1.5rem);
@@ -352,7 +349,8 @@ export default function SupportTeam() {
         }
 
         .support-contact-row {
-          display: flex;
+          display: grid;
+          grid-template-columns: 40px minmax(0, 1fr);
           align-items: flex-start;
           gap: .85rem;
           min-width: 0;
@@ -361,6 +359,7 @@ export default function SupportTeam() {
           border-radius: 13px;
           background: color-mix(in srgb, var(--surface2, #f8fafc) 38%, var(--surface, #ffffff));
           transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+          direction: ltr;
         }
 
         .support-contact-row:hover {
@@ -382,23 +381,25 @@ export default function SupportTeam() {
 
         .support-row-body {
           min-width: 0;
-          flex: 1;
         }
 
         .support-row-head {
-          display: flex;
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
           align-items: center;
-          justify-content: space-between;
           gap: .75rem;
           min-height: 30px;
           width: 100%;
+          direction: ltr;
         }
 
         .support-row-label {
+          min-width: 0;
           color: var(--text2, #64748b);
           font-size: .8rem;
           font-weight: 900;
           line-height: 1.5;
+          overflow-wrap: anywhere;
         }
 
         .support-row-actions {
@@ -406,6 +407,7 @@ export default function SupportTeam() {
           align-items: center;
           gap: .35rem;
           flex: 0 0 auto;
+          justify-self: end;
         }
 
         .support-icon-action {
@@ -439,10 +441,18 @@ export default function SupportTeam() {
           unicode-bidi: plaintext;
         }
 
+        .support-row-value--ltr {
+          direction: ltr;
+          unicode-bidi: isolate;
+        }
+
         .support-value-link {
+          display: inline-block;
+          max-width: 100%;
           color: #1d4ed8;
           text-decoration: none;
           overflow-wrap: anywhere;
+          unicode-bidi: isolate;
         }
 
         .support-value-link:hover {
@@ -485,27 +495,52 @@ export default function SupportTeam() {
         }
 
         .support-page[dir="rtl"] .support-card,
+        .support-page[dir="rtl"] .support-card h1,
         .support-page[dir="rtl"] .support-row-body,
         .support-page[dir="rtl"] .support-row-label,
         .support-page[dir="rtl"] .support-row-value {
+          direction: rtl;
           text-align: right;
         }
 
-        .support-page[dir="rtl"] .support-card-head,
         .support-page[dir="rtl"] .support-contact-row {
-          direction: rtl;
+          grid-template-columns: minmax(0, 1fr) 40px;
+        }
+
+        .support-page[dir="rtl"] .support-contact-row .support-row-icon {
+          grid-column: 2;
+          grid-row: 1;
+        }
+
+        .support-page[dir="rtl"] .support-contact-row .support-row-body {
+          grid-column: 1;
+          grid-row: 1;
         }
 
         .support-page[dir="rtl"] .support-row-head {
-          justify-content: flex-start;
+          grid-template-columns: auto minmax(0, 1fr);
+        }
+
+        .support-page[dir="rtl"] .support-row-label {
+          grid-column: 2;
+          grid-row: 1;
         }
 
         .support-page[dir="rtl"] .support-row-actions {
-          direction: rtl;
+          grid-column: 1;
+          grid-row: 1;
+          justify-self: start;
+          direction: ltr;
+        }
+
+        .support-page[dir="rtl"] .support-row-value--ltr {
+          direction: ltr;
+          text-align: right;
+          unicode-bidi: isolate;
         }
 
         .support-page[dir="rtl"] .support-phone-list {
-          justify-content: flex-end;
+          justify-content: flex-start;
           direction: rtl;
         }
 
@@ -529,34 +564,74 @@ export default function SupportTeam() {
           }
 
           .support-card-head {
-            align-items: flex-start;
+            grid-template-columns: 42px minmax(0, 1fr);
+            align-items: center;
+            gap: .72rem;
+            padding: .9rem;
+          }
+
+          .support-card-mark {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
           }
 
           .support-contact-row {
+            grid-template-columns: 38px minmax(0, 1fr);
             gap: .75rem;
             padding: .82rem;
           }
 
+          .support-page[dir="rtl"] .support-contact-row {
+            grid-template-columns: minmax(0, 1fr) 38px;
+          }
+
           .support-row-head {
-            align-items: flex-start;
-            flex-direction: column;
-            gap: .5rem;
+            align-items: center;
+            gap: .6rem;
           }
 
-          .support-page[dir="rtl"] .support-row-head {
-            align-items: flex-end;
+          .support-row-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 11px;
           }
 
-          .support-row-actions {
-            align-self: flex-start;
-          }
-
-          .support-page[dir="rtl"] .support-row-actions {
-            align-self: flex-end;
+          .support-icon-action {
+            width: 34px;
+            height: 34px;
           }
 
           .support-phone-list {
             width: 100%;
+          }
+        }
+
+        @media (max-width: 420px) {
+          .support-page {
+            padding: .6rem;
+          }
+
+          .support-contact-list {
+            gap: .6rem;
+            padding: .7rem;
+          }
+
+          .support-contact-row {
+            padding: .72rem;
+          }
+
+          .support-row-label {
+            font-size: .76rem;
+          }
+
+          .support-row-value {
+            font-size: .88rem;
+          }
+
+          .support-phone-list a {
+            width: 100%;
+            justify-content: center;
           }
         }
       `}</style>

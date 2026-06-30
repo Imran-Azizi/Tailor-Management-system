@@ -1,11 +1,14 @@
-﻿import { useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import {
   LuCircleCheck,
   LuClock,
+  LuGift,
   LuPhone,
+  LuReceiptText,
   LuSearch,
+  LuShieldCheck,
   LuSquareCheck,
 } from "react-icons/lu";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
@@ -16,11 +19,279 @@ import {
   toAsciiDigits,
 } from "../lib/normalize.js";
 import { formatCurrency } from "../lib/currency.js";
+import { getOrderGrossTotal } from "../lib/orderFinancials.js";
 import {
   getOrderLabelParts,
   getOrderPrimaryDisplayName,
 } from "../lib/orderType.js";
-import { Card, EmptyState, Spinner } from "../components/ui/index.jsx";
+import {
+  Card,
+  EmptyState,
+  Modal,
+  Spinner,
+} from "../components/ui/index.jsx";
+
+const DELIVERY_SCROLL_THUMB_MIN = 56;
+let cachedDeliveryRtlScrollType = null;
+
+function detectDeliveryRtlScrollType() {
+  if (typeof document === "undefined") return "negative";
+  if (cachedDeliveryRtlScrollType) return cachedDeliveryRtlScrollType;
+
+  const scroller = document.createElement("div");
+  const content = document.createElement("div");
+  scroller.dir = "rtl";
+  scroller.style.cssText =
+    "position:absolute;top:-9999px;width:4px;height:1px;overflow:scroll;visibility:hidden;";
+  content.style.cssText = "width:8px;height:1px;";
+  scroller.appendChild(content);
+  document.body.appendChild(scroller);
+
+  if (scroller.scrollLeft > 0) {
+    cachedDeliveryRtlScrollType = "default";
+  } else {
+    scroller.scrollLeft = 1;
+    cachedDeliveryRtlScrollType =
+      scroller.scrollLeft === 0 ? "negative" : "reverse";
+  }
+
+  document.body.removeChild(scroller);
+  return cachedDeliveryRtlScrollType;
+}
+
+function getDeliveryScrollLeft(element) {
+  const maxScroll = Math.max(0, element.scrollWidth - element.clientWidth);
+  const direction = window.getComputedStyle(element).direction;
+  const scrollLeft = element.scrollLeft;
+
+  if (direction !== "rtl") {
+    return Math.min(maxScroll, Math.max(0, scrollLeft));
+  }
+
+  switch (detectDeliveryRtlScrollType()) {
+    case "negative":
+      return Math.min(maxScroll, Math.max(0, maxScroll + scrollLeft));
+    case "reverse":
+      return Math.min(maxScroll, Math.max(0, maxScroll - scrollLeft));
+    default:
+      return Math.min(maxScroll, Math.max(0, scrollLeft));
+  }
+}
+
+function setDeliveryScrollLeft(element, value) {
+  const maxScroll = Math.max(0, element.scrollWidth - element.clientWidth);
+  const nextValue = Math.min(maxScroll, Math.max(0, value));
+  const direction = window.getComputedStyle(element).direction;
+
+  if (direction !== "rtl") {
+    element.scrollLeft = nextValue;
+    return;
+  }
+
+  switch (detectDeliveryRtlScrollType()) {
+    case "negative":
+      element.scrollLeft = nextValue - maxScroll;
+      break;
+    case "reverse":
+      element.scrollLeft = maxScroll - nextValue;
+      break;
+    default:
+      element.scrollLeft = nextValue;
+  }
+}
+
+function DeliveryHorizontalScrollArea({ children, label }) {
+  const viewportRef = useRef(null);
+  const trackRef = useRef(null);
+  const metricsRef = useRef({
+    canScroll: false,
+    maxScroll: 0,
+    thumbLeft: 0,
+    thumbWidth: DELIVERY_SCROLL_THUMB_MIN,
+  });
+  const dragRef = useRef(null);
+  const rafRef = useRef(0);
+  const [metrics, setMetrics] = useState(metricsRef.current);
+
+  useEffect(() => {
+    metricsRef.current = metrics;
+  }, [metrics]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return undefined;
+
+    const update = () => {
+      const trackWidth = trackRef.current?.clientWidth || viewport.clientWidth;
+      const maxScroll = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+      const canScroll = maxScroll > 1 && trackWidth > 0;
+      const thumbWidth = canScroll
+        ? Math.max(
+            DELIVERY_SCROLL_THUMB_MIN,
+            Math.round((viewport.clientWidth / viewport.scrollWidth) * trackWidth),
+          )
+        : trackWidth;
+      const maxThumbLeft = Math.max(0, trackWidth - thumbWidth);
+      const scrollLeft = getDeliveryScrollLeft(viewport);
+      const thumbLeft =
+        canScroll && maxScroll > 0
+          ? Math.round((scrollLeft / maxScroll) * maxThumbLeft)
+          : 0;
+
+      setMetrics({ canScroll, maxScroll, thumbLeft, thumbWidth });
+    };
+
+    const scheduleUpdate = () => {
+      window.cancelAnimationFrame(rafRef.current);
+      rafRef.current = window.requestAnimationFrame(update);
+    };
+
+    scheduleUpdate();
+    viewport.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate);
+
+    let resizeObserver = null;
+    if (typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(scheduleUpdate);
+      resizeObserver.observe(viewport);
+      if (viewport.firstElementChild) {
+        resizeObserver.observe(viewport.firstElementChild);
+      }
+    }
+
+    return () => {
+      viewport.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
+      window.cancelAnimationFrame(rafRef.current);
+      resizeObserver?.disconnect();
+    };
+  }, []);
+
+  const scrollToThumbLeft = (thumbLeft) => {
+    const viewport = viewportRef.current;
+    const track = trackRef.current;
+    if (!viewport || !track) return;
+
+    const maxThumbLeft = Math.max(
+      1,
+      track.clientWidth - metricsRef.current.thumbWidth,
+    );
+    const ratio = Math.min(1, Math.max(0, thumbLeft / maxThumbLeft));
+    setDeliveryScrollLeft(viewport, ratio * metricsRef.current.maxScroll);
+  };
+
+  const handlePointerDown = (event) => {
+    if (event.button !== undefined && event.button !== 0) return;
+    const track = trackRef.current;
+    if (!track || !metricsRef.current.canScroll) return;
+
+    event.preventDefault();
+    const rect = track.getBoundingClientRect();
+    const onThumb = Boolean(
+      event.target.closest(".delivery-table-scrollbar__thumb"),
+    );
+    const nextThumbLeft = onThumb
+      ? metricsRef.current.thumbLeft
+      : event.clientX - rect.left - metricsRef.current.thumbWidth / 2;
+
+    if (!onThumb) scrollToThumbLeft(nextThumbLeft);
+
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startThumbLeft: Math.min(
+        Math.max(0, nextThumbLeft),
+        Math.max(0, track.clientWidth - metricsRef.current.thumbWidth),
+      ),
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+
+  const handlePointerMove = (event) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    event.preventDefault();
+    scrollToThumbLeft(drag.startThumbLeft + event.clientX - drag.startX);
+  };
+
+  const stopDragging = (event) => {
+    if (dragRef.current?.pointerId === event.pointerId) {
+      dragRef.current = null;
+      event.currentTarget.releasePointerCapture?.(event.pointerId);
+    }
+  };
+
+  const handleKeyDown = (event) => {
+    const viewport = viewportRef.current;
+    if (!viewport || !metricsRef.current.canScroll) return;
+
+    const current = getDeliveryScrollLeft(viewport);
+    const step = Math.max(44, Math.round(viewport.clientWidth * 0.18));
+    let next = current;
+
+    if (event.key === "ArrowLeft") next = current - step;
+    else if (event.key === "ArrowRight") next = current + step;
+    else if (event.key === "PageUp") next = current - viewport.clientWidth * 0.8;
+    else if (event.key === "PageDown") next = current + viewport.clientWidth * 0.8;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = metricsRef.current.maxScroll;
+    else return;
+
+    event.preventDefault();
+    setDeliveryScrollLeft(viewport, next);
+  };
+
+  return (
+    <div className="delivery-scroll-shell">
+      <div
+        ref={viewportRef}
+        className="delivery-results-table"
+        tabIndex={0}
+        aria-label={label}
+      >
+        {children}
+      </div>
+      {metrics.canScroll ? (
+        <div className="delivery-table-scrollbar">
+          <div
+            ref={trackRef}
+            className="delivery-table-scrollbar__track"
+            role="scrollbar"
+            aria-label={label}
+            aria-orientation="horizontal"
+            aria-valuemin={0}
+            aria-valuemax={Math.round(metrics.maxScroll)}
+            aria-valuenow={Math.round(
+              metrics.maxScroll > 0
+                ? (metrics.thumbLeft /
+                    Math.max(
+                      1,
+                      (trackRef.current?.clientWidth || 0) - metrics.thumbWidth,
+                    )) *
+                    metrics.maxScroll
+                : 0,
+            )}
+            tabIndex={0}
+            onKeyDown={handleKeyDown}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={stopDragging}
+            onPointerCancel={stopDragging}
+          >
+            <div
+              className="delivery-table-scrollbar__thumb"
+              style={{
+                width: `${metrics.thumbWidth}px`,
+                transform: `translateX(${metrics.thumbLeft}px)`,
+              }}
+            />
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function formatMoney(value, language) {
   return formatCurrency(value, language, {
@@ -49,6 +320,7 @@ export default function ClothesDeliveryToCustomer() {
   const [result, setResult] = useState(null); // { customer, orders }
   const [paying, setPaying] = useState(false);
   const [payments, setPayments] = useState({}); // orderId -> string
+  const [paymentConfirmation, setPaymentConfirmation] = useState(null);
 
   const orders = result?.orders || [];
   const resultCountLabel = t("delivery.ordersFound", {
@@ -92,42 +364,52 @@ export default function ClothesDeliveryToCustomer() {
     }
   };
 
-  const submitPayment = async (order) => {
+  const openPaymentConfirmation = (order) => {
     const remaining = Number(order.remaining || 0);
+    let amount = 0;
+
+    if (remaining > 0.001) {
+      const raw = payments[order.id] ?? "";
+      amount = parseNumberLocale(raw);
+
+      if (!Number.isFinite(amount) || amount <= 0) {
+        toast.error(t("delivery.invalidAmount"));
+        return;
+      }
+
+      if (amount - remaining > 0.001) {
+        toast.error(t("delivery.paymentGreaterThanRemaining"));
+        return;
+      }
+    }
+
+    const discountToAdd =
+      remaining > 0.001 ? Math.max(0, remaining - amount) : 0;
+    const finalRemaining = Math.max(0, remaining - amount - discountToAdd);
+
+    setPaymentConfirmation({
+      order,
+      amount,
+      remaining,
+      discountToAdd,
+      finalRemaining,
+    });
+  };
+
+  const confirmPayment = async () => {
+    if (!paymentConfirmation || paying) return;
+
+    const { order, amount } = paymentConfirmation;
 
     setPaying(true);
     try {
-      let nextRemaining = remaining;
-
-      if (remaining > 0.001) {
-        const raw = payments[order.id] ?? "";
-        const amount = parseNumberLocale(raw);
-
-        if (!Number.isFinite(amount) || amount <= 0) {
-          toast.error(t("delivery.invalidAmount"));
-          return;
-        }
-
-        if (amount - remaining > 0.001) {
-          toast.error(t("delivery.paymentGreaterThanRemaining"));
-          return;
-        }
-
-        const newPaid = (order.paidAmount || 0) + amount;
-        nextRemaining = remaining - amount;
-
-        await api.put(`/orders/${order.id}`, {
-          paidAmount: newPaid,
-        });
-      }
-
-      if (nextRemaining <= 0.001) {
-        await api.patch(`/orders/${order.id}/complete`, {
-          deliveryReceive: true,
-        });
-      }
+      await api.patch(`/orders/${order.id}/settle`, {
+        receivedAmount: amount,
+        deliveryReceive: true,
+      });
 
       toast.success(t("delivery.paymentRecorded"));
+      setPaymentConfirmation(null);
       await runSearch();
     } catch {
       toast.error(
@@ -326,22 +608,20 @@ export default function ClothesDeliveryToCustomer() {
                     <EmptyState message={t("delivery.noResults")} />
                   </div>
                 ) : (
-                  <div
-                    className="delivery-results-table"
-                    tabIndex={0}
-                    aria-label={t("delivery.resultsTitle")}
+                  <DeliveryHorizontalScrollArea
+                    label={t("delivery.resultsTitle")}
                   >
                     <table className="tbl delivery-results-grid-table">
                       <colgroup>
+                        <col style={{ width: "64px" }} />
+                        <col style={{ width: "172px" }} />
+                        <col style={{ width: "144px" }} />
+                        <col style={{ width: "96px" }} />
                         <col style={{ width: "92px" }} />
-                        <col style={{ width: "240px" }} />
-                        <col style={{ width: "190px" }} />
-                        <col style={{ width: "120px" }} />
-                        <col style={{ width: "120px" }} />
-                        <col style={{ width: "120px" }} />
-                        <col style={{ width: "130px" }} />
-                        <col style={{ width: "170px" }} />
-                        <col style={{ width: "260px" }} />
+                        <col style={{ width: "96px" }} />
+                        <col style={{ width: "108px" }} />
+                        <col style={{ width: "128px" }} />
+                        <col style={{ width: "206px" }} />
                       </colgroup>
                       <thead>
                         <tr>
@@ -404,7 +684,7 @@ export default function ClothesDeliveryToCustomer() {
                                 {orderLabel.typeWithSequenceLabel}
                               </td>
                               <td className="[direction:ltr]">
-                                {formatMoney(o.totalPrice, language)}
+                                {formatMoney(getOrderGrossTotal(o), language)}
                               </td>
                               <td className="[direction:ltr]">
                                 {formatMoney(o.discount, language)}
@@ -441,7 +721,9 @@ export default function ClothesDeliveryToCustomer() {
                                     <button
                                       type="button"
                                       className="delivery-receive-button inline-flex h-10 items-center justify-center rounded-lg bg-amber-500 px-4 text-sm font-semibold text-white hover:bg-amber-600 dark:bg-amber-500 dark:hover:bg-amber-400 disabled:opacity-50"
-                                      onClick={() => submitPayment(o)}
+                                      onClick={() =>
+                                        openPaymentConfirmation(o)
+                                      }
                                       disabled={paying}
                                     >
                                       {receiveButtonText}
@@ -466,7 +748,9 @@ export default function ClothesDeliveryToCustomer() {
                                       <button
                                         type="button"
                                         className="delivery-receive-button inline-flex h-10 items-center justify-center rounded-lg bg-amber-500 px-4 text-sm font-semibold text-white hover:bg-amber-600 dark:bg-amber-500 dark:hover:bg-amber-400 disabled:opacity-50"
-                                        onClick={() => submitPayment(o)}
+                                        onClick={() =>
+                                          openPaymentConfirmation(o)
+                                        }
                                         disabled={paying}
                                       >
                                         {receiveButtonText}
@@ -480,13 +764,113 @@ export default function ClothesDeliveryToCustomer() {
                         })}
                       </tbody>
                     </table>
-                  </div>
+                  </DeliveryHorizontalScrollArea>
                 )}
               </div>
             </Card>
           </div>
         )}
       </div>
+
+      <Modal
+        open={Boolean(paymentConfirmation)}
+        onClose={() => {
+          if (!paying) setPaymentConfirmation(null);
+        }}
+        title={t("delivery.confirmPaymentTitle")}
+        maxW={460}
+        dir={dir}
+        overlayClassName="delivery-confirm-overlay"
+        boxClassName="delivery-confirm-modal"
+        bodyClassName="delivery-confirm-modal__body"
+      >
+        {paymentConfirmation ? (
+          <div className="delivery-confirm" dir={dir}>
+            <div className="delivery-confirm__amounts">
+              <div className="delivery-confirm__amount">
+                <span>
+                  <LuReceiptText size={16} />
+                  {t("common.remaining", "Remaining")}
+                </span>
+                <strong>
+                  {formatMoney(paymentConfirmation.remaining, language)}
+                </strong>
+              </div>
+              <div className="delivery-confirm__amount delivery-confirm__amount--received">
+                <span>
+                  <LuCircleCheck size={16} />
+                  {t("delivery.receivedAmount")}
+                </span>
+                <strong>
+                  {formatMoney(paymentConfirmation.amount, language)}
+                </strong>
+              </div>
+              <div className="delivery-confirm__amount delivery-confirm__amount--discount">
+                <span>
+                  <LuGift size={16} />
+                  {t("delivery.discountToApply")}
+                </span>
+                <strong>
+                  {formatMoney(paymentConfirmation.discountToAdd, language)}
+                </strong>
+              </div>
+            </div>
+
+            {paymentConfirmation.discountToAdd > 0.001 ? (
+              <div className="delivery-confirm__notice">
+                <LuGift size={18} />
+                <span>
+                  {t("delivery.discountExplanation", {
+                    amount: formatMoney(
+                      paymentConfirmation.discountToAdd,
+                      language,
+                    ),
+                  })}
+                </span>
+              </div>
+            ) : null}
+
+            <div className="delivery-confirm__settled">
+              <span>
+                <LuCircleCheck size={18} />
+                {t("delivery.finalBalance")}
+              </span>
+              <strong>
+                {formatMoney(paymentConfirmation.finalRemaining, language)}
+              </strong>
+            </div>
+
+            <div className="delivery-confirm__actions">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setPaymentConfirmation(null)}
+                disabled={paying}
+              >
+                {t("common.cancel", "Cancel")}
+              </button>
+              <button
+                type="button"
+                className="btn btn-gold delivery-confirm__submit"
+                onClick={confirmPayment}
+                disabled={paying}
+              >
+                {paying ? (
+                  <>
+                    <Spinner size={16} />
+                    {t("common.saving", "Saving...")}
+                  </>
+                ) : (
+                  <>
+                    <LuShieldCheck size={17} />
+                    {t("delivery.confirmAndReceive")}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 }

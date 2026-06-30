@@ -4,6 +4,35 @@ import { getAfghanMonthDateRange } from "../lib/afghanistanDate.js";
 import { getNotificationRetentionWhere } from "../lib/notificationRetention.js";
 
 const SALT_ROUNDS = 12;
+const USER_ACCOUNT_TYPES = ["ADMIN", "DOKAN", "DOKHT", "QICHIKAR", "FINANCE"];
+
+function sendAdminAlreadyExists(res) {
+  return res.status(409).json({
+    code: "TENANT_ADMIN_EXISTS",
+    error:
+      "This tenant already has an Admin user. Only one Admin is allowed per tenant.",
+  });
+}
+
+async function tenantHasAnotherAdmin(excludeUserId = null) {
+  const admin = await prisma.user.findFirst({
+    where: {
+      accountType: "ADMIN",
+      ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
+    },
+    select: { id: true },
+  });
+  return Boolean(admin);
+}
+
+function isSingleAdminConstraintError(error) {
+  if (error?.code !== "P2002") return false;
+  const target = error?.meta?.target;
+  if (Array.isArray(target)) {
+    return target.length === 1 && target[0] === "tenantId";
+  }
+  return String(target || "").includes("User_one_admin_per_tenant_key");
+}
 
 /** GET /api/users */
 export async function listUsers(req, res, next) {
@@ -72,20 +101,24 @@ export async function createUser(req, res, next) {
         .status(400)
         .json({ error: "name, phoneNumber and accountType are required." });
     }
-    if (
-      !["ADMIN", "DOKAN", "DOKHT", "QICHIKAR", "FINANCE"].includes(accountType)
-    ) {
+    if (!USER_ACCOUNT_TYPES.includes(accountType)) {
       return res.status(400).json({ error: "Invalid accountType." });
     }
-    // Default password is the phone number if not explicitly provided
-    const rawPassword = password || phoneNumber.trim();
-    if (rawPassword.length < 6) {
+    if (!password) {
+      return res
+        .status(400)
+        .json({ error: "Password is required for new users." });
+    }
+    if (password.length < 6) {
       return res.status(400).json({
-        error:
-          "Phone number must be at least 6 characters to use as default password.",
+        error: "Password must be at least 6 characters.",
       });
     }
-    const hashed = await bcrypt.hash(rawPassword, SALT_ROUNDS);
+    if (accountType === "ADMIN" && (await tenantHasAnotherAdmin())) {
+      return sendAdminAlreadyExists(res);
+    }
+
+    const hashed = await bcrypt.hash(password, SALT_ROUNDS);
     const user = await prisma.user.create({
       data: {
         name: name.trim(),
@@ -104,6 +137,12 @@ export async function createUser(req, res, next) {
     });
     res.status(201).json(user);
   } catch (err) {
+    if (
+      req.body?.accountType === "ADMIN" &&
+      isSingleAdminConstraintError(err)
+    ) {
+      return sendAdminAlreadyExists(res);
+    }
     next(err);
   }
 }
@@ -112,17 +151,27 @@ export async function createUser(req, res, next) {
 export async function updateUser(req, res, next) {
   try {
     const { name, phoneNumber, accountType, password, isActive } = req.body;
+    const existingUser = await prisma.user.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, accountType: true },
+    });
+    if (!existingUser) {
+      return res.status(404).json({ error: "User not found." });
+    }
 
     const data = {};
     if (name !== undefined) data.name = name.trim();
     if (phoneNumber !== undefined) data.phoneNumber = phoneNumber.trim();
     if (accountType !== undefined) {
-      if (
-        !["ADMIN", "DOKAN", "DOKHT", "QICHIKAR", "FINANCE"].includes(
-          accountType,
-        )
-      ) {
+      if (!USER_ACCOUNT_TYPES.includes(accountType)) {
         return res.status(400).json({ error: "Invalid accountType." });
+      }
+      if (
+        accountType === "ADMIN" &&
+        existingUser.accountType !== "ADMIN" &&
+        (await tenantHasAnotherAdmin(existingUser.id))
+      ) {
+        return sendAdminAlreadyExists(res);
       }
       data.accountType = accountType;
     }
@@ -149,6 +198,12 @@ export async function updateUser(req, res, next) {
     });
     res.json(user);
   } catch (err) {
+    if (
+      req.body?.accountType === "ADMIN" &&
+      isSingleAdminConstraintError(err)
+    ) {
+      return sendAdminAlreadyExists(res);
+    }
     next(err);
   }
 }

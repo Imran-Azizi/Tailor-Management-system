@@ -65,7 +65,19 @@ export function getOrderCompletionStatus(order, t, options = {}) {
     return {
       key: "damage",
       ...ROLE_STATUS.damage,
-      label: t("orders.damageOrderStatus", "Damage Order"),
+      label: t(
+        "orders.damageOrderStatus",
+        "This order has been marked as damaged",
+      ),
+      detail: "",
+    };
+  }
+
+  if (order?.isCompleted) {
+    return {
+      key: "legacyCompleted",
+      ...ROLE_STATUS.legacy,
+      label: t("common.completed", "Completed"),
       detail: "",
     };
   }
@@ -125,14 +137,6 @@ export function getOrderCompletionStatus(order, t, options = {}) {
     };
   }
 
-  if (order?.isCompleted) {
-    return {
-      key: "legacyCompleted",
-      ...ROLE_STATUS.legacy,
-      label: t("common.completed", "Completed"),
-      detail: "",
-    };
-  }
 
   return {
     key: "pending",

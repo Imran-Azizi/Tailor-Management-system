@@ -21,6 +21,10 @@ import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { parseNumberLocale, toAsciiDigits } from "../lib/normalize.js";
 import { formatCurrency } from "../lib/currency.js";
+import {
+  getOrderGrossTotal,
+  getOrderNetTotal,
+} from "../lib/orderFinancials.js";
 import { MONEY_SCALE } from "../lib/decimal.js";
 import { formatMeters } from "../lib/meters.js";
 import {
@@ -53,6 +57,10 @@ import {
   isRtlLanguage,
 } from "../lib/locale.js";
 import { getOrderCompletionStatus } from "../lib/orderCompletionStatus.js";
+import {
+  getCompletedOrderProtection,
+  formatRemainingTime,
+} from "../lib/orderProtection.js";
 
 const ROLE_COLORS = { QICHIKAR: "#D97706", DOKHT: "#DB2777" };
 const ORDER_SCROLL_THUMB_MIN = 64;
@@ -581,6 +589,8 @@ function formatMoney(value, language) {
 }
 
 function getDisplayTotalBenefit(order) {
+  if (order?.isDamageOrder) return 0;
+
   const finalTotalBenefit = Number(order?.finalTotalBenefit);
   if (Number.isFinite(finalTotalBenefit)) return finalTotalBenefit;
 
@@ -649,14 +659,17 @@ function OrderViewModal({ orderId, open, onClose }) {
       : data?.type === "READY_MADE_WASKAT"
         ? Number(data?.readyMadeWaskatOriginalPrice || 0)
         : 0;
-  const displayTotalBenefit = Number(
+  const baseDisplayTotalBenefit = Number(
     benefitDetails?.totalBenefit ?? data?.totalBenefit ?? 0,
   );
+  const displayTotalBenefit = data?.isDamageOrder
+    ? 0
+    : data?.type === "READY_MADE" || data?.type === "READY_MADE_WASKAT"
+      ? baseDisplayTotalBenefit - readyMadeOriginalPrice
+      : baseDisplayTotalBenefit;
   const displayTotalExpenses = Number(benefitDetails?.totalExpenses ?? 0);
   const displayTotalCardValue =
-    data?.type === "READY_MADE_WASKAT"
-      ? Math.max(0, Number(data?.totalPrice || 0) - readyMadeOriginalPrice)
-      : Number(data?.totalPrice || 0);
+    getOrderGrossTotal(data);
   const benefitExpenseRows = benefitDetails?.expenses || [];
 
   return (
@@ -704,7 +717,10 @@ function OrderViewModal({ orderId, open, onClose }) {
                     </Badge>
                     {data.isDamageOrder && (
                       <Badge v="red">
-                        {t("orders.damageOrderStatus", "Damage Order")}
+                        {t(
+                          "orders.damageOrderStatus",
+                          "This order has been marked as damaged",
+                        )}
                       </Badge>
                     )}
                     {data.isEmergency && (
@@ -1027,7 +1043,7 @@ function OrderViewModal({ orderId, open, onClose }) {
                 </div>
                 <strong>
                   {formatMoney(
-                    benefitDetails?.totalOrderPrice ?? data.totalPrice ?? 0,
+                    benefitDetails?.totalOrderPrice ?? getOrderNetTotal(data),
                     language,
                   )}
                 </strong>
@@ -1170,6 +1186,8 @@ function RowDropdown({
   onDelete,
   isReadOnly = false,
   readOnlyReason = "",
+  isCompleted = false,
+  completedProtection = null,
 }) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language || "en";
@@ -1217,6 +1235,28 @@ function RowDropdown({
     return () => document.removeEventListener("mousedown", handle);
   }, [open]);
 
+  const protect = completedProtection || { isProtected: false, canEdit: true, canDelete: true, isExpired: false };
+  const editDisabled = isReadOnly || (protect.isProtected && !protect.canEdit);
+  const deleteDisabled = isReadOnly || !protect.canDelete;
+  const editLocked = protect.isProtected && !protect.canEdit;
+  const deleteLocked = protect.isProtected && !protect.canDelete;
+
+  const editTitle = editLocked
+    ? t("orders.completedEditExpired", { defaultValue: "The 24-hour edit window for this completed order has expired." })
+    : protect.isProtected && protect.canEdit
+      ? t("orders.completedEditWindowRemaining", {
+          time: formatRemainingTime(protect.remainingMs),
+          defaultValue: `Edit window expires in ${formatRemainingTime(protect.remainingMs)}`,
+        })
+      : isReadOnly
+        ? readOnlyReason
+        : undefined;
+  const deleteTitle = deleteLocked
+    ? t("orders.completedOrderLocked", { defaultValue: "Completed orders cannot be edited or deleted." })
+    : isReadOnly
+      ? readOnlyReason
+      : undefined;
+
   const items = [
     isAdmin && {
       label: t("common.details", "Details"),
@@ -1227,12 +1267,13 @@ function RowDropdown({
     isAdmin && {
       label: t("common.edit"),
       icon: <LuPencil size={13} />,
-      onClick: isReadOnly ? null : onEdit,
-      cls: isReadOnly ? "disabled" : "",
-      disabled: isReadOnly,
-      title: isReadOnly ? readOnlyReason : undefined,
+      onClick: editDisabled ? null : onEdit,
+      cls: editLocked ? "locked" : isReadOnly ? "disabled" : "",
+      disabled: editDisabled,
+      title: editTitle,
     },
     showAssign &&
+      !protect.isProtected &&
       isAdmin && {
         label: order.assignedToId
           ? t("assignment.assignOrder")
@@ -1244,10 +1285,10 @@ function RowDropdown({
     isAdmin && {
       label: t("common.delete"),
       icon: <LuTrash2 size={13} />,
-      onClick: isReadOnly ? null : onDelete,
-      cls: isReadOnly ? "disabled" : "danger",
-      disabled: isReadOnly,
-      title: isReadOnly ? readOnlyReason : undefined,
+      onClick: deleteDisabled ? null : onDelete,
+      cls: deleteLocked ? "locked danger" : isReadOnly ? "disabled" : "danger",
+      disabled: deleteDisabled,
+      title: deleteTitle,
     },
   ].filter(Boolean);
 
@@ -1426,7 +1467,8 @@ export default function AllOrders({ filter, mode = "orders" }) {
     const orders = data?.data || [];
     return orders.reduce(
       (acc, order) => {
-        acc.total += order.totalPrice || 0;
+        if (order?.isDamageOrder) return acc;
+        acc.total += getOrderNetTotal(order);
         acc.paid += order.paidAmount || 0;
         acc.remaining += order.remaining || 0;
         return acc;
@@ -1446,7 +1488,6 @@ export default function AllOrders({ filter, mode = "orders" }) {
             ? t("orders.titleCompleted")
             : t("orders.titleAll");
   const getStatusBadgeMeta = (order) => getOrderCompletionStatus(order, t);
-
   // Always show newest orders at the top
   const orders = (data?.data || [])
     .slice()
@@ -1763,7 +1804,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
                               </Badge>
                             </td>
                             <td className="order-money-cell order-money-cell--total">
-                              {formatMoney(o.totalPrice, language)}
+                              {formatMoney(getOrderGrossTotal(o), language)}
                             </td>
                             <td
                               className={`order-money-cell ${displayTotalBenefit >= 0 ? "order-money-cell--paid" : "order-money-cell--remaining"}`}
@@ -1841,6 +1882,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
                                       billNumber: o.customer?.billNumber,
                                     })
                                   }
+                                  completedProtection={getCompletedOrderProtection(o)}
                                   isReadOnly={
                                     getMonthAccessMode(
                                       o.entryMonth ?? viewMonth,
@@ -1915,6 +1957,17 @@ export default function AllOrders({ filter, mode = "orders" }) {
                                 billNumber: o.customer?.billNumber,
                               })
                             }
+                            completedProtection={getCompletedOrderProtection(o)}
+                            isReadOnly={
+                              getMonthAccessMode(
+                                o.entryMonth ?? viewMonth,
+                                o.entryYear ?? viewYear,
+                              ) !== "editable"
+                            }
+                            readOnlyReason={t(
+                              "navbar.pastMonthReadOnly",
+                              "Past months are read-only. No editing allowed.",
+                            )}
                           />
                         </div>
                       </div>
@@ -1966,7 +2019,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
                             {t("common.total", "Total")}
                           </div>
                           <div className="order-mobile-value">
-                            {formatMoney(o.totalPrice, language)}
+                            {formatMoney(getOrderGrossTotal(o), language)}
                           </div>
                         </div>
                         <div className="order-mobile-metric">

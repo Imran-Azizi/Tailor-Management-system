@@ -9,6 +9,7 @@ import {
   LuClipboardList,
   LuEye,
   LuEyeOff,
+  LuLockKeyhole,
   LuPencil,
   LuPlus,
   LuRefreshCw,
@@ -16,6 +17,7 @@ import {
   LuTrash2,
   LuUpload,
   LuUsers,
+  LuTriangleAlert,
   LuX,
 } from "react-icons/lu";
 import { Modal } from "../components/ui/index.jsx";
@@ -102,23 +104,23 @@ function StatusPill({ status, isActive, t, isRtl = false }) {
 
 function StatTile({ label, value, icon: Icon, accent, isRtl = false }) {
   return (
-    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[0_14px_35px_-28px_rgba(15,23,42,.45)]">
-      <div className="flex items-center justify-between gap-3">
+    <div className="superadmin-stat-card rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
+      <div className="relative z-[1] flex items-center justify-between gap-4">
         <div>
-          <p className={cn("text-xs font-semibold text-[var(--text3)]", !isRtl && "uppercase tracking-[0.14em]")}>
+          <p className={cn("superadmin-stat-label text-xs font-semibold text-[var(--text3)]", !isRtl && "uppercase tracking-[0.12em]")}>
             {label}
           </p>
-          <p className="mt-2 text-2xl font-bold tracking-tight text-[var(--text1)]">
+          <p className="superadmin-stat-value mt-2 text-3xl font-bold tracking-tight text-[var(--text1)]">
             {value}
           </p>
         </div>
         <div
           className={cn(
-            "flex h-10 w-10 items-center justify-center rounded-lg border",
+            "superadmin-stat-icon flex h-12 w-12 items-center justify-center rounded-2xl border",
             accent,
           )}
         >
-          <Icon size={18} />
+          <Icon size={21} />
         </div>
       </div>
     </div>
@@ -144,7 +146,7 @@ function tenantToForm(tenant) {
     logoUrl: tenant.logoUrl || "",
     ownerName: tenant.owner?.name || "",
     ownerPhone: tenant.owner?.phoneNumber || "",
-    ownerPassword: "",
+    ownerPassword: tenant.owner?.latestPassword || "",
     subscriptionPlan: tenant.subscriptionPlan || "TRIAL",
     subscriptionStatus: tenant.subscriptionStatus || "TRIAL",
     subscriptionStart: dateInputValue(tenant.subscriptionStart),
@@ -177,7 +179,9 @@ function validateTenantForm(form, mode, t) {
 
   if (!form.ownerName.trim()) errors.ownerName = t("superAdmin.validation.ownerName");
   if (!form.ownerPhone.trim()) errors.ownerPhone = t("superAdmin.validation.ownerPhone");
-  if (form.ownerPassword && form.ownerPassword.length < 6) {
+  if (mode === "create" && !form.ownerPassword) {
+    errors.ownerPassword = t("superAdmin.validation.ownerPasswordRequired");
+  } else if (form.ownerPassword && form.ownerPassword.length < 6) {
     errors.ownerPassword = t("superAdmin.validation.passwordLength");
   }
   if (form.logoFile) {
@@ -290,7 +294,7 @@ function TenantModal({
       onClose={isPending ? () => {} : onClose}
       title={mode === "edit" ? t("superAdmin.editTenant") : t("superAdmin.createTenant")}
       maxW={860}
-      boxClassName="!rounded-lg"
+      boxClassName="superadmin-modal"
       bodyClassName="!p-0"
       dir={isRtl ? "rtl" : "ltr"}
     >
@@ -320,7 +324,8 @@ function TenantModal({
                     const isPassword = key === "ownerPassword";
                     const isRequired =
                       key === "systemName" ||
-                      ["ownerName", "ownerPhone"].includes(key);
+                      ["ownerName", "ownerPhone"].includes(key) ||
+                      (mode === "create" && key === "ownerPassword");
 
                     if (key === "logoFile") {
                       return (
@@ -544,6 +549,10 @@ export default function SuperAdminDashboard() {
   const [modalMode, setModalMode] = useState(null);
   const [editingTenant, setEditingTenant] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deletePasswordVisible, setDeletePasswordVisible] = useState(false);
+  const [deleteVerified, setDeleteVerified] = useState(false);
+  const [deletePasswordError, setDeletePasswordError] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
 
@@ -608,14 +617,66 @@ export default function SuperAdminDashboard() {
     onError: (error) => toast.error(getApiErrorMessage(error, t("superAdmin.toast.updateFailed"))),
   });
 
-  const deleteMut = useMutation({
-    mutationFn: (id) => api.delete(`/tenants/${id}`),
+  const resetDeleteFlow = () => {
+    setDeleteTarget(null);
+    setDeletePassword("");
+    setDeletePasswordVisible(false);
+    setDeleteVerified(false);
+    setDeletePasswordError("");
+  };
+
+  const beginDeleteFlow = (tenant) => {
+    setDeleteTarget(tenant);
+    setDeletePassword("");
+    setDeletePasswordVisible(false);
+    setDeleteVerified(false);
+    setDeletePasswordError("");
+  };
+
+  const verifyDeleteMut = useMutation({
+    mutationFn: ({ id, password }) =>
+      api.post(`/tenants/${id}/verify-deletion`, { password }),
     onSuccess: () => {
+      setDeletePasswordError("");
+      setDeleteVerified(true);
+    },
+    onError: (error) => {
+      const message =
+        error?.response?.data?.code === "INVALID_CURRENT_PASSWORD"
+          ? t("superAdmin.secureDelete.invalidPassword")
+          : error?.response?.data?.code === "TOO_MANY_PASSWORD_ATTEMPTS"
+            ? t("superAdmin.secureDelete.tooManyAttempts")
+          : getApiErrorMessage(error, t("superAdmin.toast.deleteFailed"));
+      setDeletePasswordError(message);
+      toast.error(message);
+    },
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: ({ id, password }) =>
+      api.delete(`/tenants/${id}`, { data: { password } }),
+    onSuccess: ({ data }) => {
       toast.success(t("superAdmin.toast.deleted"));
-      setDeleteTarget(null);
+      if (data?.cleanupWarnings?.length) {
+        toast(t("superAdmin.toast.cleanupWarning"), { icon: "⚠️" });
+      }
+      resetDeleteFlow();
       qc.invalidateQueries({ queryKey: ["saas-tenants"] });
     },
-    onError: (error) => toast.error(getApiErrorMessage(error, t("superAdmin.toast.deleteFailed"))),
+    onError: (error) => {
+      if (error?.response?.data?.code === "INVALID_CURRENT_PASSWORD") {
+        const message = t("superAdmin.secureDelete.invalidPassword");
+        setDeleteVerified(false);
+        setDeletePasswordError(message);
+        toast.error(message);
+        return;
+      }
+      if (error?.response?.data?.code === "TOO_MANY_PASSWORD_ATTEMPTS") {
+        toast.error(t("superAdmin.secureDelete.tooManyAttempts"));
+        return;
+      }
+      toast.error(getApiErrorMessage(error, t("superAdmin.toast.deleteFailed")));
+    },
   });
 
   const isSaving = createMut.isPending || updateMut.isPending;
@@ -655,23 +716,23 @@ export default function SuperAdminDashboard() {
       )}
       dir={isRtl ? "rtl" : "ltr"}
     >
-      <div className="mx-auto flex max-w-7xl flex-col gap-5">
-        <section className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_18px_45px_-34px_rgba(15,23,42,.65)] sm:p-6">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+      <div className="superadmin-content mx-auto flex max-w-[1440px] flex-col gap-6">
+        <section className="superadmin-hero overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-7">
+          <div className="relative z-[1] flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="max-w-3xl">
-              <div className={cn("inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200", !isRtl && "uppercase tracking-[0.14em]")}>
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <div className={cn("superadmin-eyebrow inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold", !isRtl && "uppercase tracking-[0.14em]")}>
+                <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_0_5px_rgba(52,211,153,.12)]" />
                 {t("superAdmin.badge")}
               </div>
-              <h1 className="mt-4 text-2xl font-bold tracking-tight text-[var(--text1)] sm:text-3xl">
+              <h1 className="superadmin-hero-title mt-5 text-3xl font-bold tracking-[-0.035em] text-[var(--text1)] sm:text-4xl">
                 {t("superAdmin.title")}
               </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text3)]">
+              <p className="superadmin-hero-copy mt-3 max-w-2xl text-sm leading-7 text-[var(--text2)] sm:text-[15px]">
                 {t("superAdmin.subtitle")}
               </p>
             </div>
             <button
-              className="group inline-flex min-h-12 w-full items-center justify-center gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-600 px-5 text-sm font-bold text-white shadow-[0_18px_34px_-22px_rgba(5,150,105,0.95)] transition duration-200 hover:-translate-y-0.5 hover:border-emerald-600 hover:bg-emerald-700 hover:shadow-[0_22px_42px_-22px_rgba(5,150,105,0.95)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] active:translate-y-0 sm:w-auto"
+              className="superadmin-primary-action group inline-flex min-h-12 w-full items-center justify-center gap-2.5 rounded-2xl border px-5 text-sm font-bold text-white transition duration-200 focus-visible:outline-none active:translate-y-0 sm:w-auto"
               onClick={openCreateModal}
             >
               <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white/15 transition group-hover:bg-white/20">
@@ -682,7 +743,7 @@ export default function SuperAdminDashboard() {
           </div>
         </section>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="superadmin-stats-grid grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <StatTile
             label={t("superAdmin.metrics.tenants")}
             value={totals.tenants}
@@ -706,16 +767,16 @@ export default function SuperAdminDashboard() {
           />
         </div>
 
-        <section className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[0_18px_45px_-34px_rgba(15,23,42,.65)]">
-          <div className="flex flex-col gap-3 border-b border-[var(--border)] bg-[var(--surface2)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+        <section className="superadmin-table-card overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)]">
+          <div className="superadmin-table-toolbar flex flex-col gap-4 border-b border-[var(--border)] px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h2 className="text-base font-bold text-[var(--text1)]">{t("superAdmin.tableTitle")}</h2>
-              <p className="mt-1 text-xs text-[var(--text3)]">
+              <h2 className="text-lg font-bold tracking-tight text-[var(--text1)]">{t("superAdmin.tableTitle")}</h2>
+              <p className="mt-1 text-sm text-[var(--text3)]">
                 {t("superAdmin.tableSubtitle")}
               </p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <div className="iw min-w-0 sm:w-80">
+              <div className="iw superadmin-search min-w-0 sm:w-80">
                 <LuSearch size={15} className="ico" />
                 <input
                   className="inp with-leading-icon"
@@ -725,7 +786,7 @@ export default function SuperAdminDashboard() {
                 />
               </div>
               <button
-                className="btn btn-outline"
+                className="btn btn-outline superadmin-refresh"
                 onClick={() => qc.invalidateQueries({ queryKey: ["saas-tenants"] })}
                 disabled={isLoading}
               >
@@ -735,10 +796,110 @@ export default function SuperAdminDashboard() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] border-collapse text-sm">
+          <div className="grid gap-3 p-3 sm:p-4 md:hidden">
+            {isLoading ? (
+              <div className="rounded-2xl border border-dashed border-[var(--border)] px-4 py-10 text-center text-sm text-[var(--text3)]">
+                {t("superAdmin.loadingTenants")}
+              </div>
+            ) : tenants.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-[var(--border)] px-4 py-10 text-center text-sm text-[var(--text3)]">
+                {t("superAdmin.noTenants")}
+              </div>
+            ) : (
+              tenants.map((tenant) => (
+                <article key={tenant.id} className="superadmin-tenant-card rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface2)] text-[var(--text2)]">
+                        {tenant.logoUrl ? (
+                          <img src={assetUrl(tenant.logoUrl)} alt="" className="h-full w-full object-contain" />
+                        ) : (
+                          <LuBuilding2 size={18} />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="truncate text-sm font-bold text-[var(--text1)]">
+                          {tenant.systemName || tenant.businessName}
+                        </h3>
+                        <p className="mt-1 truncate text-xs text-[var(--text3)]">
+                          {t(`superAdmin.plan.${tenant.subscriptionPlan}`, tenant.subscriptionPlan)}
+                        </p>
+                      </div>
+                    </div>
+                    <StatusPill
+                      status={tenant.subscriptionStatus}
+                      isActive={tenant.isActive}
+                      t={t}
+                      isRtl={isRtl}
+                    />
+                  </div>
+
+                  <dl className="mt-4 grid grid-cols-3 gap-2">
+                    {[
+                      [t("superAdmin.columns.users"), tenant._count?.users || 0],
+                      [t("superAdmin.columns.customers"), tenant._count?.customers || 0],
+                      [t("superAdmin.columns.orders"), tenant._count?.orders || 0],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-xl bg-[var(--surface2)] px-2 py-2.5 text-center">
+                        <dt className="truncate text-[10px] font-semibold text-[var(--text3)]">{label}</dt>
+                        <dd className="mt-1 text-base font-bold text-[var(--text1)]">{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+
+                  <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-[var(--surface2)] px-3 py-2.5 text-xs">
+                    <span className="text-[var(--text3)]">{t("superAdmin.columns.expiry")}</span>
+                    <strong className="font-semibold text-[var(--text2)]">
+                      {formatDateLocale(tenant.expiryDate, language)}
+                    </strong>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-3 gap-2">
+                    <button
+                      className="btn btn-outline btn-sm min-w-0 justify-center px-2"
+                      onClick={() => openEditModal(tenant)}
+                      disabled={isSaving || deleteMut.isPending}
+                    >
+                      <LuPencil size={13} />
+                      <span className="truncate">{t("common.edit")}</span>
+                    </button>
+                    <button
+                      className="btn btn-outline btn-sm min-w-0 justify-center px-2"
+                      disabled={updateMut.isPending}
+                      onClick={() =>
+                        updateMut.mutate({
+                          id: tenant.id,
+                          data: {
+                            isActive: !tenant.isActive,
+                            subscriptionStatus: tenant.isActive ? "SUSPENDED" : "ACTIVE",
+                          },
+                        })
+                      }
+                    >
+                      {tenant.isActive ? <LuBan size={13} /> : <LuCircleCheck size={13} />}
+                      <span className="truncate">
+                        {tenant.isActive ? t("superAdmin.suspend") : t("superAdmin.activate")}
+                      </span>
+                    </button>
+                    <button
+                      className="btn btn-outline btn-sm min-w-0 justify-center px-2"
+                      disabled={deleteMut.isPending}
+                      style={{ color: "var(--danger)" }}
+                      onClick={() => beginDeleteFlow(tenant)}
+                    >
+                      <LuTrash2 size={13} />
+                      <span className="truncate">{t("common.delete")}</span>
+                    </button>
+                  </div>
+                </article>
+              ))
+            )}
+          </div>
+
+          <div className="superadmin-table-wrap hidden overflow-x-auto md:block">
+            <table className="superadmin-table w-full min-w-[980px] border-collapse text-sm">
               <thead>
-                <tr className="border-b border-[var(--border)]">
+                <tr className="border-b border-[var(--border)] bg-[var(--surface2)]">
                   {[
                     t("superAdmin.columns.tenant"),
                     t("superAdmin.columns.plan"),
@@ -845,7 +1006,7 @@ export default function SuperAdminDashboard() {
                             className="btn btn-outline btn-sm"
                             disabled={deleteMut.isPending}
                             style={{ color: "var(--danger)" }}
-                            onClick={() => setDeleteTarget(tenant)}
+                            onClick={() => beginDeleteFlow(tenant)}
                           >
                             <LuTrash2 size={13} />
                             {t("common.delete")}
@@ -880,18 +1041,100 @@ export default function SuperAdminDashboard() {
         />
 
         <Modal
-          open={Boolean(deleteTarget)}
-          onClose={() => (deleteMut.isPending ? null : setDeleteTarget(null))}
+          open={Boolean(deleteTarget) && !deleteVerified}
+          onClose={() => (verifyDeleteMut.isPending ? null : resetDeleteFlow())}
+          title={t("superAdmin.secureDelete.passwordTitle")}
+          maxW={480}
+          boxClassName="superadmin-modal"
+          dir={isRtl ? "rtl" : "ltr"}
+          >
+            <form
+              className="space-y-5"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (!deletePassword || verifyDeleteMut.isPending) return;
+                verifyDeleteMut.mutate({
+                  id: deleteTarget.id,
+                  password: deletePassword,
+                });
+              }}
+            >
+            <div>
+              <label className="lbl" htmlFor="tenant-delete-password">
+                {t("superAdmin.secureDelete.currentPassword")}
+              </label>
+              <div className="relative">
+                <input
+                  id="tenant-delete-password"
+                  className="inp w-full"
+                  type={deletePasswordVisible ? "text" : "password"}
+                  value={deletePassword}
+                  autoComplete="current-password"
+                  autoFocus
+                  onChange={(event) => {
+                    setDeletePassword(event.target.value);
+                    setDeletePasswordError("");
+                  }}
+                  aria-invalid={Boolean(deletePasswordError)}
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 end-0 flex w-11 items-center justify-center text-[var(--text3)]"
+                  onClick={() => setDeletePasswordVisible((visible) => !visible)}
+                  aria-label={
+                    deletePasswordVisible
+                      ? t("superAdmin.hidePassword")
+                      : t("superAdmin.showPassword")
+                  }
+                >
+                  {deletePasswordVisible ? <LuEyeOff size={17} /> : <LuEye size={17} />}
+                </button>
+              </div>
+              {deletePasswordError ? (
+                <p className="err-msg mt-2" role="alert">
+                  {deletePasswordError}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                className="btn btn-outline"
+                disabled={verifyDeleteMut.isPending}
+                onClick={resetDeleteFlow}
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={!deletePassword || verifyDeleteMut.isPending}
+              >
+                {verifyDeleteMut.isPending ? (
+                  <LuRefreshCw size={15} className="animate-spin" />
+                ) : (
+                  <LuLockKeyhole size={15} />
+                )}
+                {t("superAdmin.secureDelete.verify")}
+              </button>
+            </div>
+          </form>
+        </Modal>
+
+        <Modal
+          open={Boolean(deleteTarget) && deleteVerified}
+          onClose={() => (deleteMut.isPending ? null : resetDeleteFlow())}
           title={t("superAdmin.deleteConfirmTitle")}
           maxW={480}
-          boxClassName="!rounded-lg"
+          boxClassName="superadmin-modal"
           dir={isRtl ? "rtl" : "ltr"}
         >
           <div className="space-y-4">
             <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100">
               <div className="flex items-start gap-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/70 text-red-600 ring-1 ring-red-200 dark:bg-white/10 dark:text-red-200 dark:ring-red-500/30">
-                  <LuTrash2 size={19} />
+                  <LuTriangleAlert size={19} />
                 </span>
                 <div className="min-w-0">
                   <p className="text-sm font-bold">
@@ -910,7 +1153,7 @@ export default function SuperAdminDashboard() {
                 type="button"
                 className="btn btn-outline"
                 disabled={deleteMut.isPending}
-                onClick={() => setDeleteTarget(null)}
+                onClick={resetDeleteFlow}
               >
                 {t("common.cancel")}
               </button>
@@ -918,7 +1161,12 @@ export default function SuperAdminDashboard() {
                 type="button"
                 className="btn btn-danger"
                 disabled={deleteMut.isPending || !deleteTarget?.id}
-                onClick={() => deleteMut.mutate(deleteTarget.id)}
+                onClick={() =>
+                  deleteMut.mutate({
+                    id: deleteTarget.id,
+                    password: deletePassword,
+                  })
+                }
               >
                 {deleteMut.isPending ? (
                   <LuRefreshCw size={15} className="animate-spin" />

@@ -4,7 +4,10 @@ import { useTranslation } from "react-i18next";
 import { LuFactory, LuFilter, LuRuler, LuShoppingBag } from "react-icons/lu";
 import api from "../lib/api.js";
 import { formatCurrency } from "../lib/currency.js";
-import { formatDateLocale } from "../lib/locale.js";
+import {
+  formatDateLocale,
+  isRtlLanguage,
+} from "../lib/locale.js";
 import { formatMeters } from "../lib/meters.js";
 import { getOrderTypeLabel } from "../lib/orderType.js";
 import {
@@ -17,6 +20,7 @@ import {
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
 import MobileFilterPanel from "../components/ui/MobileFilterPanel.jsx";
+import "./RakhtRevenue.css";
 
 const DEFAULT_FILTERS = {
   search: "",
@@ -31,7 +35,7 @@ const DEFAULT_FILTERS = {
 export default function RakhtRevenue() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language || "en";
-  const isRtl = i18n.dir?.(language) === "rtl";
+  const isRtl = isRtlLanguage(language);
   const meterUnit = t("rakht.meterUnitShort", { defaultValue: "m" });
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const { viewMonth, viewYear } = useMonth();
@@ -65,7 +69,7 @@ export default function RakhtRevenue() {
 
   if (isLoading) {
     return (
-      <div className="page">
+      <div className="page professional-report-page">
         <Spinner />
       </div>
     );
@@ -92,9 +96,89 @@ export default function RakhtRevenue() {
     Boolean(filters.tonName),
     Boolean(filters.orderType),
   ].filter(Boolean).length;
+  const revenueColumns = {
+    date: {
+      header: t("common.date", "Date"),
+      render: (row) =>
+        formatDateLocale(row.createdAt, language, {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        }),
+    },
+    customer: {
+      header: t("createOrder.customerInfo", "Customer"),
+      render: (row) => row.customerName || "-",
+    },
+    company: {
+      header: t("rakht.companyName", "Company"),
+      render: (row) => row.companyName || "-",
+    },
+    brand: {
+      header: t("rakht.brandName", "Brand"),
+      render: (row) => row.brandName || "-",
+    },
+    ton: {
+      header: t("rakht.tonName", "Ton Color Name"),
+      render: (row) => row.tonName || "-",
+    },
+    orderType: {
+      header: t("createOrder.orderTypes", "Order Type"),
+      render: (row) => getOrderTypeLabel(row.orderType, language),
+    },
+    meters: {
+      header: t("rakht.requiredMeters", "Meters"),
+      render: (row) => formatMeters(row.meters),
+      numeric: true,
+    },
+    costPerMeter: {
+      header: t("rakht.piecePrice", "Cost/Meter"),
+      render: (row) => formatCurrency(row.costPerMeter, language),
+      numeric: true,
+    },
+    sellingPerMeter: {
+      header: t("rakht.priceForCustomer", "Sell/Meter"),
+      render: (row) => formatCurrency(row.sellingPerMeter, language),
+      numeric: true,
+    },
+    benefit: {
+      header: t("rakht.benefit", "Benefit"),
+      render: (row) => formatCurrency(row.benefit, language),
+      numeric: true,
+      benefit: true,
+    },
+  };
+  const revenueColumnOrder = isRtl
+    ? [
+        "company",
+        "brand",
+        "ton",
+        "customer",
+        "orderType",
+        "meters",
+        "costPerMeter",
+        "sellingPerMeter",
+        "benefit",
+        "date",
+      ]
+    : [
+        "date",
+        "customer",
+        "company",
+        "brand",
+        "ton",
+        "orderType",
+        "meters",
+        "costPerMeter",
+        "sellingPerMeter",
+        "benefit",
+      ];
 
   return (
-    <div className="page">
+    <div
+      className="page report-root professional-report-page rakht-revenue-page"
+      dir={isRtl ? "rtl" : "ltr"}
+    >
       <PageHeader
         title={t("rakht.totalRevenue", { defaultValue: "Total Revenue" })}
         subtitle={t("rakht.totalRevenueSubtitle", {
@@ -266,49 +350,50 @@ export default function RakhtRevenue() {
           noPad
         >
         {summary.details?.length ? (
-          <div className="tbl-wrap">
-            <table className="tbl" style={{ width: "100%" }}>
+          <div className="tbl-wrap professional-report-table-wrap rakht-revenue-records-wrap">
+            <table
+              className="tbl professional-report-table rakht-revenue-records-table"
+              data-language-direction={isRtl ? "rtl" : "ltr"}
+            >
               <thead>
                 <tr>
-                  <th>{t("common.date", "Date")}</th>
-                  <th>{t("createOrder.customerInfo", "Customer")}</th>
-                  <th>{t("rakht.companyName", "Company")}</th>
-                  <th>{t("rakht.brandName", "Brand")}</th>
-                  <th>{t("rakht.tonName", "Ton Color Name")}</th>
-                  <th>{t("createOrder.orderTypes", "Type")}</th>
-                  <th>{t("rakht.requiredMeters", "Meters")}</th>
-                  <th>{t("rakht.piecePrice", "Cost/Meter")}</th>
-                  <th>{t("rakht.priceForCustomer", "Sell/Meter")}</th>
-                  <th>{t("rakht.benefit", "Benefit")}</th>
+                  {revenueColumnOrder.map((columnKey) => (
+                    <th
+                      key={columnKey}
+                      className={`rakht-revenue-col--${columnKey}`}
+                    >
+                      {revenueColumns[columnKey].header}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {summary.details.map((row) => (
                   <tr key={row.orderId}>
-                    <td>
-                      {formatDateLocale(row.createdAt, language, {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </td>
-                    <td>{row.customerName}</td>
-                    <td>{row.companyName}</td>
-                    <td>{row.brandName}</td>
-                    <td>{row.tonName}</td>
-                    <td>{getOrderTypeLabel(row.orderType, language)}</td>
-                    <td>{formatMeters(row.meters)}</td>
-                    <td>{formatCurrency(row.costPerMeter, language)}</td>
-                    <td>{formatCurrency(row.sellingPerMeter, language)}</td>
-                    <td
-                      style={{
-                        color:
-                          row.benefit >= 0 ? "var(--success)" : "var(--danger)",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {formatCurrency(row.benefit, language)}
-                    </td>
+                    {revenueColumnOrder.map((columnKey) => {
+                      const column = revenueColumns[columnKey];
+                      return (
+                        <td
+                          key={columnKey}
+                          className={`rakht-revenue-col--${columnKey}${
+                            column.numeric ? " rakht-revenue-number" : ""
+                          }`}
+                          style={
+                            column.benefit
+                              ? {
+                                  color:
+                                    row.benefit >= 0
+                                      ? "var(--success)"
+                                      : "var(--danger)",
+                                  fontWeight: 700,
+                                }
+                              : undefined
+                          }
+                        >
+                          {column.render(row)}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>

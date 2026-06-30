@@ -3,6 +3,12 @@ import crypto from "crypto";
 import fs from "fs/promises";
 import path from "path";
 import { prisma } from "../lib/prisma.js";
+import {
+  getOrderFinancialPaid,
+  getOrderFinancialRemaining,
+  getOrderFinancialTotal,
+} from "../lib/orderFinancials.js";
+import { prepareTenantBackupDeletion } from "../services/backup.service.js";
 
 const SALT_ROUNDS = 12;
 const DEFAULT_CURRENCY = "AFN";
@@ -46,6 +52,7 @@ const ownerSelect = {
   id: true,
   name: true,
   phoneNumber: true,
+  latestPassword: true,
   accountType: true,
   isActive: true,
 };
@@ -213,6 +220,29 @@ async function writeAudit(req, action, entity, entityId, metadata = null) {
   });
 }
 
+async function verifySuperAdminPassword(req, password) {
+  if (!password) {
+    const error = new Error("Current password is required.");
+    error.status = 400;
+    throw error;
+  }
+  const account = await prisma.user.findUnique({
+    where: { id: req.user.id },
+    select: { password: true, accountType: true },
+  });
+  if (!account || account.accountType !== "SUPER_ADMIN") {
+    const error = new Error("Super admin account not found.");
+    error.status = 404;
+    throw error;
+  }
+  if (!(await bcrypt.compare(String(password), account.password))) {
+    const error = new Error("Current password is incorrect.");
+    error.status = 401;
+    error.code = "INVALID_CURRENT_PASSWORD";
+    throw error;
+  }
+}
+
 export async function listTenants(req, res, next) {
   try {
     const search = String(req.query.search || "").trim();
@@ -267,12 +297,14 @@ export async function createTenant(req, res, next) {
     }
 
     const tenantSlug = await uniqueTenantSlug(businessName);
-    savedLogoUrl = await saveLogo(req.body.logoUpload);
-
-    const password = ownerPassword || ownerPhone.trim();
+    if (!ownerPassword) {
+      return res.status(400).json({ error: "Owner password is required." });
+    }
+    const password = String(ownerPassword);
     if (password.length < 6) {
       return res.status(400).json({ error: "Owner password must be at least 6 characters." });
     }
+    savedLogoUrl = await saveLogo(req.body.logoUpload);
 
     const created = await prisma.$transaction(async (tx) => {
       const tenant = await tx.tenant.create({
@@ -294,8 +326,9 @@ export async function createTenant(req, res, next) {
           phoneNumber: ownerPhone.trim(),
           accountType: "ADMIN",
           password: await bcrypt.hash(password, SALT_ROUNDS),
+          latestPassword: password,
         },
-        select: { id: true, name: true, phoneNumber: true, accountType: true },
+        select: ownerSelect,
       });
 
       return { tenant, owner };
@@ -354,7 +387,10 @@ export async function updateTenant(req, res, next) {
           data: {
             ...ownerData,
             ...(req.body.ownerPassword
-              ? { password: await bcrypt.hash(String(req.body.ownerPassword), SALT_ROUNDS) }
+              ? {
+                  password: await bcrypt.hash(String(req.body.ownerPassword), SALT_ROUNDS),
+                  latestPassword: String(req.body.ownerPassword),
+                }
               : {}),
           },
         });
@@ -377,15 +413,72 @@ export async function updateTenant(req, res, next) {
 }
 
 export async function deleteTenant(req, res, next) {
+  let backupDeletion = null;
   try {
     const tenant = await prisma.tenant.findUnique({
       where: { id: req.params.id },
-      select: { logoUrl: true },
+      select: { id: true, logoUrl: true, systemName: true },
     });
-    await prisma.tenant.delete({ where: { id: req.params.id } });
-    if (tenant?.logoUrl) await deleteLogo(tenant.logoUrl);
-    await writeAudit(req, "TENANT_DELETED", "Tenant", req.params.id);
-    res.json({ message: "Tenant deleted." });
+    if (!tenant) return res.status(404).json({ error: "Tenant not found." });
+
+    await verifySuperAdminPassword(req, req.body?.password);
+    backupDeletion = await prepareTenantBackupDeletion(tenant.id);
+
+    await prisma.$transaction(async (tx) => {
+      if (backupDeletion.recordIds.length) {
+        await tx.backupRecord.deleteMany({
+          where: { id: { in: backupDeletion.recordIds } },
+        });
+      }
+      await tx.tenant.delete({ where: { id: tenant.id } });
+      await tx.auditLog.create({
+        data: {
+          tenantId: null,
+          actorId: req.user.id,
+          action: "TENANT_DELETED",
+          entity: "Tenant",
+          entityId: tenant.id,
+          metadata: {
+            systemName: tenant.systemName,
+            deletedBackupCount: backupDeletion.recordIds.length,
+          },
+          ipAddress: req.ip,
+          userAgent: req.headers["user-agent"],
+        },
+      });
+    });
+
+    const cleanupWarnings = await backupDeletion.commit();
+    backupDeletion = null;
+    if (tenant.logoUrl) {
+      try {
+        await deleteLogo(tenant.logoUrl);
+      } catch (error) {
+        cleanupWarnings.push({
+          type: "logo",
+          error: error?.message || "Could not remove tenant logo.",
+        });
+      }
+    }
+    res.json({
+      message: "Tenant deleted.",
+      cleanupWarnings,
+    });
+  } catch (err) {
+    if (backupDeletion) await backupDeletion.rollback();
+    next(err);
+  }
+}
+
+export async function verifyTenantDeletionPassword(req, res, next) {
+  try {
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: req.params.id },
+      select: { id: true },
+    });
+    if (!tenant) return res.status(404).json({ error: "Tenant not found." });
+    await verifySuperAdminPassword(req, req.body?.password);
+    res.json({ verified: true });
   } catch (err) {
     next(err);
   }
@@ -394,13 +487,34 @@ export async function deleteTenant(req, res, next) {
 export async function tenantStats(req, res, next) {
   try {
     const tenantId = req.params.id;
-    const [users, customers, orders, activeOrders, revenue] = await Promise.all([
-      prisma.user.count({ where: { tenantId } }),
-      prisma.customer.count({ where: { tenantId } }),
-      prisma.order.count({ where: { tenantId } }),
-      prisma.order.count({ where: { tenantId, isCompleted: false } }),
-      prisma.order.aggregate({ where: { tenantId }, _sum: { totalPrice: true, paidAmount: true, remaining: true } }),
-    ]);
+    const [users, customers, orders, activeOrders, revenue, revenueOrders] =
+      await Promise.all([
+        prisma.user.count({ where: { tenantId } }),
+        prisma.customer.count({ where: { tenantId } }),
+        prisma.order.count({ where: { tenantId } }),
+        prisma.order.count({ where: { tenantId, isCompleted: false } }),
+        prisma.order.aggregate({
+          where: { tenantId, damagedClothesPenalties: { none: {} } },
+          _sum: {
+            totalPrice: true,
+            discount: true,
+            paidAmount: true,
+            remaining: true,
+          },
+        }),
+        prisma.order.findMany({
+          where: { tenantId, damagedClothesPenalties: { none: {} } },
+          select: {
+            type: true,
+            totalPrice: true,
+            totalBenefit: true,
+            discount: true,
+            paidAmount: true,
+            readyMadeOriginalPrice: true,
+            readyMadeWaskatOriginalPrice: true,
+          },
+        }),
+      ]);
 
     res.json({
       users,
@@ -408,9 +522,19 @@ export async function tenantStats(req, res, next) {
       orders,
       activeOrders,
       revenue: {
-        totalPrice: revenue._sum.totalPrice || 0,
-        paidAmount: revenue._sum.paidAmount || 0,
-        remaining: revenue._sum.remaining || 0,
+        totalPrice: revenueOrders.reduce(
+          (sum, order) => sum + getOrderFinancialTotal(order),
+          0,
+        ),
+        discount: revenue._sum.discount || 0,
+        paidAmount: revenueOrders.reduce(
+          (sum, order) => sum + getOrderFinancialPaid(order),
+          0,
+        ),
+        remaining: revenueOrders.reduce(
+          (sum, order) => sum + getOrderFinancialRemaining(order),
+          0,
+        ),
       },
     });
   } catch (err) {
@@ -426,11 +550,18 @@ export async function getMyTenantSettings(req, res, next) {
 
     const tenant = await prisma.tenant.findUnique({
       where: { id: req.user.tenantId },
-      select: tenantSelect,
+      select: {
+        ...tenantSelect,
+        users: {
+          where: { id: req.user.id },
+          take: 1,
+          select: ownerSelect,
+        },
+      },
     });
 
     if (!tenant) return res.status(404).json({ error: "Tenant settings not found." });
-    res.json(tenant);
+    res.json(serializeTenant(tenant));
   } catch (err) {
     next(err);
   }
@@ -446,6 +577,63 @@ export async function updateMyTenantSettings(req, res, next) {
       where: { id: req.user.tenantId },
       select: { logoUrl: true },
     });
+    const ownerName = req.body.ownerName;
+    const ownerPhone = req.body.ownerPhone;
+    const currentPassword = String(req.body.currentPassword || "");
+    const newPassword = String(req.body.newPassword || "");
+    const confirmPassword = String(req.body.confirmPassword || "");
+    const ownerData = {};
+
+    if (ownerName !== undefined) {
+      const name = String(ownerName || "").trim();
+      if (!name) return res.status(400).json({ error: "Owner name is required." });
+      ownerData.name = name;
+    }
+    if (ownerPhone !== undefined) {
+      const phoneNumber = String(ownerPhone || "").trim();
+      if (!phoneNumber) return res.status(400).json({ error: "Owner phone is required." });
+      ownerData.phoneNumber = phoneNumber;
+    }
+    if (newPassword || confirmPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({ error: "Current password is required." });
+      }
+      if (newPassword !== confirmPassword) {
+        return res.status(400).json({ error: "New password and confirmation do not match." });
+      }
+      if (newPassword.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters." });
+      }
+      ownerData.password = await bcrypt.hash(newPassword, SALT_ROUNDS);
+      ownerData.latestPassword = newPassword;
+    }
+
+    if (Object.keys(ownerData).length) {
+      const account = await prisma.user.findUnique({
+        where: { id: req.user.id },
+        select: { id: true, tenantId: true, password: true, accountType: true },
+      });
+      if (!account || account.tenantId !== req.user.tenantId || account.accountType !== "ADMIN") {
+        return res.status(404).json({ error: "Owner account not found." });
+      }
+      if (ownerData.password && !(await bcrypt.compare(currentPassword, account.password))) {
+        return res.status(401).json({ code: "INVALID_CURRENT_PASSWORD", error: "Current password is incorrect." });
+      }
+      if (ownerData.phoneNumber) {
+        const phoneOwner = await prisma.user.findFirst({
+          where: {
+            tenantId: req.user.tenantId,
+            id: { not: account.id },
+            phoneNumber: ownerData.phoneNumber,
+          },
+          select: { id: true },
+        });
+        if (phoneOwner) {
+          return res.status(409).json({ code: "PHONE_IN_USE", error: "This phone number is already in use." });
+        }
+      }
+    }
+
     const allowed = tenantPayload(req.body);
     delete allowed.subscriptionPlan;
     delete allowed.subscriptionStatus;
@@ -453,20 +641,35 @@ export async function updateMyTenantSettings(req, res, next) {
     delete allowed.expiryDate;
     delete allowed.isActive;
 
-    const tenant = await prisma.tenant.update({
-      where: { id: req.user.tenantId },
-      data: {
-        ...allowed,
-        ...(req.body.logoUpload ? { logoUrl: (newLogoUrl = await saveLogo(req.body.logoUpload)) } : {}),
-        ...(req.body.removeLogo ? { logoUrl: null } : {}),
-      },
-      select: tenantSelect,
+    const tenant = await prisma.$transaction(async (tx) => {
+      if (Object.keys(ownerData).length) {
+        await tx.user.update({
+          where: { id: req.user.id },
+          data: ownerData,
+        });
+      }
+      return tx.tenant.update({
+        where: { id: req.user.tenantId },
+        data: {
+          ...allowed,
+          ...(req.body.logoUpload ? { logoUrl: (newLogoUrl = await saveLogo(req.body.logoUpload)) } : {}),
+          ...(req.body.removeLogo ? { logoUrl: null } : {}),
+        },
+        select: {
+          ...tenantSelect,
+          users: {
+            where: { id: req.user.id },
+            take: 1,
+            select: ownerSelect,
+          },
+        },
+      });
     });
     if ((newLogoUrl || req.body.removeLogo) && existing?.logoUrl) {
       await deleteLogo(existing.logoUrl);
     }
     await writeAudit(req, "TENANT_SETTINGS_UPDATED", "Tenant", tenant.id);
-    res.json(tenant);
+    res.json(serializeTenant(tenant));
   } catch (err) {
     if (newLogoUrl) await deleteLogo(newLogoUrl).catch(() => {});
     next(err);

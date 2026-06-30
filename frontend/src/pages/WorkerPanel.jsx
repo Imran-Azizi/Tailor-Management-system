@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
   LuBell,
   LuCheck,
-  LuCircleAlert,
   LuClipboardList,
   LuEye,
-  LuHash,
   LuPlay,
   LuSearch,
   LuSquareCheck,
@@ -16,23 +15,21 @@ import {
 } from "react-icons/lu";
 import api from "../lib/api.js";
 import { parseNumberLocale } from "../lib/normalize.js";
-import { getApiErrorMessage } from "../lib/feedback.js";
+import {
+  getWorkerFeedbackMessage,
+  workerToastOptions,
+} from "../lib/workerFeedback.js";
 import {
   getOrderLabelParts,
   getOrderPrimaryDisplayName,
 } from "../lib/orderType.js";
-import { formatUserNotificationMessage } from "../lib/notifications.js";
+import { resolveRakhtColorHex } from "../lib/rakhtColors.js";
 import {
   formatDateTimeLocale,
-  formatRelativeTimeLocale,
   formatSystemDate,
   isRtlLanguage,
   normalizeLanguage,
 } from "../lib/locale.js";
-import {
-  getNotificationSummary,
-  groupNotificationsByDay,
-} from "../lib/notificationGrouping.js";
 import { formatCurrency } from "../lib/currency.js";
 import { formatMeters } from "../lib/meters.js";
 import {
@@ -42,9 +39,8 @@ import {
 
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
-import { formatMonthYearLabel } from "../lib/months.js";
+import { useWorkerPanel } from "../context/WorkerPanelContext.jsx";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
-import { NotificationText } from "../components/ui/index.jsx";
 
 const ROLE_CONFIG = {
   DOKHT: {
@@ -282,16 +278,11 @@ function getVisibleSearchOrders(searchResult, userId, accountType) {
   return searchResult.orders.filter((order) => {
     const roleState = getRoleOrderState(order, accountType);
 
-    // Prevent same-role workers from seeing an order claimed/assigned by another worker.
+    // ---
     if (roleState.assignedToId && roleState.assignedToId !== userId) {
       return false;
     }
     if (roleState.receivedById && roleState.receivedById !== userId) {
-      return false;
-    }
-
-    // Dokht can only see after Qichikar completion.
-    if (accountType === "DOKHT" && !order?.qichikarCompletedAt) {
       return false;
     }
 
@@ -331,7 +322,7 @@ function upsertOrderInWorkerPayload(previousPayload, nextOrder) {
 function ConfirmActionModal({ config, pending, onClose, onConfirm }) {
   if (!config) return null;
 
-  // RTL support for modal
+  // ---
   let language = undefined;
   if (typeof window !== "undefined" && window.i18next) {
     language = window.i18next.language;
@@ -435,9 +426,37 @@ function OrderDetailsModal({ order, language, accountType, t, onClose }) {
 
   const isRtl = isRtlLanguage(language);
   const showCompletionBadge = !isCompleted;
+  const rakhtColorName =
+    typeof order?.rakhtColor === "string"
+      ? order.rakhtColor.trim()
+      : order?.rakhtColor;
+  const renderRakhtColorValue = (colorName, colorHex) => {
+    const swatchHex = resolveRakhtColorHex(colorName, colorHex);
+    const safeColorName =
+      typeof colorName === "string" ? colorName.trim() : colorName;
+
+    return (
+      <span className="worker-rakht-color-value">
+        {swatchHex ? (
+          <span
+            className="worker-rakht-color-value__swatch"
+            style={{ background: swatchHex }}
+          />
+        ) : null}
+        <span>{safeColorName}</span>
+      </span>
+    );
+  };
   const rakhtRows = [
     [t("rakht.brandName", { defaultValue: "Brand" }), order?.rakhtBrandName],
-    [t("rakht.color", { defaultValue: "Color" }), order?.rakhtColor],
+    ...(rakhtColorName
+      ? [
+          [
+            t("rakht.color", { defaultValue: "Color" }),
+            renderRakhtColorValue(rakhtColorName, order?.rakhtColorHex),
+          ],
+        ]
+      : []),
     [
       t("rakht.requiredMeters", {
         defaultValue: "Required Meters",
@@ -448,19 +467,70 @@ function OrderDetailsModal({ order, language, accountType, t, onClose }) {
     ],
   ].filter(([, value]) => value != null && String(value).trim() !== "");
 
-  const renderDetailItems = (rows) =>
-    rows.length ? (
-      <div className="worker-detail-list">
-        {rows.map(([label, value]) => (
-          <div className="worker-detail-item" key={label}>
-            <span>{label}</span>
-            <strong>{value}</strong>
-          </div>
-        ))}
+  const summaryRows = [
+    [t("workerPanel.price", "Price"), formatCurrency(priceValue, language)],
+    [
+      t("workerPanel.updatedOn", "Updated"),
+      fmtDate(payment.paidAt || order.updatedAt, language),
+    ],
+  ];
+
+  const primaryDetailSections = [
+    {
+      title: t("workerPanel.orderSummary", "Order Summary"),
+      rows: summaryRows,
+    },
+    {
+      title: t("createOrder.rakhtSelection", {
+        defaultValue: "Rakht Selection",
+      }),
+      rows: rakhtRows,
+    },
+  ];
+
+  const pairedDetailSections = [
+    {
+      title: t("createOrder.measurements", "Measurements"),
+      rows: measurementRows.map(([key, tKey]) => [t(tKey), measure[key]]),
+    },
+    {
+      title: t("createOrder.styleOptions", "Styling Details"),
+      rows: [...styleRows, ...booleanRows].map(([key, tKey]) => [
+        t(tKey),
+        measure[key] === true ? t("common.yes", "Yes") : measure[key],
+      ]),
+    },
+  ];
+
+  const renderTitledDetailTable = (section) => (
+    <>
+      <div className="worker-detail-table-title">{section.title}</div>
+      <div className="worker-detail-table-scroll">
+        <table className="worker-detail-table">
+          <thead>
+            <tr>
+              <th>{t("common.field", "Field")}</th>
+              <th>{t("common.value", "Value")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {section.rows.length ? (
+              section.rows.map(([label, value]) => (
+                <tr key={`${section.title}-${label}`}>
+                  <td>{label}</td>
+                  <td>{value}</td>
+                </tr>
+              ))
+            ) : (
+              <tr className="worker-detail-table__empty-row">
+                <td colSpan={2}>-</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
-    ) : (
-      <div className="worker-detail-empty">-</div>
-    );
+    </>
+  );
 
   return (
     <div
@@ -482,8 +552,8 @@ function OrderDetailsModal({ order, language, accountType, t, onClose }) {
         className="worker-details-modal max-h-[82vh] overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl"
         dir={isRtl ? "rtl" : "ltr"}
         style={{
-          width: "min(430px, calc(100vw - 28px))",
-          maxWidth: "430px",
+          width: "min(760px, calc(100vw - 28px))",
+          maxWidth: "760px",
         }}
       >
         <div className="worker-details-modal__header">
@@ -522,49 +592,24 @@ function OrderDetailsModal({ order, language, accountType, t, onClose }) {
         </div>
 
         <div className="worker-details-modal__body">
-          <div className="worker-details-summary">
-            <div className="worker-details-summary__item">
-              <span>
-                {t("workerPanel.price", "Price")}
-              </span>
-              <strong>
-                {formatCurrency(priceValue, language)}
-              </strong>
+          <section
+            className="worker-detail-section worker-detail-section--unified"
+            aria-label={t("myTasks.orderDetails", "Order Details")}
+          >
+            <div className="worker-detail-primary-stack">
+              {primaryDetailSections.map((section) => (
+                <div className="worker-detail-primary-panel" key={section.title}>
+                  {renderTitledDetailTable(section)}
+                </div>
+              ))}
             </div>
-            <div className="worker-details-summary__item">
-              <span>
-                {t("workerPanel.updatedOn", "Updated")}
-              </span>
-              <strong>
-                {fmtDate(payment.paidAt || order.updatedAt, language)}
-              </strong>
+            <div className="worker-detail-paired-grid">
+              {pairedDetailSections.map((section) => (
+                <div className="worker-detail-paired-panel" key={section.title}>
+                  {renderTitledDetailTable(section)}
+                </div>
+              ))}
             </div>
-          </div>
-
-          <section className="worker-detail-section">
-            <h3>
-              {t("createOrder.rakhtSelection", {
-                defaultValue: "Rakht Selection",
-              })}
-            </h3>
-            {renderDetailItems(rakhtRows)}
-          </section>
-
-          <section className="worker-detail-section">
-            <h3>{t("createOrder.measurements", "Measurements")}</h3>
-            {renderDetailItems(
-              measurementRows.map(([key, tKey]) => [t(tKey), measure[key]]),
-            )}
-          </section>
-
-          <section className="worker-detail-section">
-            <h3>{t("createOrder.styleOptions", "Styling Details")}</h3>
-            {renderDetailItems(
-              [...styleRows, ...booleanRows].map(([key, tKey]) => [
-                t(tKey),
-                measure[key] === true ? t("common.yes", "Yes") : measure[key],
-              ]),
-            )}
           </section>
         </div>
 
@@ -636,46 +681,93 @@ function OrderDetailsModal({ order, language, accountType, t, onClose }) {
 
           .worker-details-modal__body {
             display: grid;
-            gap: .5rem;
-            padding: .56rem;
+            gap: .6rem;
+            padding: .68rem;
           }
 
-          .worker-details-summary {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: .42rem;
-          }
-
-          .worker-details-summary__item,
           .worker-detail-section {
             border: 1px solid var(--border, #e2e8f0);
-            border-radius: 10px;
+            border-radius: 14px;
             background: color-mix(in srgb, var(--surface2, #f8fafc) 34%, var(--surface, #fff));
-          }
-
-          .worker-details-summary__item {
-            padding: .48rem .55rem;
-          }
-
-          .worker-details-summary__item span {
-            display: block;
-            color: var(--text3, #94a3b8);
-            font-size: .66rem;
-            font-weight: 900;
-            line-height: 1.5;
-          }
-
-          .worker-details-summary__item strong {
-            display: block;
-            margin-top: .12rem;
-            color: var(--text1, #0f172a);
-            font-size: .8rem;
-            line-height: 1.5;
-            overflow-wrap: anywhere;
           }
 
           .worker-detail-section {
             overflow: hidden;
+          }
+
+          .worker-detail-section--unified {
+            box-shadow: 0 14px 34px rgba(15, 23, 42, .07);
+          }
+
+          .worker-detail-primary-stack {
+            display: grid;
+            gap: .68rem;
+            padding: .68rem;
+            background: color-mix(in srgb, var(--surface2, #f8fafc) 46%, var(--surface, #fff));
+          }
+
+          .worker-detail-primary-panel {
+            min-width: 0;
+            overflow: hidden;
+            border: 1px solid color-mix(in srgb, var(--border, #e2e8f0) 86%, transparent);
+            border-radius: 12px;
+            background: var(--surface, #fff);
+            box-shadow: 0 10px 22px rgba(15, 23, 42, .045);
+          }
+
+          .worker-detail-paired-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: .68rem;
+            padding: .68rem;
+            border-top: 1px solid var(--border, #e2e8f0);
+            background: color-mix(in srgb, var(--surface2, #f8fafc) 58%, var(--surface, #fff));
+          }
+
+          .worker-detail-paired-panel {
+            min-width: 0;
+            overflow: hidden;
+            border: 1px solid color-mix(in srgb, var(--border, #e2e8f0) 86%, transparent);
+            border-radius: 12px;
+            background: var(--surface, #fff);
+            box-shadow: 0 10px 22px rgba(15, 23, 42, .045);
+          }
+
+          .worker-detail-table-title {
+            padding: .74rem .82rem .68rem;
+            border-bottom: 1px solid color-mix(in srgb, var(--primary, #2563eb) 18%, var(--border, #e2e8f0));
+            background: linear-gradient(90deg, color-mix(in srgb, var(--primary, #2563eb) 12%, var(--surface2, #f8fafc)), var(--surface, #fff));
+            color: var(--text1, #0f172a);
+            font-size: .84rem;
+            font-weight: 950;
+            line-height: 1.45;
+          }
+
+          .worker-detail-paired-panel .worker-detail-table {
+            min-width: 320px;
+          }
+
+          .worker-detail-paired-panel .worker-detail-table th {
+            top: 0;
+          }
+
+          .worker-rakht-color-value {
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem;
+            max-width: 100%;
+            vertical-align: middle;
+          }
+
+          .worker-rakht-color-value__swatch {
+            width: 1rem;
+            height: 1rem;
+            flex: 0 0 auto;
+            border-radius: 999px;
+            border: 2px solid var(--surface, #fff);
+            box-shadow:
+              0 0 0 1px color-mix(in srgb, var(--border, #e2e8f0) 86%, #94a3b8),
+              0 2px 6px rgba(15, 23, 42, .16);
           }
 
           .worker-detail-section h3 {
@@ -688,50 +780,99 @@ function OrderDetailsModal({ order, language, accountType, t, onClose }) {
             line-height: 1.5;
           }
 
-          .worker-detail-list {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: .38rem;
-            padding: .44rem;
+          .worker-detail-table-scroll {
+            width: 100%;
+            overflow-x: auto;
+            overscroll-behavior-inline: contain;
+            scrollbar-width: thin;
+            scrollbar-color: color-mix(in srgb, var(--primary, #2563eb) 36%, transparent) transparent;
           }
 
-          .worker-detail-item {
-            min-width: 0;
-            border: 1px solid color-mix(in srgb, var(--border, #e2e8f0) 78%, transparent);
-            border-radius: 8px;
+          .worker-detail-table {
+            width: 100%;
+            min-width: 560px;
+            border-collapse: collapse;
             background: var(--surface, #fff);
-            padding: .4rem .46rem;
           }
 
-          .worker-detail-item span {
-            display: block;
-            color: var(--text3, #94a3b8);
-            font-size: .64rem;
-            font-weight: 900;
-            line-height: 1.5;
-          }
-
-          .worker-detail-item strong {
-            display: block;
-            margin-top: .1rem;
-            color: var(--text1, #0f172a);
-            font-size: .76rem;
+          .worker-detail-table th,
+          .worker-detail-table td {
+            padding: .62rem .72rem;
+            border-bottom: 1px solid color-mix(in srgb, var(--border, #e2e8f0) 82%, transparent);
+            text-align: left;
+            vertical-align: top;
             line-height: 1.55;
+          }
+
+          .worker-detail-table th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: color-mix(in srgb, var(--surface2, #f8fafc) 72%, var(--surface, #fff));
+            color: var(--text2, #64748b);
+            font-size: .7rem;
+            font-weight: 900;
+            letter-spacing: .02em;
+            text-transform: uppercase;
+            white-space: nowrap;
+          }
+
+          .worker-detail-table td {
+            color: var(--text1, #0f172a);
+            font-size: .8rem;
+            font-weight: 800;
             overflow-wrap: anywhere;
           }
 
-          .worker-detail-empty {
-            padding: .5rem .55rem;
+          .worker-detail-table td:first-child {
+            width: 36%;
+            color: var(--text2, #64748b);
+            font-size: .74rem;
+            font-weight: 900;
+            white-space: nowrap;
+          }
+
+          .worker-detail-table tbody tr:last-child td {
+            border-bottom: 0;
+          }
+
+          .worker-detail-table__section-row td {
+            padding: .72rem .78rem;
+            background: linear-gradient(90deg, color-mix(in srgb, var(--primary, #2563eb) 12%, var(--surface2, #f8fafc)), var(--surface2, #f8fafc));
+            border-top: 1px solid color-mix(in srgb, var(--primary, #2563eb) 18%, var(--border, #e2e8f0));
+            border-bottom: 1px solid color-mix(in srgb, var(--primary, #2563eb) 18%, var(--border, #e2e8f0));
+            color: var(--text1, #0f172a);
+            font-size: .82rem;
+            font-weight: 950;
+            letter-spacing: 0;
+          }
+
+          .worker-detail-table tbody .worker-detail-table__section-row:first-child td {
+            border-top: 0;
+          }
+
+          .worker-detail-table__empty-row td {
+            padding: .72rem .78rem;
             color: var(--text3, #94a3b8);
-            font-weight: 700;
+            font-weight: 800;
+            background: var(--surface, #fff);
           }
 
           .worker-details-modal[dir="rtl"],
           .worker-details-modal[dir="rtl"] h2,
           .worker-details-modal[dir="rtl"] h3,
-          .worker-details-modal[dir="rtl"] .worker-details-summary__item,
-          .worker-details-modal[dir="rtl"] .worker-detail-item {
+          .worker-details-modal[dir="rtl"] .worker-detail-table th,
+          .worker-details-modal[dir="rtl"] .worker-detail-table td {
             text-align: right;
+          }
+
+          .worker-details-modal[dir="rtl"] .worker-detail-table__section-row td {
+            background: linear-gradient(270deg, color-mix(in srgb, var(--primary, #2563eb) 12%, var(--surface2, #f8fafc)), var(--surface2, #f8fafc));
+          }
+
+          .worker-details-modal[dir="rtl"] .worker-detail-table-title {
+            text-align: right;
+            background: linear-gradient(270deg, color-mix(in srgb, var(--primary, #2563eb) 12%, var(--surface2, #f8fafc)), var(--surface, #fff));
           }
 
           .worker-details-modal[dir="rtl"] .worker-details-modal__header,
@@ -750,9 +891,29 @@ function OrderDetailsModal({ order, language, accountType, t, onClose }) {
               gap: .52rem;
             }
 
-            .worker-details-summary,
-            .worker-detail-list {
+            .worker-detail-table-scroll {
+              -webkit-overflow-scrolling: touch;
+            }
+
+            .worker-detail-table {
+              min-width: 560px;
+            }
+          }
+
+          @media (max-width: 760px) {
+            .worker-detail-paired-grid {
               grid-template-columns: 1fr;
+              gap: .58rem;
+              padding: .58rem;
+            }
+
+            .worker-detail-primary-stack {
+              gap: .58rem;
+              padding: .58rem;
+            }
+
+            .worker-detail-paired-panel .worker-detail-table {
+              min-width: 440px;
             }
           }
         `}</style>
@@ -761,7 +922,7 @@ function OrderDetailsModal({ order, language, accountType, t, onClose }) {
   );
 }
 
-// ─── Penalty Detail Modal ───────────────────────────────────────────────────
+// ---
 function PenaltyDetailModal({ penalty, language, t, onClose }) {
   if (!penalty) return null;
 
@@ -909,15 +1070,15 @@ function PenaltyDetailModal({ penalty, language, t, onClose }) {
                   ],
                   [
                     t("damagedClothes.details.customerName"),
-                    penalty.customerName || "—",
+                    penalty.customerName || "\u2014",
                   ],
                   [
                     t("damagedClothes.details.phoneNumber"),
-                    penalty.phoneNumber || "—",
+                    penalty.phoneNumber || "\u2014",
                   ],
                   [
                     t("damagedClothes.details.orderType"),
-                    penalty.orderType || "—",
+                    penalty.orderType || "\u2014",
                   ],
                 ].map(([label, value], i, arr) => (
                   <tr key={label}>
@@ -1151,7 +1312,7 @@ function PenaltyDetailModal({ penalty, language, t, onClose }) {
                   >
                     {t(
                       "damagedClothes.details.dailyTaskExpense",
-                      "Daily Task Expense",
+                      "Daily Expense",
                     )}
                   </td>
                   <td
@@ -1192,7 +1353,7 @@ function PenaltyDetailModal({ penalty, language, t, onClose }) {
             {t("workerPanel.appliedBy", "Applied By")}
           </span>
           <strong style={{ color: "var(--text1)" }}>
-            {penalty.createdBy?.name || "—"}
+            {penalty.createdBy?.name || "\u2014"}
           </strong>
         </div>
       </div>
@@ -1202,21 +1363,27 @@ function PenaltyDetailModal({ penalty, language, t, onClose }) {
 
 export default function WorkerPanel() {
   const { t, i18n } = useTranslation();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { viewMonth, viewYear, setViewMonth, setViewYear } = useMonth();
   const qc = useQueryClient();
   const language = i18n.resolvedLanguage || i18n.language || "en";
+  const feedbackToastOptions = useMemo(
+    () => workerToastOptions(language),
+    [language],
+  );
   const cfg = ROLE_CONFIG[user?.accountType] || ROLE_CONFIG.QICHIKAR;
-  const roleLabel = t(cfg.labelKey, {
-    defaultValue: user?.accountType === "DOKHT" ? "Dokht" : "Qichikar",
-  });
   const workerScope = [user?.id, user?.accountType];
 
-  const [activeTab, setActiveTab] = useState("all");
+  const { activeTab, setActiveTab, setTabs } = useWorkerPanel();
+
   const [billSearch, setBillSearch] = useState("");
   const [searchResult, setSearchResult] = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [hasSearchAttempt, setHasSearchAttempt] = useState(false);
+  const [isOrderReceiveModalOpen, setIsOrderReceiveModalOpen] =
+    useState(false);
   const [detailOrder, setDetailOrder] = useState(null);
   const [selectedPenalty, setSelectedPenalty] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
@@ -1241,7 +1408,34 @@ export default function WorkerPanel() {
     };
   }, []);
 
-  const { data: orderPayload, isLoading } = useQuery({
+  useEffect(() => {
+    if (!isOrderReceiveModalOpen) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") setIsOrderReceiveModalOpen(false);
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOrderReceiveModalOpen]);
+
+  useEffect(() => {
+    if (!location.state?.openOrderReceiveModal) return;
+
+    setIsOrderReceiveModalOpen(true);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.pathname, location.state?.openOrderReceiveModal, navigate]);
+
+  const {
+    data: orderPayload,
+    isLoading,
+    isError: ordersLoadFailed,
+  } = useQuery({
     queryKey: ["worker-panel-orders", ...workerScope, viewMonth, viewYear],
     queryFn: () =>
       api
@@ -1261,34 +1455,6 @@ export default function WorkerPanel() {
     ? orderPayload
     : orderPayload?.data || [];
 
-  const { data: allNotifs = [] } = useQuery({
-    queryKey: ["worker-panel-notifs", ...workerScope],
-    queryFn: () => api.get("/users/me/notifications").then((r) => r.data),
-    enabled: Boolean(user?.id && user?.accountType),
-    refetchInterval: 30000,
-  });
-
-  const { data: workerMoneySummary } = useQuery({
-    queryKey: [
-      "worker-panel-transaction-summary",
-      ...workerScope,
-      viewMonth,
-      viewYear,
-    ],
-    queryFn: () =>
-      api
-        .get("/transactions/me/summary", {
-          params: {
-            month: viewMonth,
-            year: viewYear,
-          },
-        })
-        .then((r) => r.data),
-    enabled: Boolean(user?.id && user?.accountType),
-    refetchInterval: 15000,
-    refetchOnWindowFocus: true,
-  });
-
   const { data: damagedPenaltyPayload, isLoading: damagedPenaltyLoading } =
     useQuery({
       queryKey: ["worker-panel-damaged-penalties", ...workerScope],
@@ -1301,38 +1467,6 @@ export default function WorkerPanel() {
       enabled: Boolean(user?.id),
       refetchInterval: 30000,
     });
-
-  const unreadNotifs = useMemo(
-    () => allNotifs.filter((n) => !n.isRead),
-    [allNotifs],
-  );
-  const groupedUnreadNotifs = useMemo(
-    () =>
-      groupNotificationsByDay(unreadNotifs, {
-        language,
-        t,
-        getDate: (item) => item?.createdAt,
-      }),
-    [language, t, unreadNotifs],
-  );
-
-  const readAllMut = useMutation({
-    mutationFn: () => api.patch("/users/me/notifications/read-all"),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["worker-panel-notifs"] });
-      qc.invalidateQueries({ queryKey: ["worker-notifs-count"] });
-      qc.invalidateQueries({ queryKey: ["worker-notifs-dropdown"] });
-    },
-  });
-
-  const readOneMut = useMutation({
-    mutationFn: (id) => api.patch(`/users/me/notifications/${id}/read`),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["worker-panel-notifs"] });
-      qc.invalidateQueries({ queryKey: ["worker-notifs-count"] });
-      qc.invalidateQueries({ queryKey: ["worker-notifs-dropdown"] });
-    },
-  });
 
   const receiveMut = useMutation({
     mutationFn: (id) => api.patch(`/orders/${id}/receive`).then((r) => r.data),
@@ -1403,15 +1537,20 @@ export default function WorkerPanel() {
           "workerPanel.orderReceivedAdminNotified",
           "Order received - Admin notified",
         ),
+        feedbackToastOptions,
       );
       setConfirmAction(null);
     },
     onError: (error) => {
       toast.error(
-        getApiErrorMessage(
+        getWorkerFeedbackMessage(
           error,
+          t,
+          language,
+          "workerPanel.failedReceiveOrder",
           t("workerPanel.failedReceiveOrder", "Failed to receive order"),
         ),
+        feedbackToastOptions,
       );
     },
   });
@@ -1425,6 +1564,7 @@ export default function WorkerPanel() {
           "workerPanel.statusUpdatedAdminNotified",
           "Status updated - Admin notified",
         ),
+        feedbackToastOptions,
       );
       setOptimisticInProgressIds((prev) => prev.filter((item) => item !== id));
       if (updated?.inProgress) setActiveTab("inProgress");
@@ -1434,10 +1574,14 @@ export default function WorkerPanel() {
     onError: (error, id) => {
       setOptimisticInProgressIds((prev) => prev.filter((item) => item !== id));
       toast.error(
-        getApiErrorMessage(
+        getWorkerFeedbackMessage(
           error,
+          t,
+          language,
+          "workerPanel.failedUpdateStatus",
           t("workerPanel.failedUpdateStatus", "Failed to update status"),
         ),
+        feedbackToastOptions,
       );
     },
   });
@@ -1452,6 +1596,7 @@ export default function WorkerPanel() {
           "workerPanel.orderCompletedAdminNotified",
           "Order completed - Admin notified",
         ),
+        feedbackToastOptions,
       );
       setActiveTab("completed");
       refreshSearchResult();
@@ -1461,10 +1606,14 @@ export default function WorkerPanel() {
     onError: (error) => {
       setOptimisticCompletedIds([]);
       toast.error(
-        getApiErrorMessage(
+        getWorkerFeedbackMessage(
           error,
+          t,
+          language,
+          "workerPanel.failedCompleteOrder",
           t("workerPanel.failedCompleteOrder", "Failed to complete order"),
         ),
+        feedbackToastOptions,
       );
     },
   });
@@ -1497,20 +1646,9 @@ export default function WorkerPanel() {
     };
   }, [orders, user?.accountType]);
 
-  const totalLoanAmount = Number(workerMoneySummary?.loanTotal || 0);
-  const damagePenaltyTotalFromSummary = Number(
-    workerMoneySummary?.damagePenaltyTotal || 0,
-  );
-  const totalCompletedPayments = Number(
-    workerMoneySummary?.totalCompletedPayments || 0,
-  );
-  const moneyReceiptTotal = Number(workerMoneySummary?.moneyReceiptTotal || 0);
-  const currentMoney =
-    totalCompletedPayments - totalLoanAmount - damagePenaltyTotalFromSummary;
   const damagedPenalties = Array.isArray(damagedPenaltyPayload?.data)
     ? damagedPenaltyPayload.data
     : [];
-  const totalDamagePenaltyAmount = damagePenaltyTotalFromSummary;
 
   const newAssignedOrders = useMemo(() => {
     const accountType = user?.accountType;
@@ -1604,11 +1742,6 @@ export default function WorkerPanel() {
   const canOrderBeReceived = (order) => {
     if (isWorkerCompletedForRole(order, user?.accountType)) return false;
 
-    // Dokht can only receive an order after Qichikar has completed their part.
-    if (user?.accountType === "DOKHT" && !order?.qichikarCompletedAt) {
-      return false;
-    }
-
     const roleState = getRoleOrderState(order, user?.accountType);
 
     const receivedBySameRoleOtherUser =
@@ -1625,14 +1758,6 @@ export default function WorkerPanel() {
   };
 
   const getAssignmentBlockReason = (order) => {
-    // Dokht-specific: Qichikar must complete first.
-    if (user?.accountType === "DOKHT" && !order?.qichikarCompletedAt) {
-      return t(
-        "workerPanel.waitingForQichikar",
-        "Waiting for Qichikar (cutting) to complete first",
-      );
-    }
-
     const roleState = getRoleOrderState(order, user?.accountType);
 
     if (roleState.receivedById && roleState.receivedById !== user?.id) {
@@ -1658,7 +1783,7 @@ export default function WorkerPanel() {
     },
     {
       key: "assigned",
-      label: t("workerPanel.statusAssigned", "Assigned"),
+      label: t("workerPanel.statusAssigned", "Received"),
       count: stats.assigned,
     },
     {
@@ -1678,6 +1803,20 @@ export default function WorkerPanel() {
     },
   ];
 
+  useEffect(() => {
+    setTabs(tabs);
+  }, [
+    setTabs,
+    stats.all,
+    stats.assigned,
+    stats.inProgress,
+    stats.completed,
+    damagedPenaltyPayload?.total,
+    language,
+  ]);
+
+  const activeTabMeta = tabs.find((tab) => tab.key === activeTab) || tabs[0];
+
   const refreshSearchResult = async () => {
     if (!searchResult?.customer || !billSearch.trim()) return;
     const parsed = parseNumberLocale(billSearch.trim());
@@ -1693,7 +1832,7 @@ export default function WorkerPanel() {
       );
       setSearchResult({ ...data, orders: visibleOrders });
     } catch {
-      // keep previous search payload if refresh fails
+      // ---
     }
   };
 
@@ -1703,6 +1842,7 @@ export default function WorkerPanel() {
     if (!Number.isFinite(parsed) || parsed <= 0) {
       toast.error(
         t("assignment.invalidBillNumber", "Enter a valid bill number."),
+        feedbackToastOptions,
       );
       return;
     }
@@ -1718,14 +1858,21 @@ export default function WorkerPanel() {
         user?.accountType,
       );
       setSearchResult({ ...data, orders: visibleOrders });
-      toast.success(t("createOrder.customerFound", "Customer found"));
+      toast.success(
+        t("createOrder.customerFound", "Customer found"),
+        feedbackToastOptions,
+      );
     } catch (error) {
       setSearchResult(null);
       toast.error(
-        getApiErrorMessage(
+        getWorkerFeedbackMessage(
           error,
+          t,
+          language,
+          "workerPanel.feedback.searchFailed",
           t("assignment.noOrdersFound", "No orders found for this bill."),
         ),
+        feedbackToastOptions,
       );
     } finally {
       setSearchLoading(false);
@@ -1754,7 +1901,7 @@ export default function WorkerPanel() {
           );
           await progressMut.mutateAsync(order.id);
         } catch {
-          // errors are handled in mutation callbacks
+          // ---
         }
         return;
       }
@@ -1783,7 +1930,7 @@ export default function WorkerPanel() {
         title: t("workerPanel.receiveOrder", "Receive Order"),
         message: t(
           "workerPanel.receiveOrderConfirmMsg",
-          "Receive this order to add it to your Assigned tab. Admin will be notified.",
+          "Receive this order to add it to your received orders list. Admin will be notified.",
         ),
         confirmLabel: t("workerPanel.receive", "Receive"),
         pendingLabel: t("workerPanel.processing", "Processing..."),
@@ -1868,148 +2015,125 @@ export default function WorkerPanel() {
     const paidToWorker = payment.status === "PAID_TO_WORKER";
 
     return (
-      <div
+      <article
         key={`${source}-${order.id}`}
-        className="card"
-        style={{ padding: 14, display: "grid", gap: 10 }}
+        className="worker-order-card"
+        style={{ "--order-accent": typeColor }}
       >
-        {/* ── Card header: badge + customer info ── */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 8,
-            alignItems: "flex-start",
-          }}
-        >
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        <div className="worker-order-card__head">
+          <div className="worker-order-card__badges">
             <span
-              className="badge"
+              className="worker-order-card__type-badge"
               style={{
-                background: `${typeColor}18`,
+                background: `${typeColor}14`,
                 color: typeColor,
-                border: `1px solid ${typeColor}40`,
-                flexShrink: 0,
+                borderColor: `${typeColor}35`,
               }}
             >
               {orderLabel.typeWithSequenceLabel}
             </span>
-            {!isCompleted ? (
+            {!isCompleted && (
               <span
-                className="badge"
+                className="worker-order-card__status-badge"
                 style={getOrderCompletionBadgeStyle(completionStatus)}
                 title={completionStatus.detail || completionStatus.label}
               >
                 {completionStatus.label}
               </span>
-            ) : null}
+            )}
+            {isCompleted && (
+              <span className="worker-order-card__status-badge worker-order-card__status-badge--done">
+                {t("workerPanel.statusCompleted", "Completed")}
+              </span>
+            )}
           </div>
+          <span className="worker-order-card__bill">
+            #{order.customer?.billNumber || "-"}
+          </span>
         </div>
 
-        {/* ── Customer identity block ── */}
-        <div style={{ display: "grid", gap: 2 }}>
-          <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text1)" }}>
+        <div className="worker-order-card__body">
+          <h3 className="worker-order-card__customer">
             {getOrderPrimaryDisplayName(
               order,
               order.customer?.firstName,
               language,
             )}
-          </div>
-          <div
-            style={{
-              fontSize: 12,
-              color: "var(--text3)",
-              display: "flex",
-              gap: 10,
-              flexWrap: "wrap",
-            }}
-          >
-            <span>#{order.customer?.billNumber || "-"}</span>
-            {!["DOKHT", "QICHIKAR"].includes(user?.accountType) &&
-              order.customer?.phoneNumber && (
-                <span>{order.customer.phoneNumber}</span>
-              )}
-          </div>
-        </div>
+          </h3>
 
-        {(order?.rakhtBrandName || order?.rakhtColor) && (
-          <div className="order-mobile-rakht">
-            <span className="order-rakht-chip order-rakht-chip--brand">
-              {order.rakhtBrandName || "-"}
-            </span>
-            <span className="order-rakht-chip order-rakht-chip--color">
-              {order.rakhtColor || "-"}
-            </span>
-            {order?.rakhtRequiredMeters != null && (
-              <span className="order-rakht-chip order-rakht-chip--meters">
-                {formatMeters(order.rakhtRequiredMeters)}m
+          {(order?.rakhtBrandName || order?.rakhtColor) && (
+            <div className="order-mobile-rakht worker-order-card__rakht">
+              <span className="order-rakht-chip order-rakht-chip--brand">
+                {order.rakhtBrandName || "-"}
               </span>
-            )}
-          </div>
-        )}
-
-        {/* ── Assignment / received info ── */}
-        {receivedByCurrentUser && roleState.receivedAt ? (
-          <div style={{ fontSize: 12, color: "var(--text3)" }}>
-            {t("workerPanel.receivedOn", "Received on")}:{" "}
-            {fmtDate(roleState.receivedAt, language)}
-          </div>
-        ) : (
-          order.assignedBy && (
-            <div style={{ fontSize: 12, color: "var(--text3)" }}>
-              {t("workerPanel.assignedBy", "Assigned by")}:{" "}
-              {order.assignedBy.name} {t("workerPanel.on", "on")}{" "}
-              {fmtDate(order.assignedAt, language)}
+              <span className="order-rakht-chip order-rakht-chip--color">
+                {order.rakhtColor || "-"}
+              </span>
+              {order?.rakhtRequiredMeters != null && (
+                <span className="order-rakht-chip order-rakht-chip--meters">
+                  {formatMeters(order.rakhtRequiredMeters)}m
+                </span>
+              )}
             </div>
-          )
-        )}
-
-        {/* ── Price row ── */}
-        <div style={{ fontSize: 12, color: "var(--text2)", fontWeight: 600 }}>
-          {t("workerPanel.price", "Price")}:{" "}
-          <span
-            style={{
-              color: paidToWorker ? "#15803d" : "var(--text1)",
-            }}
-          >
-            {paidToWorker
-              ? formatCurrency(payment.amount || 0, language)
-              : order.assignmentPrice != null
-                ? formatCurrency(order.assignmentPrice, language)
-                : "-"}
-          </span>
-          {!paidToWorker && order.assignmentPrice != null && (
-            <span
-              style={{
-                fontSize: 11,
-                color: "var(--text3)",
-                marginInlineStart: 4,
-                fontWeight: 400,
-              }}
-            >
-              ({t("workerPanel.assignedPrice", "assigned")})
-            </span>
           )}
+
+          <div className="worker-order-card__meta">
+            {receivedByCurrentUser && roleState.receivedAt ? (
+              <div className="worker-order-card__meta-item">
+                <span className="worker-order-card__meta-label">
+                  {t("workerPanel.receivedOn", "Received on")}
+                </span>
+                <span className="worker-order-card__meta-value">
+                  {fmtDate(roleState.receivedAt, language)}
+                </span>
+              </div>
+            ) : (
+              order.assignedBy && (
+                <div className="worker-order-card__meta-item">
+                  <span className="worker-order-card__meta-label">
+                    {t("workerPanel.assignedBy", "Received from")}
+                  </span>
+                  <span className="worker-order-card__meta-value">
+                    {order.assignedBy.name}
+                  </span>
+                </div>
+              )
+            )}
+            <div className="worker-order-card__meta-item">
+              <span className="worker-order-card__meta-label">
+                {t("workerPanel.price", "Price")}
+              </span>
+              <span
+                className={`worker-order-card__meta-value worker-order-card__price${paidToWorker ? " worker-order-card__price--paid" : ""}`}
+              >
+                {paidToWorker
+                  ? formatCurrency(payment.amount || 0, language)
+                  : order.assignmentPrice != null
+                    ? formatCurrency(order.assignmentPrice, language)
+                    : "-"}
+                {!paidToWorker && order.assignmentPrice != null && (
+                  <span className="worker-order-card__price-hint">
+                    ({t("workerPanel.assignedPrice", "order price")})
+                  </span>
+                )}
+              </span>
+            </div>
+          </div>
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(2,minmax(0,1fr))",
-            gap: 8,
-          }}
-        >
+        <div className="worker-order-card__actions">
           <button
-            className="btn btn-outline btn-sm"
+            type="button"
+            className="worker-order-card__btn worker-order-card__btn--view"
             onClick={() => setDetailOrder(order)}
-            style={{ gridColumn: "1 / -1" }}
           >
-            <LuEye size={13} /> {t("workerPanel.view", "View")}
+            <LuEye size={14} />
+            {t("workerPanel.view", "View")}
           </button>
 
           <button
-            className="btn btn-outline btn-sm"
-            style={{ gridColumn: "1 / -1" }}
+            type="button"
+            className="worker-order-card__btn worker-order-card__btn--start"
             onClick={() => {
               if (isCompleted) return;
               openConfirm("start", order);
@@ -2034,29 +2158,16 @@ export default function WorkerPanel() {
             }
           >
             {!receivedByCurrentUser && canReceive ? (
-              <LuCheck size={13} />
+              <LuCheck size={14} />
             ) : (
-              <LuPlay size={13} />
+              <LuPlay size={14} />
             )}
-            {!receivedByCurrentUser && canReceive
-              ? t("workerPanel.startWork", "Start Work")
-              : t("workerPanel.startWork", "Start Work")}
+            {t("workerPanel.startWork", "Start Work")}
           </button>
 
           <button
-            className="btn btn-sm"
-            style={
-              isCompleted
-                ? {
-                    gridColumn: "1 / -1",
-                    background: "#DC2626",
-                    color: "#fff",
-                    border: "1px solid #B91C1C",
-                    cursor: "not-allowed",
-                    opacity: 0.95,
-                  }
-                : { gridColumn: "1 / -1" }
-            }
+            type="button"
+            className={`worker-order-card__btn worker-order-card__btn--complete${isCompleted ? " is-done" : ""}`}
             onClick={() => {
               if (isCompleted) return;
               openConfirm("complete", order);
@@ -2068,13 +2179,13 @@ export default function WorkerPanel() {
                 : undefined
             }
           >
-            <LuSquareCheck size={13} />{" "}
+            <LuSquareCheck size={14} />
             {isCompleted
               ? t("workerPanel.statusCompleted", "Completed")
               : t("workerPanel.complete", "Complete")}
           </button>
         </div>
-      </div>
+      </article>
     );
   };
 
@@ -2157,7 +2268,7 @@ export default function WorkerPanel() {
     );
   };
 
-  // Determine RTL based on language, hoisted to top scope
+  // ---
   const lang =
     typeof i18n !== "undefined" && i18n.resolvedLanguage
       ? i18n.resolvedLanguage
@@ -2165,263 +2276,22 @@ export default function WorkerPanel() {
         ? language
         : "en";
   const isRtl = isRtlLanguage(lang);
-  const isWorkerStatsRtl = ["dari", "pashto"].includes(
-    normalizeLanguage(lang),
-  );
-  window.__isRtl = isRtl; // for debugging
 
   return (
-    <div className="grid gap-4 text-slate-900 dark:text-slate-100 sm:gap-5">
-      <div className="card p-4 sm:p-5">
-        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-          <div>
-            <h1 className="m-0 text-xl font-extrabold text-[var(--text1)] sm:text-2xl">
-              {t("workerPanel.greeting", "Welcome")} {user?.name || ""}
-            </h1>
-            <p className="mt-1.5 text-xs text-[var(--text3)] sm:text-sm">
-              {roleLabel} - {t("workerPanel.allOrders", "All Orders")}:{" "}
-              {stats.all}
-            </p>
-            <p className="mt-1 text-xs text-[var(--text3)]">
-              {t("common.viewingMonth", "Viewing data for")}:{" "}
-              <b>{formatMonthYearLabel(viewMonth, viewYear, language)}</b>
-            </p>
-          </div>
-          <span
-            className="badge"
-            style={{
-              background: `${cfg.color}14`,
-              color: cfg.color,
-              border: `1px solid ${cfg.color}30`,
-            }}
-          >
-            {roleLabel}
-          </span>
-        </div>
-
-        {/* Stat Cards Section - Dokht/Qichikar only */}
-        <div
-          className={`worker-panel-stats mt-4 grid gap-3 ${
-            isWorkerStatsRtl
-              ? "worker-panel-stats--rtl"
-              : "worker-panel-stats--ltr"
-          }`}
-          dir={isWorkerStatsRtl ? "rtl" : "ltr"}
-        >
-          <div
-            className={`worker-panel-stat-card min-h-[118px] rounded-xl border-2 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
-              currentMoney >= 0
-                ? "border-emerald-300 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-800 dark:from-emerald-950/40 dark:to-slate-900"
-                : "border-rose-300 bg-gradient-to-br from-rose-50 to-white dark:border-rose-800 dark:from-rose-950/40 dark:to-slate-900"
-            }`}
-          >
-            <div className="worker-panel-stat-card__shell flex h-full items-start justify-between gap-3">
-              <div className="worker-panel-stat-card__copy grid min-w-0 content-between gap-3">
-                <div>
-                  <div className="worker-panel-stat-card__label text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    {t("workerPanel.currentMoney", "Current Money")}
-                  </div>
-                  <div
-                    className={`worker-panel-stat-card__value mt-2 flex flex-wrap items-center gap-2 text-3xl font-extrabold ${
-                      currentMoney >= 0
-                        ? "text-emerald-700 dark:text-emerald-300"
-                        : "text-rose-700 dark:text-rose-300"
-                    }`}
-                  >
-                    <AfCurrencyIcon size={22} />
-                    {formatCurrency(currentMoney, language)}
-                  </div>
-                </div>
-              </div>
-              <div
-                className={`worker-panel-stat-card__icon grid h-12 w-12 shrink-0 place-items-center rounded-xl ring-1 ${
-                  currentMoney >= 0
-                    ? "bg-emerald-100 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:ring-emerald-900"
-                    : "bg-rose-100 text-rose-700 ring-rose-200 dark:bg-rose-950/70 dark:text-rose-300 dark:ring-rose-900"
-                }`}
-              >
-                <AfCurrencyIcon size={24} />
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="worker-panel-stat-card min-h-[118px] rounded-xl border border-rose-200 bg-gradient-to-br from-rose-50 to-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-rose-900/70 dark:from-rose-950/35 dark:to-slate-900">
-              <div className="worker-panel-stat-card__shell flex h-full items-start justify-between gap-3">
-                <div className="worker-panel-stat-card__copy grid min-w-0 content-between gap-3">
-                  <div>
-                    <div className="worker-panel-stat-card__label text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                      {t(
-                        "workerPanel.totalPenaltyAmount",
-                        "Total Damage Penalty",
-                      )}
-                    </div>
-                    <div className="worker-panel-stat-card__value mt-2 flex flex-wrap items-center gap-2 text-2xl font-extrabold text-rose-700 dark:text-rose-300">
-                      <AfCurrencyIcon size={20} />
-                      {formatCurrency(totalDamagePenaltyAmount, language)}
-                    </div>
-                  </div>
-                  <div className="worker-panel-stat-card__sub text-xs font-semibold text-rose-700 dark:text-rose-300">
-                    {damagedPenaltyPayload?.total || 0}{" "}
-                    {t("workerPanel.totalPenalties", "penalties")}
-                  </div>
-                </div>
-                <div className="worker-panel-stat-card__icon grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-rose-100 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-950/70 dark:text-rose-300 dark:ring-rose-900">
-                  <LuCircleAlert size={22} />
-                </div>
-              </div>
-            </div>
-
-            <div className="worker-panel-stat-card min-h-[118px] rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-amber-900/70 dark:from-amber-950/35 dark:to-slate-900">
-              <div className="worker-panel-stat-card__shell flex h-full items-start justify-between gap-3">
-                <div className="worker-panel-stat-card__copy grid min-w-0 content-between gap-3">
-                  <div>
-                    <div className="worker-panel-stat-card__label text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                      {t("workerPanel.loanTotal", "Loan Total")}
-                    </div>
-                    <div className="worker-panel-stat-card__value mt-2 flex flex-wrap items-center gap-2 text-2xl font-extrabold text-amber-700 dark:text-amber-300">
-                      <AfCurrencyIcon size={20} />
-                      {formatCurrency(totalLoanAmount, language)}
-                    </div>
-                  </div>
-                </div>
-                <div className="worker-panel-stat-card__icon grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950/70 dark:text-amber-300 dark:ring-amber-900">
-                  <LuHash size={22} />
-                </div>
-              </div>
-            </div>
-
-            <div className="worker-panel-stat-card min-h-[118px] rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-blue-900/70 dark:from-blue-950/35 dark:to-slate-900">
-              <div className="worker-panel-stat-card__shell flex h-full items-start justify-between gap-3">
-                <div className="worker-panel-stat-card__copy grid min-w-0 content-between gap-3">
-                  <div>
-                    <div className="worker-panel-stat-card__label text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                      {t(
-                        "workerPanel.totalCompletedPayments",
-                        "Total Money from Completed Orders",
-                      )}
-                    </div>
-                    <div className="worker-panel-stat-card__value mt-2 flex flex-wrap items-center gap-2 text-2xl font-extrabold text-blue-700 dark:text-blue-300">
-                      <AfCurrencyIcon size={20} />
-                      {formatCurrency(totalCompletedPayments, language)}
-                    </div>
-                  </div>
-                </div>
-                <div className="worker-panel-stat-card__icon grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-blue-100 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-950/70 dark:text-blue-300 dark:ring-blue-900">
-                  <LuSquareCheck size={22} />
-                </div>
-              </div>
-            </div>
-
-            <div className="worker-panel-stat-card min-h-[118px] rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-emerald-900/70 dark:from-emerald-950/35 dark:to-slate-900">
-              <div className="worker-panel-stat-card__shell flex h-full items-start justify-between gap-3">
-                <div className="worker-panel-stat-card__copy grid min-w-0 content-between gap-3">
-                  <div>
-                    <div className="worker-panel-stat-card__label text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                      {t("workerPanel.moneyReceipt", "Money Receipt")}
-                    </div>
-                    <div className="worker-panel-stat-card__value mt-2 flex flex-wrap items-center gap-2 text-2xl font-extrabold text-emerald-700 dark:text-emerald-300">
-                      <AfCurrencyIcon size={20} />
-                      {formatCurrency(moneyReceiptTotal, language)}
-                    </div>
-                  </div>
-                </div>
-                <div className="worker-panel-stat-card__icon grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:ring-emerald-900">
-                  <AfCurrencyIcon size={22} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="card p-3.5 sm:p-4">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2.5">
-          <div>
-            <label className="lbl">
-              {t("orders.billNumber", "Bill Number")}
-            </label>
-            <div style={{ position: "relative" }}>
-              <LuSearch
-                size={14}
-                style={{
-                  position: "absolute",
-                  insetInlineStart: 10,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "var(--text3)",
-                }}
-              />
-              <input
-                className="inp"
-                inputMode="numeric"
-                style={{ paddingInlineStart: 32 }}
-                value={billSearch}
-                onChange={(e) => setBillSearch(e.target.value)}
-                placeholder={t(
-                  "workerPanel.searchBillPlaceholder",
-                  "Search by bill number",
-                )}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") onSearch();
-                }}
-              />
-            </div>
-          </div>
-          <div className="grid">
-            <button
-              className="btn btn-gold"
-              style={{ minWidth: 110, height: 40 }}
-              onClick={onSearch}
-              disabled={searchLoading}
-            >
-              <LuSearch size={14} />{" "}
-              {searchLoading
-                ? t("common.loading", "Loading...")
-                : t("common.search", "Search")}
-            </button>
-          </div>
-        </div>
-
-        {visibleSearchResultOrders.length ? (
-          <div className="mt-3.5 grid gap-2.5">
-            {visibleSearchResultOrders.map((order) =>
-              renderSearchResultCard(order),
-            )}
-          </div>
-        ) : hasSearchAttempt && !searchResult?.orders?.length ? (
-          <div className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-            {t(
-              "workerPanel.noOrderFoundByBill",
-              "No order found for this bill number.",
-            )}
-          </div>
-        ) : null}
-      </div>
-
-      {(newAssignedOrders.length > 0 || unreadNotifs.length > 0) && (
-        <div className="card" style={{ padding: 0 }}>
-          <div className="flex flex-col gap-2 border-b border-[var(--border)] px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-center gap-2">
-              <LuBell size={15} style={{ color: cfg.color }} />
-              <strong style={{ fontSize: 14 }}>
-                {t("workerPanel.newAssignments", "New Assignments")}
-              </strong>
+    <div className="worker-panel-page" dir={isRtl ? "rtl" : "ltr"}>
+      {newAssignedOrders.length > 0 && (
+        <section className="worker-panel-assignments">
+          <div className="worker-panel-assignments__head">
+            <div className="worker-panel-assignments__title-wrap">
+              <LuBell size={16} style={{ color: cfg.color }} />
+              <strong>{t("workerPanel.newAssignments", "New Orders")}</strong>
               <span
-                className="badge"
-                style={{ background: cfg.color, color: "#fff" }}
+                className="worker-panel-assignments__count"
+                style={{ background: cfg.color }}
               >
                 {newAssignedOrders.length}
               </span>
             </div>
-            {unreadNotifs.length > 0 && (
-              <button
-                className="btn btn-outline btn-sm"
-                onClick={() => readAllMut.mutate()}
-              >
-                {t("workerPanel.markAllRead", "Mark all read")}
-              </button>
-            )}
           </div>
           {newAssignedOrders.length > 0 && (
             <div className="grid gap-2 p-3">
@@ -2497,146 +2367,29 @@ export default function WorkerPanel() {
               })}
             </div>
           )}
-          {unreadNotifs.length > 0 && (
-            <div className="worker-notif-scroll">
-              {groupedUnreadNotifs.map((group) => (
-                <section
-                  key={group.dayKey}
-                  className="notif-day-group worker-notif-day-group"
-                >
-                  <div className="notif-day-heading">{group.heading}</div>
-                  {group.items.map((item) => {
-                    const isPayment = item.type === "ADMIN_PAYMENT";
-                    const message = formatUserNotificationMessage(
-                      item,
-                      t,
-                      language,
-                    );
-                    const summary = getNotificationSummary(message);
-
-                    return (
-                      <article
-                        key={item.id}
-                        className="notif-feed-item notif-feed-item--drawer worker-notif-item"
-                      >
-                        <span
-                          className="notif-feed-item__icon"
-                          aria-hidden="true"
-                        >
-                          {isPayment ? (
-                            <AfCurrencyIcon
-                              size={14}
-                              style={{ color: "var(--success)" }}
-                            />
-                          ) : (
-                            <LuCircleAlert
-                              size={14}
-                              style={{ color: cfg.color }}
-                            />
-                          )}
-                        </span>
-                        <div className="notif-feed-item__copy">
-                          <p className="notif-feed-item__title">
-                            {summary.title}
-                          </p>
-                          {summary.message && (
-                            <NotificationText
-                              language={language}
-                              className="notif-feed-item__message"
-                            >
-                              {summary.message}
-                            </NotificationText>
-                          )}
-                          <div className="notif-feed-item__meta">
-                            <span title={formatDateTimeLocale(item.createdAt, language)}>
-                              {formatRelativeTimeLocale(item.createdAt, language)}
-                            </span>
-                          </div>
-                        </div>
-                        <button
-                          className="btn btn-outline btn-sm worker-notif-read-btn"
-                          onClick={() => readOneMut.mutate(item.id)}
-                        >
-                          <LuCheck size={13} />
-                        </button>
-                      </article>
-                    );
-                  })}
-                </section>
-              ))}
-            </div>
-          )}
-        </div>
+        </section>
       )}
 
-      <div className="card overflow-hidden p-0">
-        <div
-          style={{
-            display: "flex",
-            gap: 2,
-            overflowX: "auto",
-            borderBottom: "1px solid var(--border)",
-            padding: "0 12px",
-          }}
-        >
-          {tabs.map((tab) => {
-            const active = activeTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                style={{
-                  border: "none",
-                  background: "none",
-                  padding: "12px 13px",
-                  cursor: "pointer",
-                  color: active ? cfg.color : "var(--text3)",
-                  borderBottom: active
-                    ? `2px solid ${cfg.color}`
-                    : "2px solid transparent",
-                  fontWeight: active ? 700 : 500,
-                  display: "flex",
-                  gap: 6,
-                  alignItems: "center",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {tab.label}
-                <span
-                  className="badge"
-                  style={{
-                    background: active ? `${cfg.color}14` : "var(--surface2)",
-                    color: active ? cfg.color : "var(--text3)",
-                  }}
-                >
-                  {tab.count}
-                </span>
-              </button>
-            );
-          })}
+      <section className="worker-panel-orders">
+        <div className="worker-panel-orders__head">
+          <h2 className="worker-panel-orders__title">{activeTabMeta?.label}</h2>
+          <span
+            className="worker-panel-orders__count"
+            style={{ background: `${cfg.color}14`, color: cfg.color }}
+          >
+            {activeTabMeta?.count ?? 0}
+          </span>
         </div>
 
-        <div className="p-3.5 sm:p-4">
+        <div className="worker-panel-orders__body">
           {activeTab === "penalties" ? (
             damagedPenaltyLoading ? (
-              <div
-                style={{
-                  padding: "30px 0",
-                  textAlign: "center",
-                  color: "var(--text3)",
-                }}
-              >
+              <div className="worker-panel-orders__empty">
                 {t("common.loading", "Loading...")}
               </div>
             ) : damagedPenalties.length === 0 ? (
-              <div
-                style={{
-                  padding: "40px 0",
-                  textAlign: "center",
-                  color: "var(--text3)",
-                }}
-              >
-                <LuClipboardList size={36} style={{ marginBottom: 8 }} />
+              <div className="worker-panel-orders__empty">
+                <LuClipboardList size={36} />
                 <div>{t("workerPanel.noDamagedPenaltyHistory")}</div>
               </div>
             ) : (
@@ -2770,7 +2523,7 @@ export default function WorkerPanel() {
                         {[
                           {
                             label: t("damagedClothes.details.phoneNumber"),
-                            value: penalty.phoneNumber || "—",
+                            value: penalty.phoneNumber || "\u2014",
                           },
                           {
                             label: t(
@@ -2784,7 +2537,7 @@ export default function WorkerPanel() {
                           },
                           {
                             label: t("workerPanel.appliedBy", "Applied By"),
-                            value: penalty.createdBy?.name || "—",
+                            value: penalty.createdBy?.name || "\u2014",
                           },
                         ].map((item, i, arr) => (
                           <div
@@ -2890,26 +2643,14 @@ export default function WorkerPanel() {
           ) : (
             <>
               {isLoading ? (
-                <div
-                  style={{
-                    padding: "30px 0",
-                    textAlign: "center",
-                    color: "var(--text3)",
-                  }}
-                >
+                <div className="worker-panel-orders__empty">
                   {t("workerPanel.loadingOrders", "Loading orders...")}
                 </div>
               ) : null}
 
               {!isLoading && filteredOrders.length === 0 ? (
-                <div
-                  style={{
-                    padding: "40px 0",
-                    textAlign: "center",
-                    color: "var(--text3)",
-                  }}
-                >
-                  <LuClipboardList size={36} style={{ marginBottom: 8 }} />
+                <div className="worker-panel-orders__empty">
+                  <LuClipboardList size={36} />
                   <div>
                     {t(
                       "workerPanel.noOrdersInCategory",
@@ -2920,14 +2661,116 @@ export default function WorkerPanel() {
               ) : null}
 
               {!isLoading && filteredOrders.length > 0 ? (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
+                <div className="worker-panel-orders__grid">
                   {filteredOrders.map((order) => renderOrderCard(order))}
                 </div>
               ) : null}
             </>
           )}
         </div>
-      </div>
+      </section>
+
+      {isOrderReceiveModalOpen && (
+        <div
+          className="worker-order-receive-modal"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setIsOrderReceiveModalOpen(false);
+            }
+          }}
+        >
+          <section
+            className="worker-order-receive-modal__dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="worker-order-receive-modal-title"
+          >
+            <header className="worker-order-receive-modal__header">
+              <div className="worker-order-receive-modal__heading">
+                <span
+                  className="worker-order-receive-modal__icon"
+                  style={{ background: cfg.color + "18", color: cfg.color }}
+                >
+                  <LuClipboardList size={19} />
+                </span>
+                <div>
+                  <h2 id="worker-order-receive-modal-title">
+                    {t("workerPanel.receiveOrders", "Receive Orders")}
+                  </h2>
+                  <p>
+                    {t(
+                      "workerPanel.receiveOrdersDescription",
+                      "Search by bill number to receive an order.",
+                    )}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="worker-order-receive-modal__close"
+                onClick={() => setIsOrderReceiveModalOpen(false)}
+                aria-label={t("common.close", "Close")}
+              >
+                <LuX size={19} />
+              </button>
+            </header>
+
+            <div className="worker-order-receive-modal__body">
+              <label
+                className="worker-order-receive-modal__label"
+                htmlFor="worker-order-bill-search"
+              >
+                {t("workerPanel.billNumberLabel", "Bill Number")}
+              </label>
+              <div className="worker-panel-search__inner">
+                <LuSearch size={16} className="worker-panel-search__icon" />
+                <input
+                  id="worker-order-bill-search"
+                  className="worker-panel-search__input"
+                  inputMode="numeric"
+                  autoFocus
+                  value={billSearch}
+                  onChange={(e) => setBillSearch(e.target.value)}
+                  placeholder={t(
+                    "workerPanel.searchBillPlaceholder",
+                    "Search by bill number",
+                  )}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") onSearch();
+                  }}
+                />
+                <button
+                  type="button"
+                  className="worker-panel-search__btn"
+                  style={{ background: cfg.color }}
+                  onClick={onSearch}
+                  disabled={searchLoading}
+                >
+                  {searchLoading
+                    ? t("common.loading", "Loading...")
+                    : t("common.search", "Search")}
+                </button>
+              </div>
+
+              {visibleSearchResultOrders.length ? (
+                <div className="worker-panel-search__results">
+                  {visibleSearchResultOrders.map((order) =>
+                    renderSearchResultCard(order),
+                  )}
+                </div>
+              ) : hasSearchAttempt && !searchResult?.orders?.length ? (
+                <p className="worker-panel-search__empty">
+                  {t(
+                    "workerPanel.noOrderFoundByBill",
+                    "No order found for this bill number.",
+                  )}
+                </p>
+              ) : null}
+            </div>
+          </section>
+        </div>
+      )}
 
       <OrderDetailsModal
         order={detailOrder}
@@ -2951,3 +2794,6 @@ export default function WorkerPanel() {
     </div>
   );
 }
+
+
+

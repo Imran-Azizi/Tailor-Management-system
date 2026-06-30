@@ -24,6 +24,51 @@ import {
   decimalLt,
   sumScaled,
 } from "../lib/decimal.js";
+import {
+  getOrderDiscount,
+  getOrderFinancialTotal,
+  getOrderGrossTotal,
+  getOrderNetTotal,
+} from "../lib/orderFinancials.js";
+
+const COMPLETED_ORDER_LOCKED_MESSAGE =
+  "سفارش تکمیل‌شده قابل ویرایش یا حذف نیست.";
+
+const createCompletedOrderLockedError = () =>
+  Object.assign(new Error("Completed orders cannot be edited or deleted."), {
+    status: 409,
+    code: "COMPLETED_ORDER_LOCKED",
+    publicMessage: COMPLETED_ORDER_LOCKED_MESSAGE,
+  });
+
+const COMPLETED_ORDER_EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+// Temporary: set to false to restore completed-order deletion protection.
+const ALLOW_COMPLETED_ORDER_DELETE_TEMPORARILY = true;
+
+const COMPLETED_ORDER_EDIT_EXPIRED_MESSAGE =
+  "ویرایش سفارش تکمیل‌شده پس از ۲۴ ساعت غیرفعال می‌شود.";
+
+const createCompletedOrderEditExpiredError = () =>
+  Object.assign(
+    new Error("Completed order edit window has expired. Order is now read-only."),
+    {
+      status: 409,
+      code: "COMPLETED_ORDER_EDIT_EXPIRED",
+      publicMessage: COMPLETED_ORDER_EDIT_EXPIRED_MESSAGE,
+    },
+  );
+
+const isCompletedEditWindowExpired = (order) => {
+  if (!order?.isCompleted) return false;
+  const completedAt = order.completedAt;
+  if (!completedAt) return true;
+  return Date.now() - new Date(completedAt).getTime() > COMPLETED_ORDER_EDIT_WINDOW_MS;
+};
+
+const getCompletedOrderEditExpiresAt = (order) => {
+  if (!order?.isCompleted || !order.completedAt) return null;
+  return new Date(new Date(order.completedAt).getTime() + COMPLETED_ORDER_EDIT_WINDOW_MS);
+};
 
 function requireActiveTenantId() {
   const tenantId = getTenantContext()?.tenantId;
@@ -33,6 +78,36 @@ function requireActiveTenantId() {
     });
   }
   return tenantId;
+}
+
+const PRINT_TENANT_SELECT = {
+  id: true,
+  tenantId: true,
+  slug: true,
+  businessName: true,
+  systemName: true,
+  address: true,
+  phone: true,
+  mobile: true,
+  email: true,
+  logoUrl: true,
+  currency: true,
+  language: true,
+  timezone: true,
+};
+
+async function getBillTenantBranding({ customer, orders = [] } = {}, tx = prisma) {
+  const tenantId =
+    customer?.tenantId ||
+    orders.find((order) => order?.tenantId)?.tenantId ||
+    null;
+
+  if (!tenantId) return null;
+
+  return tx.tenant.findUnique({
+    where: { id: tenantId },
+    select: PRINT_TENANT_SELECT,
+  });
 }
 
 const NUMERIC_MEASUREMENT_FIELDS = new Set([
@@ -198,16 +273,16 @@ export const enrichOrderAssignment = (order) => {
     : Boolean(order.isDamageOrder);
   const qichikarCompleted = Boolean(order.qichikarCompletedAt);
   const dokhtCompleted = Boolean(order.dokhtCompletedAt);
-  const orderStatus = isDamageOrder
-    ? "DAMAGE_ORDER"
-    : qichikarCompleted && dokhtCompleted
-      ? "READY_FOR_DELIVERY"
-      : qichikarCompleted
-        ? "QICHIKAR_COMPLETED"
-        : dokhtCompleted
-          ? "DOKHT_COMPLETED"
-          : order.isCompleted
-            ? "COMPLETED"
+  const orderStatus = order.isCompleted
+    ? "COMPLETED"
+    : isDamageOrder
+      ? "DAMAGE_ORDER"
+      : qichikarCompleted && dokhtCompleted
+        ? "READY_FOR_DELIVERY"
+        : qichikarCompleted
+          ? "QICHIKAR_COMPLETED"
+          : dokhtCompleted
+            ? "DOKHT_COMPLETED"
             : order.inProgress
               ? "IN_PROGRESS"
               : "PENDING";
@@ -220,6 +295,11 @@ export const enrichOrderAssignment = (order) => {
       typeof order.assignmentNote === "string"
         ? normalizeText(order.assignmentNote) || null
         : (order.assignmentNote ?? null),
+    completedEditWindowExpiresAt: order.isCompleted
+      ? getCompletedOrderEditExpiresAt(order)
+      : null,
+    canEditCompletedOrder:
+      order.isCompleted && !isCompletedEditWindowExpired(order),
   };
 };
 
@@ -522,7 +602,16 @@ const ORDER_LIST_INCLUDE_BASE = {
   readyMadeClothing: true,
   readyMadeWaskatOrder: true,
   readyMadeWaskatClothing: true,
-  damagedClothesPenalties: { select: { id: true }, take: 1 },
+  damagedClothesPenalties: {
+    select: {
+      id: true,
+      roleType: true,
+      userId: true,
+      createdAt: true,
+      user: { select: { id: true, name: true, accountType: true } },
+    },
+    take: 1,
+  },
   notifications: { orderBy: { createdAt: "desc" }, take: 1 },
   assignedTo: { select: { id: true, name: true, accountType: true } },
   qichikarAssignedTo: { select: { id: true, name: true, accountType: true } },
@@ -546,7 +635,16 @@ const ORDER_DETAIL_INCLUDE_BASE = {
   readyMadeClothing: true,
   readyMadeWaskatOrder: true,
   readyMadeWaskatClothing: true,
-  damagedClothesPenalties: { select: { id: true }, take: 1 },
+  damagedClothesPenalties: {
+    select: {
+      id: true,
+      roleType: true,
+      userId: true,
+      createdAt: true,
+      user: { select: { id: true, name: true, accountType: true } },
+    },
+    take: 1,
+  },
   notifications: true,
   assignedTo: { select: { id: true, name: true, accountType: true } },
   qichikarAssignedTo: { select: { id: true, name: true, accountType: true } },
@@ -565,6 +663,7 @@ const ORDER_BENEFIT_INCLUDE_BASE = {
   assignedTo: { select: { id: true, name: true, accountType: true } },
   qichikarAssignedTo: { select: { id: true, name: true, accountType: true } },
   dokhtAssignedTo: { select: { id: true, name: true, accountType: true } },
+  damagedClothesPenalties: { select: { id: true }, take: 1 },
 };
 
 const toMoney = (value) => {
@@ -656,6 +755,7 @@ const buildExpenseRow = ({
   date,
 });
 
+
 const buildOrderBenefitDetails = ({
   order,
   linkedDailyExpenses = [],
@@ -668,9 +768,20 @@ const buildOrderBenefitDetails = ({
     order?.rakhtRequiredMeters || 0,
     MONEY_SCALE,
   );
-  const qichikarAmount = toPositiveMoney(order?.qichikarPaymentAmount);
-  const dokhtAmount = toPositiveMoney(order?.dokhtPaymentAmount);
-  const workerAmount = toPositiveMoney(order?.workerPaymentAmount);
+  const qichikarAmount =
+    order?.qichikarPaymentStatus === "PAID_TO_WORKER"
+      ? toPositiveMoney(order?.qichikarPaymentAmount)
+      : 0;
+  const dokhtAmount =
+    order?.dokhtPaymentStatus === "PAID_TO_WORKER"
+      ? toPositiveMoney(order?.dokhtPaymentAmount)
+      : 0;
+  const workerAmount =
+    qichikarAmount <= 0 &&
+    dokhtAmount <= 0 &&
+    order?.workerPaymentStatus === "PAID_TO_WORKER"
+      ? toPositiveMoney(order?.workerPaymentAmount)
+      : 0;
 
   if (purchaseTotal > 0) {
     rows.push(
@@ -700,8 +811,8 @@ const buildOrderBenefitDetails = ({
         userRole: "QICHIKAR",
         orderType: order?.type || null,
         source: "Order",
-        paidAt: order?.qichikarPaidAt || order?.qichikarAssignedAt || null,
-        date: order?.qichikarPaidAt || order?.qichikarAssignedAt || null,
+        paidAt: order?.qichikarPaidAt || null,
+        date: order?.qichikarPaidAt || null,
       }),
     );
   }
@@ -718,14 +829,14 @@ const buildOrderBenefitDetails = ({
         userRole: "DOKHT",
         orderType: order?.type || null,
         source: "Order",
-        paidAt: order?.dokhtPaidAt || order?.dokhtAssignedAt || null,
-        date: order?.dokhtPaidAt || order?.dokhtAssignedAt || null,
+        paidAt: order?.dokhtPaidAt || null,
+        date: order?.dokhtPaidAt || null,
       }),
     );
   }
 
-  // Legacy fallback for orders that only have workerPaymentAmount populated.
-  if (qichikarAmount <= 0 && dokhtAmount <= 0 && workerAmount > 0) {
+  // Legacy fallback for older orders that only stored workerPaymentAmount.
+  if (workerAmount > 0) {
     rows.push(
       buildExpenseRow({
         key: "worker",
@@ -799,11 +910,21 @@ const buildOrderBenefitDetails = ({
     rows.map((entry) => toPositiveMoney(entry.amount)),
     MONEY_SCALE,
   );
-  const totalOrderPrice = toMoney(order?.totalPrice || 0);
-  const totalBenefit = subScaled(totalOrderPrice, totalExpenses, MONEY_SCALE);
+  const grossOrderPrice = getOrderGrossTotal(order);
+  const discount = getOrderDiscount(order);
+  const totalOrderPrice = getOrderNetTotal(order);
+  const isDamageOrder = Array.isArray(order?.damagedClothesPenalties)
+    ? order.damagedClothesPenalties.length > 0
+    : false;
+  const totalBenefit = isDamageOrder
+    ? 0
+    : subScaled(totalOrderPrice, totalExpenses, MONEY_SCALE);
 
   return {
     orderId: order?.id,
+    isDamageOrder,
+    grossOrderPrice,
+    discount,
     totalOrderPrice,
     totalExpenses,
     totalBenefit,
@@ -814,7 +935,7 @@ const buildOrderBenefitDetails = ({
 export const getOrderBenefitDetails = async (
   orderId,
   tx = prisma,
-  { includeReadyMadeOriginalExpense = true } = {},
+  { includeReadyMadeOriginalExpense = false } = {},
 ) => {
   const order = await tx.order.findUnique({
     where: { id: orderId },
@@ -838,6 +959,7 @@ export const getOrderBenefitDetails = async (
 
   return {
     ...details,
+    netProfitRecognizedAt: order.netProfitRecognizedAt || null,
     dailyExpenses: linkedDailyExpenses,
   };
 };
@@ -848,9 +970,18 @@ export const recalculateOrderBenefit = async (orderId, tx = prisma) => {
   });
   if (!details) return null;
 
+  const data = { totalBenefit: details.totalBenefit };
+  if (details.isDamageOrder) {
+    data.netProfitRecognizedAt = null;
+    data.netProfitRecognizedAmount = null;
+    data.netProfitRecognizedById = null;
+  } else if (details.netProfitRecognizedAt) {
+    data.netProfitRecognizedAmount = details.totalBenefit;
+  }
+
   await tx.order.update({
     where: { id: orderId },
-    data: { totalBenefit: details.totalBenefit },
+    data,
   });
 
   return details;
@@ -957,6 +1088,36 @@ const buildCompletedWorkerPaymentRows = (order) => {
       workerPaidBy: paymentSnapshot.paidBy,
       ...editMeta,
     });
+  }
+
+  const damagedPenalty = Array.isArray(order?.damagedClothesPenalties)
+    ? order.damagedClothesPenalties[0]
+    : null;
+  const damagedRole = damagedPenalty?.roleType;
+  if (damagedRole === "QICHIKAR" || damagedRole === "DOKHT") {
+    const alreadyHasRole = rows.some((row) => row.workerRole === damagedRole);
+    const damagedWorker =
+      getCompletedWorkerForRole(order, damagedRole) || damagedPenalty.user;
+    if (!alreadyHasRole && damagedWorker) {
+      const paymentSnapshot = getRolePaymentSnapshot(order, damagedRole);
+      const editMeta = getWorkerPaymentEditMeta(
+        paymentSnapshot.status,
+        paymentSnapshot.paidAt,
+      );
+      rows.push({
+        ...order,
+        rowId: `${order.id}:${damagedRole}:DAMAGE`,
+        workerRole: damagedRole,
+        assignedTo: damagedWorker,
+        completedAt: damagedPenalty.createdAt || order.updatedAt,
+        workerPaymentStatus: paymentSnapshot.status,
+        workerPaymentAmount: paymentSnapshot.amount,
+        workerPaidAt: paymentSnapshot.paidAt,
+        workerPaidBy: paymentSnapshot.paidBy,
+        isDamageOrder: true,
+        ...editMeta,
+      });
+    }
   }
 
   if (!rows.length && order?.isCompleted && order?.assignedTo) {
@@ -1335,6 +1496,10 @@ export const getAllOrders = async ({
       ...order,
       totalBenefit: computed.totalBenefit,
       finalTotalBenefit,
+      financialTotal: getOrderFinancialTotal({
+        ...order,
+        totalBenefit: computed.totalBenefit,
+      }),
     };
   });
 
@@ -1449,9 +1614,11 @@ export const lookupOrdersByBillOrPhone = async ({
       const enrichedOrders = await enrichOrdersWithDisplayMeta(
         enrichOrderListAssignment(orders),
       );
+      const customer = enrichedOrders[0]?.customer || orders[0]?.customer || null;
       return {
-        customer: enrichedOrders[0]?.customer || orders[0]?.customer || null,
+        customer,
         orders: enrichedOrders,
+        tenant: await getBillTenantBranding({ customer, orders: enrichedOrders }),
       };
     }
 
@@ -1485,11 +1652,14 @@ export const lookupOrdersByBillOrPhone = async ({
 
   if (!orders.length) return null;
 
+  const enrichedOrders = await enrichOrdersWithDisplayMeta(
+    enrichOrderListAssignment(orders),
+  );
+
   return {
     customer,
-    orders: await enrichOrdersWithDisplayMeta(
-      enrichOrderListAssignment(orders),
-    ),
+    orders: enrichedOrders,
+    tenant: await getBillTenantBranding({ customer, orders: enrichedOrders }),
   };
 };
 
@@ -1530,6 +1700,11 @@ export const getCompletedOrdersFromWorkers = async ({
             isCompleted: true,
             assignedToId: { not: null },
             assignedTo: { accountType: { in: ["QICHIKAR", "DOKHT"] } },
+          },
+          {
+            damagedClothesPenalties: {
+              some: { roleType: { in: ["QICHIKAR", "DOKHT"] } },
+            },
           },
         ],
       },
@@ -1574,16 +1749,32 @@ export const getCompletedOrdersFromWorkers = async ({
   const wantsPaymentStatusFilter =
     paymentStatus && ["UNPAID", "PAID_TO_WORKER"].includes(paymentStatus);
   if (qichikarUserId && String(qichikarUserId).trim()) {
+    const userId = String(qichikarUserId).trim();
     where.AND.push({
-      qichikarAssignedToId: String(qichikarUserId).trim(),
-      qichikarCompletedAt: { not: null },
+      OR: [
+        { qichikarAssignedToId: userId, qichikarCompletedAt: { not: null } },
+        { qichikarReceivedById: userId, qichikarCompletedAt: { not: null } },
+        {
+          damagedClothesPenalties: {
+            some: { userId, roleType: "QICHIKAR" },
+          },
+        },
+      ],
     });
   }
 
   if (dokhtUserId && String(dokhtUserId).trim()) {
+    const userId = String(dokhtUserId).trim();
     where.AND.push({
-      dokhtAssignedToId: String(dokhtUserId).trim(),
-      dokhtCompletedAt: { not: null },
+      OR: [
+        { dokhtAssignedToId: userId, dokhtCompletedAt: { not: null } },
+        { dokhtReceivedById: userId, dokhtCompletedAt: { not: null } },
+        {
+          damagedClothesPenalties: {
+            some: { userId, roleType: "DOKHT" },
+          },
+        },
+      ],
     });
   }
 
@@ -1903,6 +2094,8 @@ export const markCompletedWorkerOrdersAsReceived = async ({
         },
       });
 
+      await recalculateOrderBenefit(order.id, tx);
+
       output.push({
         orderId: order.id,
         workerRole: item.workerRole,
@@ -2076,11 +2269,14 @@ export const getOrderBillByOrderId = async (id) => {
     ORDER_DETAIL_INCLUDE_BASE,
   );
 
+  const enrichedOrders = await enrichOrdersWithDisplayMeta(
+    enrichOrderListAssignment(orders),
+  );
+
   return {
     customer,
-    orders: await enrichOrdersWithDisplayMeta(
-      enrichOrderListAssignment(orders),
-    ),
+    orders: enrichedOrders,
+    tenant: await getBillTenantBranding({ customer, orders: enrichedOrders }),
   };
 };
 
@@ -2783,6 +2979,9 @@ export const updateOrder = async (id, body) => {
   const existingOrder = await prisma.order.findUnique({ where: { id } });
   if (!existingOrder)
     throw Object.assign(new Error("Order not found"), { status: 404 });
+  if (existingOrder.isCompleted && isCompletedEditWindowExpired(existingOrder)) {
+    throw createCompletedOrderEditExpiredError();
+  }
 
   const monthPolicy = await getMonthPolicy({ tx: prisma });
   const existingMonth = Number(existingOrder.entryMonth);
@@ -2848,7 +3047,10 @@ export const updateOrder = async (id, body) => {
 
     if (shouldSyncBillEmergency) {
       await tx.order.updateMany({
-        where: { customerId: existingOrder.customerId },
+        where: {
+          customerId: existingOrder.customerId,
+          isCompleted: false,
+        },
         data: {
           isEmergency: body.isEmergency ?? existingOrder.isEmergency ?? false,
           emergencyExpiry:
@@ -2946,6 +3148,9 @@ export const updateOrderBill = async (
     include: { customer: true },
   });
   if (!seed) throw Object.assign(new Error("Order not found"), { status: 404 });
+  if (seed.isCompleted && isCompletedEditWindowExpired(seed)) {
+    throw createCompletedOrderEditExpiredError();
+  }
 
   const monthPolicy = await getMonthPolicy({ tx: prisma });
   const seedMonth = Number(seed.entryMonth);
@@ -3028,11 +3233,21 @@ export const updateOrderBill = async (
         id: true,
         type: true,
         customerId: true,
+        isCompleted: true,
         rakhtTonId: true,
         rakhtRequiredMeters: true,
       },
     });
     const existingById = new Map(existingOrders.map((o) => [o.id, o]));
+    const expiredCompletedSubmittedOrder = (items || []).find(
+      (item) =>
+        item?.id &&
+        existingById.get(item.id)?.isCompleted &&
+        isCompletedEditWindowExpired(existingById.get(item.id)),
+    );
+    if (expiredCompletedSubmittedOrder) {
+      throw createCompletedOrderEditExpiredError();
+    }
 
     // Roll back reserved Rakht meters for existing bill items being updated.
     // New snapshots are reserved again below in the same transaction.
@@ -3248,7 +3463,10 @@ export const updateOrderBill = async (
 
     // sync emergency settings across all orders in bill
     await tx.order.updateMany({
-      where: { customerId: seed.customerId },
+      where: {
+        customerId: seed.customerId,
+        isCompleted: false,
+      },
       data: {
         isEmergency: hasEmergency,
         emergencyExpiry: emergencyExpiry ? new Date(emergencyExpiry) : null,
@@ -3323,41 +3541,57 @@ const resolveCompletionBox = async (tx, order) => {
   return available;
 };
 
-export const markComplete = async (id) => {
-  return prisma.$transaction(async (tx) => {
-    const order = await tx.order.findUnique({ where: { id } });
-    if (!order)
-      throw Object.assign(new Error("Order not found"), { status: 404 });
+const markCompleteWithTx = async (tx, id, { actorId = null } = {}) => {
+  const order = await tx.order.findUnique({
+    where: { id },
+    include: { damagedClothesPenalties: { select: { id: true }, take: 1 } },
+  });
+  if (!order)
+    throw Object.assign(new Error("Order not found"), { status: 404 });
 
-    if (Number(order.remaining || 0) > 0) {
-      throw Object.assign(
-        new Error(
-          "This order cannot be marked as completed until full payment is confirmed by admin.",
-        ),
-        { status: 400 },
-      );
-    }
+  const isDamageOrder = Array.isArray(order.damagedClothesPenalties)
+    ? order.damagedClothesPenalties.length > 0
+    : false;
 
-    if (order.isCompleted) {
-      return tx.order.findUnique({
-        where: { id },
-        include: { customer: true, box: true },
-      });
-    }
+  if (Number(order.remaining || 0) > 0) {
+    throw Object.assign(
+      new Error(
+        "This order cannot be marked as completed until full payment is confirmed by admin.",
+      ),
+      { status: 400 },
+    );
+  }
 
-    const wasUnassigned = !order.boxId;
-    const box = await resolveCompletionBox(tx, order);
-
-    const updated = await tx.order.update({
+  if (order.isCompleted) {
+    return tx.order.findUnique({
       where: { id },
+      include: { customer: true, box: true },
+    });
+  }
+
+  await resolveCompletionBox(tx, order);
+  const benefitDetails = await recalculateOrderBenefit(id, tx);
+  const recognizedAt = new Date();
+  if (isDamageOrder) {
+    await tx.order.updateMany({
+      where: { id, isCompleted: false },
       data: {
         isCompleted: true,
+        completedAt: recognizedAt,
+        totalBenefit: 0,
+        netProfitRecognizedAt: null,
+        netProfitRecognizedAmount: null,
+        netProfitRecognizedById: null,
         isEmergency: false,
         emergencyExpiry: null,
         inProgress: false,
         boxId: null,
         foreignBoxId: null,
       },
+    });
+
+    const updatedDamageOrder = await tx.order.findUnique({
+      where: { id },
       include: {
         customer: true,
         box: true,
@@ -3372,35 +3606,200 @@ export const markComplete = async (id) => {
       },
     });
 
-    await recalculateOrderBenefit(id, tx);
+    return enrichOrderWithDisplayMeta(
+      enrichOrderAssignment(updatedDamageOrder),
+      tx,
+    );
+  }
 
-    if (order.boxId) {
-      const boxRecord = await tx.box.findUnique({ where: { id: order.boxId } });
-      const currentCount = await tx.order.count({
-        where: { boxId: order.boxId, isCompleted: false, id: { not: id } },
+  const recognizedAmount = toMoney(
+    benefitDetails?.totalBenefit ?? order.totalBenefit ?? 0,
+  );
+
+  const completionResult = await tx.order.updateMany({
+    where: { id, isCompleted: false, netProfitRecognizedAt: null },
+    data: {
+      isCompleted: true,
+      completedAt: recognizedAt,
+      netProfitRecognizedAt: recognizedAt,
+      netProfitRecognizedAmount: recognizedAmount,
+      netProfitRecognizedById: actorId || null,
+      isEmergency: false,
+      emergencyExpiry: null,
+      inProgress: false,
+      boxId: null,
+      foreignBoxId: null,
+    },
+  });
+
+  if (completionResult.count !== 1) {
+    return tx.order.findUnique({
+      where: { id },
+      include: { customer: true, box: true },
+    });
+  }
+
+  const updated = await tx.order.findUnique({
+    where: { id },
+    include: {
+      customer: true,
+      box: true,
+    },
+  });
+
+  await tx.notification.updateMany({
+    where: { orderId: id },
+    data: {
+      isRead: true,
+      expiresAt: new Date(),
+    },
+  });
+
+  if (order.boxId) {
+    const boxRecord = await tx.box.findUnique({ where: { id: order.boxId } });
+    const currentCount = await tx.order.count({
+      where: { boxId: order.boxId, isCompleted: false, id: { not: id } },
+    });
+    if (boxRecord && currentCount === boxRecord.capacity - 1) {
+      const admins = await tx.user.findMany({
+        where: { accountType: "ADMIN" },
+        select: { id: true },
       });
-      if (boxRecord && currentCount === boxRecord.capacity - 1) {
-        const admins = await tx.user.findMany({
-          where: { accountType: "ADMIN" },
-          select: { id: true },
-        });
-        await Promise.all(
-          admins.map((admin) =>
-            tx.userNotification.create({
-              data: {
-                tenantId: requireActiveTenantId(),
-                userId: admin.id,
-                orderId: id,
-                message: `Capacity available in ${boxRecord.boxName} (${order.type})`,
-                type: "BOX_CAPACITY",
-              },
-            }),
-          ),
-        );
-      }
+      await Promise.all(
+        admins.map((admin) =>
+          tx.userNotification.create({
+            data: {
+              tenantId: requireActiveTenantId(),
+              userId: admin.id,
+              orderId: id,
+              message: `Capacity available in ${boxRecord.boxName} (${order.type})`,
+              type: "BOX_CAPACITY",
+            },
+          }),
+        ),
+      );
+    }
+  }
+
+  return enrichOrderWithDisplayMeta(enrichOrderAssignment(updated), tx);
+};
+
+export const markComplete = async (id, options = {}) =>
+  prisma.$transaction((tx) => markCompleteWithTx(tx, id, options));
+
+export const settleOrder = async ({
+  id,
+  receivedAmount,
+  deliveryReceive = false,
+  actor,
+  requestMeta = {},
+}) => {
+  const normalizedReceived = toMoney(receivedAmount);
+
+  if (!Number.isFinite(normalizedReceived) || normalizedReceived < 0) {
+    throw Object.assign(new Error("Invalid received amount."), { status: 400 });
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const order = await tx.order.findUnique({ where: { id } });
+    if (!order) {
+      throw Object.assign(new Error("Order not found"), { status: 404 });
+    }
+    if (order.isCompleted) {
+      throw Object.assign(new Error("Order already completed."), {
+        status: 409,
+      });
     }
 
-    return enrichOrderWithDisplayMeta(enrichOrderAssignment(updated), tx);
+    const remainingBefore = maxScaled(order.remaining || 0, 0, MONEY_SCALE);
+    if (normalizedReceived > remainingBefore) {
+      throw Object.assign(
+        new Error("Payment cannot be greater than remaining amount."),
+        { status: 400 },
+      );
+    }
+    if (remainingBefore > 0 && normalizedReceived <= 0) {
+      throw Object.assign(new Error("Received amount must be greater than zero."), {
+        status: 400,
+      });
+    }
+
+    const discountAdded = subScaled(
+      remainingBefore,
+      normalizedReceived,
+      MONEY_SCALE,
+    );
+    const paidAmountAfter = addScaled(
+      order.paidAmount || 0,
+      normalizedReceived,
+      MONEY_SCALE,
+    );
+    const discountAfter = addScaled(
+      order.discount || 0,
+      discountAdded,
+      MONEY_SCALE,
+    );
+
+    const updateResult = await tx.order.updateMany({
+      where: {
+        id,
+        isCompleted: false,
+        remaining: order.remaining,
+      },
+      data: {
+        paidAmount: paidAmountAfter,
+        discount: discountAfter,
+        remaining: 0,
+      },
+    });
+
+    if (updateResult.count !== 1) {
+      throw Object.assign(
+        new Error("Order balance changed. Refresh and try again."),
+        { status: 409, code: "ORDER_BALANCE_CHANGED" },
+      );
+    }
+
+    await recalculateOrderBenefit(id, tx);
+
+    await tx.auditLog.create({
+      data: {
+        tenantId: order.tenantId || requireActiveTenantId(),
+        actorId: actor?.id || null,
+        action: "ORDER_PAYMENT_SETTLED",
+        entity: "Order",
+        entityId: id,
+        metadata: {
+          billNumber: order.billNumber,
+          remainingBefore,
+          receivedAmount: normalizedReceived,
+          discountBefore: toMoney(order.discount || 0),
+          discountAdded,
+          discountAfter,
+          paidAmountBefore: toMoney(order.paidAmount || 0),
+          paidAmountAfter,
+          remainingAfter: 0,
+          deliveryReceive: Boolean(deliveryReceive),
+        },
+        ipAddress: requestMeta.ipAddress || null,
+        userAgent: requestMeta.userAgent || null,
+      },
+    });
+
+    const completedOrder = await markCompleteWithTx(tx, id, {
+      actorId: actor?.id || null,
+    });
+    return {
+      ...completedOrder,
+      settlement: {
+        remainingBefore,
+        receivedAmount: normalizedReceived,
+        discountAdded,
+        discountAfter,
+        paidAmountAfter,
+        remainingAfter: 0,
+      },
+    };
   });
 };
 
@@ -3417,6 +3816,8 @@ export const deleteOrder = async (id) =>
         rakhtRequiredMeters: true,
         rakhtCompanyName: true,
         rakhtBrandName: true,
+        isCompleted: true,
+        completedAt: true,
         entryMonth: true,
         entryYear: true,
         customer: { select: { billNumber: true } },
@@ -3425,6 +3826,9 @@ export const deleteOrder = async (id) =>
 
     if (!existing) {
       throw Object.assign(new Error("Order not found"), { status: 404 });
+    }
+    if (existing.isCompleted && !ALLOW_COMPLETED_ORDER_DELETE_TEMPORARILY) {
+      throw createCompletedOrderLockedError();
     }
 
     const monthPolicy = await getMonthPolicy({ tx });

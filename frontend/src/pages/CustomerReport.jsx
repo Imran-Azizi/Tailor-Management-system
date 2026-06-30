@@ -100,7 +100,8 @@ export default function CustomerReport() {
           ? "'Noto Naskh Arabic', 'Noto Sans Arabic', 'Inter', sans-serif"
           : undefined,
       }}
-      className="report-root"
+      className="report-root professional-report-page customer-report-page"
+      dir={isRtl ? "rtl" : "ltr"}
     >
       {/* Header */}
       <div
@@ -384,8 +385,14 @@ export default function CustomerReport() {
                 {t("report.topCustomers")}
               </span>
             </div>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <div
+              className="professional-report-table-wrap"
+              style={{ overflowX: "auto" }}
+            >
+              <table
+                className="professional-report-table"
+                style={{ width: "100%", borderCollapse: "collapse" }}
+              >
                 <thead>
                   <tr style={{ background: "var(--surface2)" }}>
                     {[

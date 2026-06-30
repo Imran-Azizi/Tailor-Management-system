@@ -9,12 +9,15 @@ import {
   setAuthCookies,
   setCsrfCookie,
   hashSessionToken,
+  hashRefreshToken,
 } from '../lib/sessionCookies.js';
 import { JWT_SECRET } from '../middleware/auth.middleware.js';
 
 const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'tailor-refresh-secret-change-in-prod';
 const ACCESS_EXP = '15m';
 const REFRESH_EXP = '7d';
+const PASSWORD_MIN_LENGTH = 8;
+const SALT_ROUNDS = 12;
 
 function signAccess(user, refreshToken) {
   return jwt.sign(
@@ -181,7 +184,7 @@ export async function login(req, res, next) {
     const refreshToken = signRefresh(user);
     const accessToken = signAccess(user, refreshToken);
 
-    await prisma.user.update({ where: { id: user.id }, data: { refreshToken } });
+    await prisma.user.update({ where: { id: user.id }, data: { refreshToken: hashRefreshToken(refreshToken) } });
     setAuthCookies(res, { accessToken, refreshToken });
 
     res.json({
@@ -195,7 +198,7 @@ export async function login(req, res, next) {
 /** POST /api/auth/refresh */
 export async function refresh(req, res, next) {
   try {
-    const refreshToken = getCookie(req, REFRESH_COOKIE_NAME) || req.body?.refreshToken;
+    const refreshToken = getCookie(req, REFRESH_COOKIE_NAME);
     if (!refreshToken) return res.status(400).json({ error: 'Refresh token required.' });
 
     let payload;
@@ -205,11 +208,12 @@ export async function refresh(req, res, next) {
       return res.status(401).json({ error: 'Invalid or expired refresh token.' });
     }
 
+    const hashedToken = hashRefreshToken(refreshToken);
     const user = await prisma.user.findUnique({
       where: { id: payload.sub },
       include: { tenant: { select: tenantSelect() } },
     });
-    if (!user || user.refreshToken !== refreshToken || !user.isActive) {
+    if (!user || !user.refreshToken || user.refreshToken !== hashedToken || !user.isActive) {
       return res.status(401).json({ error: 'Token revoked or invalid.' });
     }
     if (user.accountType !== 'SUPER_ADMIN') {
@@ -223,7 +227,7 @@ export async function refresh(req, res, next) {
 
     const newRefresh = signRefresh(user);
     const newAccess = signAccess(user, newRefresh);
-    await prisma.user.update({ where: { id: user.id }, data: { refreshToken: newRefresh } });
+    await prisma.user.update({ where: { id: user.id }, data: { refreshToken: hashRefreshToken(newRefresh) } });
     setAuthCookies(res, { accessToken: newAccess, refreshToken: newRefresh });
 
     res.json({ user: serializeUser(user) });
@@ -235,14 +239,15 @@ export async function refresh(req, res, next) {
 /** POST /api/auth/logout */
 export async function logout(req, res, next) {
   try {
-    const refreshToken = getCookie(req, REFRESH_COOKIE_NAME) || req.body?.refreshToken;
+    const refreshToken = getCookie(req, REFRESH_COOKIE_NAME);
     if (req.user) {
       await prisma.user.update({ where: { id: req.user.id }, data: { refreshToken: null } });
     } else if (refreshToken) {
       try {
         const payload = jwt.verify(refreshToken, REFRESH_SECRET);
+        const hashedToken = hashRefreshToken(refreshToken);
         await prisma.user.updateMany({
-          where: { id: payload.sub, refreshToken },
+          where: { id: payload.sub, refreshToken: hashedToken },
           data: { refreshToken: null },
         });
       } catch {
@@ -266,4 +271,114 @@ export function csrf(req, res) {
   const csrfToken = createCsrfToken();
   setCsrfCookie(res, csrfToken);
   res.json({ csrfToken });
+}
+
+function isStrongPassword(password) {
+  return (
+    typeof password === 'string' &&
+    password.length >= PASSWORD_MIN_LENGTH &&
+    /[a-zA-Z]/.test(password) &&
+    /\d/.test(password)
+  );
+}
+
+/** PUT /api/auth/profile */
+export async function updateProfile(req, res, next) {
+  try {
+    const name = String(req.body?.name || '').trim();
+    const phoneNumber = String(req.body?.phoneNumber || '').trim();
+    const currentPassword = String(req.body?.currentPassword || '');
+
+    if (!name || name.length < 2 || name.length > 100) {
+      return res.status(400).json({ error: 'Full name must be between 2 and 100 characters.' });
+    }
+    if (!/^[0-9+()\-\s]{7,24}$/.test(phoneNumber)) {
+      return res.status(400).json({ error: 'Enter a valid phone number.' });
+    }
+    if (!currentPassword) {
+      return res.status(400).json({ error: 'Current password is required.' });
+    }
+
+    const account = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { id: true, password: true, accountType: true },
+    });
+    if (!account || account.accountType !== 'SUPER_ADMIN') {
+      return res.status(404).json({ error: 'Super admin account not found.' });
+    }
+    if (!(await bcrypt.compare(currentPassword, account.password))) {
+      return res.status(401).json({ code: 'INVALID_CURRENT_PASSWORD', error: 'Current password is incorrect.' });
+    }
+
+    const phoneOwner = await prisma.user.findFirst({
+      where: {
+        id: { not: account.id },
+        accountType: 'SUPER_ADMIN',
+        phoneNumber,
+      },
+      select: { id: true },
+    });
+    if (phoneOwner) {
+      return res.status(409).json({ code: 'PHONE_IN_USE', error: 'This phone number is already in use.' });
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: account.id },
+      data: { name, phoneNumber },
+      include: { tenant: { select: tenantSelect() } },
+    });
+    res.json({ user: serializeUser(updated) });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** POST /api/auth/change-password */
+export async function changePassword(req, res, next) {
+  try {
+    const currentPassword = String(req.body?.currentPassword || '');
+    const newPassword = String(req.body?.newPassword || '');
+    const confirmPassword = String(req.body?.confirmPassword || '');
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({ error: 'All password fields are required.' });
+    }
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ error: 'New password and confirmation do not match.' });
+    }
+    if (!isStrongPassword(newPassword)) {
+      return res.status(400).json({
+        error: `Password must be at least ${PASSWORD_MIN_LENGTH} characters and include a letter and a number.`,
+      });
+    }
+    if (newPassword === currentPassword) {
+      return res.status(400).json({ error: 'New password must be different from the current password.' });
+    }
+
+    const account = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      include: { tenant: { select: tenantSelect() } },
+    });
+    if (!account || account.accountType !== 'SUPER_ADMIN') {
+      return res.status(404).json({ error: 'Super admin account not found.' });
+    }
+    if (!(await bcrypt.compare(currentPassword, account.password))) {
+      return res.status(401).json({ code: 'INVALID_CURRENT_PASSWORD', error: 'Current password is incorrect.' });
+    }
+
+    const refreshToken = signRefresh(account);
+    const accessToken = signAccess(account, refreshToken);
+    const updated = await prisma.user.update({
+      where: { id: account.id },
+      data: {
+        password: await bcrypt.hash(newPassword, SALT_ROUNDS),
+        refreshToken: hashRefreshToken(refreshToken),
+      },
+      include: { tenant: { select: tenantSelect() } },
+    });
+    setAuthCookies(res, { accessToken, refreshToken });
+    res.json({ user: serializeUser(updated) });
+  } catch (err) {
+    next(err);
+  }
 }

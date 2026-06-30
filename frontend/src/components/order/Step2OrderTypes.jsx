@@ -14,6 +14,7 @@ import {
 } from "react-icons/lu";
 import { getOrderTypeLabel } from "../../lib/orderType.js";
 import { formatCurrency } from "../../lib/currency.js";
+import { isRtlLanguage } from "../../lib/locale.js";
 import api from "../../lib/api.js";
 import styles from "./Step2OrderTypes.module.css";
 
@@ -53,7 +54,9 @@ function ReadyMadeCatalogDropdown({
   chooseLabel,
   codeField,
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language;
+  const isRtl = isRtlLanguage(language);
   const { data: items = [], isLoading } = useQuery({
     queryKey,
     queryFn: () => api.get(endpoint).then((r) => r.data),
@@ -69,6 +72,8 @@ function ReadyMadeCatalogDropdown({
         border: "1px solid var(--primary-200)",
         borderRadius: 10,
         background: "var(--surface2)",
+        direction: isRtl ? "rtl" : "ltr",
+        textAlign: isRtl ? "right" : "left",
       }}
     >
       <label
@@ -108,6 +113,8 @@ function ReadyMadeCatalogDropdown({
               fontSize: 13,
               paddingInlineEnd: 32,
               width: "100%",
+              direction: isRtl ? "rtl" : "ltr",
+              textAlign: isRtl ? "right" : "left",
             }}
             value={selectedId || ""}
             onChange={(e) => {
@@ -124,8 +131,8 @@ function ReadyMadeCatalogDropdown({
                 disabled={Number(item?.quantity || 0) <= 0}
               >
                 {item?.[codeField]}
-                {" — "}
-                {formatCurrency(item.originalPrice)}
+                {" - "}
+                {formatCurrency(item.originalPrice, language)}
                 {` (${t("common.quantity", "Quantity")}: ${Number(item?.quantity || 0)})`}
               </option>
             ))}
@@ -145,11 +152,27 @@ function ReadyMadeCatalogDropdown({
         </>
       )}
       {selectedId && (
-        <p style={{ marginTop: 6, fontSize: 12, color: "var(--primary)" }}>
-          {t("readyMade.originalPrice", "Original Price")}:{" "}
-          {formatCurrency(
-            items.find((i) => i.id === selectedId)?.originalPrice ?? 0,
-          )}
+        <p
+          style={{
+            marginTop: 8,
+            fontSize: 12,
+            color: "var(--primary)",
+            fontWeight: 700,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 10,
+            direction: isRtl ? "rtl" : "ltr",
+            textAlign: isRtl ? "right" : "left",
+          }}
+        >
+          <span>{t("readyMade.originalPrice", "Original Price")}</span>
+          <span style={{ direction: "ltr", unicodeBidi: "isolate" }}>
+            {formatCurrency(
+              items.find((i) => i.id === selectedId)?.originalPrice ?? 0,
+              language,
+            )}
+          </span>
         </p>
       )}
     </div>

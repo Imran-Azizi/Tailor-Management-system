@@ -1,0 +1,85 @@
+.rakht-revenue-records-table {
+  width: 100%;
+}
+
+.rakht-revenue-records-table th,
+.rakht-revenue-records-table td {
+  vertical-align: middle;
+  text-align: start;
+}
+
+.rakht-revenue-records-table[data-language-direction="rtl"] th,
+.rakht-revenue-records-table[data-language-direction="rtl"] td {
+  direction: rtl;
+  text-align: right;
+}
+
+.rakht-revenue-records-table[data-language-direction="rtl"] thead th {
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.rakht-revenue-number {
+  direction: ltr !important;
+  unicode-bidi: isolate;
+  white-space: nowrap;
+}
+
+@media (min-width: 1200px) {
+  .rakht-revenue-records-wrap {
+    overflow-x: hidden !important;
+  }
+
+  .rakht-revenue-records-table {
+    min-width: 0 !important;
+    table-layout: fixed;
+    font-size: 12px;
+  }
+
+  .rakht-revenue-records-table th,
+  .rakht-revenue-records-table td {
+    padding-inline: 7px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .rakht-revenue-col--company {
+    width: 11%;
+  }
+
+  .rakht-revenue-col--brand,
+  .rakht-revenue-col--ton {
+    width: 9%;
+  }
+
+  .rakht-revenue-col--customer {
+    width: 11%;
+  }
+
+  .rakht-revenue-col--orderType {
+    width: 11%;
+  }
+
+  .rakht-revenue-col--meters {
+    width: 7%;
+  }
+
+  .rakht-revenue-col--costPerMeter,
+  .rakht-revenue-col--sellingPerMeter {
+    width: 11%;
+  }
+
+  .rakht-revenue-col--benefit {
+    width: 10%;
+  }
+
+  .rakht-revenue-col--date {
+    width: 10%;
+  }
+}
+
+@media (max-width: 1199px) {
+  .rakht-revenue-records-table {
+    min-width: 1120px;
+  }
+}

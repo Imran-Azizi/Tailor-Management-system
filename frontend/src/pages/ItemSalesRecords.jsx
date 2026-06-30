@@ -216,7 +216,7 @@ export default function ItemSalesRecords() {
                   <th>{t("items.sell.profit", { defaultValue: "Profit" })}</th>
                   <th>
                     {t("items.sell.quantitySold", {
-                      defaultValue: "Quantity Sold",
+                      defaultValue: "Quantity",
                     })}
                   </th>
                   <th>

@@ -296,7 +296,54 @@ export const getAllCustomers = async ({
     prisma.customer.count({ where }),
   ]);
 
-  return { data, total, page: Number(page), limit: Number(limit) };
+  const customerIds = data.map((customer) => customer.id);
+  const orderTotals = customerIds.length
+    ? await prisma.order.groupBy({
+        by: ["customerId"],
+        where: {
+          customerId: { in: customerIds },
+          damagedClothesPenalties: { none: {} },
+        },
+        _sum: {
+          totalPrice: true,
+          discount: true,
+          paidAmount: true,
+          remaining: true,
+        },
+      })
+    : [];
+  const totalsByCustomerId = new Map(
+    orderTotals.map((row) => [
+      row.customerId,
+      {
+        totalPrice: Number(row._sum?.totalPrice || 0),
+        discount: Number(row._sum?.discount || 0),
+        netTotal: Math.max(
+          0,
+          Number(row._sum?.totalPrice || 0) -
+            Number(row._sum?.discount || 0),
+        ),
+        paidAmount: Number(row._sum?.paidAmount || 0),
+        remaining: Number(row._sum?.remaining || 0),
+      },
+    ]),
+  );
+
+  return {
+    data: data.map((customer) => ({
+      ...customer,
+      _sum: totalsByCustomerId.get(customer.id) || {
+        totalPrice: 0,
+        discount: 0,
+        netTotal: 0,
+        paidAmount: 0,
+        remaining: 0,
+      },
+    })),
+    total,
+    page: Number(page),
+    limit: Number(limit),
+  };
 };
 
 export const getCustomerById = async (id) => {
@@ -313,6 +360,7 @@ export const getCustomerById = async (id) => {
           readyMadeWaskatOrder: true,
           box: true,
           foreignBox: true,
+          damagedClothesPenalties: { select: { id: true }, take: 1 },
           assignedTo: { select: { id: true, name: true, accountType: true } },
           qichikarAssignedTo: {
             select: { id: true, name: true, accountType: true },

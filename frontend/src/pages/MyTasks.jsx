@@ -1,4 +1,5 @@
 import { formatCurrency } from "../lib/currency.js";
+import { getOrderGrossTotal } from "../lib/orderFinancials.js";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -9,7 +10,6 @@ import {
   LuClipboardList,
   LuCalendarClock,
   LuUser,
-  LuBell,
   LuCheck,
   LuPlay,
   LuPause,
@@ -26,18 +26,12 @@ import {
   getOrderLabelParts,
   getOrderPrimaryDisplayName,
 } from "../lib/orderType.js";
-import { formatUserNotificationMessage } from "../lib/notifications.js";
-import {
-  formatDateTimeLocale,
-  formatRelativeTimeLocale,
-} from "../lib/locale.js";
 import { formatSystemDate } from "../lib/locale.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import {
   Badge,
   Spinner,
   EmptyState,
-  NotificationText,
 } from "../components/ui/index.jsx";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -444,7 +438,7 @@ function OrderDetailModal({
                     {t("myTasks.totalShort")}
                   </span>
                   <span style={{ fontWeight: 700 }}>
-                    {fmt$(order.totalPrice, language)}
+                    {fmt$(getOrderGrossTotal(order), language)}
                   </span>
                 </div>
                 {order.discount > 0 && (
@@ -542,7 +536,7 @@ function OrderDetailModal({
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <LuUser size={12} style={{ color: "var(--text3)" }} />
                   <span style={{ color: "var(--text2)" }}>
-                    {t("assignment.assignedBy")}:{" "}
+                    {t("workerPanel.assignedBy", "Received from")}:{" "}
                     <strong>{order.assignedBy.name}</strong>
                   </span>
                 </div>
@@ -831,7 +825,7 @@ function OrderCard({
             {order.assignedBy && (
               <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <LuUser size={11} />
-                {t("assignment.assignedBy")}: {order.assignedBy.name}
+                {t("workerPanel.assignedBy", "Received from")}: {order.assignedBy.name}
               </span>
             )}
           </div>
@@ -853,7 +847,7 @@ function OrderCard({
         {/* Price */}
         <div style={{ textAlign: "end", flexShrink: 0 }}>
           <p style={{ fontSize: 15, fontWeight: 800, color: "var(--text1)" }}>
-            {fmt$(order.totalPrice, language)}
+            {fmt$(getOrderGrossTotal(order), language)}
           </p>
           {order.discount > 0 && (
             <p style={{ fontSize: 11, color: "#16a34a" }}>
@@ -994,31 +988,6 @@ export default function MyTasks() {
     refetchInterval: 30_000,
   });
   const allOrders = result?.data || [];
-
-  // ── Unread user notifications ──
-  const { data: notifs = [] } = useQuery({
-    queryKey: ["my-notifs-unread"],
-    queryFn: () =>
-      api.get("/users/me/notifications?unread=true").then((r) => r.data),
-    refetchInterval: 30_000,
-  });
-
-  // ── Mutations ──
-  const readAllMut = useMutation({
-    mutationFn: () => api.patch("/users/me/notifications/read-all"),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["my-notifs-unread"] });
-      qc.invalidateQueries({ queryKey: ["my-notifs-count"] });
-    },
-  });
-
-  const readOneMut = useMutation({
-    mutationFn: (id) => api.patch(`/users/me/notifications/${id}/read`),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["my-notifs-unread"] });
-      qc.invalidateQueries({ queryKey: ["my-notifs-count"] });
-    },
-  });
 
   const progressMut = useMutation({
     mutationFn: (id) => api.patch(`/orders/${id}/progress`),
@@ -1221,124 +1190,6 @@ export default function MyTasks() {
           </div>
         ))}
       </div>
-
-      {/* ── Notification panel ── */}
-      {notifs.length > 0 && (
-        <div
-          style={{
-            background: "#2563EB08",
-            border: "1px solid #2563EB25",
-            borderRadius: 12,
-            marginBottom: 20,
-            overflow: "hidden",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "11px 16px",
-              borderBottom: "1px solid #2563EB20",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <LuBell size={14} style={{ color: "#2563EB" }} />
-              <span
-                style={{ fontSize: 13, fontWeight: 600, color: "var(--text1)" }}
-              >
-                {t("myTasks.newAssignments", { count: notifs.length })}
-              </span>
-              <span
-                style={{
-                  fontSize: 10,
-                  padding: "1px 7px",
-                  background: "#2563EB",
-                  color: "#fff",
-                  borderRadius: 99,
-                  fontWeight: 800,
-                }}
-              >
-                {notifs.length}
-              </span>
-            </div>
-            <button
-              onClick={() => readAllMut.mutate()}
-              disabled={readAllMut.isPending}
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                color: "#2563EB",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                opacity: readAllMut.isPending ? 0.6 : 1,
-              }}
-            >
-              {t("myTasks.markAllRead")}
-            </button>
-          </div>
-          <div style={{ maxHeight: 220, overflowY: "auto" }}>
-            {notifs.map((n) => (
-              <div
-                key={n.id}
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 10,
-                  padding: "10px 16px",
-                  borderBottom: "1px solid #2563EB12",
-                }}
-              >
-                <LuBell
-                  size={12}
-                  style={{ color: "#2563EB", flexShrink: 0, marginTop: 3 }}
-                />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <NotificationText
-                    language={language}
-                    style={{
-                      fontSize: 12,
-                      color: "var(--text1)",
-                      lineHeight: 1.45,
-                    }}
-                  >
-                    {formatUserNotificationMessage(n, t, language)}
-                  </NotificationText>
-                  <p
-                    style={{
-                      fontSize: 11,
-                      color: "var(--text3)",
-                      marginTop: 2,
-                    }}
-                  >
-                    <span title={formatDateTimeLocale(n.createdAt, language)}>
-                      {formatRelativeTimeLocale(n.createdAt, language)}
-                    </span>
-                  </p>
-                </div>
-                <button
-                  onClick={() => readOneMut.mutate(n.id)}
-                  title={t("myTasks.markAllRead")}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "#2563EB",
-                    padding: "3px 5px",
-                    borderRadius: 5,
-                    flexShrink: 0,
-                    display: "flex",
-                    alignItems: "center",
-                  }}
-                >
-                  <LuCheck size={12} />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* ── Filter tabs ── */}
       <div

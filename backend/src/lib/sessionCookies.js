@@ -102,3 +102,7 @@ export function isValidCsrfToken(csrfToken) {
 export function hashSessionToken(token) {
   return crypto.createHash("sha256").update(String(token || "")).digest("hex");
 }
+
+export function hashRefreshToken(token) {
+  return crypto.createHash("sha256").update(String(token || "")).digest("hex");
+}

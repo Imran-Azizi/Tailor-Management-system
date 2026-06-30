@@ -28,7 +28,7 @@ import {
 import AfCurrencyIcon from "../ui/AfCurrencyIcon.jsx";
 
 const ROLE_ACCENT = {
-  SUPER_ADMIN: "#111827",
+  SUPER_ADMIN: "#6366F1",
   ADMIN: "#2563EB",
   DOKAN: "#0D9488",
   QICHIKAR: "#D97706",
@@ -56,6 +56,13 @@ const SUPER_ADMIN_SECTIONS = [
         fallback: "Backup & Restore",
         path: "/super-admin/backups",
         icon: LuDatabaseBackup,
+      },
+      {
+        key: "superAdminSettings",
+        label: "superAdminSettings.title",
+        fallback: "Super Admin Settings",
+        path: "/super-admin/settings",
+        icon: LuSettings,
       },
     ],
   },

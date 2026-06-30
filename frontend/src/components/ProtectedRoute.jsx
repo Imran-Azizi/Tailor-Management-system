@@ -55,7 +55,7 @@ export function ProtectedRoute({ children }) {
   }
 
   if (WORKER_ROLES.includes(user.accountType)) {
-    return <Navigate to="/panel" replace />;
+    return <Navigate to="/panel/dashboard" replace />;
   }
 
   if (!MAIN_PANEL_ROLES.includes(user.accountType)) {

@@ -105,7 +105,10 @@ export default function WorkerPaymentReceipts() {
   };
 
   return (
-    <div className="page">
+    <div
+      className="page report-root professional-report-page worker-payment-receipts-page"
+      dir={isRtl ? "rtl" : "ltr"}
+    >
       <PageHeader
         title={t("workerReceipts.title", "Worker Payment Receipt History")}
         subtitle={t(
@@ -305,8 +308,8 @@ export default function WorkerPaymentReceipts() {
               message={t("workerReceipts.empty", "No receipt records found.")}
             />
           ) : (
-            <div className="tbl-wrap order-scroll-x">
-              <table className="tbl">
+            <div className="tbl-wrap professional-report-table-wrap order-scroll-x">
+              <table className="tbl professional-report-table">
                 <thead>
                   <tr>
                     <th>{t("orders.billNumber", "Bill Number")}</th>

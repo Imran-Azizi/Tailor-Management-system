@@ -8,7 +8,8 @@ import {
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 function isCsrfExempt(req) {
-  return req.path === "/auth/csrf" || req.path === "/health";
+  const url = req.originalUrl || (req.baseUrl + req.path);
+  return url.includes("/auth/csrf") || url.includes("/health");
 }
 
 export function csrfProtection(req, res, next) {

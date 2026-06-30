@@ -611,31 +611,16 @@ export default function CompletedWorkerOrders() {
         dir={isRtl ? "rtl" : "ltr"}
       >
         <StatCard
-          label={t("completedWorkerOrders.totalOrders", "Matching Orders")}
-          value={stats.totalOrders}
-          Icon={LuSquareCheckBig}
-          accent="#2563EB"
-        />
-        <StatCard
-          label={t("completedWorkerOrders.paidOrders", "Paid Orders")}
-          value={stats.paidOrders}
-          Icon={AfCurrencyIcon}
-          accent="#15803D"
-        />
-        <StatCard
-          label={t("completedWorkerOrders.unpaidOrders", "Unpaid Orders")}
-          value={stats.unpaidOrders}
-          Icon={LuUser}
-          accent="#B45309"
-        />
-        <StatCard
-          label={t("completedWorkerOrders.totalPaid", "Total Paid")}
-          value={formatCurrency(stats.totalPaidAmount || 0, "en", {
+          label={t(
+            "completedWorkerOrders.pendingReceiptTotal",
+            "Pending Receipt",
+          )}
+          value={formatCurrency(stats.totalPendingReceiptAmount || 0, "en", {
             minimumFractionDigits: 0,
             maximumFractionDigits: 0,
           })}
           Icon={AfCurrencyIcon}
-          accent="#7C3AED"
+          accent="#B45309"
         />
         <StatCard
           label={t("completedWorkerOrders.totalReceipt", "Total Receipt")}
@@ -647,16 +632,31 @@ export default function CompletedWorkerOrders() {
           accent="#0F766E"
         />
         <StatCard
-          label={t(
-            "completedWorkerOrders.pendingReceiptTotal",
-            "Pending Receipt",
-          )}
-          value={formatCurrency(stats.totalPendingReceiptAmount || 0, "en", {
+          label={t("completedWorkerOrders.totalPaid", "Total Paid")}
+          value={formatCurrency(stats.totalPaidAmount || 0, "en", {
             minimumFractionDigits: 0,
             maximumFractionDigits: 0,
           })}
           Icon={AfCurrencyIcon}
+          accent="#7C3AED"
+        />
+        <StatCard
+          label={t("completedWorkerOrders.unpaidOrders", "Unpaid Orders")}
+          value={stats.unpaidOrders}
+          Icon={LuUser}
           accent="#B45309"
+        />
+        <StatCard
+          label={t("completedWorkerOrders.paidOrders", "Paid Orders")}
+          value={stats.paidOrders}
+          Icon={AfCurrencyIcon}
+          accent="#15803D"
+        />
+        <StatCard
+          label={t("completedWorkerOrders.totalOrders", "Matching Orders")}
+          value={stats.totalOrders}
+          Icon={LuSquareCheckBig}
+          accent="#2563EB"
         />
       </section>
 
@@ -886,26 +886,12 @@ export default function CompletedWorkerOrders() {
               <table className="tbl">
                 <thead>
                   <tr>
-                    <th>
-                      {t("completedWorkerOrders.workerName", "Worker Name")}
-                    </th>
-                    <th>
-                      {t("completedWorkerOrders.workerRole", "Worker Role")}
-                    </th>
-                    <th>{t("orders.billNumber", "Bill Number")}</th>
-                    <th>{t("common.customer", "Customer")}</th>
-                    <th>{t("workerPanel.orderType", "Order Type")}</th>
+                    <th>{t("common.select", "Select")}</th>
+                    <th>{t("common.actions", "Actions")}</th>
                     <th>
                       {t(
-                        "completedWorkerOrders.completionDate",
-                        "Completion Date",
-                      )}
-                    </th>
-                    <th>{t("common.status", "Status")}</th>
-                    <th>
-                      {t(
-                        "completedWorkerOrders.paymentStatus",
-                        "Payment Status",
+                        "completedWorkerOrders.paymentAmount",
+                        "Payment Amount",
                       )}
                     </th>
                     <th>
@@ -916,12 +902,26 @@ export default function CompletedWorkerOrders() {
                     </th>
                     <th>
                       {t(
-                        "completedWorkerOrders.paymentAmount",
-                        "Payment Amount",
+                        "completedWorkerOrders.paymentStatus",
+                        "Payment Status",
                       )}
                     </th>
-                    <th>{t("common.actions", "Actions")}</th>
-                    <th>{t("common.select", "Select")}</th>
+                    <th>{t("common.status", "Status")}</th>
+                    <th>
+                      {t(
+                        "completedWorkerOrders.completionDate",
+                        "Completion Date",
+                      )}
+                    </th>
+                    <th>{t("workerPanel.orderType", "Order Type")}</th>
+                    <th>{t("common.customer", "Customer")}</th>
+                    <th>{t("orders.billNumber", "Bill Number")}</th>
+                    <th>
+                      {t("completedWorkerOrders.workerRole", "Worker Role")}
+                    </th>
+                    <th>
+                      {t("completedWorkerOrders.workerName", "Worker Name")}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -953,42 +953,42 @@ export default function CompletedWorkerOrders() {
                         }
                         className={isHighlighted ? "row-highlight" : undefined}
                       >
-                        <td>{order.assignedTo?.name || "-"}</td>
                         <td>
-                          {workerRoleLabel(
-                            order.workerRole || order.assignedTo?.accountType,
-                            t,
-                          )}
-                        </td>
-                        <td>#{order.customer?.billNumber || "-"}</td>
-                        <td>
-                          <div className="grid gap-0.5">
-                            <strong className="text-[var(--text1)]">
-                              {getOrderPrimaryDisplayName(
-                                order,
-                                order.customer?.firstName,
-                                language,
-                              )}
-                            </strong>
-                            <span className="text-xs text-[var(--text3)]">
-                              {order.customer?.phoneNumber || "-"}
-                            </span>
-                          </div>
-                        </td>
-                        <td>{orderLabel.typeWithSequenceLabel}</td>
-                        <td>
-                          {formatDateLocale(
-                            order.completedAt || order.updatedAt,
-                            language,
-                          )}
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            disabled={
+                              !canSelectForReceipt || receiptMut.isPending
+                            }
+                            onChange={(e) =>
+                              toggleSelectRow(order, e.target.checked)
+                            }
+                            aria-label={t(
+                              "completedWorkerOrders.selectOrder",
+                              "Select order",
+                            )}
+                          />
                         </td>
                         <td>
-                          <Badge v="green">
-                            {t("common.completed", "Completed")}
-                          </Badge>
+                          <button
+                            type="button"
+                            className="btn btn-gold btn-sm"
+                            onClick={() => handleSavePayment(order)}
+                            disabled={
+                              payWorkerMut.isPending || !editUiState.canSubmit
+                            }
+                          >
+                            <AfCurrencyIcon size={14} />
+                            {!isAlreadyPaid
+                              ? t(
+                                  "completedWorkerOrders.savePayment",
+                                  "Save Payment",
+                                )
+                              : editUiState.canEditWithinWindow
+                                ? t("common.edit", "Edit")
+                                : t("completedWorkerOrders.expired", "Expired")}
+                          </button>
                         </td>
-                        <td>{paymentBadge(order.workerPaymentStatus, t)}</td>
-                        <td>{receiptBadge(order.moneyReceiptStatus, t)}</td>
                         <td>
                           <div style={{ minWidth: 160 }}>
                             <input
@@ -1033,42 +1033,42 @@ export default function CompletedWorkerOrders() {
                             ) : null}
                           </div>
                         </td>
+                        <td>{receiptBadge(order.moneyReceiptStatus, t)}</td>
+                        <td>{paymentBadge(order.workerPaymentStatus, t)}</td>
                         <td>
-                          <button
-                            type="button"
-                            className="btn btn-gold btn-sm"
-                            onClick={() => handleSavePayment(order)}
-                            disabled={
-                              payWorkerMut.isPending || !editUiState.canSubmit
-                            }
-                          >
-                            <AfCurrencyIcon size={14} />
-                            {!isAlreadyPaid
-                              ? t(
-                                  "completedWorkerOrders.savePayment",
-                                  "Save Payment",
-                                )
-                              : editUiState.canEditWithinWindow
-                                ? t("common.edit", "Edit")
-                                : t("completedWorkerOrders.expired", "Expired")}
-                          </button>
+                          <Badge v="green">
+                            {t("common.completed", "Completed")}
+                          </Badge>
                         </td>
                         <td>
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            disabled={
-                              !canSelectForReceipt || receiptMut.isPending
-                            }
-                            onChange={(e) =>
-                              toggleSelectRow(order, e.target.checked)
-                            }
-                            aria-label={t(
-                              "completedWorkerOrders.selectOrder",
-                              "Select order",
-                            )}
-                          />
+                          {formatDateLocale(
+                            order.completedAt || order.updatedAt,
+                            language,
+                          )}
                         </td>
+                        <td>{orderLabel.typeWithSequenceLabel}</td>
+                        <td>
+                          <div className="grid gap-0.5">
+                            <strong className="text-[var(--text1)]">
+                              {getOrderPrimaryDisplayName(
+                                order,
+                                order.customer?.firstName,
+                                language,
+                              )}
+                            </strong>
+                            <span className="text-xs text-[var(--text3)]">
+                              {order.customer?.phoneNumber || "-"}
+                            </span>
+                          </div>
+                        </td>
+                        <td>#{order.customer?.billNumber || "-"}</td>
+                        <td>
+                          {workerRoleLabel(
+                            order.workerRole || order.assignedTo?.accountType,
+                            t,
+                          )}
+                        </td>
+                        <td>{order.assignedTo?.name || "-"}</td>
                       </tr>
                     );
                   })}

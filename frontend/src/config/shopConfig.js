@@ -27,5 +27,5 @@ export const SHOP_CONFIG = {
   },
   phones: ["+93 78 022 33 44", "+93 76 490 40 41"],
   // Optional: set this to your logo URL/path to show on printed bills.
-  logoUrl: "./logo.png",
+  logoUrl: "./system_icon.png",
 };
