@@ -25,6 +25,10 @@ import { startBackupCron } from "./cron/backup.cron.js";
 import { itemRoutes } from "./routes/item.routes.js";
 import { itemSaleRoutes } from "./routes/itemSale.routes.js";
 import rbacRoutes from "./routes/rbac.routes.js";
+import {
+  createCorsMiddlewareOptions,
+  parseConfiguredOrigins,
+} from "./lib/corsOrigins.js";
 
 const app = express();
 const parsePort = (value) => {
@@ -43,80 +47,12 @@ const parseTrustProxy = (value) => {
 
 app.set("trust proxy", parseTrustProxy(process.env.TRUST_PROXY));
 
-const normalizeOrigin = (value) => {
-  const raw = String(value || "").trim();
-  if (!raw) return null;
-  if (raw === "*") return "*";
-  if (/^https?:\/\//i.test(raw)) return raw.replace(/\/$/, "");
-  if (/^localhost(:\d+)?$/i.test(raw) || /^127\.0\.0\.1(:\d+)?$/i.test(raw)) {
-    return `http://${raw.replace(/\/$/, "")}`;
-  }
-  return `https://${raw.replace(/\/$/, "")}`;
-};
-
-const parseConfiguredOrigins = () => {
-  const rawValues = [
-    process.env.FRONTEND_URL,
-    process.env.FRONTEND_URLS,
-    process.env.CORS_ORIGINS,
-  ]
-    .filter(Boolean)
-    .join(",")
-    .split(",")
-    .map((v) => v.trim())
-    .filter(Boolean);
-
-  const normalized = rawValues
-    .map(normalizeOrigin)
-    .filter(Boolean)
-    .filter((value, index, list) => list.indexOf(value) === index);
-
-  if (!normalized.length) {
-    return ["http://localhost:5173"];
-  }
-  return normalized;
-};
-
 const configuredOrigins = parseConfiguredOrigins();
 console.log("[CORS] Configured origins:", configuredOrigins);
 
-// ✅ Allow any Vercel preview deployment automatically
-const isTrustedVercelDeployment = (origin) =>
-  /^https:\/\/tailor-management-system(-[a-z0-9-]+)?\.vercel\.app$/i.test(origin);
+const corsOptions = createCorsMiddlewareOptions(configuredOrigins);
 
-const corsOrigin = (origin, callback) => {
-  // Allow server-to-server and CLI requests that don't send Origin.
-  if (!origin) {
-    callback(null, true);
-    return;
-  }
-
-  const normalizedRequestOrigin = normalizeOrigin(origin);
-  if (!normalizedRequestOrigin) {
-    callback(new Error("Invalid request origin."));
-    return;
-  }
-
-  if (
-    configuredOrigins.includes("*") ||
-    configuredOrigins.includes(normalizedRequestOrigin) ||
-    isTrustedVercelDeployment(normalizedRequestOrigin)
-  ) {
-    callback(null, true);
-    return;
-  }
-
-  // Return error for blocked origins
-  callback(new Error(`CORS blocked for origin: ${normalizedRequestOrigin}`));
-};
-
-const corsOptions = {
-  origin: corsOrigin,
-  credentials: true,
-  optionsSuccessStatus: 200,
-};
-
-// ✅ Ensure preflight requests always succeed
+// Ensure preflight requests always succeed for allowed origins.
 app.options("*", cors(corsOptions));
 app.use(cors(corsOptions));
 app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || "5mb" }));

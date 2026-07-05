@@ -33,6 +33,13 @@ export const errorHandler = (err, req, res, next) => {
       .json({ error: "Database unavailable. Please try again shortly." });
   }
 
+  if (err.code === "CORS_BLOCKED") {
+    return res.status(403).json({
+      error: err.publicMessage || err.message,
+      code: "CORS_BLOCKED",
+    });
+  }
+
   const status = typeof err.status === "number" ? err.status : 500;
   const isServerError = status >= 500;
   const response = {

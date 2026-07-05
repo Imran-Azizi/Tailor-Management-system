@@ -20,16 +20,30 @@ function cookieSecure() {
   if (configured !== undefined) {
     return String(configured).toLowerCase() === "true";
   }
+
+  const publicUrl =
+    process.env.APP_PUBLIC_URL ||
+    process.env.FRONTEND_URL ||
+    process.env.CORS_ORIGINS?.split(",")[0]?.trim() ||
+    "";
+
+  if (/^https:\/\//i.test(publicUrl)) return true;
+  if (/^http:\/\//i.test(publicUrl)) return false;
+
   return isProduction();
 }
 
 function cookieSameSite() {
-  const configured = String(
-    process.env.COOKIE_SAME_SITE || (isProduction() ? "none" : "lax"),
-  ).toLowerCase();
+  const configured = String(process.env.COOKIE_SAME_SITE || "").toLowerCase();
   const allowed = new Set(["strict", "lax", "none"]);
-  const sameSite = allowed.has(configured) ? configured : "lax";
-  return sameSite === "none" && !cookieSecure() ? "lax" : sameSite;
+  if (allowed.has(configured)) {
+    const sameSite = configured;
+    return sameSite === "none" && !cookieSecure() ? "lax" : sameSite;
+  }
+
+  // Same-origin VPS deployments work best with lax cookies.
+  if (!cookieSecure()) return "lax";
+  return isProduction() ? "none" : "lax";
 }
 
 export function parseCookies(req) {
