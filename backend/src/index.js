@@ -116,6 +116,8 @@ startBackupCron();
 
 const server = app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Health check: http://localhost:${PORT}/api/health`);
+  console.log(`Auth CSRF:  http://localhost:${PORT}/api/auth/csrf`);
 });
 
 server.on("error", (error) => {
