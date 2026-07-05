@@ -354,6 +354,35 @@ export async function loadArabicFont(fontPath) {
   return openFont(fontPath);
 }
 
+/** Shape Arabic/Pashto text with full OpenType features (connected letters). */
+export function layoutArabicRun(fkFont, text, language = "fa") {
+  const safeText = normalizeArabicInput(text);
+  if (!safeText || !fkFont) return null;
+
+  const mappedLanguage = LANGUAGE_MAP[language] || LANGUAGE_MAP.fa;
+  const hasArabic = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(safeText);
+  const shapingLanguage =
+    mappedLanguage === "dflt" && hasArabic ? "fa" : mappedLanguage;
+  const layoutFeatures =
+    LANGUAGE_FEATURES[shapingLanguage] || LANGUAGE_FEATURES.dflt;
+
+  return fkFont.layout(
+    safeText,
+    layoutFeatures,
+    RTL_SCRIPT,
+    shapingLanguage || RTL_LANGUAGE,
+    RTL_DIRECTION,
+  );
+}
+
+/** Measure shaped Arabic text width in PDF points. */
+export function arabicTextWidthPts(fkFont, text, fontSize, language = "fa") {
+  const run = layoutArabicRun(fkFont, text, language);
+  if (!run?.positions?.length) return 0;
+  const scale = fontSize / fkFont.unitsPerEm;
+  return run.positions.reduce((sum, pos) => sum + pos.xAdvance * scale, 0);
+}
+
 /**
  * Resolve the best available Arabic-capable font path for report PDFs.
  * This includes env overrides, bundled project fonts, and OS fallbacks.

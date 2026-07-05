@@ -18,6 +18,9 @@ import {
   getOrderFinancialTotal,
 } from "../lib/orderFinancials.js";
 
+const toPositiveMoney = (value) =>
+  Math.max(0, toNumberScaled(value || 0, MONEY_SCALE));
+
 const AFGHAN_MONTH_LABELS_EN = [
   "January",
   "February",
@@ -41,6 +44,47 @@ const withNonDamagedOrders = (where = {}) => ({
   ...where,
   ...NON_DAMAGED_ORDER_WHERE,
 });
+
+const computeDisplayTotalBenefit = (order, linkedDailyExpenseAmount = 0) => {
+  const isDamageOrder = Array.isArray(order?.damagedClothesPenalties)
+    ? order.damagedClothesPenalties.length > 0
+    : false;
+  if (isDamageOrder) return 0;
+
+  const purchaseTotal = mulScaled(
+    order?.rakhtPiecePrice || 0,
+    order?.rakhtRequiredMeters || 0,
+    MONEY_SCALE,
+  );
+  const qichikarAmount =
+    order?.qichikarPaymentStatus === "PAID_TO_WORKER"
+      ? toPositiveMoney(order?.qichikarPaymentAmount)
+      : 0;
+  const dokhtAmount =
+    order?.dokhtPaymentStatus === "PAID_TO_WORKER"
+      ? toPositiveMoney(order?.dokhtPaymentAmount)
+      : 0;
+  const workerAmount =
+    qichikarAmount <= 0 &&
+    dokhtAmount <= 0 &&
+    order?.workerPaymentStatus === "PAID_TO_WORKER"
+      ? toPositiveMoney(order?.workerPaymentAmount)
+      : 0;
+  const totalExpenses = [
+    purchaseTotal,
+    qichikarAmount,
+    dokhtAmount,
+    workerAmount,
+    linkedDailyExpenseAmount,
+  ].reduce((total, amount) => addScaled(total, amount, MONEY_SCALE), 0);
+  const totalBenefit = subScaled(
+    getOrderFinancialTotal(order),
+    totalExpenses,
+    MONEY_SCALE,
+  );
+
+  return totalBenefit;
+};
 
 const computeFinancialSummary = async (where) => {
   const rows = await prisma.order.findMany({
@@ -319,6 +363,15 @@ export const getDashboardStats = async ({
     ...dailyTaskWhere,
     OR: [{ orderId: null }, { order: { is: NON_DAMAGED_ORDER_WHERE } }],
   };
+  const financialOrderDailyTaskWhere = {
+    ...dailyTaskWhere,
+    orderId: { not: null },
+    order: { is: NON_DAMAGED_ORDER_WHERE },
+  };
+  const otherDailyTaskWhere = {
+    ...dailyTaskWhere,
+    orderId: null,
+  };
 
   const rakhtWhere = hasMonthFilter
     ? {
@@ -344,11 +397,25 @@ export const getDashboardStats = async ({
       : {}),
   };
 
-  const [dailyTaskTotal, dailyTaskAmount, rakhtPriceAggregate, loanAggregate] =
-    await Promise.all([
+  const [
+    dailyTaskTotal,
+    dailyTaskAmount,
+    orderDailyTaskAmount,
+    otherDailyTaskAmount,
+    rakhtPriceAggregate,
+    loanAggregate,
+  ] = await Promise.all([
       prisma.dailyTask.count({ where: dailyTaskWhere }),
       prisma.dailyTask.aggregate({
         where: financialDailyTaskWhere,
+        _sum: { amount: true },
+      }),
+      prisma.dailyTask.aggregate({
+        where: financialOrderDailyTaskWhere,
+        _sum: { amount: true },
+      }),
+      prisma.dailyTask.aggregate({
+        where: otherDailyTaskWhere,
         _sum: { amount: true },
       }),
       prisma.rakht.aggregate({
@@ -362,6 +429,12 @@ export const getDashboardStats = async ({
     ]);
 
   const dailyTaskExpenseTotal = Number(dailyTaskAmount._sum?.amount || 0);
+  const orderDailyTaskExpenseTotal = Number(
+    orderDailyTaskAmount._sum?.amount || 0,
+  );
+  const otherDailyTaskExpenseTotal = Number(
+    otherDailyTaskAmount._sum?.amount || 0,
+  );
 
   const paidDateRange = hasMonthFilter
     ? {
@@ -372,13 +445,10 @@ export const getDashboardStats = async ({
 
   const [
     allOrdersBenefitAggregate,
-    readyMadeBenefitAggregate,
-    readyMadeFinalProfitAggregate,
-    readyMadeWaskatBenefitAggregate,
-    readyMadeWaskatFinalProfitAggregate,
     totalRakhtRevenue,
     linkedDailyExpenseAggregate,
     otherItemsProfitAggregate,
+    pendingPrepaymentAggregate,
     qichikarPaidAggregate,
     dokhtPaidAggregate,
     legacyQichikarPaidAggregate,
@@ -387,40 +457,8 @@ export const getDashboardStats = async ({
     prisma.order.aggregate({
       where: {
         ...recognizedProfitWhere,
-        type: { notIn: ["READY_MADE", "READY_MADE_WASKAT"] },
       },
       _sum: { netProfitRecognizedAmount: true },
-    }),
-    prisma.order.aggregate({
-      where: {
-        ...recognizedProfitWhere,
-        type: "READY_MADE",
-      },
-      _sum: { netProfitRecognizedAmount: true },
-    }),
-    prisma.order.aggregate({
-      where: {
-        ...recognizedProfitWhere,
-        type: "READY_MADE",
-      },
-      _sum: { netProfitRecognizedAmount: true, readyMadeOriginalPrice: true },
-    }),
-    prisma.order.aggregate({
-      where: {
-        ...recognizedProfitWhere,
-        type: "READY_MADE_WASKAT",
-      },
-      _sum: { netProfitRecognizedAmount: true },
-    }),
-    prisma.order.aggregate({
-      where: {
-        ...recognizedProfitWhere,
-        type: "READY_MADE_WASKAT",
-      },
-      _sum: {
-        netProfitRecognizedAmount: true,
-        readyMadeWaskatOriginalPrice: true,
-      },
     }),
     computeRakhtBenefitRevenue(recognizedProfitWhere),
     prisma.dailyTask.aggregate({
@@ -444,6 +482,14 @@ export const getDashboardStats = async ({
           : {}),
       },
       _sum: { profit: true },
+    }),
+    prisma.order.aggregate({
+      where: {
+        ...financialMonthWhere,
+        isCompleted: false,
+        paidAmount: { gt: 0 },
+      },
+      _sum: { paidAmount: true },
     }),
     prisma.order.aggregate({
       where: {
@@ -486,22 +532,6 @@ export const getDashboardStats = async ({
   const totalOrderBenefit = Number(
     allOrdersBenefitAggregate._sum?.netProfitRecognizedAmount || 0,
   );
-  const totalReadyMadeProfit = Number(
-    readyMadeBenefitAggregate._sum?.netProfitRecognizedAmount || 0,
-  );
-  const totalReadyMadeProfitAfterExpenses = subScaled(
-    readyMadeFinalProfitAggregate._sum?.netProfitRecognizedAmount || 0,
-    readyMadeFinalProfitAggregate._sum?.readyMadeOriginalPrice || 0,
-    MONEY_SCALE,
-  );
-  const totalReadyMadeWaskatProfit = Number(
-    readyMadeWaskatBenefitAggregate._sum?.netProfitRecognizedAmount || 0,
-  );
-  const totalReadyMadeWaskatProfitAfterExpenses = subScaled(
-    readyMadeWaskatFinalProfitAggregate._sum?.netProfitRecognizedAmount || 0,
-    readyMadeWaskatFinalProfitAggregate._sum?.readyMadeWaskatOriginalPrice || 0,
-    MONEY_SCALE,
-  );
   const totalRakhtRevenueNumber = Number(totalRakhtRevenue || 0);
   const otherItemsTotalProfit = Number(
     otherItemsProfitAggregate._sum?.profit || 0,
@@ -509,21 +539,41 @@ export const getDashboardStats = async ({
   const linkedDailyExpensesInRange = Number(
     linkedDailyExpenseAggregate._sum?.amount || 0,
   );
+  const pendingPrepaymentIncome = Number(
+    pendingPrepaymentAggregate._sum?.paidAmount || 0,
+  );
   const totalProfitBeforeDailyExpenses =
     totalRakhtRevenueNumber +
     totalOrderBenefit +
-    totalReadyMadeProfitAfterExpenses +
-    totalReadyMadeWaskatProfitAfterExpenses +
+    pendingPrepaymentIncome +
     otherItemsTotalProfit +
     linkedDailyExpensesInRange;
   const netProfit = totalProfitBeforeDailyExpenses - dailyTaskExpenseTotal;
 
+  const recentOrderIds = recentOrders.map((order) => order.id).filter(Boolean);
+  const recentDailyExpenseSums = recentOrderIds.length
+    ? await prisma.dailyTask.groupBy({
+        by: ["orderId"],
+        where: { orderId: { in: recentOrderIds } },
+        _sum: { amount: true },
+      })
+    : [];
+  const recentDailyExpenseByOrderId = new Map(
+    recentDailyExpenseSums.map((row) => [
+      row.orderId,
+      Number(row._sum?.amount || 0),
+    ]),
+  );
+  const totalAllOrdersBenefit = totalOrderBenefit;
+
   const recentOrdersWithRevenue = recentOrders.map((order) => {
-    const baseBenefit = Number(order?.totalBenefit || 0);
     const isDamageOrder = Array.isArray(order?.damagedClothesPenalties)
       ? order.damagedClothesPenalties.length > 0
       : false;
-    const finalTotalBenefit = isDamageOrder ? 0 : baseBenefit;
+    const finalTotalBenefit = computeDisplayTotalBenefit(
+      order,
+      Number(recentDailyExpenseByOrderId.get(order.id) || 0),
+    );
 
     return {
       ...order,
@@ -572,6 +622,10 @@ export const getDashboardStats = async ({
     dailyTaskTotal,
     dailyTaskAmount: dailyTaskExpenseTotal,
     totalDailyExpenses: dailyTaskExpenseTotal,
+    orderDailyTaskExpenses: orderDailyTaskExpenseTotal,
+    totalOrderExpenses: orderDailyTaskExpenseTotal,
+    otherDailyTaskExpenses: otherDailyTaskExpenseTotal,
+    totalOtherExpenses: otherDailyTaskExpenseTotal,
     totalExpenses: dailyTaskExpenseTotal,
     totalRakhtPrice: rakhtPriceAggregate._sum?.totalPrice || 0,
     totalLoan: loanAggregate._sum?.amount || 0,
@@ -582,10 +636,8 @@ export const getDashboardStats = async ({
       (dokhtPaidAggregate._sum?.dokhtPaymentAmount || 0) +
       (legacyDokhtPaidAggregate._sum?.workerPaymentAmount || 0),
     totalOrderBenefit,
-    totalReadyMadeProfit,
-    totalReadyMadeProfitAfterExpenses,
-    totalReadyMadeWaskatProfit,
-    totalReadyMadeWaskatProfitAfterExpenses,
+    pendingPrepaymentIncome,
+    totalAllOrdersBenefit,
     totalRakhtRevenue: totalRakhtRevenueNumber,
     otherItemsTotalProfit,
     linkedDailyExpensesInRange,

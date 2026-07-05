@@ -9,8 +9,11 @@
  * - Mixed RTL/LTR content handling
  */
 
-import { drawArabicTextSync } from "./arabicRenderer.js";
-import { normalizeReportPdfText } from "./reportLocale.js";
+import { drawArabicTextSync, arabicTextWidthPts } from "./arabicRenderer.js";
+import {
+  normalizeReportPdfText,
+  stripBidiMarks,
+} from "./reportLocale.js";
 
 // Constants for RTL-aware rendering
 const ARABIC_SCRIPT_REGEX =
@@ -61,14 +64,12 @@ export function wt(
  * Calculate token width in points (for RTL and LTR text)
  * Returns width of text considering font, size, and script
  */
-export function tokenWidth(doc, token, fkFont, fontSize = 10) {
-  const text = normalizeReportPdfText(token, "dari");
+export function tokenWidth(doc, token, fkFont, fontSize = 10, language = "fa") {
+  const text = stripBidiMarks(normalizeReportPdfText(token, language));
   if (!text) return 0;
 
   if (fkFont && hasArabicScript(text)) {
-    const scale = fontSize / fkFont.unitsPerEm;
-    const run = fkFont.layout(text, [], "arab", "dflt", "rtl");
-    return run.positions.reduce((sum, pos) => sum + pos.xAdvance * scale, 0);
+    return arabicTextWidthPts(fkFont, text, fontSize, language);
   }
 
   return doc.font("Helvetica").fontSize(fontSize).widthOfString(text);
@@ -141,7 +142,7 @@ export function drawRtlMixedValue(
   bold = false,
   language = "dari",
 ) {
-  const text = normalizeReportPdfText(value, language);
+  const text = stripBidiMarks(normalizeReportPdfText(value, language));
   if (!text) return;
 
   const tokens = text.match(/(\d[\d,./:-]*|\s+|[^\d\s]+)/g) || [text];
@@ -150,7 +151,7 @@ export function drawRtlMixedValue(
   tokens.forEach((token) => {
     const segment = String(token ?? "");
     if (!segment) return;
-    const w = tokenWidth(doc, segment, fkFont, fontSize);
+    const w = tokenWidth(doc, segment, fkFont, fontSize, language);
     const startX = cursor - w;
 
     if (!segment.trim()) {

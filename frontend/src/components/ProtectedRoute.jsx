@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext.jsx";
+import AccessDenied from "../pages/AccessDenied.jsx";
 
 const WORKER_ROLES = ["DOKHT", "QICHIKAR"];
 const MAIN_PANEL_ROLES = ["SUPER_ADMIN", "ADMIN", "DOKAN", "FINANCE"];
@@ -92,9 +93,9 @@ export function WorkerProtectedRoute({ children }) {
   return children;
 }
 
-/** Renders nothing (redirects to /dashboard) if user lacks the required role. */
-export function RoleRoute({ children, roles }) {
-  const { user } = useAuth();
+/** Shows a professional denied state if user lacks the required role/permission. */
+export function RoleRoute({ children, roles, permission, permissions }) {
+  const { user, hasPermission, hasAnyPermission } = useAuth();
   if (roles && !roles.includes(user?.accountType)) {
     const fallback =
       user?.accountType === "SUPER_ADMIN"
@@ -105,6 +106,13 @@ export function RoleRoute({ children, roles }) {
           ? "/orders"
           : "/dashboard";
     return <Navigate to={fallback} replace />;
+  }
+  const requiredPermissions = permissions || (permission ? [permission] : []);
+  if (requiredPermissions.length && !hasAnyPermission(requiredPermissions)) {
+    return <AccessDenied />;
+  }
+  if (permission && !hasPermission(permission)) {
+    return <AccessDenied />;
   }
   return children;
 }

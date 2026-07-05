@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { LuFactory, LuFilter, LuRuler, LuShoppingBag } from "react-icons/lu";
 import api from "../lib/api.js";
-import { formatCurrency } from "../lib/currency.js";
+import { formatReportMoney } from "../lib/currency.js";
 import {
   formatDateLocale,
   isRtlLanguage,
@@ -20,6 +20,7 @@ import {
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
 import MobileFilterPanel from "../components/ui/MobileFilterPanel.jsx";
+import { ReportMonthBanner } from "../components/reports/ReportKit.jsx";
 import "./RakhtRevenue.css";
 
 const DEFAULT_FILTERS = {
@@ -133,17 +134,17 @@ export default function RakhtRevenue() {
     },
     costPerMeter: {
       header: t("rakht.piecePrice", "Cost/Meter"),
-      render: (row) => formatCurrency(row.costPerMeter, language),
+      render: (row) => formatReportMoney(row.costPerMeter, language),
       numeric: true,
     },
     sellingPerMeter: {
       header: t("rakht.priceForCustomer", "Sell/Meter"),
-      render: (row) => formatCurrency(row.sellingPerMeter, language),
+      render: (row) => formatReportMoney(row.sellingPerMeter, language),
       numeric: true,
     },
     benefit: {
       header: t("rakht.benefit", "Benefit"),
-      render: (row) => formatCurrency(row.benefit, language),
+      render: (row) => formatReportMoney(row.benefit, language),
       numeric: true,
       benefit: true,
     },
@@ -187,6 +188,11 @@ export default function RakhtRevenue() {
         })}
       />
 
+      <ReportMonthBanner
+        isEmpty={!isFetching && Number(summary.pagination?.total || 0) === 0}
+        style={{ marginBottom: 16 }}
+      />
+
       <div
         className="g-stats"
         style={{
@@ -196,7 +202,7 @@ export default function RakhtRevenue() {
       >
         <StatCard
           label={t("rakht.totalRevenue", { defaultValue: "Total Revenue" })}
-          value={formatCurrency(summary.totalRevenue, language)}
+          value={formatReportMoney(summary.totalRevenue, language)}
           Icon={AfCurrencyIcon}
           accent="#0F766E"
           sub={t("rakht.benefit", { defaultValue: "Rakht Benefit" })}
@@ -221,7 +227,7 @@ export default function RakhtRevenue() {
           label={t("rakht.avgSellingPricePerMeter", {
             defaultValue: "Avg Selling Price / Meter",
           })}
-          value={formatCurrency(summary.avgSellingPricePerMeter, language)}
+          value={formatReportMoney(summary.avgSellingPricePerMeter, language)}
           Icon={LuFactory}
           accent="#D97706"
         />
@@ -360,7 +366,11 @@ export default function RakhtRevenue() {
                   {revenueColumnOrder.map((columnKey) => (
                     <th
                       key={columnKey}
-                      className={`rakht-revenue-col--${columnKey}`}
+                      className={`rakht-revenue-col--${columnKey}${
+                        revenueColumns[columnKey].numeric
+                          ? " report-cell-num"
+                          : ""
+                      }`}
                     >
                       {revenueColumns[columnKey].header}
                     </th>
@@ -376,7 +386,9 @@ export default function RakhtRevenue() {
                         <td
                           key={columnKey}
                           className={`rakht-revenue-col--${columnKey}${
-                            column.numeric ? " rakht-revenue-number" : ""
+                            column.numeric
+                              ? " rakht-revenue-number report-cell-num report-num"
+                              : ""
                           }`}
                           style={
                             column.benefit
@@ -407,6 +419,7 @@ export default function RakhtRevenue() {
         )}
 
         <div
+          className="report-pagination"
           style={{
             display: "flex",
             alignItems: "center",

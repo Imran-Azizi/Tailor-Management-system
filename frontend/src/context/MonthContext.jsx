@@ -4,6 +4,7 @@ import {
   useState,
   useCallback,
   useEffect,
+  useMemo,
 } from "react";
 import api from "../lib/api.js";
 import { getCurrentAfghanMonthYear, getMonthStatus } from "../lib/months.js";
@@ -199,24 +200,32 @@ export function MonthProvider({ children }) {
     [monthPolicy.currentMonth, monthPolicy.currentYear],
   );
 
-  return (
-    <MonthContext.Provider
-      value={{
-        viewMonth,
-        viewYear,
-        setViewMonth,
-        setViewYear,
-        monthPolicy,
-        isSelectableMonth,
-        getMonthDisabledReason,
-        getMonthAccessMode,
-        currentGregorianMonth: monthPolicy.currentMonth,
-        currentGregorianYear: monthPolicy.currentYear,
-      }}
-    >
-      {children}
-    </MonthContext.Provider>
+  const value = useMemo(
+    () => ({
+      viewMonth,
+      viewYear,
+      setViewMonth,
+      setViewYear,
+      monthPolicy,
+      isSelectableMonth,
+      getMonthDisabledReason,
+      getMonthAccessMode,
+      currentGregorianMonth: monthPolicy.currentMonth,
+      currentGregorianYear: monthPolicy.currentYear,
+    }),
+    [
+      viewMonth,
+      viewYear,
+      setViewMonth,
+      setViewYear,
+      monthPolicy,
+      isSelectableMonth,
+      getMonthDisabledReason,
+      getMonthAccessMode,
+    ],
   );
+
+  return <MonthContext.Provider value={value}>{children}</MonthContext.Provider>;
 }
 
 export function useMonth() {

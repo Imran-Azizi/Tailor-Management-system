@@ -4,83 +4,91 @@ import * as draftCtrl from "../controllers/orderDraft.controller.js";
 import {
   authenticate,
   authorize,
+  authorizeAnyPermission,
   authorizeDokanOrderOwner,
+  authorizePermission,
 } from "../middleware/auth.middleware.js";
+import { PERMISSIONS } from "../lib/permissions.js";
 const router = Router();
 router.use(authenticate);
 
-router.get("/drafts", authorize("ADMIN", "DOKAN", "FINANCE"), draftCtrl.list);
+router.get("/drafts", authorizePermission(PERMISSIONS.ORDERS_CREATE), draftCtrl.list);
 router.get(
   "/drafts/:id",
-  authorize("ADMIN", "DOKAN", "FINANCE"),
+  authorizePermission(PERMISSIONS.ORDERS_CREATE),
   draftCtrl.getOne,
 );
 router.post(
   "/drafts",
-  authorize("ADMIN", "DOKAN", "FINANCE"),
+  authorizePermission(PERMISSIONS.ORDERS_CREATE),
   draftCtrl.upsert,
 );
-router.delete("/drafts/:id", authorize("ADMIN", "DOKAN"), draftCtrl.remove);
+router.delete("/drafts/:id", authorizePermission(PERMISSIONS.ORDERS_CREATE), draftCtrl.remove);
 
 router.get(
   "/",
-  authorize("ADMIN", "DOKAN", "QICHIKAR", "DOKHT", "FINANCE"),
+  authorizePermission(PERMISSIONS.ORDERS_VIEW, "QICHIKAR", "DOKHT"),
   ctrl.getAll,
 );
-router.get("/report/monthly", authorize("ADMIN"), ctrl.getMonthlyReport);
+router.get("/report/monthly", authorizePermission(PERMISSIONS.REPORTS_VIEW), ctrl.getMonthlyReport);
 router.get(
   "/global-search",
-  authorize("ADMIN", "FINANCE"),
+  authorizePermission(PERMISSIONS.ORDERS_VIEW),
   ctrl.globalSearch,
 );
 router.get(
   "/stats/finance-created",
-  authorize("FINANCE"),
+  authorizeAnyPermission(PERMISSIONS.ORDERS_VIEW, PERMISSIONS.FINANCE_VIEW),
   ctrl.getFinanceCreatedOrderStats,
 );
 router.get(
   "/lookup",
-  authorize("ADMIN", "QICHIKAR", "DOKHT", "FINANCE"),
+  authorizePermission(PERMISSIONS.ORDERS_VIEW, "QICHIKAR", "DOKHT"),
   ctrl.lookup,
 );
 router.get(
   "/completed/from-workers",
-  authorize("ADMIN"),
+  authorizePermission(PERMISSIONS.ORDERS_VIEW),
   ctrl.getCompletedFromWorkers,
 );
 router.get(
   "/completed/receipts",
-  authorize("ADMIN"),
+  authorizePermission(PERMISSIONS.FINANCE_PAYMENTS_MANAGE),
   ctrl.getCompletedWorkerReceipts,
+);
+router.patch(
+  "/completed/receipts/:receiptId",
+  authorizePermission(PERMISSIONS.FINANCE_PAYMENTS_MANAGE),
+  ctrl.updateCompletedWorkerReceipt,
 );
 router.get(
   "/:id",
-  authorize("ADMIN", "DOKAN", "QICHIKAR", "DOKHT", "FINANCE"),
+  authorizePermission(PERMISSIONS.ORDERS_VIEW, "QICHIKAR", "DOKHT"),
   authorizeDokanOrderOwner("id"),
   ctrl.getOne,
 );
 router.get(
   "/:id/bill",
-  authorize("ADMIN", "DOKAN", "FINANCE"),
+  authorizePermission(PERMISSIONS.ORDERS_PRINT),
   authorizeDokanOrderOwner("id"),
   ctrl.getBill,
 );
 router.get(
   "/:id/prefill",
-  authorize("ADMIN", "FINANCE"),
+  authorizeAnyPermission(PERMISSIONS.ORDERS_CREATE, PERMISSIONS.ORDERS_EDIT),
   ctrl.getOrderPrefillData,
 );
-router.post("/", authorize("ADMIN", "DOKAN", "FINANCE"), ctrl.create);
-router.put("/:id", authorize("ADMIN", "FINANCE"), ctrl.update);
-router.put("/:id/bill", authorize("ADMIN"), ctrl.updateBill);
+router.post("/", authorizePermission(PERMISSIONS.ORDERS_CREATE), ctrl.create);
+router.put("/:id", authorizePermission(PERMISSIONS.ORDERS_EDIT), ctrl.update);
+router.put("/:id/bill", authorizePermission(PERMISSIONS.ORDERS_EDIT), ctrl.updateBill);
 router.patch(
   "/:id/settle",
-  authorize("ADMIN", "FINANCE"),
+  authorizePermission(PERMISSIONS.ORDERS_DELIVER),
   ctrl.settle,
 );
 router.patch(
   "/:id/complete",
-  authorize("ADMIN", "QICHIKAR", "DOKHT", "FINANCE"),
+  authorizePermission(PERMISSIONS.ORDERS_DELIVER, "QICHIKAR", "DOKHT"),
   ctrl.markComplete,
 );
 router.patch(
@@ -89,16 +97,20 @@ router.patch(
   ctrl.markInProgress,
 );
 router.patch("/:id/receive", authorize("QICHIKAR", "DOKHT"), ctrl.markReceived);
-router.patch("/:id/assign", authorize("ADMIN"), ctrl.assign);
+router.patch(
+  "/:id/assign",
+  authorizePermission(PERMISSIONS.ORDERS_ASSIGN),
+  ctrl.assign,
+);
 router.patch(
   "/:id/pay-worker",
-  authorize("ADMIN"),
+  authorizePermission(PERMISSIONS.FINANCE_PAYMENTS_MANAGE),
   ctrl.payWorkerForCompletedOrder,
 );
 router.patch(
   "/completed/from-workers/receipts",
-  authorize("ADMIN"),
+  authorizePermission(PERMISSIONS.FINANCE_PAYMENTS_MANAGE),
   ctrl.markCompletedWorkerReceipts,
 );
-router.delete("/:id", authorize("ADMIN"), ctrl.remove);
+router.delete("/:id", authorizePermission(PERMISSIONS.ORDERS_DELETE), ctrl.remove);
 export default router;

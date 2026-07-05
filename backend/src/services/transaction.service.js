@@ -198,7 +198,7 @@ export const getTransactionSummaryForUser = async (
     completedPaymentsAggregate._sum?.[paymentSumField] || 0,
   );
   const moneyReceiptTotal = Number(receiptAggregate._sum?.paidAmount || 0);
-  const totalCompletedPayments = Math.max(
+  const outstandingCompletedPayments = Math.max(
     totalCompletedPaymentsGross - moneyReceiptTotal,
     0,
   );
@@ -207,9 +207,10 @@ export const getTransactionSummaryForUser = async (
     loanTotal,
     damagePenaltyTotal,
     totalCompletedPaymentsGross,
-    totalCompletedPayments,
+    totalCompletedPayments: totalCompletedPaymentsGross,
+    outstandingCompletedPayments,
     moneyReceiptTotal,
-    currentBalance: totalCompletedPayments - loanTotal - damagePenaltyTotal,
+    currentBalance: moneyReceiptTotal - loanTotal - damagePenaltyTotal,
   };
 };
 
@@ -255,7 +256,7 @@ export const getTransactions = async ({
     where.transactionDate = { gte: monthStart, lte: monthEnd };
   }
 
-  const [data, total] = await Promise.all([
+  const [data, total, amountAggregate] = await Promise.all([
     prisma.transaction.findMany({
       where,
       skip,
@@ -267,9 +268,16 @@ export const getTransactions = async ({
       orderBy: { createdAt: "desc" },
     }),
     prisma.transaction.count({ where }),
+    prisma.transaction.aggregate({ where, _sum: { amount: true } }),
   ]);
 
-  return { data, total, page, limit };
+  return {
+    data,
+    total,
+    page,
+    limit,
+    totalAmount: Number(amountAggregate?._sum?.amount || 0),
+  };
 };
 
 export const getUsersByAccountType = async (accountType) => {

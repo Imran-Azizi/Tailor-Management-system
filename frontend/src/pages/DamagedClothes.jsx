@@ -26,6 +26,32 @@ import {
 import { Modal, PageHeader } from "../components/ui/index.jsx";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 
+const STAT_PILL_COLORS = {
+  red: { bg: "rgba(239,68,68,.12)", text: "var(--danger, #ef4444)" },
+  neutral: { bg: "rgba(128,128,128,.12)", text: "var(--text2, #6b7280)" },
+};
+
+function StatPill({ label, value, color = "neutral" }) {
+  const palette = STAT_PILL_COLORS[color] || STAT_PILL_COLORS.neutral;
+  return (
+    <div
+      style={{
+        background: palette.bg,
+        color: palette.text,
+        borderRadius: 8,
+        padding: "6px 10px",
+        fontSize: 12,
+        lineHeight: 1.5,
+      }}
+    >
+      <div style={{ fontWeight: 600, fontSize: 11, textTransform: "uppercase", opacity: 0.8 }}>
+        {label}
+      </div>
+      <div style={{ fontWeight: 600, fontSize: 13 }}>{value}</div>
+    </div>
+  );
+}
+
 function SmallSpinner() {
   return (
     <div
@@ -47,7 +73,7 @@ const ROLE_OPTIONS = [
   { value: "QICHIKAR", labelKey: "damagedClothes.roles.qichikar" },
 ];
 
-function buildSelectStyles({ hasError = false, isRtl = false } = {}) {
+function buildSelectStyles({ hasError = false, isRtl = false, menuZIndex = 4000 } = {}) {
   return {
     control: (base, state) => ({
       ...base,
@@ -66,13 +92,17 @@ function buildSelectStyles({ hasError = false, isRtl = false } = {}) {
     }),
     menu: (base) => ({
       ...base,
-      zIndex: 80,
+      zIndex: menuZIndex,
       background: "var(--surface)",
       border: "1px solid var(--border)",
       borderRadius: 10,
       overflow: "hidden",
       direction: isRtl ? "rtl" : "ltr",
       boxShadow: "var(--sh-lg)",
+    }),
+    menuPortal: (base) => ({
+      ...base,
+      zIndex: menuZIndex,
     }),
     option: (base, state) => ({
       ...base,
@@ -138,30 +168,6 @@ const DAMAGED_TONES = {
   },
 };
 
-function StatPill({ label, value, color = "neutral" }) {
-  const c = DAMAGED_TONES[color] || DAMAGED_TONES.neutral;
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 2,
-        padding: "8px 12px",
-        borderRadius: 10,
-        background: c.bg,
-        border: `1px solid ${c.border}`,
-      }}
-    >
-      <span style={{ fontSize: 11, color: "var(--text3)", fontWeight: 500 }}>
-        {label}
-      </span>
-      <span style={{ fontSize: 14, fontWeight: 700, color: c.text }}>
-        {value}
-      </span>
-    </div>
-  );
-}
-
 function getRoleLabel(role, t) {
   if (role === "DOKHT") return t("damagedClothes.roles.dokht", "Dokht");
   if (role === "QICHIKAR")
@@ -193,6 +199,7 @@ export default function DamagedClothes() {
   const [recordsSearch, setRecordsSearch] = useState("");
   const [recordsRole, setRecordsRole] = useState(null);
   const [recordsPage, setRecordsPage] = useState(1);
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
 
   const roleOptions = useMemo(
     () =>
@@ -379,297 +386,301 @@ export default function DamagedClothes() {
   };
 
   return (
-    <div className="page" dir={isRtl ? "rtl" : "ltr"} style={{ paddingBottom: 40 }}>
-      <div
-        style={{
-          maxWidth: 1024,
-          width: "100%",
-          margin: "0 auto",
-          display: "grid",
-          gap: 20,
-        }}
-      >
+    <div
+      className="page damaged-clothes-page"
+      dir={isRtl ? "rtl" : "ltr"}
+    >
+      <div className="damaged-clothes-shell">
         {/* ── Page Header ─────────────────────────────────────────────── */}
         <PageHeader
           title={t("damagedClothes.title")}
           subtitle={t("damagedClothes.subtitle")}
-        />
-
-        {/* ── Filter / Search Card ─────────────────────────────────────── */}
-        <div
-          style={{
-            background: "var(--surface)",
-            borderRadius: 16,
-            border: "1px solid var(--border)",
-            boxShadow: "0 4px 20px rgba(15,23,42,.06)",
-            padding: "20px 20px 18px",
-            display: "grid",
-            gap: 16,
-          }}
-        >
-          {/* Role + Worker selects */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {/* Role */}
-            <div style={{ display: "grid", gap: 6 }}>
-              <label
-                style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: "var(--text2)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                <LuUsers size={14} style={{ color: "var(--primary)" }} />
-                {t("damagedClothes.roleLabel")}
-                <span style={{ color: "var(--danger)" }}>*</span>
-              </label>
-              <Select
-                classNamePrefix="rs"
-                isRtl={isRtl}
-                options={roleOptions}
-                value={selectedRole}
-                onChange={(value) => {
-                  setSelectedRole(value);
-                  setSelectedWorker(null);
-                  setSearchTriggered(false);
-                  setSubmittedSearch("");
-                  setSearchText("");
-                  setSelectedOrder(null);
-                }}
-                placeholder={t("damagedClothes.rolePlaceholder")}
-                styles={buildSelectStyles({ isRtl })}
-              />
-            </div>
-
-            {/* Worker */}
-            <div style={{ display: "grid", gap: 6 }}>
-              <label
-                style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: "var(--text2)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                <LuUser size={14} style={{ color: "var(--primary)" }} />
-                {t("damagedClothes.workerLabel")}
-                <span style={{ color: "var(--danger)" }}>*</span>
-              </label>
-              <Select
-                classNamePrefix="rs"
-                isRtl={isRtl}
-                options={workerOptions}
-                value={selectedWorker}
-                onChange={(value) => {
-                  setSelectedWorker(value);
-                  setSearchTriggered(false);
-                  setSubmittedSearch("");
-                  setSelectedOrder(null);
-                }}
-                isLoading={workersLoading}
-                isDisabled={!selectedRole?.value}
-                placeholder={t("damagedClothes.workerPlaceholder")}
-                noOptionsMessage={() =>
-                  workersLoading
-                    ? t("common.loading", "Loading...")
-                    : t("common.noData", "No data found")
-                }
-                styles={buildSelectStyles({ isRtl })}
-              />
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div
-            style={{ height: 1, background: "var(--border)", margin: "0 -4px" }}
-          />
-
-          {/* Search bar */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
-            <div style={{ position: "relative" }}>
-              <LuSearch
-                size={15}
-                style={{
-                  position: "absolute",
-                  insetInlineStart: 13,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "var(--text3)",
-                  pointerEvents: "none",
-                }}
-              />
-              <input
-                className="inp"
-                style={{
-                  height: 44,
-                  paddingInlineStart: 38,
-                  paddingInlineEnd: 14,
-                  borderRadius: 10,
-                  fontSize: 14,
-                }}
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                placeholder={t("damagedClothes.searchPlaceholder")}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") onSearch();
-                }}
-              />
-            </div>
+          action={
             <button
               type="button"
-              className="btn btn-gold"
-              onClick={onSearch}
-              disabled={searchLoading}
+              className="btn btn-gold damaged-clothes-primary-action"
+              onClick={() => setSearchModalOpen(true)}
+              aria-haspopup="dialog"
+              aria-expanded={searchModalOpen}
+            >
+              <LuSearch size={16} />
+              {t("damagedClothes.applyPenalty", "Apply Penalty")}
+            </button>
+          }
+        />
+        <Modal
+          open={searchModalOpen}
+          onClose={() => setSearchModalOpen(false)}
+          title={t("damagedClothes.applyPenalty", "Apply Penalty")}
+          maxW={920}
+          dir={isRtl ? "rtl" : "ltr"}
+        >
+          <div style={{ display: "grid", gap: 24 }}>
+            {/* ── Filter / Search Card ─────────────────────────────────────── */}
+            <div
+              className="damaged-clothes-search-form"
               style={{
-                height: 44,
-                minWidth: 120,
-                borderRadius: 10,
-                gap: 6,
-                fontWeight: 600,
+                display: "grid",
+                gap: 24,
+                padding: "24px 0 16px",
+                border: "1px solid var(--border)",
+                borderRadius: 18,
+                background: "var(--surface)",
               }}
             >
-              {searchLoading ? <SmallSpinner /> : <LuSearch size={14} />}
-              {searchLoading
-                ? t("common.loading", "Loading...")
-                : t("common.search", "Search")}
-            </button>
-          </div>
-        </div>
+              {/* Role + Worker selects */}
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                {/* Role */}
+                <div style={{ display: "grid", gap: 10, minWidth: 0 }}>
+                  <label
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "var(--text3)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <LuUsers size={14} style={{ color: "var(--primary)" }} />
+                    {t("damagedClothes.roleLabel")}
+                    <span style={{ color: "var(--danger)" }}>*</span>
+                  </label>
+                  <Select
+                    classNamePrefix="rs"
+                    isRtl={isRtl}
+                    options={roleOptions}
+                    value={selectedRole}
+                    onChange={(value) => {
+                      setSelectedRole(value);
+                      setSelectedWorker(null);
+                      setSearchTriggered(false);
+                      setSubmittedSearch("");
+                      setSearchText("");
+                      setSelectedOrder(null);
+                    }}
+                    placeholder={t("damagedClothes.rolePlaceholder")}
+                    styles={buildSelectStyles({ isRtl })}
+                    menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+                    menuPosition="fixed"
+                    menuPlacement="auto"
+                    menuShouldBlockScroll={false}
+                  />
+                </div>
 
-        {/* ── Orders Results Card ──────────────────────────────────────── */}
-        <div
-          style={{
-            background: "var(--surface)",
-            borderRadius: 16,
-            border: "1px solid var(--border)",
-            boxShadow: "0 4px 20px rgba(15,23,42,.06)",
-            overflow: "hidden",
-            display: searchTriggered ? "block" : "none",
-          }}
-        >
-          {/* Card header */}
-          <div
-            style={{
-              padding: "14px 20px",
-              borderBottom: "1px solid var(--border)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-              flexWrap: "wrap",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <AfCurrencyIcon size={16} style={{ color: "var(--primary)" }} />
-              <span
-                style={{ fontSize: 15, fontWeight: 700, color: "var(--text1)" }}
-              >
-                {t("damagedClothes.ordersTitle")}
-              </span>
-            </div>
-            {searchTriggered && !searchLoading && (
-              <span
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  padding: "3px 10px",
-                  borderRadius: 20,
-                  background: DAMAGED_TONES.primary.bg,
-                  color: DAMAGED_TONES.primary.text,
-                  border: `1px solid ${DAMAGED_TONES.primary.border}`,
-                }}
-              >
-                {t("damagedClothes.totalFound", { count: orders.length })}
-              </span>
-            )}
-          </div>
+                {/* Worker */}
+                <div style={{ display: "grid", gap: 10, minWidth: 0 }}>
+                  <label
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "var(--text3)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <LuUser size={14} style={{ color: "var(--primary)" }} />
+                    {t("damagedClothes.workerLabel")}
+                    <span style={{ color: "var(--danger)" }}>*</span>
+                  </label>
+                  <Select
+                    classNamePrefix="rs"
+                    isRtl={isRtl}
+                    options={workerOptions}
+                    value={selectedWorker}
+                    onChange={(value) => {
+                      setSelectedWorker(value);
+                      setSearchTriggered(false);
+                      setSubmittedSearch("");
+                      setSelectedOrder(null);
+                    }}
+                    isLoading={workersLoading}
+                    isDisabled={!selectedRole?.value}
+                    placeholder={t("damagedClothes.workerPlaceholder")}
+                    noOptionsMessage={() =>
+                      workersLoading
+                        ? t("common.loading", "Loading...")
+                        : t("common.noData", "No data found")
+                    }
+                    styles={buildSelectStyles({ isRtl })}
+                    menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+                    menuPosition="fixed"
+                    menuPlacement="auto"
+                    menuShouldBlockScroll={false}
+                  />
+                </div>
+              </div>
 
-          {/* Card body */}
-          <div style={{ padding: "16px 20px" }}>
-            {!searchTriggered ? (
-              /* Initial empty state */
+              {/* Divider */}
               <div
                 style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "40px 0",
-                  color: "var(--text3)",
+                  height: 1,
+                  background: "var(--border)",
+                  margin: "0 -4px",
                 }}
+              />
+
+              {/* Search bar */}
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  onSearch();
+                }}
+                className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-end"
+                style={{ gap: 18 }}
               >
-                <LuClipboardList size={36} style={{ opacity: 0.4 }} />
-                <p style={{ margin: 0, fontSize: 14 }}>
-                  {t("damagedClothes.searchHelp")}
-                </p>
-              </div>
-            ) : searchLoading ? (
-              /* Loading skeleton */
-              <div style={{ display: "grid", gap: 10 }}>
-                {[1, 2].map((i) => (
-                  <div
-                    key={i}
+                <div style={{ position: "relative", minWidth: 0 }}>
+                  <LuSearch
+                    size={15}
                     style={{
-                      borderRadius: 12,
-                      border: "1px solid var(--border)",
-                      padding: 16,
-                      background: "var(--surface2)",
-                      height: 120,
-                      animation: "pulse 1.6s cubic-bezier(.4,0,.6,1) infinite",
+                      position: "absolute",
+                      insetInlineStart: 13,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      color: "var(--text3)",
+                      pointerEvents: "none",
                     }}
                   />
-                ))}
-              </div>
-            ) : orders.length === 0 ? (
-              /* No results */
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "40px 0",
-                  color: "var(--text3)",
-                }}
-              >
-                <LuSearch size={36} style={{ opacity: 0.4 }} />
-                <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>
-                  {emptyStateCode === "ORDER_NOT_FOUND"
-                    ? t("damagedClothes.orderNotFound")
-                    : emptyStateCode === "WORKER_NOT_ON_ORDER"
-                      ? t("damagedClothes.userDidNotWorkOnOrder")
-                      : t("damagedClothes.noOrders")}
-                </p>
-                {submittedSearch && (
-                  <p style={{ margin: 0, fontSize: 12 }}>
-                    {t("common.search", "Search")}:{" "}
-                    <strong>{submittedSearch}</strong>
-                  </p>
+                  <input
+                    className="inp"
+                    style={{
+                      height: 50,
+                      paddingInlineStart: 44,
+                      paddingInlineEnd: 18,
+                      borderRadius: 14,
+                      fontSize: 15,
+                      width: "100%",
+                      minWidth: 0,
+                    }}
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    placeholder={t("damagedClothes.searchPlaceholder")}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="btn btn-gold damaged-clothes-search-button"
+                  disabled={searchLoading}
+                  style={{ minHeight: 50, paddingInline: 22, borderRadius: 14 }}
+                >
+                  {searchLoading ? <SmallSpinner /> : <LuSearch size={14} />}
+                  {searchLoading
+                    ? t("common.loading", "Loading...")
+                    : t("common.search", "Search")}
+                </button>
+              </form>
+            </div>
+
+            {/* ── Orders Results Card ──────────────────────────────────────── */}
+            <div
+              className="damaged-clothes-results-card"
+              style={{ display: searchTriggered ? "block" : "none" }}
+            >
+              {/* Card header */}
+              <div className="damaged-clothes-results-header">
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <AfCurrencyIcon size={16} style={{ color: "var(--primary)" }} />
+                  <span
+                    style={{ fontSize: 15, fontWeight: 700, color: "var(--text1)" }}
+                  >
+                    {t("damagedClothes.ordersTitle")}
+                  </span>
+                </div>
+                {searchTriggered && !searchLoading && (
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      padding: "3px 10px",
+                      borderRadius: 20,
+                      background: DAMAGED_TONES.primary.bg,
+                      color: DAMAGED_TONES.primary.text,
+                      border: `1px solid ${DAMAGED_TONES.primary.border}`,
+                    }}
+                  >
+                    {t("damagedClothes.totalFound", { count: orders.length })}
+                  </span>
                 )}
               </div>
-            ) : (
-              /* Order cards */
-              <div style={{ display: "grid", gap: 12 }}>
-                {orders.map((order) => (
-                  <OrderCard
-                    key={order.id}
-                    order={order}
+
+              {/* Card body */}
+              <div className="damaged-clothes-results-body">
+                {!searchTriggered ? (
+                  /* Initial empty state */
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "40px 0",
+                      color: "var(--text3)",
+                    }}
+                  >
+                    <LuClipboardList size={36} style={{ opacity: 0.4 }} />
+                    <p style={{ margin: 0, fontSize: 14 }}>
+                      {t("damagedClothes.searchHelp")}
+                    </p>
+                  </div>
+                ) : searchLoading ? (
+                  /* Loading skeleton */
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {[1, 2].map((i) => (
+                      <div
+                        key={i}
+                        style={{
+                          borderRadius: 12,
+                          border: "1px solid var(--border)",
+                          padding: 16,
+                          background: "var(--surface2)",
+                          height: 120,
+                          animation: "pulse 1.6s cubic-bezier(.4,0,.6,1) infinite",
+                        }}
+                      />
+                    ))}
+                  </div>
+                ) : orders.length === 0 ? (
+                  /* No results */
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "40px 0",
+                      color: "var(--text3)",
+                    }}
+                  >
+                    <LuSearch size={36} style={{ opacity: 0.4 }} />
+                    <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>
+                      {emptyStateCode === "ORDER_NOT_FOUND"
+                        ? t("damagedClothes.orderNotFound")
+                        : emptyStateCode === "WORKER_NOT_ON_ORDER"
+                          ? t("damagedClothes.userDidNotWorkOnOrder")
+                          : t("damagedClothes.noOrders")}
+                    </p>
+                    {submittedSearch && (
+                      <p style={{ margin: 0, fontSize: 12 }}>
+                        {t("common.search", "Search")}:{" "}
+                        <strong>{submittedSearch}</strong>
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <OrderResultsTable
+                    orders={orders}
                     language={language}
-                    isRtl={isRtl}
                     t={t}
                     selectedRole={selectedRole}
                     selectedWorker={selectedWorker}
-                    onApply={() => openConfirm(order)}
+                    onApply={openConfirm}
                   />
-                ))}
+                )}
               </div>
-            )}
+            </div>
           </div>
-        </div>
+        </Modal>
 
         <RecordsPanel
           t={t}
@@ -786,222 +797,179 @@ export default function DamagedClothes() {
 }
 
 /* ── Order Card sub-component ─────────────────────────────────────────── */
-function OrderCard({
-  order,
+function OrderResultsTable({
+  orders,
   language,
   t,
   selectedRole,
   selectedWorker,
   onApply,
 }) {
-  const isDamageOrder = Boolean(order?.isDamageOrder);
   const selectedRoleValue = selectedRole?.value;
-  const expenseBreakdownCards = [
-    {
-      key: "totalOrderAmount",
-      label: t("damagedClothes.details.totalOrderAmount"),
-      value: formatCurrency(order.totalOrderAmount || 0, language),
-      color: "green",
-    },
-    {
-      key: "rakhtExpense",
-      label: t("damagedClothes.details.rakhtExpense"),
-      value: formatCurrency(order.rakhtExpense || 0, language),
-      color: "neutral",
-    },
-    ...(selectedRoleValue === "DOKHT"
-      ? []
-      : [
-          {
-            key: "dokhtExpense",
-            label: t("damagedClothes.details.dokhtExpense"),
-            value: formatCurrency(order.dokhtExpense || 0, language),
-            color: "neutral",
-          },
-        ]),
-    ...(selectedRoleValue === "QICHIKAR"
-      ? []
-      : [
-          {
-            key: "qichikarExpense",
-            label: t("damagedClothes.details.qichikarExpense"),
-            value: formatCurrency(order.qichikarExpense || 0, language),
-            color: "neutral",
-          },
-        ]),
+  const columns = [
+    t("orders.billNumber", "Bill #"),
+    t("damagedClothes.details.customerName", "Customer"),
+    t("damagedClothes.details.orderType", "Order Type"),
+    t("damagedClothes.details.totalPenalty", "Penalty"),
+    t("common.status", "Status"),
+    t("common.actions", "Actions"),
   ];
-  const expenseGridClassName =
-    expenseBreakdownCards.length === 4
-      ? "grid grid-cols-2 gap-3 sm:grid-cols-4"
-      : "grid grid-cols-1 gap-3 sm:grid-cols-3";
 
   return (
     <div
+      className="order-scroll-x damaged-clothes-found-table-wrap"
       style={{
-        background: "var(--surface)",
+        overflowX: "auto",
         border: "1px solid var(--border)",
         borderRadius: 14,
-        overflow: "hidden",
-        boxShadow: "0 1px 4px rgba(15,23,42,.05)",
-        transition: "box-shadow .15s",
+        background: "var(--surface)",
       }}
     >
-      {/* Card header row */}
-      <div
+      <table
+        className="damaged-clothes-found-table"
         style={{
-          padding: "10px 16px",
-          borderBottom: "1px solid var(--border)",
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          flexWrap: "wrap",
-          background: "var(--surface2)",
+          width: "100%",
+          borderCollapse: "separate",
+          borderSpacing: 0,
         }}
       >
-        <span
-          style={{
-            fontSize: 17,
-            fontWeight: 800,
-            color: "var(--primary)",
-            letterSpacing: -0.4,
-            lineHeight: 1,
-          }}
-        >
-          #{order.billNumber || "-"}
-        </span>
-        <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text1)" }}>
-          {order.customerName || "-"}
-        </span>
-        <span
-          style={{
-            fontSize: 12,
-            color: "var(--text3)",
-            fontWeight: 500,
-          }}
-        >
-          {order.phoneNumber || ""}
-        </span>
-        <div
-          style={{
-            marginInlineStart: "auto",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
-          {isDamageOrder && (
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                padding: "3px 10px",
-                borderRadius: 20,
-                background: DAMAGED_TONES.red.bg,
-                border: `1px solid ${DAMAGED_TONES.red.border}`,
-                color: DAMAGED_TONES.red.text,
-              }}
-            >
-              {t("orders.damageOrderStatus", "Damage Order")}
-            </span>
-          )}
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              padding: "3px 10px",
-              borderRadius: 20,
-              background: DAMAGED_TONES.primary.bg,
-              border: `1px solid ${DAMAGED_TONES.primary.border}`,
-              color: DAMAGED_TONES.primary.text,
-            }}
-          >
-            {order.orderType || "-"}
-          </span>
-        </div>
-      </div>
-
-      {/* Financial stats */}
-      <div style={{ padding: "12px 16px", display: "grid", gap: 10 }}>
-        {/* Expense breakdown: 4 columns */}
-        <div className={expenseGridClassName}>
-          {expenseBreakdownCards.map((card) => (
-            <StatPill
-              key={card.key}
-              label={card.label}
-              value={card.value}
-              color={card.color}
+        <thead>
+          <tr>
+            {columns.map((label) => (
+              <th
+                key={label}
+                style={{
+                  padding: "12px 14px",
+                  textAlign: "start",
+                  color: "var(--text3)",
+                  fontSize: 11,
+                  fontWeight: 800,
+                  textTransform: "uppercase",
+                  letterSpacing: 0,
+                  borderBottom: "1px solid var(--border)",
+                  background: "var(--surface2)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {orders.map((order) => (
+            <OrderResultTableRow
+              key={order.id}
+              order={order}
+              language={language}
+              t={t}
+              selectedRoleValue={selectedRoleValue}
+              selectedWorker={selectedWorker}
+              onApply={() => onApply(order)}
             />
           ))}
-        </div>
-
-        {/* Daily task + total penalty (last, full-width highlight) */}
-        <div className="grid grid-cols-2 gap-3">
-          <StatPill
-            label={t("damagedClothes.details.dailyTaskExpense")}
-            value={formatCurrency(order.dailyTaskExpense || 0, language)}
-            color="neutral"
-          />
-          <StatPill
-            label={t("damagedClothes.details.totalPenalty")}
-            value={formatCurrency(order.totalExpense || 0, language)}
-            color="red"
-          />
-        </div>
-
-        {/* Apply Penalty button */}
-        {isDamageOrder && (
-          <div
-            style={{
-              border: `1px solid ${DAMAGED_TONES.red.border}`,
-              background: DAMAGED_TONES.red.bg,
-              color: DAMAGED_TONES.red.text,
-              borderRadius: 10,
-              padding: "9px 12px",
-              fontSize: 12,
-              fontWeight: 700,
-              lineHeight: 1.6,
-            }}
-          >
-            {buildDuplicateMessage(
-              {
-                workerName: order?.damagedAssignedTo?.name,
-                roleType: order?.damagedAssignedRole,
-              },
-              t,
-            )}
-          </div>
-        )}
-
-        {/* Apply Penalty button */}
-        <div
-          style={{ display: "flex", justifyContent: "flex-end", paddingTop: 4 }}
-        >
-          <button
-            type="button"
-            className="btn btn-danger"
-            onClick={onApply}
-            disabled={!selectedWorker?.value || isDamageOrder}
-            style={{
-              width: "100%",
-              maxWidth: 240,
-              gap: 7,
-              borderRadius: 10,
-              fontWeight: 600,
-              opacity: selectedWorker?.value && !isDamageOrder ? 1 : 0.5,
-              cursor:
-                selectedWorker?.value && !isDamageOrder
-                  ? "pointer"
-                  : "not-allowed",
-            }}
-          >
-            <LuShieldAlert size={14} />
-            {isDamageOrder
-              ? t("orders.damageOrderStatus", "Damage Order")
-              : t("damagedClothes.applyPenalty")}
-          </button>
-        </div>
-      </div>
+        </tbody>
+      </table>
     </div>
+  );
+}
+
+function OrderResultTableRow({
+  order,
+  language,
+  t,
+  selectedRoleValue,
+  selectedWorker,
+  onApply,
+}) {
+  const isDamageOrder = Boolean(order?.isDamageOrder);
+  const canApply = Boolean(selectedWorker?.value) && !isDamageOrder;
+
+  return (
+    <tr>
+      <ResultTableCell mono strong>
+        #{order.billNumber || "-"}
+      </ResultTableCell>
+      <ResultTableCell strong>{order.customerName || "-"}</ResultTableCell>
+      <ResultTableCell>
+        <StatusBadge tone="blue">{order.orderType || "-"}</StatusBadge>
+      </ResultTableCell>
+      <ResultTableCell strong tone="red">
+        {formatCurrency(order.totalExpense || 0, language)}
+      </ResultTableCell>
+      <ResultTableCell>
+        {isDamageOrder ? (
+          <StatusBadge tone="red">
+            {t("orders.damageOrderStatus", "Damage Order")}
+          </StatusBadge>
+        ) : (
+          <StatusBadge tone="green">{t("common.ready", "Ready")}</StatusBadge>
+        )}
+      </ResultTableCell>
+      <ResultTableCell>
+        <button
+          type="button"
+          className="btn btn-danger"
+          onClick={onApply}
+          disabled={!canApply}
+          title={
+            isDamageOrder
+              ? buildDuplicateMessage(
+                  {
+                    workerName: order?.damagedAssignedTo?.name,
+                    roleType: order?.damagedAssignedRole,
+                  },
+                  t,
+                )
+              : undefined
+          }
+          style={{
+            minWidth: 132,
+            minHeight: 34,
+            gap: 6,
+            borderRadius: 9,
+            fontSize: 12,
+            opacity: canApply ? 1 : 0.5,
+            cursor: canApply ? "pointer" : "not-allowed",
+          }}
+        >
+          <LuShieldAlert size={14} />
+          {isDamageOrder
+            ? t("orders.damageOrderStatus", "Damage Order")
+            : t("damagedClothes.applyPenalty")}
+        </button>
+      </ResultTableCell>
+    </tr>
+  );
+}
+
+function ResultTableCell({
+  children,
+  strong = false,
+  mono = false,
+  tone,
+}) {
+  return (
+    <td
+      style={{
+        padding: "13px 14px",
+        borderBottom: "1px solid var(--border)",
+        color:
+          tone === "red"
+            ? DAMAGED_TONES.red.text
+            : strong
+              ? "var(--text1)"
+              : "var(--text2)",
+        fontWeight: strong ? 800 : 500,
+        verticalAlign: "middle",
+        whiteSpace: "nowrap",
+        fontFamily: mono
+          ? "ui-monospace, SFMono-Regular, Menlo, monospace"
+          : undefined,
+      }}
+    >
+      {children}
+    </td>
   );
 }
 
@@ -1251,7 +1219,7 @@ function RecordsPanel({
         </Modal>
 
         <div
-          className="order-scroll-x"
+          className="order-scroll-x damaged-clothes-records-table-wrap"
           style={{
             overflowX: "auto",
             border: "1px solid var(--border)",

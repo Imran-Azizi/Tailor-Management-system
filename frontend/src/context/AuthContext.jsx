@@ -12,6 +12,7 @@ import api, {
   clearCsrfToken,
   setAuthSessionExpiredHandler,
 } from "../lib/api.js";
+import { normalizePermissionList } from "../lib/permissions.js";
 
 const AuthContext = createContext(null);
 const AUTH_CHANNEL_NAME = "tailor-auth-session";
@@ -116,10 +117,30 @@ export function AuthProvider({ children }) {
   const isFinance = user?.accountType === "FINANCE";
   const isWorker = isDokht || isQichikar;
   const canManageOrders = isAdmin || isDokan;
+  const permissions = useMemo(
+    () => normalizePermissionList(user?.permissions),
+    [user?.permissions],
+  );
+  const permissionSet = useMemo(() => new Set(permissions), [permissions]);
 
   const hasRole = useCallback(
     (...roles) => roles.includes(user?.accountType),
     [user?.accountType],
+  );
+  const hasPermission = useCallback(
+    (permission) =>
+      isAdmin ||
+      isSuperAdmin ||
+      !permission ||
+      permissionSet.has(permission),
+    [isAdmin, isSuperAdmin, permissionSet],
+  );
+  const hasAnyPermission = useCallback(
+    (...nextPermissions) =>
+      isAdmin ||
+      isSuperAdmin ||
+      nextPermissions.flat().some((permission) => permissionSet.has(permission)),
+    [isAdmin, isSuperAdmin, permissionSet],
   );
 
   const value = useMemo(
@@ -138,7 +159,10 @@ export function AuthProvider({ children }) {
       isFinance,
       isWorker,
       canManageOrders,
+      permissions,
       hasRole,
+      hasPermission,
+      hasAnyPermission,
     }),
     [
       user,
@@ -155,7 +179,10 @@ export function AuthProvider({ children }) {
       isFinance,
       isWorker,
       canManageOrders,
+      permissions,
       hasRole,
+      hasPermission,
+      hasAnyPermission,
     ],
   );
 

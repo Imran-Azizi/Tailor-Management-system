@@ -25,7 +25,6 @@ const QICHIKAR_NOT_COMPLETED_MESSAGE =
   "This order cannot be received yet. Waiting for the Qichikar (cutting) worker to complete their work first.";
 const COMPLETED_REASSIGN_BLOCK_MESSAGE =
   "This order completed, you can not assign it again";
-const WORKER_PAYMENT_EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 const FINANCE_ORDER_ACCESS_ERROR =
   "You do not have permission to access this order.";
@@ -344,6 +343,20 @@ export const markCompletedWorkerReceipts = async (req, res, next) => {
   try {
     const result = await service.markCompletedWorkerOrdersAsReceived({
       items: req.body?.items,
+      adminId: req.user.id,
+    });
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateCompletedWorkerReceipt = async (req, res, next) => {
+  try {
+    const paidAmount = parseNumberLocale(String(req.body?.paidAmount ?? ""));
+    const result = await service.updateCompletedWorkerReceiptAmount({
+      receiptId: req.params.receiptId,
+      paidAmount,
       adminId: req.user.id,
     });
     res.json(result);
@@ -1054,23 +1067,26 @@ export const payWorkerForCompletedOrder = async (req, res, next) => {
     if (!["QICHIKAR", "DOKHT"].includes(completedWorker.accountType)) {
       return res.status(400).json({ error: "Assigned user is not a worker." });
     }
-    const isPaidAlready = order[paymentStatusField] === "PAID_TO_WORKER";
-    const paidAtValue = order[paidAtField] || order.workerPaidAt || null;
-    let isEditWindowOpen = false;
-    if (isPaidAlready && paidAtValue) {
-      const paidAtMs = new Date(paidAtValue).getTime();
-      isEditWindowOpen =
-        Number.isFinite(paidAtMs) &&
-        Date.now() - paidAtMs <= WORKER_PAYMENT_EDIT_WINDOW_MS;
-    }
 
-    if (isPaidAlready && !isEditWindowOpen) {
+    const existingReceipt = await prisma.workerPaymentReceipt.findUnique({
+      where: {
+        orderId_workerRole: {
+          orderId,
+          workerRole: paymentRole,
+        },
+      },
+      select: { id: true },
+    });
+    if (existingReceipt) {
       return res.status(409).json({
         error:
-          "Payment edit window has expired. Payments can only be updated within 24 hours.",
-        code: "PAYMENT_EDIT_WINDOW_EXPIRED",
+          "Receipt has already been confirmed. Update the receipt amount from receipt history within the receipt edit window.",
+        code: "RECEIPT_ALREADY_CONFIRMED",
       });
     }
+
+    const isPaidAlready = order[paymentStatusField] === "PAID_TO_WORKER";
+    const paidAtValue = order[paidAtField] || order.workerPaidAt || null;
 
     const now = new Date();
     const persistedPaidAt =

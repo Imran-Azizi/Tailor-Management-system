@@ -7,7 +7,8 @@ import {
   myPenalties,
   searchOrders,
 } from "../controllers/damagedClothes.controller.js";
-import { authenticate, authorize } from "../middleware/auth.middleware.js";
+import { authenticate, authorizePermission } from "../middleware/auth.middleware.js";
+import { PERMISSIONS } from "../lib/permissions.js";
 
 const router = Router();
 
@@ -15,14 +16,14 @@ router.use(authenticate);
 
 router.get("/my-penalties", myPenalties);
 
-router.get("/workers", authorize("ADMIN"), listWorkersByRole);
-router.get("/penalties", authorize("ADMIN"), listPenalties);
-router.get("/orders/search", authorize("ADMIN"), searchOrders);
+router.get("/workers", authorizePermission(PERMISSIONS.USERS_VIEW), listWorkersByRole);
+router.get("/penalties", authorizePermission(PERMISSIONS.FINANCE_DEBT_RECORDS_VIEW), listPenalties);
+router.get("/orders/search", authorizePermission(PERMISSIONS.ORDERS_VIEW), searchOrders);
 router.get(
   "/orders/:orderId/expenses",
-  authorize("ADMIN"),
+  authorizePermission(PERMISSIONS.FINANCE_VIEW),
   getOrderExpenseDetails,
 );
-router.post("/penalties", authorize("ADMIN"), createPenalty);
+router.post("/penalties", authorizePermission(PERMISSIONS.FINANCE_PAYMENTS_MANAGE), createPenalty);
 
 export default router;

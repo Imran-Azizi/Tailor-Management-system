@@ -16,6 +16,26 @@ import {
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTheme } from "../context/ThemeContext.jsx";
 import { getApiErrorMessage } from "../lib/feedback.js";
+import { PERMISSIONS } from "../lib/permissions.js";
+
+function firstAllowedMainPath(user, from = "/") {
+  const permissions = new Set(user?.permissions || []);
+  const has = (permission) =>
+    user?.accountType === "ADMIN" ||
+    user?.accountType === "SUPER_ADMIN" ||
+    permissions.has(permission);
+
+  if (from && from !== "/login" && from !== "/dashboard") return from;
+  if (has(PERMISSIONS.DASHBOARD_VIEW)) return "/dashboard";
+  if (has(PERMISSIONS.ORDERS_CREATE)) return "/orders/create";
+  if (has(PERMISSIONS.ORDERS_VIEW)) return "/orders";
+  if (has(PERMISSIONS.FINANCE_VIEW)) return "/daily-tasks/all";
+  if (has(PERMISSIONS.FINANCE_EXPENSES_ADD)) return "/daily-tasks";
+  if (has(PERMISSIONS.INVENTORY_VIEW)) return "/item-sales-records";
+  if (has(PERMISSIONS.INVENTORY_PRODUCTS_SELL)) return "/other-items";
+  if (has(PERMISSIONS.SETTINGS_VIEW)) return "/tenant-settings";
+  return "/support-team";
+}
 
 function LangBtn() {
   const { i18n, t } = useTranslation();
@@ -127,17 +147,7 @@ export default function Login() {
         navigate("/panel", { replace: true });
       } else if (["ADMIN", "DOKAN", "FINANCE"].includes(user.accountType)) {
         toast.success(t("auth.welcomeBack", { name: user.name }));
-        const dest =
-          user.accountType === "DOKAN"
-            ? "/orders/create"
-            : user.accountType === "FINANCE"
-            ? from === "/login" || from === "/dashboard"
-              ? "/orders"
-              : from
-            : from === "/login"
-              ? "/dashboard"
-              : from;
-        navigate(dest, { replace: true });
+        navigate(firstAllowedMainPath(user, from), { replace: true });
       } else {
         await logout();
         toast.error(t("auth.adminOnly", "Access denied. Admin accounts only."));

@@ -477,6 +477,7 @@ export const Pagination = ({ page, total, limit, onChange }) => {
 
   return (
     <div
+      className="pagination"
       style={{
         display: "flex",
         alignItems: "center",

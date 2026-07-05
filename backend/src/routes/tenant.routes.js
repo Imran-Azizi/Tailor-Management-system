@@ -12,6 +12,8 @@ import {
   verifyTenantDeletionPassword,
 } from "../controllers/tenant.controller.js";
 import { authenticate, authorize } from "../middleware/auth.middleware.js";
+import { authorizePermission } from "../middleware/auth.middleware.js";
+import { PERMISSIONS } from "../lib/permissions.js";
 
 const router = Router();
 const passwordVerificationLimiter = rateLimit({
@@ -27,8 +29,8 @@ const passwordVerificationLimiter = rateLimit({
 
 router.use(authenticate);
 
-router.get("/me/settings", authorize("ADMIN"), getMyTenantSettings);
-router.put("/me/settings", authorize("ADMIN"), updateMyTenantSettings);
+router.get("/me/settings", authorizePermission(PERMISSIONS.SETTINGS_VIEW), getMyTenantSettings);
+router.put("/me/settings", authorizePermission(PERMISSIONS.SETTINGS_UPDATE), updateMyTenantSettings);
 
 router.get("/", authorize("SUPER_ADMIN"), listTenants);
 router.post("/", authorize("SUPER_ADMIN"), createTenant);

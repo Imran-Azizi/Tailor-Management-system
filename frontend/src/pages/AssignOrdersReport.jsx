@@ -206,9 +206,7 @@ export default function AssignOrdersReport() {
         width: "100%",
         direction: isRtl ? "rtl" : "ltr",
         textAlign: isRtl ? "right" : "left",
-        fontFamily: isRtl
-          ? "'Vazirmatn', 'Noto Sans Arabic', 'Noto Naskh Arabic', sans-serif"
-          : undefined,
+        fontFamily: isRtl ? "var(--font-rtl)" : undefined,
       }}
     >
       <PageHeader

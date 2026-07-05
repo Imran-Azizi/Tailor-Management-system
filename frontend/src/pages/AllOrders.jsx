@@ -19,13 +19,13 @@ import {
 import toast from "react-hot-toast";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
+import { PERMISSIONS } from "../lib/permissions.js";
 import { parseNumberLocale, toAsciiDigits } from "../lib/normalize.js";
 import { formatCurrency } from "../lib/currency.js";
 import {
   getOrderGrossTotal,
   getOrderNetTotal,
 } from "../lib/orderFinancials.js";
-import { MONEY_SCALE } from "../lib/decimal.js";
 import { formatMeters } from "../lib/meters.js";
 import {
   getOrderDisplayName,
@@ -45,7 +45,6 @@ import {
   ConfirmDeleteModal,
 } from "../components/ui/index.jsx";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
-import { OrderDocumentPack } from "../components/order/OrderDocumentPack.jsx";
 import OrderCreatorBadge from "../components/order/OrderCreatorBadge.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
@@ -594,16 +593,7 @@ function getDisplayTotalBenefit(order) {
   const finalTotalBenefit = Number(order?.finalTotalBenefit);
   if (Number.isFinite(finalTotalBenefit)) return finalTotalBenefit;
 
-  const totalBenefit = Number(order?.totalBenefit || 0);
-  if (order?.type !== "READY_MADE" && order?.type !== "READY_MADE_WASKAT") {
-    return totalBenefit;
-  }
-  const readyMadeOriginalPrice = Number(
-    order?.type === "READY_MADE"
-      ? order?.readyMadeOriginalPrice || 0
-      : order?.readyMadeWaskatOriginalPrice || 0,
-  );
-  return totalBenefit - readyMadeOriginalPrice;
+  return Number(order?.totalBenefit || 0);
 }
 
 function getBenefitEntryDate(entry) {
@@ -664,12 +654,9 @@ function OrderViewModal({ orderId, open, onClose }) {
   );
   const displayTotalBenefit = data?.isDamageOrder
     ? 0
-    : data?.type === "READY_MADE" || data?.type === "READY_MADE_WASKAT"
-      ? baseDisplayTotalBenefit - readyMadeOriginalPrice
-      : baseDisplayTotalBenefit;
+    : baseDisplayTotalBenefit;
   const displayTotalExpenses = Number(benefitDetails?.totalExpenses ?? 0);
-  const displayTotalCardValue =
-    getOrderGrossTotal(data);
+  const displayTotalCardValue = getOrderGrossTotal(data);
   const benefitExpenseRows = benefitDetails?.expenses || [];
 
   return (
@@ -832,6 +819,12 @@ function OrderViewModal({ orderId, open, onClose }) {
                     <span>{t("common.total", "Total")}</span>
                     <strong>
                       {formatMoney(displayTotalCardValue, language)}
+                    </strong>
+                  </div>
+                  <div className="order-view-kpi-item order-view-kpi-item--discount">
+                    <span>{t("createOrder.discount", "Discount")}</span>
+                    <strong style={{ color: "#7C3AED" }}>
+                      {formatMoney(data.discount, language)}
                     </strong>
                   </div>
                   <div className="order-view-kpi-item">
@@ -1178,7 +1171,9 @@ function OrderViewModal({ orderId, open, onClose }) {
 
 function RowDropdown({
   order,
-  isAdmin,
+  canViewOrder,
+  canEditOrder,
+  canDeleteOrder,
   showAssign = false,
   onView,
   onAssign,
@@ -1258,13 +1253,13 @@ function RowDropdown({
       : undefined;
 
   const items = [
-    isAdmin && {
+    canViewOrder && {
       label: t("common.details", "Details"),
       icon: <LuClipboardList size={13} />,
       onClick: onView,
       cls: "",
     },
-    isAdmin && {
+    canEditOrder && {
       label: t("common.edit"),
       icon: <LuPencil size={13} />,
       onClick: editDisabled ? null : onEdit,
@@ -1274,7 +1269,7 @@ function RowDropdown({
     },
     showAssign &&
       !protect.isProtected &&
-      isAdmin && {
+      canEditOrder && {
         label: order.assignedToId
           ? t("assignment.assignOrder")
           : t("assignment.assign"),
@@ -1282,7 +1277,7 @@ function RowDropdown({
         onClick: onAssign,
         cls: "",
       },
-    isAdmin && {
+    canDeleteOrder && {
       label: t("common.delete"),
       icon: <LuTrash2 size={13} />,
       onClick: deleteDisabled ? null : onDelete,
@@ -1348,12 +1343,16 @@ export default function AllOrders({ filter, mode = "orders" }) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
   const isRtl = isRtlLanguage(language);
-  const { user, isAdmin, isFinance } = useAuth();
+  const { user, isAdmin, isFinance, hasPermission } = useAuth();
   const { viewMonth, viewYear, getMonthAccessMode } = useMonth();
   const qc = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();
-  const canManageAssignments = mode === "assignment" && isAdmin;
+  const canViewOrders = hasPermission(PERMISSIONS.ORDERS_VIEW);
+  const canEditOrders = hasPermission(PERMISSIONS.ORDERS_EDIT);
+  const canDeleteOrders = hasPermission(PERMISSIONS.ORDERS_DELETE);
+  const canManageAssignments =
+    mode === "assignment" && hasPermission(PERMISSIONS.ORDERS_ASSIGN);
   const remainingOnly = filter === "remaining";
   const statusFilter =
     filter === "pending"
@@ -1464,16 +1463,26 @@ export default function AllOrders({ filter, mode = "orders" }) {
   });
 
   const totals = useMemo(() => {
+    if (data?.summary) {
+      return {
+        total: Number(data.summary.total || 0),
+        discount: Number(data.summary.discount || 0),
+        paid: Number(data.summary.paid || 0),
+        remaining: Number(data.summary.remaining || 0),
+      };
+    }
+
     const orders = data?.data || [];
     return orders.reduce(
       (acc, order) => {
         if (order?.isDamageOrder) return acc;
         acc.total += getOrderNetTotal(order);
-        acc.paid += order.paidAmount || 0;
-        acc.remaining += order.remaining || 0;
+        acc.discount += Number(order.discount || 0);
+        acc.paid += Number(order.paidAmount || 0);
+        acc.remaining += Number(order.remaining || 0);
         return acc;
       },
-      { total: 0, paid: 0, remaining: 0 },
+      { total: 0, discount: 0, paid: 0, remaining: 0 },
     );
   }, [data]);
 
@@ -1489,9 +1498,13 @@ export default function AllOrders({ filter, mode = "orders" }) {
             : t("orders.titleAll");
   const getStatusBadgeMeta = (order) => getOrderCompletionStatus(order, t);
   // Always show newest orders at the top
-  const orders = (data?.data || [])
-    .slice()
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const orders = useMemo(
+    () =>
+      (data?.data || [])
+        .slice()
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+    [data?.data],
+  );
   const totalPages = Math.max(1, Math.ceil((data?.total || 0) / 20));
   const subtitle = data
     ? t("ui.pageSummary", {
@@ -1688,7 +1701,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
           </span>
           <div className="order-dashboard-copy">
             <div className="order-dashboard-label">
-              {t("orders.listedTotal")}
+              {t("common.total", "Total")}
             </div>
             <strong className="order-dashboard-value">
               {formatMoney(totals.total, language)}
@@ -1705,6 +1718,19 @@ export default function AllOrders({ filter, mode = "orders" }) {
             </div>
             <strong className="order-dashboard-value order-dashboard-value--paid">
               {formatMoney(totals.paid, language)}
+            </strong>
+          </div>
+        </div>
+        <div className="order-dashboard-card order-dashboard-card--discount">
+          <span className="order-dashboard-icon">
+            <AfCurrencyIcon size={16} />
+          </span>
+          <div className="order-dashboard-copy">
+            <div className="order-dashboard-label">
+              {t("createOrder.discount", "Discount")}
+            </div>
+            <strong className="order-dashboard-value">
+              {formatMoney(totals.discount, language)}
             </strong>
           </div>
         </div>
@@ -1857,7 +1883,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
                             </td>
                             <td>
                               <div className="order-actions-row">
-                                {isAdmin && (
+                                {canViewOrders && (
                                   <button
                                     type="button"
                                     className="btn btn-outline btn-sm"
@@ -1868,7 +1894,9 @@ export default function AllOrders({ filter, mode = "orders" }) {
                                 )}
                                 <RowDropdown
                                   order={o}
-                                  isAdmin={isAdmin}
+                                  canViewOrder={canViewOrders}
+                                  canEditOrder={canEditOrders}
+                                  canDeleteOrder={canDeleteOrders}
                                   showAssign={canManageAssignments}
                                   onView={() => setViewOrderId(o.id)}
                                   onAssign={() => setAssignModal(o)}
@@ -1934,7 +1962,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
                           #{o.customer?.billNumber}
                         </span>
                         <div className="order-mobile-head-actions">
-                          {isAdmin && (
+                          {canViewOrders && (
                             <button
                               type="button"
                               className="btn btn-outline btn-sm"
@@ -1945,7 +1973,9 @@ export default function AllOrders({ filter, mode = "orders" }) {
                           )}
                           <RowDropdown
                             order={o}
-                            isAdmin={isAdmin}
+                            canViewOrder={canViewOrders}
+                            canEditOrder={canEditOrders}
+                            canDeleteOrder={canDeleteOrders}
                             showAssign={canManageAssignments}
                             onView={() => setViewOrderId(o.id)}
                             onAssign={() => setAssignModal(o)}

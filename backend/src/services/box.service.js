@@ -277,27 +277,26 @@ export const assignOrderToBox = async (orderId, boxId) => {
     throw Object.assign(new Error("Order not found"), { status: 404 });
   }
 
-  // Prevent assigning READY_MADE_WASKAT to any box
-  if (order.type === "READY_MADE_WASKAT") {
-    return prisma.order.update({
-      where: { id: orderId },
-      data: { boxId: null },
-      include: { customer: true, box: true },
-    });
-  }
-
-  // Always assign READY_MADE to Outfit box
+  // Always assign ready-made orders to their matching physical box type.
   let effectiveBoxId = boxId;
-  if (order.type === "READY_MADE") {
-    // Find the first Outfit box
-    const outfitBox = await prisma.box.findFirst({
-      where: { boxType: "OUTFIT" },
+  const readyMadeBoxType =
+    order.type === "READY_MADE"
+      ? "OUTFIT"
+      : order.type === "READY_MADE_WASKAT"
+        ? "WASKAT"
+        : null;
+  if (readyMadeBoxType) {
+    const readyMadeBox = await prisma.box.findFirst({
+      where: { boxType: readyMadeBoxType },
       orderBy: { createdAt: "asc" },
     });
-    if (!outfitBox) {
-      throw Object.assign(new Error("No Outfit box found for READY_MADE order."), { status: 404 });
+    if (!readyMadeBox) {
+      throw Object.assign(
+        new Error(`No ${readyMadeBoxType} box found for ${order.type} order.`),
+        { status: 404 },
+      );
     }
-    effectiveBoxId = outfitBox.id;
+    effectiveBoxId = readyMadeBox.id;
   }
 
   if (!effectiveBoxId) {
@@ -317,12 +316,14 @@ export const assignOrderToBox = async (orderId, boxId) => {
     throw Object.assign(new Error("Box not found"), { status: 404 });
   }
 
-  // For READY_MADE, allow only Outfit box
-  if (order.type === "READY_MADE" && box.boxType !== "OUTFIT") {
-    throw Object.assign(new Error("READY_MADE orders must be assigned to Outfit box."), { status: 400 });
+  if (readyMadeBoxType && box.boxType !== readyMadeBoxType) {
+    throw Object.assign(
+      new Error(`${order.type} orders must be assigned to ${readyMadeBoxType} box.`),
+      { status: 400 },
+    );
   }
 
-  if (order.type !== "READY_MADE" && box.boxType !== order.type) {
+  if (!readyMadeBoxType && box.boxType !== order.type) {
     throw Object.assign(new Error("Order type and box type do not match."), {
       status: 400,
     });

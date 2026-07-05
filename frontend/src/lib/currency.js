@@ -49,3 +49,15 @@ export function formatCurrency(
 
   return `${number} ${token}`;
 }
+
+/**
+ * Standard money format for report pages: "1,500 AF".
+ * Whole amounts never show ".00"; fractional amounts keep up to 2 digits.
+ */
+export function formatReportMoney(value, language) {
+  return formatCurrency(value, language, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+    trimTrailingZeros: true,
+  });
+}

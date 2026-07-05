@@ -19,6 +19,7 @@ import {
 } from "react-icons/lu";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
+import { PERMISSIONS } from "../lib/permissions.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { ConfirmDeleteModal } from "../components/ui/index.jsx";
 
@@ -458,7 +459,10 @@ function UserModal({ user, hasAdmin, onClose, onSaved }) {
 
 export default function UserManagement() {
   const { t } = useTranslation();
-  const { user: me } = useAuth();
+  const { user: me, hasPermission } = useAuth();
+  const canCreateUsers = hasPermission(PERMISSIONS.USERS_CREATE);
+  const canEditUsers = hasPermission(PERMISSIONS.USERS_EDIT);
+  const canDeleteUsers = hasPermission(PERMISSIONS.USERS_DELETE);
   const qc = useQueryClient();
   const [modal, setModal] = useState(null); // null | 'new' | userObj
   const [deleteUserTarget, setDeleteUserTarget] = useState(null);
@@ -530,25 +534,27 @@ export default function UserManagement() {
             {users.length}
           </span>
         </div>
-        <button
-          onClick={() => setModal("new")}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 7,
-            padding: "8px 16px",
-            background: "var(--primary)",
-            color: "#fff",
-            border: "none",
-            borderRadius: 8,
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          <LuUserPlus size={15} />
-          {t("users.addUser")}
-        </button>
+        {canCreateUsers ? (
+          <button
+            onClick={() => setModal("new")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
+              padding: "8px 16px",
+              background: "var(--primary)",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            <LuUserPlus size={15} />
+            {t("users.addUser")}
+          </button>
+        ) : null}
       </div>
 
       {/* Table */}
@@ -664,36 +670,40 @@ export default function UserManagement() {
                     </td>
                     <td>
                       <div style={{ display: "flex", gap: 6 }}>
-                        <button
-                          onClick={() => setModal(u)}
-                          style={{
-                            padding: "5px 8px",
-                            background: "var(--surface2)",
-                            border: "1px solid var(--border)",
-                            borderRadius: 6,
-                            cursor: "pointer",
-                            color: "var(--text2)",
-                            display: "flex",
-                          }}
-                        >
-                          <LuPencil size={13} />
-                        </button>
-                        <button
-                          onClick={() => confirmDelete(u)}
-                          disabled={u.id === me?.id}
-                          style={{
-                            padding: "5px 8px",
-                            background: "#ef444410",
-                            border: "1px solid #ef444430",
-                            borderRadius: 6,
-                            cursor: u.id === me?.id ? "not-allowed" : "pointer",
-                            color: "#ef4444",
-                            display: "flex",
-                            opacity: u.id === me?.id ? 0.4 : 1,
-                          }}
-                        >
-                          <LuTrash2 size={13} />
-                        </button>
+                        {canEditUsers ? (
+                          <button
+                            onClick={() => setModal(u)}
+                            style={{
+                              padding: "5px 8px",
+                              background: "var(--surface2)",
+                              border: "1px solid var(--border)",
+                              borderRadius: 6,
+                              cursor: "pointer",
+                              color: "var(--text2)",
+                              display: "flex",
+                            }}
+                          >
+                            <LuPencil size={13} />
+                          </button>
+                        ) : null}
+                        {canDeleteUsers ? (
+                          <button
+                            onClick={() => confirmDelete(u)}
+                            disabled={u.id === me?.id}
+                            style={{
+                              padding: "5px 8px",
+                              background: "#ef444410",
+                              border: "1px solid #ef444430",
+                              borderRadius: 6,
+                              cursor: u.id === me?.id ? "not-allowed" : "pointer",
+                              color: "#ef4444",
+                              display: "flex",
+                              opacity: u.id === me?.id ? 0.4 : 1,
+                            }}
+                          >
+                            <LuTrash2 size={13} />
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>

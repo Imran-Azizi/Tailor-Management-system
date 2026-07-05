@@ -23,7 +23,7 @@ export default function ReportRoot({
     l.startsWith("pashto") ||
     l.startsWith("ps");
   const fontFamily = isRtl
-    ? "'Vazirmatn', 'Noto Naskh Arabic', 'Noto Sans Arabic', 'Bahij Zar', 'Segoe UI', Tahoma, sans-serif"
+    ? "var(--font-rtl)"
     : "'Inter', 'Segoe UI', Arial, sans-serif";
   return (
     <div

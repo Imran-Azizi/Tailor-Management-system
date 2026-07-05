@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
@@ -17,17 +18,15 @@ import {
 } from "recharts";
 import {
   LuShoppingBag,
-  LuSquareCheck,
   LuCircleCheck,
   LuClock,
   LuTriangleAlert,
-  LuCalendarCheck,
-  LuUsers,
   LuFactory,
   LuShieldAlert,
 } from "react-icons/lu";
 import { useTranslation } from "react-i18next";
 import api from "../lib/api.js";
+import { PERMISSIONS } from "../lib/permissions.js";
 import { formatCurrency } from "../lib/currency.js";
 import { getOrderGrossTotal } from "../lib/orderFinancials.js";
 import {
@@ -55,14 +54,18 @@ import ReportTable from "../components/monthlyReport/ReportTable.jsx";
 
 const ORDER_TYPE_COLORS = {
   OUTFIT: "#2563EB",
-  WASKAT: "#0891B2",
-  KORTY: "#7C3AED",
-  YAKHANQAQ: "#DC2626",
+  WASKAT: "#16A34A",
+  KORTY: "#F97316",
+  YAKHANQAQ: "#7C3AED",
+  READY_MADE: "#DC2626",
+  READY_MADE_WASKAT: "#0891B2",
+  FOREIGN_SHIPPING: "#64748B",
 };
 
 const CURRENCY_FORMAT_OPTIONS = {
-  minimumFractionDigits: 2,
+  minimumFractionDigits: 0,
   maximumFractionDigits: 2,
+  trimTrailingZeros: true,
 };
 
 function formatMoney(value, language) {
@@ -75,18 +78,7 @@ function getOrderRevenue(order) {
   const finalTotalBenefit = Number(order?.finalTotalBenefit);
   if (Number.isFinite(finalTotalBenefit)) return finalTotalBenefit;
 
-  const baseBenefit = Number(order?.totalBenefit || 0);
-  if (order?.type !== "READY_MADE" && order?.type !== "READY_MADE_WASKAT") {
-    return baseBenefit;
-  }
-
-  const readyMadeOriginalPrice = Number(
-    order?.type === "READY_MADE"
-      ? order?.readyMadeOriginalPrice || 0
-      : order?.readyMadeWaskatOriginalPrice || 0,
-  );
-
-  return baseBenefit - readyMadeOriginalPrice;
+  return Number(order?.totalBenefit || 0);
 }
 
 const TooltipCard = ({ active, payload, label, language, t, isRtl }) => {
@@ -131,7 +123,7 @@ export default function Dashboard() {
   const language = i18n.resolvedLanguage || i18n.language;
   const isRtl = isRtlLanguage(language);
   const navigate = useNavigate();
-  const { isAdmin, isFinance, user } = useAuth();
+  const { isAdmin, isFinance, user, hasPermission } = useAuth();
   const { viewMonth, viewYear } = useMonth();
 
   const { data: dashboardData, isLoading } = useQuery({
@@ -148,6 +140,33 @@ export default function Dashboard() {
     refetchInterval: 60_000,
   });
 
+  const monthlyChartData = useMemo(
+    () =>
+      (dashboardData?.monthlyRevenue || []).map((item) => ({
+        ...item,
+        monthLabel:
+          item.monthNumber && item.monthYear
+            ? formatMonthYearLabel(item.monthNumber, item.monthYear, language)
+            : item.month,
+      })),
+    [dashboardData?.monthlyRevenue, language],
+  );
+
+  const ordersByTypeChartData = useMemo(
+    () =>
+      (dashboardData?.ordersByType || []).map((orderType) => ({
+        name: getOrderTypeLabel(orderType.type, language),
+        value: orderType.count,
+        type: orderType.type,
+      })),
+    [dashboardData?.ordersByType, language],
+  );
+
+  const lineChartTooltip = useMemo(
+    () => <TooltipCard language={language} t={t} isRtl={isRtl} />,
+    [language, t, isRtl],
+  );
+
   if (isLoading) {
     return (
       <div className="page">
@@ -157,35 +176,25 @@ export default function Dashboard() {
   }
 
   const data = dashboardData || {};
-  const monthlyChartData = (data.monthlyRevenue || []).map((item) => ({
-    ...item,
-    monthLabel:
-      item.monthNumber && item.monthYear
-        ? formatMonthYearLabel(item.monthNumber, item.monthYear, language)
-        : item.month,
-  }));
 
   const totalRakhtRevenue = Number(data.totalRakhtRevenue ?? 0) || 0;
   const totalOrderBenefit = Number(data.totalOrderBenefit ?? 0) || 0;
-  const totalReadyMadeProfit = Number(data.totalReadyMadeProfit ?? 0) || 0;
-  const totalReadyMadeProfitAfterExpenses =
-    Number(data.totalReadyMadeProfitAfterExpenses ?? totalReadyMadeProfit) || 0;
-  const totalReadyMadeWaskatProfit =
-    Number(data.totalReadyMadeWaskatProfit ?? 0) || 0;
-  const totalReadyMadeWaskatProfitAfterExpenses =
-    Number(
-      data.totalReadyMadeWaskatProfitAfterExpenses ??
-        totalReadyMadeWaskatProfit,
-    ) || 0;
+  const totalAllOrdersBenefit =
+    Number(data.totalAllOrdersBenefit ?? totalOrderBenefit) || 0;
 
   const otherItemsTotalProfit = Number(data.otherItemsTotalProfit ?? 0) || 0;
+  const pendingPrepaymentIncome =
+    Number(data.pendingPrepaymentIncome ?? 0) || 0;
   const totalExpenses =
     Number(data.totalExpenses ?? data.totalDailyExpenses ?? 0) || 0;
+  const totalOrderExpenses =
+    Number(data.totalOrderExpenses ?? data.orderDailyTaskExpenses ?? 0) || 0;
+  const totalOtherExpenses =
+    Number(data.totalOtherExpenses ?? data.otherDailyTaskExpenses ?? 0) || 0;
   const fallbackNetBenefit =
     totalRakhtRevenue +
-    totalOrderBenefit +
-    totalReadyMadeProfitAfterExpenses +
-    totalReadyMadeWaskatProfitAfterExpenses +
+    totalAllOrdersBenefit +
+    pendingPrepaymentIncome +
     otherItemsTotalProfit -
     totalExpenses;
   const netBenefit =
@@ -303,7 +312,7 @@ export default function Dashboard() {
       label: t("dashboardPage.totalOrderBenefit", {
         defaultValue: "Total Order Benefit",
       }),
-      value: formatMoney(totalOrderBenefit, language),
+      value: formatMoney(totalAllOrdersBenefit, language),
       Icon: AfCurrencyIcon,
       accent: "#7C3AED",
       adminOnly: true,
@@ -312,43 +321,25 @@ export default function Dashboard() {
       rtlOrder: 21,
     },
     {
-      key: "readyMadeProfit",
-      label: t("dashboardPage.totalReadyMadeProfitAfterExpenses", {
-        defaultValue: "Total Ready-Made Profit (After Expenses)",
-      }),
-      value: formatMoney(totalReadyMadeProfitAfterExpenses, language),
-      Icon: AfCurrencyIcon,
-      accent: "#059669",
-      adminOnly: true,
-      onClick: () => navigate("/orders/completed?type=READY_MADE"),
-      ltrOrder: 23,
-      rtlOrder: 23,
-    },
-    {
-      key: "readyMadeWaskatProfit",
-      label: t("dashboardPage.totalReadyMadeWaskatProfitAfterExpenses", {
-        defaultValue: "Total Ready-Made Waskat Profit (After Expenses)",
-      }),
-      value: formatMoney(totalReadyMadeWaskatProfitAfterExpenses, language),
-      Icon: AfCurrencyIcon,
-      accent: "#0284C7",
-      adminOnly: true,
-      onClick: () => navigate("/orders/completed?type=READY_MADE_WASKAT"),
-      ltrOrder: 24,
-      rtlOrder: 24,
-    },
-    {
-      key: "dailyExpenses",
-      label: t(
-        "dashboardPage.totalExpenses",
-        "Total Expenses",
-      ),
-      value: formatMoney(totalExpenses, language),
+      key: "orderExpenses",
+      label: t("dashboardPage.orderExpenses", "Order Expenses"),
+      value: formatMoney(totalOrderExpenses, language),
       Icon: AfCurrencyIcon,
       accent: "#2563EB",
       onClick: () => navigate("/daily-tasks/all"),
       ltrOrder: 30,
       rtlOrder: 30,
+    },
+    {
+      key: "otherExpenses",
+      label: t("dashboardPage.otherExpenses", "Other Expenses"),
+      value: formatMoney(totalOtherExpenses, language),
+      Icon: AfCurrencyIcon,
+      accent: "#64748B",
+      adminOnly: true,
+      onClick: () => navigate("/daily-tasks/all"),
+      ltrOrder: 31,
+      rtlOrder: 31,
     },
     {
       key: "totalLoan",
@@ -357,8 +348,8 @@ export default function Dashboard() {
       Icon: AfCurrencyIcon,
       accent: "#D97706",
       onClick: () => navigate("/transactions?kind=LOAN"),
-      ltrOrder: 31,
-      rtlOrder: 31,
+      ltrOrder: 32,
+      rtlOrder: 32,
     },
     {
       key: "damagedClothesMoney",
@@ -371,8 +362,8 @@ export default function Dashboard() {
       accent: "#B91C1C",
       adminOnly: true,
       onClick: () => navigate("/damaged-clothes"),
-      ltrOrder: 32,
-      rtlOrder: 32,
+      ltrOrder: 33,
+      rtlOrder: 33,
     },
     {
       key: "qichikarMoney",
@@ -418,14 +409,37 @@ export default function Dashboard() {
       accent: "#B91C1C",
       adminOnly: true,
       onClick: () => navigate("/damaged-clothes"),
-      ltrOrder: 9,
-      rtlOrder: 9,
+      ltrOrder: 90,
+      rtlOrder: 90,
     },
   ];
 
   const visibleStatCards = statCards
     .filter((card) => {
-      if (card.adminOnly && !isAdmin) return false;
+      const requiredPermission =
+        {
+          otherItemsTotalProfit: PERMISSIONS.FINANCE_PROFIT_VIEW,
+          totalOrders: PERMISSIONS.ORDERS_VIEW,
+          completedOrders: PERMISSIONS.ORDERS_VIEW,
+          pendingOrders: PERMISSIONS.ORDERS_VIEW,
+          totalAmount: PERMISSIONS.FINANCE_REVENUE_VIEW,
+          collected: PERMISSIONS.FINANCE_REVENUE_VIEW,
+          totalDiscounts: PERMISSIONS.FINANCE_PROFIT_VIEW,
+          outstanding: PERMISSIONS.FINANCE_DEBT_RECORDS_VIEW,
+          rakhtRevenue: PERMISSIONS.FINANCE_REVENUE_VIEW,
+          orderBenefit: PERMISSIONS.FINANCE_PROFIT_VIEW,
+          orderExpenses: PERMISSIONS.FINANCE_VIEW,
+          otherExpenses: PERMISSIONS.FINANCE_VIEW,
+          totalLoan: PERMISSIONS.FINANCE_DEBT_RECORDS_VIEW,
+          damagedClothesMoney: PERMISSIONS.FINANCE_DEBT_RECORDS_VIEW,
+          qichikarMoney: PERMISSIONS.FINANCE_PAYMENTS_MANAGE,
+          dokhtMoney: PERMISSIONS.FINANCE_PAYMENTS_MANAGE,
+          emergency: PERMISSIONS.ORDERS_VIEW,
+          damagedClothes: PERMISSIONS.FINANCE_DEBT_RECORDS_VIEW,
+        }[card.key] || null;
+      if (requiredPermission && !hasPermission(requiredPermission))
+        return false;
+      if (card.adminOnly && !isAdmin && !requiredPermission) return false;
       if (!card.hideWhenZero) return true;
       const numericValue = Number(String(card.value).replace(/[^0-9.-]/g, ""));
       return Number.isFinite(numericValue) ? numericValue !== 0 : true;
@@ -574,8 +588,12 @@ export default function Dashboard() {
       dir={isRtl ? "rtl" : "ltr"}
     >
       <section className="dashboard-hero mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
-        <div className={`dashboard-hero-row flex flex-col gap-4 lg:items-center ${isRtl ? 'lg:flex-row' : 'lg:flex-row lg:justify-between'}`}>
-          <div className={`dashboard-hero-title ${isRtl ? 'text-end' : 'text-start'}`}>
+        <div
+          className={`dashboard-hero-row flex flex-col gap-4 lg:items-center ${isRtl ? "lg:flex-row" : "lg:flex-row lg:justify-between"}`}
+        >
+          <div
+            className={`dashboard-hero-title ${isRtl ? "text-end" : "text-start"}`}
+          >
             <h1 className="dashboard-hero-heading text-2xl font-bold text-gray-900 dark:text-slate-100">
               {t("dashboardPage.title")}
             </h1>
@@ -586,7 +604,9 @@ export default function Dashboard() {
               </strong>
             </p>
           </div>
-          <div className={`dashboard-date-chip rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 ${isRtl ? 'text-end lg:ms-auto' : 'text-start'} dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300`}>
+          <div
+            className={`dashboard-date-chip rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 ${isRtl ? "text-end lg:ms-auto" : "text-start"} dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300`}
+          >
             {t("common.date", "Date")}:{" "}
             <span className={isRtl ? "rtl-number-inline" : ""}>
               {generatedAtLabel}
@@ -646,11 +666,7 @@ export default function Dashboard() {
                 tickLine={false}
                 width={54}
               />
-              <Tooltip
-                content={
-                  <TooltipCard language={language} t={t} isRtl={isRtl} />
-                }
-              />
+              <Tooltip content={lineChartTooltip} />
               <Legend
                 align={isRtl ? "right" : "center"}
                 wrapperStyle={{
@@ -685,10 +701,7 @@ export default function Dashboard() {
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
               <Pie
-                data={(data.ordersByType || []).map((orderType) => ({
-                  name: getOrderTypeLabel(orderType.type, language),
-                  value: orderType.count,
-                }))}
+                data={ordersByTypeChartData}
                 cx="50%"
                 cy="50%"
                 outerRadius={78}
@@ -696,10 +709,13 @@ export default function Dashboard() {
                 dataKey="value"
                 paddingAngle={3}
               >
-                {(data.ordersByType || []).map((orderType, index) => (
+                {ordersByTypeChartData.map((orderType, index) => (
                   <Cell
                     key={`${orderType.type}-${index}`}
-                    fill={ORDER_TYPE_COLORS[orderType.type] || "#2563EB"}
+                    fill={
+                      ORDER_TYPE_COLORS[orderType.type] ||
+                      ORDER_TYPE_COLORS.FOREIGN_SHIPPING
+                    }
                   />
                 ))}
               </Pie>
@@ -760,7 +776,7 @@ export default function Dashboard() {
               width={32}
             />
             <Tooltip
-              content={<TooltipCard language={language} t={t} isRtl={isRtl} />}
+              content={lineChartTooltip}
             />
             <Bar
               dataKey="count"
@@ -776,8 +792,12 @@ export default function Dashboard() {
         className="dashboard-recent-orders overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900"
         dir={isRtl ? "rtl" : "ltr"}
       >
-        <div className={`dashboard-recent-orders__head border-b border-slate-200 px-4 py-3 dark:border-slate-700 sm:px-5 ${isRtl ? 'text-right' : ''}`}>
-          <h3 className={`text-base font-semibold text-gray-900 dark:text-slate-100 ${isRtl ? 'text-right' : ''}`}>
+        <div
+          className={`dashboard-recent-orders__head border-b border-slate-200 px-4 py-3 dark:border-slate-700 sm:px-5 ${isRtl ? "text-right" : ""}`}
+        >
+          <h3
+            className={`text-base font-semibold text-gray-900 dark:text-slate-100 ${isRtl ? "text-right" : ""}`}
+          >
             {t("dashboardPage.recentOrders")}
           </h3>
         </div>

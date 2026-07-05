@@ -448,14 +448,15 @@ export default function CreateOrder() {
 
     for (const entry of entries) {
       const type = entry?.type;
-      if (
-        !type ||
-        entry?.isForeignOrder ||
-        type === "READY_MADE_WASKAT"
-      ) {
+      if (!type || entry?.isForeignOrder) {
         continue;
       }
-      const boxType = type === "READY_MADE" ? "OUTFIT" : type;
+      const boxType =
+        type === "READY_MADE"
+          ? "OUTFIT"
+          : type === "READY_MADE_WASKAT"
+            ? "WASKAT"
+            : type;
       if (checkedBoxTypes.has(boxType)) continue;
       checkedBoxTypes.add(boxType);
 
@@ -1050,10 +1051,11 @@ function normalizeMeasurementSets(measurementValue) {
 
 function resolveBoxTypeForOrderEntry(entry) {
   const type = entry?.type;
-  if (!type || entry?.isForeignOrder || type === "READY_MADE_WASKAT") {
+  if (!type || entry?.isForeignOrder) {
     return null;
   }
   if (type === "READY_MADE") return "OUTFIT";
+  if (type === "READY_MADE_WASKAT") return "WASKAT";
   return type;
 }
 

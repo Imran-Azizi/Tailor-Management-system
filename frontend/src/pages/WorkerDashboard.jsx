@@ -220,11 +220,13 @@ export default function WorkerDashboard() {
     workerMoneySummary?.damagePenaltyTotal || 0,
   );
   const totalCompletedPayments = Number(
-    workerMoneySummary?.totalCompletedPayments || 0,
+    workerMoneySummary?.totalCompletedPaymentsGross ??
+      workerMoneySummary?.totalCompletedPayments ??
+      0,
   );
   const moneyReceiptTotal = Number(workerMoneySummary?.moneyReceiptTotal || 0);
   const currentMoney =
-    totalCompletedPayments - totalLoanAmount - damagePenaltyTotal;
+    moneyReceiptTotal - totalLoanAmount - damagePenaltyTotal;
   const penaltyCount = damagedPenaltyPayload?.total || 0;
 
   const monthLabel = formatMonthYearLabel(viewMonth, viewYear, language);

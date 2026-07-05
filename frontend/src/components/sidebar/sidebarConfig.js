@@ -309,6 +309,13 @@ const ADMIN_SECTIONS = [
         icon: LuShieldCheck,
       },
       {
+        key: "permissions",
+        label: "permissions.title",
+        fallback: "Permissions",
+        path: "/permissions",
+        icon: LuShieldCheck,
+      },
+      {
         key: "tenantSettings",
         label: "tenantSettings.title",
         fallback: "System Settings",
@@ -790,10 +797,10 @@ const DOKAN_ALLOWED_SECTIONS = [
 const ROLE_SECTIONS = {
   SUPER_ADMIN: SUPER_ADMIN_SECTIONS,
   ADMIN: ADMIN_SECTIONS,
-  DOKAN: DOKAN_ALLOWED_SECTIONS,
+  DOKAN: ADMIN_SECTIONS,
   QICHIKAR: WORKER_SECTIONS,
   DOKHT: WORKER_SECTIONS,
-  FINANCE: FINANCE_SECTIONS,
+  FINANCE: ADMIN_SECTIONS,
 };
 
 export function getRoleAccent(role) {

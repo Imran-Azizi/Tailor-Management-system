@@ -38,18 +38,3 @@ export const buildOrderWorkedByUserWhere = ({ userId, roleType }) => {
     ],
   };
 };
-
-export const didUserWorkOnOrder = ({ order, userId, roleType }) => {
-  if (!order || !userId || !SUPPORTED_ROLE_TYPES.has(roleType)) {
-    return false;
-  }
-
-  const { assignedField, receivedField } = getRoleSpecificFields(roleType);
-
-  return [
-    order?.[assignedField],
-    order?.[receivedField],
-    order?.assignedToId,
-    order?.receivedById,
-  ].includes(userId);
-};

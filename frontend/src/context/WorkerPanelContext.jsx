@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 
@@ -47,22 +48,34 @@ export function WorkerPanelProvider({ children, roleColor }) {
     };
   }, [mobileOpen]);
 
+  const value = useMemo(
+    () => ({
+      activeTab,
+      setActiveTab,
+      tabs,
+      setTabs,
+      roleColor,
+      collapsed,
+      toggleCollapsed,
+      mobileOpen,
+      setMobileOpen,
+      closeMobileSidebar,
+      toggleMobileSidebar,
+    }),
+    [
+      activeTab,
+      tabs,
+      roleColor,
+      collapsed,
+      toggleCollapsed,
+      mobileOpen,
+      closeMobileSidebar,
+      toggleMobileSidebar,
+    ],
+  );
+
   return (
-    <WorkerPanelContext.Provider
-      value={{
-        activeTab,
-        setActiveTab,
-        tabs,
-        setTabs,
-        roleColor,
-        collapsed,
-        toggleCollapsed,
-        mobileOpen,
-        setMobileOpen,
-        closeMobileSidebar,
-        toggleMobileSidebar,
-      }}
-    >
+    <WorkerPanelContext.Provider value={value}>
       {children}
     </WorkerPanelContext.Provider>
   );

@@ -11,6 +11,7 @@ import {
 import { useAuth } from "./context/AuthContext.jsx";
 import ScrollToTop from "./components/ScrollToTop.jsx";
 import SystemHorizontalScrollbars from "./components/SystemHorizontalScrollbars.jsx";
+import { PERMISSIONS } from "./lib/permissions.js";
 
 const Layout = lazy(() => import("./components/Layout.jsx"));
 const WorkerLayout = lazy(() => import("./components/WorkerLayout.jsx"));
@@ -57,16 +58,20 @@ const GlobalOrderSearch = lazy(() => import("./pages/GlobalOrderSearch.jsx"));
 const OtherItems = lazy(() => import("./pages/OtherItems.jsx"));
 const ItemSalesRecords = lazy(() => import("./pages/ItemSalesRecords.jsx"));
 const SupportTeam = lazy(() => import("./pages/SupportTeam.jsx"));
+const PermissionsManagement = lazy(() => import("./pages/PermissionsManagement.jsx"));
 const SuperAdminDashboard = lazy(() => import("./pages/SuperAdminDashboard.jsx"));
 const SuperAdminSettings = lazy(() => import("./pages/SuperAdminSettings.jsx"));
 const TenantSettings = lazy(() => import("./pages/TenantSettings.jsx"));
 const SubscriptionExpired = lazy(() => import("./pages/SubscriptionExpired.jsx"));
 
 function RoleBasedRedirect() {
-  const { isSuperAdmin, isDokan, isFinance } = useAuth();
+  const { isSuperAdmin, hasPermission } = useAuth();
   if (isSuperAdmin) return <Navigate to="/super-admin" replace />;
-  if (isDokan) return <Navigate to="/orders/create" replace />;
-  if (isFinance) return <Navigate to="/orders" replace />;
+  if (hasPermission(PERMISSIONS.DASHBOARD_VIEW)) return <Navigate to="/dashboard" replace />;
+  if (hasPermission(PERMISSIONS.ORDERS_CREATE)) return <Navigate to="/orders/create" replace />;
+  if (hasPermission(PERMISSIONS.ORDERS_VIEW)) return <Navigate to="/orders" replace />;
+  if (hasPermission(PERMISSIONS.FINANCE_VIEW)) return <Navigate to="/daily-tasks/all" replace />;
+  if (hasPermission(PERMISSIONS.INVENTORY_VIEW)) return <Navigate to="/item-sales-records" replace />;
   return <Navigate to="/dashboard" replace />;
 }
 
@@ -126,7 +131,10 @@ export default function App() {
                   <Route
                     path="dashboard"
                     element={
-                      <RoleRoute roles={["ADMIN"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.DASHBOARD_VIEW}
+                      >
                         <Dashboard />
                       </RoleRoute>
                     }
@@ -143,7 +151,10 @@ export default function App() {
                   <Route
                     path="orders/create"
                     element={
-                      <RoleRoute roles={["ADMIN", "DOKAN", "FINANCE"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.ORDERS_CREATE}
+                      >
                         <CreateOrder />
                       </RoleRoute>
                     }
@@ -151,7 +162,10 @@ export default function App() {
                   <Route
                     path="orders/:id/edit"
                     element={
-                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.ORDERS_EDIT}
+                      >
                         <EditOrder />
                       </RoleRoute>
                     }
@@ -159,7 +173,10 @@ export default function App() {
                   <Route
                     path="orders"
                     element={
-                      <RoleRoute roles={["ADMIN", "DOKAN", "FINANCE"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.ORDERS_VIEW}
+                      >
                         <AllOrders />
                       </RoleRoute>
                     }
@@ -167,7 +184,10 @@ export default function App() {
                   <Route
                     path="orders/pending"
                     element={
-                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.ORDERS_VIEW}
+                      >
                         <AllOrders filter="pending" />
                       </RoleRoute>
                     }
@@ -175,7 +195,10 @@ export default function App() {
                   <Route
                     path="orders/completed"
                     element={
-                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.ORDERS_VIEW}
+                      >
                         <AllOrders filter="completed" />
                       </RoleRoute>
                     }
@@ -183,7 +206,10 @@ export default function App() {
                   <Route
                     path="orders/remaining"
                     element={
-                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.ORDERS_VIEW}
+                      >
                         <AllOrders filter="remaining" />
                       </RoleRoute>
                     }
@@ -191,7 +217,10 @@ export default function App() {
                   <Route
                     path="orders/assignments"
                     element={
-                      <RoleRoute roles={["ADMIN"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.ORDERS_ASSIGN}
+                      >
                         <Navigate to="/orders/assignments/clothes" replace />
                       </RoleRoute>
                     }
@@ -199,7 +228,10 @@ export default function App() {
                   <Route
                     path="orders/assignments/clothes"
                     element={
-                      <RoleRoute roles={["ADMIN"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.ORDERS_ASSIGN}
+                      >
                         <AssignOrders />
                       </RoleRoute>
                     }
@@ -207,7 +239,10 @@ export default function App() {
                   <Route
                     path="orders/assignments/report"
                     element={
-                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.REPORTS_VIEW}
+                      >
                         <AssignOrdersReport />
                       </RoleRoute>
                     }
@@ -215,7 +250,10 @@ export default function App() {
                   <Route
                     path="orders/completed-workers"
                     element={
-                      <RoleRoute roles={["ADMIN"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.ORDERS_VIEW}
+                      >
                         <CompletedWorkerOrders />
                       </RoleRoute>
                     }
@@ -223,7 +261,10 @@ export default function App() {
                   <Route
                     path="orders/completed-workers/receipts"
                     element={
-                      <RoleRoute roles={["ADMIN"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.FINANCE_PAYMENTS_MANAGE}
+                      >
                         <WorkerPaymentReceipts />
                       </RoleRoute>
                     }
@@ -231,7 +272,10 @@ export default function App() {
                   <Route
                     path="delivery"
                     element={
-                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.ORDERS_DELIVER}
+                      >
                         <ClothesDeliveryToCustomer />
                       </RoleRoute>
                     }
@@ -240,7 +284,10 @@ export default function App() {
                   <Route
                     path="customers"
                     element={
-                      <RoleRoute roles={["ADMIN"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.CUSTOMERS_VIEW}
+                      >
                         <Customers />
                       </RoleRoute>
                     }
@@ -248,7 +295,10 @@ export default function App() {
                   <Route
                     path="customers/create"
                     element={
-                      <RoleRoute roles={["ADMIN"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.CUSTOMERS_CREATE}
+                      >
                         <Customers openCreate />
                       </RoleRoute>
                     }
@@ -256,7 +306,10 @@ export default function App() {
                   <Route
                     path="customers/transactions"
                     element={
-                      <RoleRoute roles={["ADMIN"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.CUSTOMERS_VIEW}
+                      >
                         <CustomerTransactions />
                       </RoleRoute>
                     }
@@ -264,7 +317,10 @@ export default function App() {
                   <Route
                     path="customers/report"
                     element={
-                      <RoleRoute roles={["ADMIN"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.CUSTOMERS_VIEW}
+                      >
                         <CustomerReport />
                       </RoleRoute>
                     }
@@ -272,7 +328,10 @@ export default function App() {
                   <Route
                     path="boxes"
                     element={
-                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.INVENTORY_CATEGORIES_MANAGE}
+                      >
                         <Boxes />
                       </RoleRoute>
                     }
@@ -280,7 +339,10 @@ export default function App() {
                   <Route
                     path="designs"
                     element={
-                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.SETTINGS_VIEW}
+                      >
                         <Designs />
                       </RoleRoute>
                     }
@@ -288,7 +350,10 @@ export default function App() {
                   <Route
                     path="print-bills"
                     element={
-                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.ORDERS_PRINT}
+                      >
                         <PrintBills />
                       </RoleRoute>
                     }
@@ -296,7 +361,10 @@ export default function App() {
                   <Route
                     path="rakht/create"
                     element={
-                      <RoleRoute roles={["ADMIN"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.INVENTORY_PRODUCTS_ADD}
+                      >
                         <CreateRakht />
                       </RoleRoute>
                     }
@@ -304,7 +372,10 @@ export default function App() {
                   <Route
                     path="rakhts"
                     element={
-                      <RoleRoute roles={["ADMIN"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.INVENTORY_VIEW}
+                      >
                         <AllRakhts />
                       </RoleRoute>
                     }
@@ -312,7 +383,10 @@ export default function App() {
                   <Route
                     path="rakhts/payment-history"
                     element={
-                      <RoleRoute roles={["ADMIN"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.FINANCE_PAYMENTS_MANAGE}
+                      >
                         <PaymentHistory />
                       </RoleRoute>
                     }
@@ -320,7 +394,10 @@ export default function App() {
                   <Route
                     path="rakhts/revenue"
                     element={
-                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.FINANCE_REVENUE_VIEW}
+                      >
                         <RakhtRevenue />
                       </RoleRoute>
                     }
@@ -328,7 +405,10 @@ export default function App() {
                   <Route
                     path="notifications"
                     element={
-                      <RoleRoute roles={["ADMIN"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.SETTINGS_VIEW}
+                      >
                         <Notifications />
                       </RoleRoute>
                     }
@@ -337,15 +417,32 @@ export default function App() {
                   <Route
                     path="users"
                     element={
-                      <RoleRoute roles={["ADMIN"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.USERS_VIEW}
+                      >
                         <UserManagement />
+                      </RoleRoute>
+                    }
+                  />
+                  <Route
+                    path="permissions"
+                    element={
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.PERMISSIONS_MANAGE}
+                      >
+                        <PermissionsManagement />
                       </RoleRoute>
                     }
                   />
                   <Route
                     path="tenant-settings"
                     element={
-                      <RoleRoute roles={["ADMIN"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.SETTINGS_VIEW}
+                      >
                         <TenantSettings />
                       </RoleRoute>
                     }
@@ -353,7 +450,10 @@ export default function App() {
                   <Route
                     path="damaged-clothes"
                     element={
-                      <RoleRoute roles={["ADMIN"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.FINANCE_DEBT_RECORDS_VIEW}
+                      >
                         <DamagedClothes />
                       </RoleRoute>
                     }
@@ -361,7 +461,10 @@ export default function App() {
                   <Route
                     path="transactions/create"
                     element={
-                      <RoleRoute roles={["ADMIN"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.FINANCE_PAYMENTS_MANAGE}
+                      >
                         <MakeTransaction />
                       </RoleRoute>
                     }
@@ -369,7 +472,10 @@ export default function App() {
                   <Route
                     path="transactions"
                     element={
-                      <RoleRoute roles={["ADMIN"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.FINANCE_DEBT_RECORDS_VIEW}
+                      >
                         <AllTransactions />
                       </RoleRoute>
                     }
@@ -378,7 +484,10 @@ export default function App() {
                   <Route
                     path="daily-tasks"
                     element={
-                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.FINANCE_EXPENSES_ADD}
+                      >
                         <DailyTasks />
                       </RoleRoute>
                     }
@@ -386,7 +495,10 @@ export default function App() {
                   <Route
                     path="daily-tasks/all"
                     element={
-                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.FINANCE_VIEW}
+                      >
                         <AllDailyTasks />
                       </RoleRoute>
                     }
@@ -394,7 +506,10 @@ export default function App() {
                   <Route
                     path="orders/global-search"
                     element={
-                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.ORDERS_VIEW}
+                      >
                         <GlobalOrderSearch />
                       </RoleRoute>
                     }
@@ -402,7 +517,10 @@ export default function App() {
                   <Route
                     path="other-items"
                     element={
-                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.INVENTORY_PRODUCTS_SELL}
+                      >
                         <OtherItems />
                       </RoleRoute>
                     }
@@ -410,7 +528,10 @@ export default function App() {
                   <Route
                     path="item-sales-records"
                     element={
-                      <RoleRoute roles={["ADMIN", "FINANCE"]}>
+                      <RoleRoute
+                        roles={["ADMIN", "DOKAN", "FINANCE"]}
+                        permission={PERMISSIONS.INVENTORY_VIEW}
+                      >
                         <ItemSalesRecords />
                       </RoleRoute>
                     }

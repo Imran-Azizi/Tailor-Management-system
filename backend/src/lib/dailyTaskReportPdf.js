@@ -1,7 +1,8 @@
 import PDFDocument from "pdfkit";
 import {
   formatReportLabelValue,
-  formatReportDateTime,
+  formatReportCalendarDate,
+  formatReportPdfDateTime,
   formatReportNumber,
   isRtlReportLanguage,
   normalizeReportPdfText,
@@ -67,6 +68,16 @@ function drawDashboardStatsCards(
     {
       title: labels?.statGroups?.expenses || "Expenses",
       cards: [
+        {
+          label: statLabels.orderExpenses || "Order Expenses",
+          value: `${formatReportNumber(stats.totalOrderExpenses || 0, language)} AF`,
+          accent: "#2563EB",
+        },
+        {
+          label: statLabels.otherExpenses || "Other Expenses",
+          value: `${formatReportNumber(stats.totalOtherExpenses || 0, language)} AF`,
+          accent: "#64748B",
+        },
         {
           label: statLabels.totalDailyExpenses,
           value: `${formatReportNumber(stats.totalDailyExpenses || 0, language)} AF`,
@@ -302,13 +313,7 @@ function formatTaskRowDateParts(value, language) {
   }
 
   return {
-    dateText: formatReportDateTime(date, language, {
-      year: "numeric",
-      month: "short",
-      day: "2-digit",
-      hour: undefined,
-      minute: undefined,
-    }),
+    dateText: formatReportCalendarDate(date, language, { month: "long" }),
   };
 }
 
@@ -679,13 +684,7 @@ function drawTableHeader(
 }
 
 function formatDateOnly(value, language) {
-  return formatReportDateTime(value, language, {
-    year: "numeric",
-    month: "long",
-    day: "2-digit",
-    hour: undefined,
-    minute: undefined,
-  });
+  return formatReportCalendarDate(value, language, { month: "long" });
 }
 
 export async function buildDailyTaskReportPdf(report, language = "en") {
@@ -758,14 +757,11 @@ export async function buildDailyTaskReportPdf(report, language = "en") {
     );
 
     const dateRangeSep = isRtl ? "  تا  " : "  -  ";
-    const dateRangeValue = normalizeReportPdfText(
-      `${formatDateOnly(from, language)}${dateRangeSep}${formatDateOnly(to, language)}`,
-      normalizedLanguage,
-    );
+    const dateRangeValue = `${formatDateOnly(from, language)}${dateRangeSep}${formatDateOnly(to, language)}`;
 
     drawHeaderMetaLine(doc, {
       label: text.generatedAt,
-      value: formatDateOnly(new Date(), language),
+      value: formatReportPdfDateTime(new Date(), language, { includeTime: true }),
       x: headerX + 14,
       y: headerY + 44,
       width: TABLE_W - 28,
@@ -800,7 +796,7 @@ export async function buildDailyTaskReportPdf(report, language = "en") {
     let y = headerY + headerH + 16;
     wt(
       doc,
-      text.summary || "Summary",
+      text.summary,
       40,
       y,
       { width: TABLE_W, align: rtlAwareAlign(isRtl, "left") },
@@ -825,6 +821,26 @@ export async function buildDailyTaskReportPdf(report, language = "en") {
       doc,
       text.totalAmount,
       formatSummaryMoney(summary.totalAmount, language),
+      y,
+      fkFont,
+      isRtl,
+      normalizedLanguage,
+    );
+    y += 16;
+    drawSummaryRow(
+      doc,
+      text.orderExpenses || "Order expenses",
+      formatSummaryMoney(summary.orderExpenses, language),
+      y,
+      fkFont,
+      isRtl,
+      normalizedLanguage,
+    );
+    y += 16;
+    drawSummaryRow(
+      doc,
+      text.otherExpenses || "Other expenses",
+      formatSummaryMoney(summary.otherExpenses, language),
       y,
       fkFont,
       isRtl,

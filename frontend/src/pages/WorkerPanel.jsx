@@ -1390,15 +1390,52 @@ export default function WorkerPanel() {
   const [optimisticInProgressIds, setOptimisticInProgressIds] = useState([]);
   const [optimisticCompletedIds, setOptimisticCompletedIds] = useState([]);
   const [receiveSuccessIds, setReceiveSuccessIds] = useState([]);
-  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [hideTick, setHideTick] = useState(0);
   const receiveSuccessTimersRef = useRef({});
 
+  const nowMs = useMemo(
+    () => Date.now(),
+    [hideTick, searchResult?.orders],
+  );
+
   useEffect(() => {
-    const intervalId = setInterval(() => {
-      setNowMs(Date.now());
-    }, 1000);
-    return () => clearInterval(intervalId);
-  }, []);
+    const resultOrders = Array.isArray(searchResult?.orders)
+      ? searchResult.orders
+      : [];
+    if (!resultOrders.length) return undefined;
+
+    const now = Date.now();
+    const timeouts = [];
+
+    for (const order of resultOrders) {
+      if (
+        shouldHideReceivedOrderCard(order, user?.accountType, user?.id, now)
+      ) {
+        continue;
+      }
+
+      const roleState = getRoleOrderState(order, user?.accountType);
+      if (roleState.receivedById !== user?.id || !roleState.receivedAt) {
+        continue;
+      }
+
+      const receivedAtMs = getTimestampMs(roleState.receivedAt);
+      if (receivedAtMs == null) continue;
+
+      const delay = RECEIVED_CARD_VISIBILITY_MS - (now - receivedAtMs);
+      if (delay > 0) {
+        timeouts.push(
+          setTimeout(() => {
+            setHideTick((tick) => tick + 1);
+          }, delay),
+        );
+      }
+    }
+
+    return () => {
+      timeouts.forEach(clearTimeout);
+    };
+  }, [searchResult?.orders, user?.accountType, user?.id]);
 
   useEffect(() => {
     return () => {

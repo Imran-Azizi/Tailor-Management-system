@@ -23,7 +23,7 @@ export function buildSelectStyles(optionsOrHasError = false) {
         ? document.dir === "rtl"
         : false;
   const fontFamily = isRtl
-    ? "'Vazirmatn', 'Noto Naskh Arabic', 'Noto Sans Arabic', 'Segoe UI', Tahoma, sans-serif"
+    ? "var(--font-rtl)"
     : "'Inter', 'Segoe UI', Arial, sans-serif";
 
   return {

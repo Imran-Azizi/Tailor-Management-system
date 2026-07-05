@@ -674,36 +674,56 @@ const toPositiveMoney = (value) => {
   return maxScaled(toMoney(value), 0, MONEY_SCALE);
 };
 
-const WORKER_PAYMENT_EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+const WORKER_RECEIPT_EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 const getWorkerPaymentEditMeta = (paymentStatus, paidAtValue) => {
-  if (paymentStatus !== "PAID_TO_WORKER" || !paidAtValue) {
+  return {
+    canEditWorkerPayment: paymentStatus === "PAID_TO_WORKER",
+    workerPaymentEditExpiresAt: null,
+    workerPaymentEditRemainingMs: null,
+    workerPaymentEditWindowHours: null,
+  };
+};
+
+const getWorkerReceiptEditMeta = (receiptDateValue) => {
+  if (!receiptDateValue) {
     return {
-      canEditWorkerPayment: false,
-      workerPaymentEditExpiresAt: null,
-      workerPaymentEditRemainingMs: 0,
-      workerPaymentEditWindowHours: 24,
+      canEditReceipt: false,
+      receiptEditExpiresAt: null,
+      receiptEditRemainingMs: 0,
+      receiptEditWindowHours: 24,
+      isReceiptLocked: false,
     };
   }
 
-  const paidAtMs = new Date(paidAtValue).getTime();
-  if (!Number.isFinite(paidAtMs)) {
+  const receiptDateMs = new Date(receiptDateValue).getTime();
+  if (!Number.isFinite(receiptDateMs)) {
     return {
-      canEditWorkerPayment: false,
-      workerPaymentEditExpiresAt: null,
-      workerPaymentEditRemainingMs: 0,
-      workerPaymentEditWindowHours: 24,
+      canEditReceipt: false,
+      receiptEditExpiresAt: null,
+      receiptEditRemainingMs: 0,
+      receiptEditWindowHours: 24,
+      isReceiptLocked: true,
     };
   }
 
-  const expiresAtMs = paidAtMs + WORKER_PAYMENT_EDIT_WINDOW_MS;
+  const expiresAtMs = receiptDateMs + WORKER_RECEIPT_EDIT_WINDOW_MS;
   const remainingMs = Math.max(0, expiresAtMs - Date.now());
 
   return {
-    canEditWorkerPayment: remainingMs > 0,
-    workerPaymentEditExpiresAt: new Date(expiresAtMs).toISOString(),
-    workerPaymentEditRemainingMs: remainingMs,
-    workerPaymentEditWindowHours: 24,
+    canEditReceipt: remainingMs > 0,
+    receiptEditExpiresAt: new Date(expiresAtMs).toISOString(),
+    receiptEditRemainingMs: remainingMs,
+    receiptEditWindowHours: 24,
+    isReceiptLocked: remainingMs <= 0,
+  };
+};
+
+const attachWorkerReceiptEditMeta = (receipt) => {
+  if (!receipt) return receipt;
+  return {
+    ...receipt,
+    ...getWorkerReceiptEditMeta(receipt.receiptDate),
   };
 };
 
@@ -1435,7 +1455,7 @@ export const getAllOrders = async ({
     ];
   }
 
-  const [data, total] = await Promise.all([
+  const [data, total, summaryOrders] = await Promise.all([
     findManyOrdersSafe(
       {
         where,
@@ -1446,7 +1466,41 @@ export const getAllOrders = async ({
       ORDER_LIST_INCLUDE_BASE,
     ),
     prisma.order.count({ where }),
+    prisma.order.findMany({
+      where: {
+        AND: [where, { damagedClothesPenalties: { none: {} } }],
+      },
+      select: {
+        totalPrice: true,
+        discount: true,
+        paidAmount: true,
+        remaining: true,
+      },
+    }),
   ]);
+
+  const summary = summaryOrders.reduce(
+    (acc, order) => {
+      acc.total = addScaled(acc.total, getOrderNetTotal(order), MONEY_SCALE);
+      acc.discount = addScaled(
+        acc.discount,
+        getOrderDiscount(order),
+        MONEY_SCALE,
+      );
+      acc.paid = addScaled(
+        acc.paid,
+        Number(order.paidAmount || 0),
+        MONEY_SCALE,
+      );
+      acc.remaining = addScaled(
+        acc.remaining,
+        Number(order.remaining || 0),
+        MONEY_SCALE,
+      );
+      return acc;
+    },
+    { total: 0, discount: 0, paid: 0, remaining: 0 },
+  );
 
   const orderIds = data.map((order) => order.id).filter(Boolean);
   const dailyExpenseSums = orderIds.length
@@ -1481,21 +1535,10 @@ export const getAllOrders = async ({
       linkedDailyExpenses,
     });
 
-    const readyMadeOriginalPrice =
-      order?.type === "READY_MADE"
-        ? toPositiveMoney(order?.readyMadeOriginalPrice)
-        : order?.type === "READY_MADE_WASKAT"
-          ? toPositiveMoney(order?.readyMadeWaskatOriginalPrice)
-          : 0;
-    const finalTotalBenefit =
-      order?.type === "READY_MADE" || order?.type === "READY_MADE_WASKAT"
-        ? subScaled(computed.totalBenefit, readyMadeOriginalPrice, MONEY_SCALE)
-        : computed.totalBenefit;
-
     return {
       ...order,
       totalBenefit: computed.totalBenefit,
-      finalTotalBenefit,
+      finalTotalBenefit: computed.totalBenefit,
       financialTotal: getOrderFinancialTotal({
         ...order,
         totalBenefit: computed.totalBenefit,
@@ -1510,6 +1553,7 @@ export const getAllOrders = async ({
   return {
     data: enrichedData,
     total,
+    summary,
     page: Number(page),
     limit: Number(limit),
   };
@@ -2053,14 +2097,47 @@ export const markCompletedWorkerOrdersAsReceived = async ({
       }
 
       const now = new Date();
-      const receipt = await tx.workerPaymentReceipt.upsert({
+      const existingReceipt = await tx.workerPaymentReceipt.findUnique({
         where: {
           orderId_workerRole: {
             orderId: order.id,
             workerRole: item.workerRole,
           },
         },
-        create: {
+      });
+
+      if (existingReceipt) {
+        const editMeta = getWorkerReceiptEditMeta(existingReceipt.receiptDate);
+        if (!editMeta.canEditReceipt) {
+          throw Object.assign(
+            new Error(
+              "Receipt edit window has expired. Receipts can only be updated within 24 hours from receipt creation.",
+            ),
+            {
+              status: 409,
+              code: "RECEIPT_EDIT_WINDOW_EXPIRED",
+            },
+          );
+        }
+      }
+
+      const receipt = existingReceipt
+        ? await tx.workerPaymentReceipt.update({
+            where: { id: existingReceipt.id },
+            data: {
+              tenantId,
+              workerId: worker.id,
+              paidAmount,
+              receivedByAdminId: adminId,
+              status: "RECEIVED",
+            },
+            include: {
+              receivedByAdmin: { select: { id: true, name: true } },
+              worker: { select: { id: true, name: true, accountType: true } },
+            },
+          })
+        : await tx.workerPaymentReceipt.create({
+            data: {
           tenantId,
           orderId: order.id,
           workerId: worker.id,
@@ -2069,20 +2146,12 @@ export const markCompletedWorkerOrdersAsReceived = async ({
           receiptDate: now,
           receivedByAdminId: adminId,
           status: "RECEIVED",
-        },
-        update: {
-          tenantId,
-          workerId: worker.id,
-          paidAmount,
-          receiptDate: now,
-          receivedByAdminId: adminId,
-          status: "RECEIVED",
-        },
-        include: {
-          receivedByAdmin: { select: { id: true, name: true } },
-          worker: { select: { id: true, name: true, accountType: true } },
-        },
-      });
+            },
+            include: {
+              receivedByAdmin: { select: { id: true, name: true } },
+              worker: { select: { id: true, name: true, accountType: true } },
+            },
+          });
 
       await tx.userNotification.create({
         data: {
@@ -2100,7 +2169,7 @@ export const markCompletedWorkerOrdersAsReceived = async ({
         orderId: order.id,
         workerRole: item.workerRole,
         paidAmount,
-        receipt,
+        receipt: attachWorkerReceiptEditMeta(receipt),
       });
     }
 
@@ -2117,6 +2186,89 @@ export const markCompletedWorkerOrdersAsReceived = async ({
     totalCount: results.length,
     totalAmount,
   };
+};
+
+export const updateCompletedWorkerReceiptAmount = async ({
+  receiptId,
+  paidAmount,
+  adminId,
+}) => {
+  const normalizedReceiptId = String(receiptId || "").trim();
+  const normalizedPaidAmount = Number(paidAmount);
+
+  if (!normalizedReceiptId) {
+    throw Object.assign(new Error("Receipt id is required."), { status: 400 });
+  }
+  if (!Number.isFinite(normalizedPaidAmount) || normalizedPaidAmount <= 0) {
+    throw Object.assign(
+      new Error("Receipt amount must be a valid positive number."),
+      { status: 400 },
+    );
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const tenantId = requireActiveTenantId();
+    const receipt = await tx.workerPaymentReceipt.findFirst({
+      where: {
+        id: normalizedReceiptId,
+        tenantId,
+      },
+      include: {
+        worker: { select: { id: true, name: true, accountType: true } },
+        receivedByAdmin: { select: { id: true, name: true } },
+        order: {
+          select: {
+            id: true,
+            type: true,
+            customer: { select: { billNumber: true, firstName: true } },
+          },
+        },
+      },
+    });
+
+    if (!receipt) {
+      throw Object.assign(new Error("Receipt record was not found."), {
+        status: 404,
+      });
+    }
+
+    const editMeta = getWorkerReceiptEditMeta(receipt.receiptDate);
+    if (!editMeta.canEditReceipt) {
+      throw Object.assign(
+        new Error(
+          "Receipt edit window has expired. Receipts can only be updated within 24 hours from receipt creation.",
+        ),
+        {
+          status: 409,
+          code: "RECEIPT_EDIT_WINDOW_EXPIRED",
+        },
+      );
+    }
+
+    const updated = await tx.workerPaymentReceipt.update({
+      where: { id: receipt.id },
+      data: {
+        paidAmount: normalizedPaidAmount,
+        receivedByAdminId: adminId || receipt.receivedByAdminId,
+        status: "RECEIVED",
+      },
+      include: {
+        worker: { select: { id: true, name: true, accountType: true } },
+        receivedByAdmin: { select: { id: true, name: true } },
+        order: {
+          select: {
+            id: true,
+            type: true,
+            customer: { select: { billNumber: true, firstName: true } },
+          },
+        },
+      },
+    });
+
+    await recalculateOrderBenefit(receipt.orderId, tx);
+
+    return attachWorkerReceiptEditMeta(updated);
+  });
 };
 
 export const getCompletedWorkerOrderReceipts = async ({
@@ -2240,7 +2392,7 @@ export const getCompletedWorkerOrderReceipts = async ({
   ]);
 
   return {
-    data: rows,
+    data: rows.map(attachWorkerReceiptEditMeta),
     total,
     page: Number(page),
     limit: Number(limit),
@@ -2365,10 +2517,12 @@ const buildOrderUpdateData = (existingOrder, body) => {
 };
 
 const resolveAutoBoxForNewOrder = async (tx, orderType) => {
-  if (orderType === "READY_MADE_WASKAT") {
-    return null;
-  }
-  const resolvedType = orderType === "READY_MADE" ? "OUTFIT" : orderType;
+  const resolvedType =
+    orderType === "READY_MADE"
+      ? "OUTFIT"
+      : orderType === "READY_MADE_WASKAT"
+        ? "WASKAT"
+        : orderType;
   const boxes = await tx.box.findMany({
     where: { boxType: resolvedType },
     orderBy: { createdAt: "asc" },
@@ -2731,10 +2885,6 @@ export const createOrder = async ({
         }
 
         foreignBoxId = foreignBox.id;
-      } else if (type === "READY_MADE_WASKAT") {
-        // Ready-made Waskat does not use a tailoring box.
-        boxId = null;
-        foreignBoxId = null;
       } else {
         autoBox = await resolveAutoBoxForNewOrder(tx, type);
         boxId = autoBox.boxId;
@@ -3488,8 +3638,18 @@ export const updateOrderBill = async (
   });
 };
 
+const resolveBoxTypeForOrder = (orderType) => {
+  if (orderType === "READY_MADE") return "OUTFIT";
+  if (orderType === "READY_MADE_WASKAT") return "WASKAT";
+  return orderType;
+};
+
 const resolveCompletionBox = async (tx, order) => {
-  const expectedBoxType = order.type === "READY_MADE" ? "OUTFIT" : order.type;
+  const expectedBoxType = resolveBoxTypeForOrder(order.type);
+
+  if (!expectedBoxType) {
+    return null;
+  }
 
   if (order.boxId) {
     const existingBox = await tx.box.findUnique({

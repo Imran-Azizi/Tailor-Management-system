@@ -6,7 +6,6 @@ import toast from "react-hot-toast";
 import {
   LuArrowRightLeft,
   LuBuilding2,
-  LuCalendarCheck,
   LuCalendarDays,
   LuFilter,
   LuFileText,
@@ -19,9 +18,8 @@ import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
-import { formatMonthYearLabel } from "../lib/months.js";
 import { formatSystemDate, isRtlLanguage } from "../lib/locale.js";
-import { formatCurrency } from "../lib/currency.js";
+import { formatReportMoney } from "../lib/currency.js";
 import {
   Badge,
   Card,
@@ -31,6 +29,10 @@ import {
   Spinner,
   StatCard,
 } from "../components/ui/index.jsx";
+import {
+  ReportKpiGrid,
+  ReportMonthBanner,
+} from "../components/reports/ReportKit.jsx";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import MobileFilterPanel from "../components/ui/MobileFilterPanel.jsx";
 import "./AllTransactions.css";
@@ -50,10 +52,7 @@ const BADGE_V = {
 };
 
 function formatMoney(v, language = "en") {
-  return formatCurrency(v, language, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  return formatReportMoney(v, language);
 }
 
 function formatDate(iso, language) {
@@ -116,10 +115,12 @@ export default function AllTransactions() {
   });
 
   const transactions = data?.data || [];
-  const totalAmount = useMemo(
+  const pageAmount = useMemo(
     () => transactions.reduce((s, tx) => s + Number(tx.amount || 0), 0),
     [transactions],
   );
+  const totalAmount =
+    data?.totalAmount != null ? Number(data.totalAmount) : pageAmount;
 
   const ACCOUNT_TYPES = ["ADMIN", "DOKAN", "DOKHT", "QICHIKAR"];
   const activeFilterCount = [
@@ -271,48 +272,10 @@ export default function AllTransactions() {
       />
 
       {isAdmin && (
-        <div
-          className="month-info-banner all-transactions-month-banner"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "8px 14px",
-            marginBottom: 4,
-            borderRadius: "var(--r)",
-            background: "var(--success-soft, #F0FDF4)",
-            border: "1px solid var(--success-soft-border, #BBF7D0)",
-            fontSize: 13,
-            color: "var(--success, #16A34A)",
-            fontWeight: 500,
-          }}
-        >
-          <LuCalendarCheck size={14} />
-          <span>
-            {t("common.viewingMonth", "Viewing data for")}:{" "}
-            <strong style={{ fontWeight: 700 }}>
-              {formatMonthYearLabel(viewMonth, viewYear, language)}
-            </strong>
-          </span>
-          {data?.total === 0 && !isLoading && (
-            <span
-              className="month-info-empty"
-              style={{ marginInlineStart: "auto", fontSize: 11, opacity: 0.75 }}
-            >
-              {t("common.noDataThisMonth", "No data found for this month")}
-            </span>
-          )}
-        </div>
+        <ReportMonthBanner isEmpty={data?.total === 0 && !isLoading} />
       )}
 
-      <div
-        className="all-transactions-stats"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
-          gap: 12,
-        }}
-      >
+      <ReportKpiGrid className="all-transactions-stats">
         <StatCard
           label={t("transaction.totalTransactions", "Total Transactions")}
           value={Number(data?.total || 0)}
@@ -323,11 +286,15 @@ export default function AllTransactions() {
         <StatCard
           label={t("transaction.totalAmount", "Total Amount")}
           value={formatMoney(totalAmount, language)}
-          sub={t("transaction.currentPageTotal", "Current page total")}
+          sub={
+            data?.totalAmount != null
+              ? t("transaction.resultsAcrossPages", "Across all pages")
+              : t("transaction.currentPageTotal", "Current page total")
+          }
           Icon={AfCurrencyIcon}
           accent="#0F766E"
         />
-      </div>
+      </ReportKpiGrid>
 
       <MobileFilterPanel
         activeCount={activeFilterCount}
@@ -341,10 +308,6 @@ export default function AllTransactions() {
           <div className="all-transactions-filter-summary">
             <span className="badge bg-gray">
               {t("common.filters", "Filters")}: {activeFilterCount}
-            </span>
-            <span className="badge bg-gold" style={{ marginInlineStart: 8 }}>
-              {t("transaction.totalAmount", "Total Amount")}:{" "}
-              {formatMoney(totalAmount, language)}
             </span>
           </div>
           <div
@@ -561,7 +524,7 @@ export default function AllTransactions() {
                       amount: (
                         <td
                           key="amount"
-                          className="all-transactions-money"
+                          className="all-transactions-money report-num"
                           style={{
                             color: getAmountColor(tx.kind),
                           }}

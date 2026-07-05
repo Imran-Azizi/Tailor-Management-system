@@ -4,8 +4,9 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon src/index.js",
+    "fonts:ensure": "node src/scripts/ensureReportFonts.js",
     "prisma:generate": "prisma generate",
-    "start": "prisma generate && prisma migrate deploy && node prisma/seed.js && node src/index.js",
+    "start": "node src/scripts/ensureReportFonts.js && prisma generate && prisma migrate deploy && node prisma/seed.js && node src/index.js",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db push --accept-data-loss && node prisma/seed.js",

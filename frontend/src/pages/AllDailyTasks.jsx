@@ -37,6 +37,7 @@ import {
   isDailyTaskEditable,
 } from "../lib/dailyTasks.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
+import { PERMISSIONS } from "../lib/permissions.js";
 import { formatCurrency } from "../lib/currency.js";
 import { formatMonthYearLabel } from "../lib/months.js";
 import { formatSystemDateTime } from "../lib/locale.js";
@@ -121,6 +122,7 @@ function StatBanner({ label, value, Icon, accent, sub }) {
       }}
     >
       <div
+        className="dt-summary-card__accent"
         style={{
           position: "absolute",
           top: 0,
@@ -128,10 +130,10 @@ function StatBanner({ label, value, Icon, accent, sub }) {
           width: 3,
           height: "100%",
           background: accent,
-          borderRadius: "var(--r-lg) 0 0 var(--r-lg)",
         }}
       />
       <div
+        className="dt-summary-card__icon"
         style={{
           width: 44,
           height: 44,
@@ -145,10 +147,11 @@ function StatBanner({ label, value, Icon, accent, sub }) {
       >
         <Icon size={22} style={{ color: accent }} />
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="dt-summary-card__body" style={{ flex: 1, minWidth: 0 }}>
         <p
+          className="dt-summary-card__label"
           style={{
-            textAlign: "end",
+            textAlign: "start",
             fontWeight: 600,
             color: "var(--text3)",
             textTransform: "uppercase",
@@ -159,18 +162,28 @@ function StatBanner({ label, value, Icon, accent, sub }) {
           {label}
         </p>
         <p
+          className="dt-summary-card__value"
           style={{
             fontSize: 25,
             fontWeight: 700,
             color: accent,
             letterSpacing: "-.03em",
             lineHeight: 1,
+            textAlign: "start",
           }}
         >
           {value}
         </p>
         {sub && (
-          <p style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 5 }}>
+          <p
+            className="dt-summary-card__sub"
+            style={{
+              fontSize: 11.5,
+              color: "var(--text3)",
+              marginTop: 5,
+              textAlign: "start",
+            }}
+          >
             {sub}
           </p>
         )}
@@ -436,8 +449,9 @@ function DailyTaskDetailsModal({
     fontSize: 11,
     fontWeight: 700,
     color: "var(--text3)",
-    textTransform: "uppercase",
-    letterSpacing: ".05em",
+    textTransform: isRtlTextLanguage(language) ? "none" : "uppercase",
+    letterSpacing: isRtlTextLanguage(language) ? 0 : ".05em",
+    textAlign: "start",
   };
 
   const valueStyle = {
@@ -446,6 +460,8 @@ function DailyTaskDetailsModal({
     color: "var(--text1)",
     lineHeight: 1.5,
     wordBreak: "break-word",
+    textAlign: "start",
+    unicodeBidi: "plaintext",
   };
 
   return (
@@ -477,7 +493,7 @@ function DailyTaskDetailsModal({
           {t("dailyTasks.notFound", "Expense not found.")}
         </div>
       ) : (
-        <div style={{ display: "grid", gap: 16 }}>
+        <div style={{ display: "grid", gap: 16, direction: "inherit" }}>
           <div
             style={{
               display: "grid",
@@ -595,27 +611,38 @@ function TaskRow({
 
   return (
     <tr className="tr-hover dt-row" style={{ transition: "all .16s ease" }}>
-      <td style={{ width: 44, color: "var(--text3)", fontSize: 12 }}>
+      <td
+        className="dt-cell-index"
+        style={{ width: 44, color: "var(--text3)", fontSize: 12 }}
+      >
         {index + 1}
       </td>
       <td>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div className="dt-person-cell">
           <Avatar name={task.fromName} size={30} accent="#2563EB" />
-          <span style={{ fontWeight: 600, fontSize: 13.5, lineHeight: 1.2 }}>
+          <span
+            style={{
+              fontWeight: 600,
+              fontSize: 13.5,
+              lineHeight: 1.2,
+              minWidth: 0,
+            }}
+          >
             {task.fromName}
           </span>
         </div>
       </td>
       <td>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div className="dt-person-cell">
           <Avatar name={task.recipientName} size={30} accent="#7C3AED" />
-          <span style={{ fontSize: 13.5, lineHeight: 1.2 }}>
+          <span style={{ fontSize: 13.5, lineHeight: 1.2, minWidth: 0 }}>
             {task.recipientName}
           </span>
         </div>
       </td>
-      <td style={{ textAlign: "center" }}>
+      <td className="dt-cell-center" style={{ textAlign: "center" }}>
         <span
+          className="dt-money-pill"
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -634,12 +661,13 @@ function TaskRow({
           {formatMoney(task.amount, language)}
         </span>
       </td>
-      <td style={{ textAlign: "center" }}>
+      <td className="dt-cell-center" style={{ textAlign: "center" }}>
         <p style={{ fontSize: 13, color: "var(--text1)", fontWeight: 600 }}>
           {formatDateTime(task.taskDate, language)}
         </p>
       </td>
       <td
+        className="dt-note-cell"
         style={{
           maxWidth: 210,
           overflow: "hidden",
@@ -650,25 +678,17 @@ function TaskRow({
           textAlign: "start",
           direction: isRtlNote ? "rtl" : "ltr",
           unicodeBidi: "plaintext",
-          fontFamily: isRtlNote
-            ? "'Noto Naskh Arabic','Noto Sans Arabic','Inter',sans-serif"
-            : undefined,
+          fontFamily: isRtlNote ? "var(--font-rtl)" : undefined,
         }}
       >
         {task.note || <span style={{ opacity: 0.35 }}>—</span>}
       </td>
       <td
+        className="dt-cell-actions"
         style={{ textAlign: "end", width: 148 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "flex-end",
-            gap: 8,
-          }}
-        >
+        <div className="dt-row-actions">
           <button
             type="button"
             className="btn btn-outline btn-sm"
@@ -726,6 +746,7 @@ function TaskCard({
       }}
     >
       <div
+        className="dt-mobile-card__head"
         style={{
           display: "flex",
           alignItems: "center",
@@ -734,6 +755,7 @@ function TaskCard({
         }}
       >
         <div
+          className="dt-mobile-party-flow"
           style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}
         >
           <Avatar name={task.fromName} size={28} accent="#2563EB" />
@@ -750,6 +772,7 @@ function TaskCard({
             {task.fromName}
           </span>
           <LuArrowUpRight
+            className="dt-mobile-party-arrow"
             size={13}
             style={{ color: "var(--text3)", flexShrink: 0 }}
           />
@@ -767,6 +790,7 @@ function TaskCard({
           </span>
         </div>
         <span
+          className="dt-mobile-amount"
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -786,6 +810,7 @@ function TaskCard({
       </div>
 
       <div
+        className="dt-mobile-meta-row"
         style={{
           display: "flex",
           alignItems: "center",
@@ -800,6 +825,7 @@ function TaskCard({
             display: "flex",
             alignItems: "center",
             gap: 4,
+            minWidth: 0,
           }}
         >
           <LuCalendarDays size={12} />
@@ -810,6 +836,7 @@ function TaskCard({
 
       {task.note && (
         <p
+          className="dt-mobile-note"
           style={{
             fontSize: 12,
             color: "var(--text3)",
@@ -825,6 +852,7 @@ function TaskCard({
       )}
 
       <div
+        className="dt-mobile-actions"
         style={{
           display: "flex",
           flexWrap: "wrap",
@@ -866,8 +894,8 @@ export default function AllDailyTasks() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const language = i18n.resolvedLanguage || i18n.language;
-  const isRtl = (i18n.dir?.() || "ltr") === "rtl";
-  const { isAdmin } = useAuth();
+  const isRtl = isRtlTextLanguage(language);
+  const { hasPermission } = useAuth();
   const { viewMonth, viewYear, getMonthAccessMode } = useMonth();
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
@@ -913,8 +941,15 @@ export default function AllDailyTasks() {
     return d.toISOString().slice(0, 16);
   };
 
+  const canViewExpenses = hasPermission(PERMISSIONS.FINANCE_VIEW);
+  const canAddExpenses = hasPermission(PERMISSIONS.FINANCE_EXPENSES_ADD);
+  const canEditExpenses = hasPermission(PERMISSIONS.FINANCE_EXPENSES_EDIT);
+  const canDeleteExpenses = hasPermission(PERMISSIONS.FINANCE_EXPENSES_DELETE);
+  const canPrintReports = hasPermission(PERMISSIONS.REPORTS_PRINT);
+  const canManageExpenses = canEditExpenses || canDeleteExpenses;
+
   const openEdit = (task) => {
-    if (!isAdmin) return;
+    if (!canEditExpenses) return;
     if (!isMonthEditable) {
       toast.error(monthReadOnlyReason);
       return;
@@ -935,7 +970,7 @@ export default function AllDailyTasks() {
   };
 
   const requestDelete = (task) => {
-    if (!isAdmin) return;
+    if (!canDeleteExpenses) return;
     if (!isMonthEditable) {
       toast.error(monthReadOnlyReason);
       return;
@@ -1037,8 +1072,8 @@ export default function AllDailyTasks() {
             page,
             limit: 20,
             search,
-            month: isAdmin ? viewMonth : undefined,
-            year: isAdmin ? viewYear : undefined,
+            month: canViewExpenses ? viewMonth : undefined,
+            year: canViewExpenses ? viewYear : undefined,
           },
         })
         .then((r) => r.data),
@@ -1046,13 +1081,16 @@ export default function AllDailyTasks() {
 
   const tasks = data?.data || [];
   const total = data?.total || 0;
-  const totalAmount = useMemo(
+  const pageTotalAmount = useMemo(
     () => tasks.reduce((sum, task) => sum + Number(task.amount), 0),
     [tasks],
   );
-  const isRtlNote = isRtlTextLanguage(i18n.language);
-  const summaryTotalTasks = total;
-  const summaryTotalAmount = totalAmount;
+  const isRtlNote = isRtl;
+  const summary = data?.summary || {};
+  const summaryTotalTasks = summary.totalTasks ?? total;
+  const summaryTotalAmount = summary.totalAmount ?? pageTotalAmount;
+  const summaryOrderExpenses = summary.orderExpenses ?? 0;
+  const summaryOtherExpenses = summary.otherExpenses ?? 0;
 
   // Derive the anchor date for monthly/yearly reports from the currently viewed month
   const reportMonthDate = `${viewYear}-${String(viewMonth).padStart(2, "0")}-01`;
@@ -1198,14 +1236,14 @@ export default function AllDailyTasks() {
                   return next;
                 });
               }}
-              disabled={!isAdmin || reportMutation.isPending}
+              disabled={!canPrintReports || reportMutation.isPending}
             >
               <LuFileText size={14} />
               {t("dailyTasks.report", "Report")}
               <LuChevronDown size={14} />
             </button>
 
-            {reportMenuOpen && isAdmin && (
+            {reportMenuOpen && canPrintReports && (
               <div
                 className="dt-report-dropdown"
                 style={{
@@ -1213,9 +1251,12 @@ export default function AllDailyTasks() {
                   top: reportMenuPos.top,
                   left: reportMenuPos.left,
                   width: reportMenuPos.width,
+                  direction: isRtl ? "rtl" : "ltr",
+                  textAlign: isRtl ? "right" : "left",
                 }}
               >
                 <div
+                  className="dt-report-month"
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -1263,8 +1304,9 @@ export default function AllDailyTasks() {
         }
       />
 
-      {isAdmin && (
+      {canViewExpenses && (
         <div
+          className="dt-month-banner"
           style={{
             display: "flex",
             alignItems: "center",
@@ -1288,6 +1330,7 @@ export default function AllDailyTasks() {
           </span>
           {data?.total === 0 && !isLoading && (
             <span
+              className="dt-month-banner__empty"
               style={{
                 marginInlineStart: "auto",
                 fontSize: 11,
@@ -1329,6 +1372,20 @@ export default function AllDailyTasks() {
           Icon={AfCurrencyIcon}
           accent="#16A34A"
           sub={`${tasks.length} ${t("dailyTasks.taskCount", "tasks on page")}`}
+        />
+        <StatBanner
+          label={t("dailyTasks.orderExpenses", "Order Expenses")}
+          value={formatMoney(summaryOrderExpenses, language)}
+          Icon={AfCurrencyIcon}
+          accent="#2563EB"
+          sub={t("dailyTasks.linkedToOrders", "Linked to orders")}
+        />
+        <StatBanner
+          label={t("dailyTasks.otherExpenses", "Other Expenses")}
+          value={formatMoney(summaryOtherExpenses, language)}
+          Icon={AfCurrencyIcon}
+          accent="#64748B"
+          sub={t("dailyTasks.notLinkedToOrders", "Not linked to orders")}
         />
       </div>
 
@@ -1400,17 +1457,19 @@ export default function AllDailyTasks() {
             )}
           </form>
 
-          <button
-            type="button"
-            className="btn btn-outline btn-sm dt-toolbar-btn"
-            style={{ gap: 6, minWidth: 132, height: 38 }}
-            disabled={!isMonthEditable}
-            title={isMonthEditable ? undefined : monthReadOnlyReason}
-            onClick={() => navigate("/daily-tasks")}
-          >
-            <LuPlus size={14} />
-            {t("dailyTasks.newTask", "New Expense")}
-          </button>
+          {canAddExpenses ? (
+            <button
+              type="button"
+              className="btn btn-outline btn-sm dt-toolbar-btn"
+              style={{ gap: 6, minWidth: 132, height: 38 }}
+              disabled={!isMonthEditable}
+              title={isMonthEditable ? undefined : monthReadOnlyReason}
+              onClick={() => navigate("/daily-tasks")}
+            >
+              <LuPlus size={14} />
+              {t("dailyTasks.newTask", "New Expense")}
+            </button>
+          ) : null}
 
           <button
             type="button"
@@ -1447,7 +1506,7 @@ export default function AllDailyTasks() {
               <table className="tbl professional-report-table dt-table">
                 <thead>
                   <tr>
-                    <th style={{ width: 44 }}>
+                    <th className="dt-cell-index" style={{ width: 44 }}>
                       <LuHash size={12} />
                     </th>
                     <th>
@@ -1474,7 +1533,7 @@ export default function AllDailyTasks() {
                         {t("dailyTasks.recipientName")}
                       </div>
                     </th>
-                    <th style={{ textAlign: "center" }}>
+                    <th className="dt-cell-center" style={{ textAlign: "center" }}>
                       <div
                         style={{
                           display: "inline-flex",
@@ -1486,7 +1545,7 @@ export default function AllDailyTasks() {
                         {t("dailyTasks.amount")}
                       </div>
                     </th>
-                    <th style={{ textAlign: "center" }}>
+                    <th className="dt-cell-center" style={{ textAlign: "center" }}>
                       <div
                         style={{
                           display: "inline-flex",
@@ -1499,7 +1558,10 @@ export default function AllDailyTasks() {
                       </div>
                     </th>
                     <th>{t("dailyTasks.note")}</th>
-                    <th style={{ width: 72, textAlign: "end" }}>
+                    <th
+                      className="dt-cell-actions"
+                      style={{ width: 72, textAlign: "end" }}
+                    >
                       {t("common.actions", "Actions")}
                     </th>
                   </tr>
@@ -1514,7 +1576,7 @@ export default function AllDailyTasks() {
                       isRtlNote={isRtlNote}
                       openMenu={openMenu}
                       setOpenMenu={setOpenMenu}
-                      canManage={isAdmin}
+                      canManage={canManageExpenses}
                       isMonthEditable={isMonthEditable}
                       disabledReason={effectiveDisabledReason}
                       onEdit={openEdit}
@@ -1541,7 +1603,7 @@ export default function AllDailyTasks() {
                   onView={openView}
                   openMenu={openMenu}
                   setOpenMenu={setOpenMenu}
-                  canManage={isAdmin}
+                  canManage={canManageExpenses}
                   isMonthEditable={isMonthEditable}
                   disabledReason={effectiveDisabledReason}
                   onEdit={openEdit}
@@ -1553,6 +1615,7 @@ export default function AllDailyTasks() {
         )}
 
         <div
+          className="dt-pagination-wrap"
           style={{
             borderTop: tasks.length > 0 ? "1px solid var(--border)" : "none",
           }}
@@ -1604,6 +1667,7 @@ export default function AllDailyTasks() {
             <Field label={t("dailyTasks.recipientName")} required>
               <input
                 className="inp"
+                style={{ textAlign: isRtl ? "right" : "left" }}
                 value={editForm.recipientName}
                 onChange={(e) =>
                   setEditForm((s) => ({ ...s, recipientName: e.target.value }))
@@ -1614,6 +1678,7 @@ export default function AllDailyTasks() {
               <input
                 type="number"
                 className="inp"
+                style={{ direction: "ltr", textAlign: isRtl ? "right" : "left" }}
                 min="1"
                 step="1"
                 value={editForm.amount}
@@ -1626,6 +1691,7 @@ export default function AllDailyTasks() {
               <input
                 type="datetime-local"
                 className="inp"
+                style={{ direction: "ltr", textAlign: isRtl ? "right" : "left" }}
                 value={editForm.taskDate}
                 onChange={(e) =>
                   setEditForm((s) => ({ ...s, taskDate: e.target.value }))
@@ -1642,7 +1708,7 @@ export default function AllDailyTasks() {
                 onChange={(e) =>
                   setEditForm((s) => ({ ...s, note: e.target.value }))
                 }
-                style={{ resize: "vertical" }}
+                style={{ resize: "vertical", textAlign: isRtl ? "right" : "left" }}
               />
             </Field>
           </div>
@@ -1716,6 +1782,242 @@ export default function AllDailyTasks() {
           transform: translateY(-2px);
           box-shadow: var(--sh-md);
           border-color: var(--border2);
+        }
+        .daily-tasks-report-page {
+          direction: ltr;
+          text-align: start;
+        }
+        .daily-tasks-report-page[dir="rtl"] {
+          direction: rtl !important;
+          font-family: var(--font-rtl);
+        }
+        .daily-tasks-report-page[dir="ltr"] {
+          direction: ltr !important;
+        }
+        .daily-tasks-report-page[dir="rtl"] .page-hd,
+        .daily-tasks-report-page[dir="rtl"] .page-hd > div:first-child {
+          direction: rtl;
+          text-align: right;
+        }
+        .daily-tasks-report-page[dir="rtl"] .page-hd {
+          flex-direction: row !important;
+        }
+        .daily-tasks-report-page[dir="rtl"] .page-hd h1,
+        .daily-tasks-report-page[dir="rtl"] .page-hd p,
+        .daily-tasks-report-page[dir="rtl"] .dt-summary-card__label {
+          letter-spacing: 0 !important;
+          text-transform: none !important;
+        }
+        .daily-tasks-report-page[dir="rtl"] .page-hd-action {
+          direction: rtl;
+          flex-direction: row !important;
+          justify-content: flex-start;
+        }
+        .daily-tasks-report-page[dir="rtl"] .tbl-wrap,
+        .daily-tasks-report-page[dir="rtl"] .dt-table {
+          direction: rtl !important;
+        }
+        .daily-tasks-report-page[dir="rtl"] .dt-table th,
+        .daily-tasks-report-page[dir="rtl"] .dt-table td {
+          text-align: right !important;
+        }
+        .dt-summary-card {
+          direction: inherit;
+          text-align: start;
+        }
+        .dt-summary-card__accent {
+          border-start-start-radius: var(--r-lg);
+          border-end-start-radius: var(--r-lg);
+        }
+        .dt-summary-card__body {
+          display: grid;
+          justify-items: start;
+        }
+        .dt-summary-card__value,
+        .dt-summary-card__sub {
+          width: 100%;
+          unicode-bidi: plaintext;
+        }
+        .daily-tasks-report-page[dir="rtl"] .dt-summary-card__value {
+          letter-spacing: 0 !important;
+        }
+        .daily-tasks-report-page[dir="rtl"] .dt-month-banner,
+        .daily-tasks-report-page[dir="rtl"] .dt-report-month {
+          direction: rtl;
+          text-align: right;
+        }
+        .daily-tasks-report-page[dir="rtl"] .dt-month-banner {
+          justify-content: flex-start;
+        }
+        .daily-tasks-report-page[dir="rtl"] .dt-month-banner__empty {
+          margin-inline-start: auto;
+          text-align: left;
+        }
+        .dt-toolbar {
+          direction: inherit;
+        }
+        .daily-tasks-report-page[dir="rtl"] .dt-toolbar {
+          flex-direction: row !important;
+          justify-content: flex-start;
+        }
+        .dt-search-form {
+          direction: inherit;
+        }
+        .daily-tasks-report-page[dir="rtl"] .dt-search-form {
+          flex-direction: row !important;
+        }
+        .dt-search-input {
+          text-align: start;
+          unicode-bidi: plaintext;
+        }
+        .daily-tasks-report-page[dir="rtl"] .dt-toolbar .btn,
+        .daily-tasks-report-page[dir="rtl"] .dt-search-form .btn,
+        .daily-tasks-report-page[dir="rtl"] .dt-report-dropdown .btn {
+          direction: rtl;
+        }
+        .daily-tasks-report-page[dir="rtl"] .dt-report-dropdown {
+          font-family: var(--font-rtl);
+        }
+        .daily-tasks-report-page[dir="rtl"] .dt-report-dropdown .btn {
+          justify-content: flex-start !important;
+          text-align: right;
+        }
+        .dt-person-cell,
+        .dt-row-actions {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          min-width: 0;
+        }
+        .daily-tasks-report-page[dir="rtl"] .dt-person-cell,
+        .daily-tasks-report-page[dir="rtl"] .dt-row-actions {
+          direction: rtl;
+          flex-direction: row;
+        }
+        .dt-person-cell > span {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .dt-row-actions {
+          justify-content: flex-end;
+          gap: 8px;
+        }
+        .daily-tasks-report-page[dir="rtl"] .dt-row-actions {
+          justify-content: flex-start;
+        }
+        .dt-table th.dt-cell-center,
+        .dt-table td.dt-cell-center {
+          text-align: center !important;
+        }
+        .dt-table th.dt-cell-actions,
+        .dt-table td.dt-cell-actions {
+          text-align: end !important;
+        }
+        .dt-table th.dt-cell-index,
+        .dt-table td.dt-cell-index {
+          text-align: center !important;
+        }
+        .dt-table thead th > div {
+          justify-content: flex-start;
+          min-width: 0;
+        }
+        .daily-tasks-report-page[dir="rtl"] .dt-table thead th > div {
+          direction: rtl;
+          flex-direction: row;
+          justify-content: flex-start;
+          text-align: right;
+        }
+        .dt-note-cell {
+          text-align: start !important;
+        }
+        .dt-money-pill,
+        .dt-mobile-amount {
+          direction: ltr;
+          gap: 4px;
+          unicode-bidi: isolate;
+        }
+        .daily-tasks-report-page[dir="rtl"] .dt-money-pill,
+        .daily-tasks-report-page[dir="rtl"] .dt-mobile-amount {
+          flex-direction: row-reverse;
+        }
+        .dt-action-dropdown {
+          min-width: 164px;
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          background: var(--surface);
+          box-shadow: 0 18px 40px -22px rgba(15,23,42,.42), 0 8px 18px -16px rgba(15,23,42,.28);
+          overflow: hidden;
+          text-align: start;
+        }
+        .daily-tasks-report-page[dir="rtl"] .dt-action-dropdown,
+        .daily-tasks-report-page[dir="rtl"] .dt-action-item {
+          direction: rtl;
+          text-align: right;
+        }
+        .daily-tasks-report-page[dir="rtl"] .dt-action-item {
+          flex-direction: row;
+          justify-content: flex-start;
+        }
+        .dt-mobile-card {
+          direction: inherit;
+          text-align: start;
+        }
+        .daily-tasks-report-page[dir="rtl"] .dt-mobile-card {
+          direction: rtl;
+          text-align: right;
+        }
+        .dt-mobile-party-flow {
+          flex: 1 1 auto;
+          overflow: hidden;
+        }
+        .daily-tasks-report-page[dir="rtl"] .dt-mobile-party-flow,
+        .daily-tasks-report-page[dir="rtl"] .dt-mobile-meta-row,
+        .daily-tasks-report-page[dir="rtl"] .dt-mobile-actions {
+          direction: rtl;
+          flex-direction: row;
+        }
+        .dt-mobile-party-flow > span {
+          min-width: 0;
+        }
+        .daily-tasks-report-page[dir="rtl"] .dt-mobile-party-arrow {
+          transform: scaleX(-1);
+        }
+        .dt-mobile-meta-row,
+        .dt-mobile-actions {
+          direction: inherit;
+        }
+        .dt-mobile-note {
+          text-align: start;
+          direction: inherit;
+          unicode-bidi: plaintext;
+        }
+        .dt-pagination-wrap {
+          direction: inherit;
+        }
+        .dt-pagination-wrap > div {
+          direction: inherit;
+          padding: 14px 16px 16px !important;
+          margin-top: 0 !important;
+          border-top: 0 !important;
+        }
+        .dt-pagination-wrap > div > span {
+          text-align: start;
+        }
+        .daily-tasks-report-page[dir="rtl"] .dt-pagination-wrap .btn {
+          direction: rtl;
+        }
+        .modal-box[dir="rtl"] {
+          direction: rtl;
+          text-align: right;
+        }
+        .modal-box[dir="rtl"] .lbl,
+        .modal-box[dir="rtl"] .modal-body,
+        .modal-box[dir="rtl"] .modal-content {
+          text-align: right;
+        }
+        .modal-box[dir="rtl"] .btn {
+          direction: rtl;
         }
 
         .dt-toolbar-btn {
@@ -1819,10 +2121,69 @@ export default function AllDailyTasks() {
           .dt-mobile-cards { display: flex !important; }
           .dt-toolbar { gap: 10px !important; }
           .dt-search-form { min-width: 100% !important; }
+          .dt-toolbar > .btn,
+          .dt-search-form .dt-toolbar-btn {
+            flex: 1 1 140px;
+          }
+          .dt-search-form {
+            flex-wrap: wrap;
+          }
+          .daily-tasks-report-page[dir="rtl"] .dt-search-form {
+            flex-direction: row !important;
+          }
+          .dt-search-form > div {
+            flex-basis: 100% !important;
+          }
+          .dt-mobile-card__head {
+            align-items: flex-start !important;
+          }
+          .dt-mobile-party-flow {
+            flex-wrap: wrap;
+          }
         }
 
         @media (max-width: 460px) {
           .dt-summary-grid { grid-template-columns: 1fr !important; }
+          .dt-summary-card {
+            padding: 14px !important;
+          }
+          .dt-mobile-card {
+            padding: 12px !important;
+          }
+          .dt-mobile-card__head,
+          .dt-mobile-actions,
+          .dt-month-banner {
+            flex-direction: column;
+            align-items: stretch !important;
+          }
+          .daily-tasks-report-page[dir="rtl"] .dt-mobile-card__head,
+          .daily-tasks-report-page[dir="rtl"] .dt-mobile-actions,
+          .daily-tasks-report-page[dir="rtl"] .dt-month-banner {
+            flex-direction: column !important;
+          }
+          .dt-mobile-actions .btn {
+            width: 100%;
+          }
+          .dt-mobile-actions > div {
+            align-self: flex-end;
+          }
+          .daily-tasks-report-page[dir="rtl"] .dt-mobile-actions > div {
+            align-self: flex-start;
+          }
+          .daily-tasks-report-page[dir="rtl"] .dt-month-banner__empty {
+            margin-inline-start: 0;
+            text-align: right;
+          }
+          .dt-pagination-wrap > div {
+            align-items: stretch !important;
+          }
+          .dt-pagination-wrap > div > div {
+            width: 100%;
+            justify-content: stretch;
+          }
+          .dt-pagination-wrap .btn {
+            flex: 1;
+          }
         }
       `}</style>
     </div>

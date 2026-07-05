@@ -37,7 +37,6 @@ import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import MobileFilterPanel from "../components/ui/MobileFilterPanel.jsx";
 
 const LIMIT = 15;
-const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 function paymentBadge(status, t) {
   if (status === "PAID_TO_WORKER") {
@@ -89,21 +88,6 @@ function getPaymentRowKey(order) {
 
 function getPaymentEditUiState(order) {
   const isAlreadyPaid = order?.workerPaymentStatus === "PAID_TO_WORKER";
-  const canEditWithinWindow = Boolean(order?.canEditWorkerPayment);
-  const expiresAt = order?.workerPaymentEditExpiresAt
-    ? new Date(order.workerPaymentEditExpiresAt)
-    : null;
-  const fallbackPaidAt = order?.workerPaidAt
-    ? new Date(order.workerPaidAt)
-    : null;
-  const fallbackExpiresAt =
-    !expiresAt &&
-    isAlreadyPaid &&
-    fallbackPaidAt &&
-    Number.isFinite(fallbackPaidAt.getTime())
-      ? new Date(fallbackPaidAt.getTime() + DAY_IN_MS)
-      : null;
-  const effectiveExpiresAt = expiresAt || fallbackExpiresAt;
 
   if (!isAlreadyPaid) {
     return {
@@ -113,30 +97,16 @@ function getPaymentEditUiState(order) {
       canSubmit: true,
       canEditAmount: true,
       actionLabel: "save",
-      effectiveExpiresAt: null,
-    };
-  }
-
-  if (canEditWithinWindow) {
-    return {
-      isAlreadyPaid,
-      canEditWithinWindow: true,
-      isExpired: false,
-      canSubmit: true,
-      canEditAmount: true,
-      actionLabel: "edit",
-      effectiveExpiresAt,
     };
   }
 
   return {
     isAlreadyPaid,
-    canEditWithinWindow: false,
-    isExpired: true,
-    canSubmit: false,
-    canEditAmount: false,
-    actionLabel: "expired",
-    effectiveExpiresAt,
+    canEditWithinWindow: true,
+    isExpired: false,
+    canSubmit: true,
+    canEditAmount: true,
+    actionLabel: "edit",
   };
 }
 
@@ -423,8 +393,8 @@ export default function CompletedWorkerOrders() {
     if (!editUiState.canSubmit) {
       toast.error(
         t(
-          "completedWorkerOrders.paymentEditExpired",
-          "Edit window expired. Payments can only be updated within 24 hours.",
+          "completedWorkerOrders.paymentLockedAfterReceipt",
+          "This payment already has a confirmed receipt. Update the receipt amount from receipt history.",
         ),
       );
       return;
@@ -653,7 +623,7 @@ export default function CompletedWorkerOrders() {
           accent="#15803D"
         />
         <StatCard
-          label={t("completedWorkerOrders.totalOrders", "Matching Orders")}
+          label={t("completedWorkerOrders.totalOrders", "All Orders")}
           value={stats.totalOrders}
           Icon={LuSquareCheckBig}
           accent="#2563EB"
@@ -984,9 +954,7 @@ export default function CompletedWorkerOrders() {
                                   "completedWorkerOrders.savePayment",
                                   "Save Payment",
                                 )
-                              : editUiState.canEditWithinWindow
-                                ? t("common.edit", "Edit")
-                                : t("completedWorkerOrders.expired", "Expired")}
+                              : t("common.edit", "Edit")}
                           </button>
                         </td>
                         <td>
@@ -1008,29 +976,6 @@ export default function CompletedWorkerOrders() {
                               disabled={!editUiState.canEditAmount}
                               style={{ minWidth: 140 }}
                             />
-                            {isAlreadyPaid &&
-                            editUiState.canEditWithinWindow ? (
-                              <div
-                                style={{
-                                  marginTop: 4,
-                                  fontSize: 11,
-                                  color: "var(--text3)",
-                                }}
-                              >
-                                {t(
-                                  "completedWorkerOrders.editWindowUntil",
-                                  "Editable until {{time}}",
-                                  {
-                                    time: editUiState.effectiveExpiresAt
-                                      ? formatDateLocale(
-                                          editUiState.effectiveExpiresAt,
-                                          language,
-                                        )
-                                      : "-",
-                                  },
-                                )}
-                              </div>
-                            ) : null}
                           </div>
                         </td>
                         <td>{receiptBadge(order.moneyReceiptStatus, t)}</td>
@@ -1099,33 +1044,21 @@ export default function CompletedWorkerOrders() {
         )}
         maxW={500}
       >
-        <div style={{ display: "grid", gap: 12 }}>
-          <p style={{ margin: 0, color: "var(--text2)", fontSize: 13 }}>
-            {t(
-              "completedWorkerOrders.confirmReceiptMessage",
-              "Mark selected orders as received and move them to receipt history?",
-            )}
-          </p>
-          <div
+        <div style={{ display: "grid", gap: 16 }}>
+          <p
             style={{
-              border: "1px solid var(--border)",
-              borderRadius: 10,
-              background: "var(--surface2)",
-              padding: 12,
-              display: "grid",
-              gap: 6,
-              fontSize: 13,
+              margin: 0,
+              color: "var(--text2)",
+              fontSize: 14,
+              lineHeight: 1.7,
             }}
           >
-            <div>
-              <b>{t("completedWorkerOrders.selectedOrders", "Selected")}:</b>{" "}
-              {selectedItems.length}
-            </div>
-            <div>
-              <b>{t("completedWorkerOrders.selectedTotal", "Total")}:</b>{" "}
-              {formatCurrency(selectedTotalAmount, "en")}
-            </div>
-          </div>
+            {t(
+              "completedWorkerOrders.confirmReceiptMessage",
+              "You are confirming receipt for the selected completed worker orders. This will mark them as received and move them to receipt history.",
+              { count: selectedItems.length },
+            )}
+          </p>
           <div
             style={{
               display: "flex",
@@ -1180,8 +1113,8 @@ export default function CompletedWorkerOrders() {
                   ? "completedWorkerOrders.confirmEditPaymentMessage"
                   : "completedWorkerOrders.confirmPaymentMessage",
                 confirmPayment.mode === "edit"
-                  ? "This payment update is allowed only within 24 hours from the original payment time."
-                  : "This payment can be updated for up to 24 hours after confirmation.",
+                  ? "This updates the worker payment while it is still waiting for receipt confirmation."
+                  : "After receipt confirmation, receipt amount corrections will be available for 24 hours from the receipt time.",
               )}
             </p>
 

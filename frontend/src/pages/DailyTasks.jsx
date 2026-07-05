@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import Select from "react-select";
 import CreatableSelect from "react-select/creatable";
-import { LuClipboardList, LuFileText, LuList, LuSend } from "react-icons/lu";
+import { LuClipboardList, LuFileText, LuSend } from "react-icons/lu";
 import api from "../lib/api.js";
 import { buildSelectStyles } from "../lib/dailyTasks.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
@@ -704,16 +704,6 @@ export default function DailyTasks() {
       <PageHeader
         title={t("dailyTasks.title")}
         subtitle={t("dailyTasks.createSubtitle")}
-        action={
-          <button
-            className="btn btn-outline"
-            style={{ gap: 6, minWidth: 144 }}
-            onClick={() => navigate("/daily-tasks/all")}
-          >
-            <LuList size={14} />
-            {t("dailyTasks.allTitle")}
-          </button>
-        }
       />
 
       {/* ── Form layout ── */}

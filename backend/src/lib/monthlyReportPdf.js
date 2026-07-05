@@ -7,6 +7,7 @@ import {
   normalizeReportLanguage,
   isRtlReportLanguage,
   resolveReportText,
+  stripBidiMarks,
 } from "./reportLocale.js";
 import {
   getOrderFinancialPaid,
@@ -22,6 +23,7 @@ import {
   loadArabicFont,
   drawArabicTextSync,
   resolveArabicReportFontPath,
+  arabicTextWidthPts,
 } from "./arabicRenderer.js";
 
 const ARABIC_SCRIPT_REGEX =
@@ -252,14 +254,12 @@ function rtlAwareAlign(isRtl, fallback = "left") {
   return isRtl ? "right" : fallback;
 }
 
-function tokenWidth(doc, token, fkFont, fontSize = 10) {
-  const text = normalizeReportPdfText(token, "dari");
+function tokenWidth(doc, token, fkFont, fontSize = 10, language = "fa") {
+  const text = stripBidiMarks(normalizeReportPdfText(token, language));
   if (!text) return 0;
 
   if (fkFont && hasArabicScript(text)) {
-    const scale = fontSize / fkFont.unitsPerEm;
-    const run = fkFont.layout(text, [], "arab", "dflt", "rtl");
-    return run.positions.reduce((sum, pos) => sum + pos.xAdvance * scale, 0);
+    return arabicTextWidthPts(fkFont, text, fontSize, language);
   }
 
   return doc.font("Helvetica").fontSize(fontSize).widthOfString(text);
@@ -322,7 +322,7 @@ function drawRtlMixedValue(
   bold = false,
   language = "dari",
 ) {
-  const text = normalizeReportPdfText(value, language);
+  const text = stripBidiMarks(normalizeReportPdfText(value, language));
   if (!text) return;
 
   const tokens = text.match(/(\d[\d,./:-]*|\s+|[^\d\s]+)/g) || [text];
@@ -331,7 +331,7 @@ function drawRtlMixedValue(
   tokens.forEach((token) => {
     const segment = String(token ?? "");
     if (!segment) return;
-    const w = tokenWidth(doc, segment, fkFont, fontSize);
+    const w = tokenWidth(doc, segment, fkFont, fontSize, language);
     const startX = cursor - w;
 
     if (!segment.trim()) {
@@ -745,24 +745,8 @@ function drawDashboardStatsCards(
     },
     {
       label: statLabels.totalOrderBenefit,
-      value: formatAfCurrency(stats.totalOrderBenefit || 0, language, isRtl),
-    },
-    {
-      label:
-        statLabels.totalReadyMadeProfitAfterExpenses ||
-        "Total Ready-Made Profit (After Expenses)",
       value: formatAfCurrency(
-        stats.totalReadyMadeProfitAfterExpenses || 0,
-        language,
-        isRtl,
-      ),
-    },
-    {
-      label:
-        statLabels.totalReadyMadeWaskatProfitAfterExpenses ||
-        "Total Ready-Made Waskat Profit (After Expenses)",
-      value: formatAfCurrency(
-        stats.totalReadyMadeWaskatProfitAfterExpenses || 0,
+        stats.totalAllOrdersBenefit ?? stats.totalOrderBenefit ?? 0,
         language,
         isRtl,
       ),
@@ -770,6 +754,14 @@ function drawDashboardStatsCards(
     {
       label: statLabels.totalRakhtRevenue,
       value: formatAfCurrency(stats.totalRakhtRevenue || 0, language, isRtl),
+    },
+    {
+      label: statLabels.orderExpenses || "Order Expenses",
+      value: formatAfCurrency(stats.totalOrderExpenses || 0, language, isRtl),
+    },
+    {
+      label: statLabels.otherExpenses || "Other Expenses",
+      value: formatAfCurrency(stats.totalOtherExpenses || 0, language, isRtl),
     },
     {
       label: statLabels.totalDailyExpenses,
@@ -1100,6 +1092,8 @@ export async function buildMonthlyReportPdf({
         totalPaid,
         totalRemaining,
         totalDailyExpenses: 0,
+        totalOrderExpenses: 0,
+        totalOtherExpenses: 0,
         totalExpenses: 0,
         netProfit: totalRevenue,
         netBenefit: totalRevenue,

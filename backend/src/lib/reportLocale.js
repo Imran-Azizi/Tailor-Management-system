@@ -108,6 +108,74 @@ function stabilizeRtlMixedText(value) {
   );
 }
 
+/** Remove invisible bidi marks before PDF tokenization (prevents glued dates). */
+export function stripBidiMarks(value) {
+  return String(value ?? "").replace(/[\u200E\u200F\u061C\u202A-\u202E]/g, "");
+}
+
+export function formatReportCalendarDate(value, language = "en", options = {}) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+
+  const normalized = normalizeReportLanguage(language);
+  if (normalized === "en") {
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: AFGHANISTAN_TIMEZONE,
+      year: "numeric",
+      month: options.month === "short" ? "short" : "long",
+      day: "2-digit",
+      ...options,
+    }).format(date);
+  }
+
+  try {
+    const parts = new Intl.DateTimeFormat("fa-AF-u-ca-persian-nu-latn", {
+      timeZone: AFGHANISTAN_TIMEZONE,
+      day: "numeric",
+      month: "numeric",
+      year: "numeric",
+    }).formatToParts(date);
+
+    const day = parts.find((part) => part.type === "day")?.value || "-";
+    const monthRaw = Number(
+      parts.find((part) => part.type === "month")?.value || 1,
+    );
+    const year = parts.find((part) => part.type === "year")?.value || "-";
+    const monthIndex = Math.max(1, Math.min(12, monthRaw)) - 1;
+    const monthLabel =
+      normalized === "pashto"
+        ? AFGHAN_MONTHS_PASHTO[monthIndex]
+        : AFGHAN_MONTHS_DARI[monthIndex];
+
+    return `${day} ${monthLabel} ${year}`;
+  } catch {
+    return "-";
+  }
+}
+
+/** Date + optional time for PDF output — explicit spaces, no bidi marks. */
+export function formatReportPdfDateTime(value, language = "en", options = {}) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+
+  const normalized = normalizeReportLanguage(language);
+  const includeTime =
+    options.hour !== undefined ||
+    options.minute !== undefined ||
+    options.second !== undefined ||
+    options.includeTime === true;
+
+  if (!includeTime) {
+    return formatReportCalendarDate(date, language, options);
+  }
+
+  if (normalized === "en") {
+    return formatReportDateTime(date, language, options);
+  }
+
+  return stripBidiMarks(formatMonthlyReportHeaderDateTime(date, language));
+}
+
 export function normalizeReportPdfText(value, language = "en") {
   let text = String(value ?? "");
   if (!text) return text;
@@ -312,16 +380,14 @@ export const REPORT_TEXT = {
       stats: {
         totalRakhtRevenue: "Total Rakht Revenue",
         totalOrderBenefit: "Total Order Benefit",
-        totalReadyMadeProfitAfterExpenses:
-          "Total Ready-Made Profit (After Expenses)",
-        totalReadyMadeWaskatProfitAfterExpenses:
-          "Total Ready-Made Waskat Profit (After Expenses)",
         netBenefit: "Net Benefit",
         totalOrders: "Total Orders",
         totalAmount: "Total Amount",
         collected: "Collected",
         outstanding: "Outstanding",
         totalDailyExpenses: "Total Daily Expenses",
+        orderExpenses: "Order Expenses",
+        otherExpenses: "Other Expenses",
         totalRakhtPrice: "Total Rakht Price",
         totalLoan: "Total Loan",
         totalDamagedClothesMoney: "Total Money of Damaged Orders",
@@ -333,11 +399,14 @@ export const REPORT_TEXT = {
     },
     daily: {
       title: "Daily Tasks Report",
+      summary: "Summary",
       generatedAt: "Generated at",
       reportType: "Report type",
       dateRange: "Date range",
       totalTasks: "Total tasks",
       totalAmount: "Total amount / expenses",
+      orderExpenses: "Order expenses",
+      otherExpenses: "Other expenses",
       highestExpense: "Highest expense",
       averageExpense: "Average expense",
       records: "Daily Task Records",
@@ -403,16 +472,14 @@ export const REPORT_TEXT = {
       stats: {
         totalRakhtRevenue: "مجموع عاید رخت",
         totalOrderBenefit: "مجموع فایده سفارش‌ها",
-        totalReadyMadeProfitAfterExpenses:
-          "مجموع فایده لباس آماده (بعد از مصارف)",
-        totalReadyMadeWaskatProfitAfterExpenses:
-          "مجموع فایده واسکت آماده (بعد از مصارف)",
         netBenefit: "درآمد خالص",
         totalOrders: "مجموع سفارش‌ها",
         totalAmount: "مجموع مبلغ",
         collected: "مجموع پرداخت شده",
         outstanding: "مجموع باقی مانده",
         totalDailyExpenses: "مجموع مصارف روزانه",
+        orderExpenses: "مصارف سفارش‌ها",
+        otherExpenses: "مصارف دیگر",
         totalRakhtPrice: "مجموع قیمت رخت ها",
         totalLoan: "مجموع قرض",
         totalDamagedClothesMoney: "مجموع پول سفارش‌های خراب",
@@ -424,11 +491,14 @@ export const REPORT_TEXT = {
     },
     daily: {
       title: "گزارش مصارف روزانه",
+      summary: "خلاصه",
       generatedAt: "زمان تولید",
       reportType: "نوع گزارش",
       dateRange: "بازه تاریخ",
       totalTasks: "مجموع مصارف",
       totalAmount: "مجموع مبلغ / مصرف",
+      orderExpenses: "مصارف سفارش‌ها",
+      otherExpenses: "مصارف دیگر",
       highestExpense: "بیشترین مصرف",
       averageExpense: "میانگین مصرف",
       records: "فهرست مصارف روزانه",
@@ -494,16 +564,14 @@ export const REPORT_TEXT = {
       stats: {
         totalRakhtRevenue: "د رخت ټول عاید",
         totalOrderBenefit: "د فرمایشونو ټول ګټه",
-        totalReadyMadeProfitAfterExpenses:
-          "د تیار لباس ټوله ګټه (له مصارفو وروسته)",
-        totalReadyMadeWaskatProfitAfterExpenses:
-          "د تیار واسکټ ټوله ګټه (له مصارفو وروسته)",
         netBenefit: "خالص عاید",
         totalOrders: "ټول فرمایشونه",
         totalAmount: "ټول مقدار",
         collected: "ټول ترلاسه شوي",
         outstanding: "ټول پاتې",
         totalDailyExpenses: "د ورځنیو مصارفو ټول مقدار",
+        orderExpenses: "د فرمایشونو مصارف",
+        otherExpenses: "نور مصارف",
         totalRakhtPrice: "د ټولو رختونو ټول قیمت",
         totalLoan: "ټول قرض",
         totalDamagedClothesMoney: "د خرابو فرمایشونو ټولې پیسې",
@@ -515,11 +583,14 @@ export const REPORT_TEXT = {
     },
     daily: {
       title: "د ورځنيو مصارفو راپور",
+      summary: "لنډیز",
       generatedAt: "د جوړېدو وخت",
       reportType: "د راپور ډول",
       dateRange: "د نېټې موده",
       totalTasks: "ټول مصارف",
       totalAmount: "ټول مقدار / مصرف",
+      orderExpenses: "د فرمایشونو مصارف",
+      otherExpenses: "نور مصارف",
       highestExpense: "تر ټولو لوړ مصرف",
       averageExpense: "اوسط مصرف",
       records: "د ورځنيو مصارفو جدول",

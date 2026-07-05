@@ -10,6 +10,7 @@ import {
 } from "react-icons/lu";
 import { useAuth } from "../context/AuthContext.jsx";
 import api from "../lib/api.js";
+import { PERMISSIONS, ROUTE_PERMISSIONS } from "../lib/permissions.js";
 import SidebarGroup from "./sidebar/SidebarGroup.jsx";
 import SidebarItem from "./sidebar/SidebarItem.jsx";
 import { isRouteActive } from "./sidebar/routeMatch.js";
@@ -104,9 +105,31 @@ function withLocalizedItems(items, t) {
   }));
 }
 
+function filterSectionsByPermissions(sections, hasPermission) {
+  return sections
+    .map((section) => {
+      const items = section.items
+        .map((item) => {
+          const children = item.children
+            ?.filter((child) => hasPermission(ROUTE_PERMISSIONS[child.path]))
+            .map((child) => ({ ...child }));
+
+          if (item.children?.length) {
+            return children?.length ? { ...item, children } : null;
+          }
+
+          return hasPermission(ROUTE_PERMISSIONS[item.path]) ? item : null;
+        })
+        .filter(Boolean);
+
+      return items.length ? { ...section, items } : null;
+    })
+    .filter(Boolean);
+}
+
 export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
   const { t, i18n } = useTranslation();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const location = useLocation();
 
   const role = user?.accountType || "ADMIN";
@@ -117,8 +140,12 @@ export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
   const expandedStorageKey = `sidebar:expanded:${role}`;
 
   const sections = useMemo(
-    () => withLocalizedLabels(getSidebarSections(role), t),
-    [role, t],
+    () =>
+      withLocalizedLabels(
+        filterSectionsByPermissions(getSidebarSections(role), hasPermission),
+        t,
+      ),
+    [role, t, hasPermission],
   );
   const footerItems = useMemo(
     () => withLocalizedItems(getSidebarFooterItems(role), t),
@@ -179,7 +206,7 @@ export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
           },
         })
         .then((r) => r.data),
-    enabled: Boolean(user?.id),
+    enabled: Boolean(user?.id) && hasPermission(PERMISSIONS.ORDERS_VIEW),
     refetchInterval: 30_000,
   });
 

@@ -84,9 +84,7 @@ export default function ItemSalesRecords() {
 
       <div className="item-record-stats">
         <StatCard
-          label={t("items.records.totalRevenue", {
-            defaultValue: "Total Revenue",
-          })}
+          label={t("common.total", { defaultValue: "Total" })}
           value={formatCurrency(stats.totalRevenue, language)}
           Icon={LuWallet}
           accent="#2563EB"

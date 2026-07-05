@@ -14,9 +14,17 @@ export default defineConfig(({ mode }) => {
       },
     },
     optimizeDeps: {
-      include: ["react-hook-form", "@hookform/resolvers/zod", "zod"],
+      include: [
+        "react-hook-form",
+        "@hookform/resolvers/zod",
+        "zod",
+        "react-icons/fa",
+        "react-icons/lu",
+      ],
     },
     build: {
+      target: "es2020",
+      cssCodeSplit: true,
       rollupOptions: {
         output: {
           manualChunks(id) {

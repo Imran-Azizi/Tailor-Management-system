@@ -97,6 +97,9 @@ model Tenant {
   itemSales                ItemSale[]
   contributors             Contributor[]
   auditLogs                AuditLog[]
+  roles                    Role[]
+  userRoles                UserRole[]
+  userPermissions          UserPermission[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -212,6 +215,9 @@ model User {
   latestPassword String?
   isActive     Boolean     @default(true)
   refreshToken String?
+  roles        UserRole[]
+  permissions  UserPermission[] @relation("UserPermissionUser")
+  grantedPermissions UserPermission[] @relation("UserPermissionGrantedBy")
 
   assignedOrders                 Order[]                 @relation("AssignedOrders")
   assignedByOrders               Order[]                 @relation("AssignedByOrders")
@@ -247,6 +253,87 @@ model User {
   @@index([tenantId])
   @@index([tenantId, accountType])
   @@unique([tenantId, phoneNumber])
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  group       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rolePermissions RolePermission[]
+  userPermissions UserPermission[]
+
+  @@index([group])
+}
+
+model Role {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  key       String
+  name      String
+  isSystem  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  rolePermissions RolePermission[]
+  users           UserRole[]
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+  @@index([key])
+}
+
+model RolePermission {
+  id           String     @id @default(uuid())
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@unique([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model UserRole {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId    String
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, roleId])
+  @@index([tenantId])
+  @@index([userId])
+  @@index([roleId])
+}
+
+model UserPermission {
+  id           String     @id @default(uuid())
+  tenantId     String
+  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation("UserPermissionUser", fields: [userId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  allowed      Boolean
+  grantedById  String?
+  grantedBy    User?      @relation("UserPermissionGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([userId, permissionId])
+  @@index([tenantId])
+  @@index([userId])
+  @@index([permissionId])
+  @@index([grantedById])
 }
 
 model UserNotification {

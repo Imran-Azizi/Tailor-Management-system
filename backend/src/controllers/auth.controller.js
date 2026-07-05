@@ -12,6 +12,7 @@ import {
   hashRefreshToken,
 } from '../lib/sessionCookies.js';
 import { JWT_SECRET } from '../middleware/auth.middleware.js';
+import { getEffectivePermissionCodes } from '../services/rbac.service.js';
 
 const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'tailor-refresh-secret-change-in-prod';
 const ACCESS_EXP = '15m';
@@ -66,7 +67,7 @@ function tenantSelect() {
   };
 }
 
-function serializeUser(user) {
+async function serializeUser(user) {
   return {
     id: user.id,
     tenantId: user.tenantId,
@@ -74,6 +75,7 @@ function serializeUser(user) {
     phoneNumber: user.phoneNumber,
     accountType: user.accountType,
     tenant: user.tenant || null,
+    permissions: user.permissions || await getEffectivePermissionCodes(user),
   };
 }
 
@@ -188,7 +190,7 @@ export async function login(req, res, next) {
     setAuthCookies(res, { accessToken, refreshToken });
 
     res.json({
-      user: serializeUser(user),
+      user: await serializeUser(user),
     });
   } catch (err) {
     next(err);
@@ -230,7 +232,7 @@ export async function refresh(req, res, next) {
     await prisma.user.update({ where: { id: user.id }, data: { refreshToken: hashRefreshToken(newRefresh) } });
     setAuthCookies(res, { accessToken: newAccess, refreshToken: newRefresh });
 
-    res.json({ user: serializeUser(user) });
+    res.json({ user: await serializeUser(user) });
   } catch (err) {
     next(err);
   }
@@ -263,7 +265,7 @@ export async function logout(req, res, next) {
 
 /** GET /api/auth/me */
 export async function me(req, res) {
-  res.json(serializeUser(req.user));
+  res.json(await serializeUser(req.user));
 }
 
 /** GET /api/auth/csrf */
@@ -327,7 +329,7 @@ export async function updateProfile(req, res, next) {
       data: { name, phoneNumber },
       include: { tenant: { select: tenantSelect() } },
     });
-    res.json({ user: serializeUser(updated) });
+    res.json({ user: await serializeUser(updated) });
   } catch (err) {
     next(err);
   }
@@ -377,7 +379,7 @@ export async function changePassword(req, res, next) {
       include: { tenant: { select: tenantSelect() } },
     });
     setAuthCookies(res, { accessToken, refreshToken });
-    res.json({ user: serializeUser(updated) });
+    res.json({ user: await serializeUser(updated) });
   } catch (err) {
     next(err);
   }

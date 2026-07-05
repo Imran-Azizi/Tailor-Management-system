@@ -5,7 +5,6 @@ import Select from "react-select";
 import toast from "react-hot-toast";
 import {
   LuArrowUpDown,
-  LuCalendarCheck,
   LuCalendarDays,
   LuDownload,
   LuFilter,
@@ -16,10 +15,9 @@ import {
 } from "react-icons/lu";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
-import { formatCurrency } from "../lib/currency.js";
+import { formatReportMoney } from "../lib/currency.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
-import { formatMonthYearLabel } from "../lib/months.js";
 import { formatSystemDateTime, isRtlLanguage } from "../lib/locale.js";
 import {
   Badge,
@@ -27,7 +25,12 @@ import {
   EmptyState,
   PageHeader,
   Spinner,
+  StatCard,
 } from "../components/ui/index.jsx";
+import {
+  ReportKpiGrid,
+  ReportMonthBanner,
+} from "../components/reports/ReportKit.jsx";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import MobileFilterPanel from "../components/ui/MobileFilterPanel.jsx";
 import "./PaymentHistory.css";
@@ -35,10 +38,7 @@ import "./PaymentHistory.css";
 const PAGE_SIZE = 20;
 
 function formatMoney(value, language = "en") {
-  return formatCurrency(value, language, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  return formatReportMoney(value, language);
 }
 
 function formatDateTime(value, language) {
@@ -253,6 +253,7 @@ export default function PaymentHistory() {
     "paidAt",
     "user",
   ];
+  const numericColumns = new Set(["totalPrice", "paidAmount", "remainingAmount"]);
 
   const paymentHistoryHeaders = {
     companyName: (
@@ -359,39 +360,29 @@ export default function PaymentHistory() {
       />
 
       {isAdmin && (
-        <div
-          className="month-info-banner"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "8px 14px",
-            marginBottom: 4,
-            borderRadius: "var(--r)",
-            background: "var(--success-soft, #F0FDF4)",
-            border: "1px solid var(--success-soft-border, #BBF7D0)",
-            fontSize: 13,
-            color: "var(--success, #16A34A)",
-            fontWeight: 500,
-          }}
-        >
-          <LuCalendarCheck size={14} />
-          <span>
-            {t("common.viewingMonth", "Viewing data for")}:{" "}
-            <strong style={{ fontWeight: 700 }}>
-              {formatMonthYearLabel(viewMonth, viewYear, language)}
-            </strong>
-          </span>
-          {data?.total === 0 && !isLoading && (
-            <span
-              className="month-info-empty"
-              style={{ marginInlineStart: "auto", fontSize: 11, opacity: 0.75 }}
-            >
-              {t("common.noDataThisMonth", "No data found for this month")}
-            </span>
-          )}
-        </div>
+        <ReportMonthBanner isEmpty={data?.total === 0 && !isLoading} />
       )}
+
+      <ReportKpiGrid>
+        <StatCard
+          label={t("rakht.totalRecords", { defaultValue: "Total Records" })}
+          value={total}
+          Icon={LuHistory}
+          accent="#2563EB"
+        />
+        <StatCard
+          label={t("rakht.totalPaidMoney", { defaultValue: "Total Paid Money" })}
+          value={formatMoney(summary.totalPaid, language)}
+          Icon={AfCurrencyIcon}
+          accent="#0F766E"
+        />
+        <StatCard
+          label={t("rakht.remainingMoney", { defaultValue: "Remaining Amount" })}
+          value={formatMoney(summary.totalRemaining, language)}
+          Icon={AfCurrencyIcon}
+          accent="#B45309"
+        />
+      </ReportKpiGrid>
 
       <MobileFilterPanel
         activeCount={activeFilterCount}
@@ -580,26 +571,6 @@ export default function PaymentHistory() {
         </Card>
       </MobileFilterPanel>
 
-      <Card>
-        <div className="payment-history-summary">
-          <span className="badge bg-gray">
-            {t("rakht.totalRecords", { defaultValue: "Total Records" })}:{" "}
-            {total}
-          </span>
-          <span className="badge bg-green">
-            {t("rakht.totalPaidMoney", { defaultValue: "Total Paid Money" })}:{" "}
-            {formatMoney(summary.totalPaid, language)}
-          </span>
-          <span className="badge bg-gold">
-            {t("rakht.remainingMoney", { defaultValue: "Remaining Amount" })}:{" "}
-            {formatMoney(summary.totalRemaining, language)}
-          </span>
-          <span className="badge bg-gray">
-            {t("common.page", { defaultValue: "Page" })}: {page} / {totalPages}
-          </span>
-        </div>
-      </Card>
-
       <div
         className="payment-history-table-section"
         dir={isTableRtl ? "rtl" : "ltr"}
@@ -634,7 +605,9 @@ export default function PaymentHistory() {
                   {paymentHistoryColumnOrder.map((columnKey) => (
                     <th
                       key={columnKey}
-                      className={`payment-history-col--${columnKey}`}
+                      className={`payment-history-col--${columnKey}${
+                        numericColumns.has(columnKey) ? " report-cell-num" : ""
+                      }`}
                     >
                       {paymentHistoryHeaders[columnKey]}
                     </th>
@@ -657,9 +630,9 @@ export default function PaymentHistory() {
                     totalPrice: (
                       <td
                         key="totalPrice"
-                        className="payment-history-col--totalPrice"
+                        className="payment-history-col--totalPrice report-cell-num"
                       >
-                        <span className="payment-history-number">
+                        <span className="payment-history-number report-num">
                           {formatMoney(row.totalPriceAfter, language)}
                         </span>
                       </td>
@@ -667,9 +640,9 @@ export default function PaymentHistory() {
                     paidAmount: (
                       <td
                         key="paidAmount"
-                        className="payment-history-col--paidAmount"
+                        className="payment-history-col--paidAmount report-cell-num"
                       >
-                        <span className="payment-history-number">
+                        <span className="payment-history-number report-num">
                           {formatMoney(row.paidAmount, language)}
                         </span>
                       </td>
@@ -677,9 +650,9 @@ export default function PaymentHistory() {
                     remainingAmount: (
                       <td
                         key="remainingAmount"
-                        className="payment-history-col--remainingAmount"
+                        className="payment-history-col--remainingAmount report-cell-num"
                       >
-                        <span className="payment-history-number">
+                        <span className="payment-history-number report-num">
                           {formatMoney(row.remainingAfter, language)}
                         </span>
                       </td>

@@ -208,12 +208,20 @@ function buildBreakdown(tasks, granularity) {
         period: key,
         totalTasks: 0,
         totalAmount: 0,
+        orderExpenses: 0,
+        otherExpenses: 0,
       });
     }
 
     const bucket = buckets.get(key);
+    const amount = Number(task.amount || 0);
     bucket.totalTasks += 1;
-    bucket.totalAmount += Number(task.amount || 0);
+    bucket.totalAmount += amount;
+    if (task.orderId) {
+      bucket.orderExpenses += amount;
+    } else {
+      bucket.otherExpenses += amount;
+    }
   }
 
   return [...buckets.values()].sort((a, b) =>
@@ -367,7 +375,34 @@ export const getDailyTasks = async ({
     }),
   ]);
 
-  return { data, total, page, limit };
+  const [summaryAggregate, orderExpenseAggregate, otherExpenseAggregate] =
+    await Promise.all([
+      prisma.dailyTask.aggregate({
+        where,
+        _sum: { amount: true },
+      }),
+      prisma.dailyTask.aggregate({
+        where: { ...where, orderId: { not: null } },
+        _sum: { amount: true },
+      }),
+      prisma.dailyTask.aggregate({
+        where: { ...where, orderId: null },
+        _sum: { amount: true },
+      }),
+    ]);
+
+  return {
+    data,
+    total,
+    page,
+    limit,
+    summary: {
+      totalTasks: total,
+      totalAmount: Number(summaryAggregate._sum?.amount || 0),
+      orderExpenses: Number(orderExpenseAggregate._sum?.amount || 0),
+      otherExpenses: Number(otherExpenseAggregate._sum?.amount || 0),
+    },
+  };
 };
 
 export const getDailyTaskById = async (id) => {
@@ -490,6 +525,14 @@ export const getDailyTaskReport = async ({
   ]);
 
   const totalAmount = Number(summaryAggregate._sum?.amount || 0);
+  const orderExpenses = tasks.reduce(
+    (sum, task) => sum + (task.orderId ? Number(task.amount || 0) : 0),
+    0,
+  );
+  const otherExpenses = tasks.reduce(
+    (sum, task) => sum + (!task.orderId ? Number(task.amount || 0) : 0),
+    0,
+  );
   const highestExpense = Number(summaryAggregate._max?.amount || 0);
   const averageAmount = Number(summaryAggregate._avg?.amount || 0);
 
@@ -506,6 +549,8 @@ export const getDailyTaskReport = async ({
     summary: {
       totalTasks,
       totalAmount,
+      orderExpenses,
+      otherExpenses,
       highestExpense,
       averageAmount,
       completedTasks: null,

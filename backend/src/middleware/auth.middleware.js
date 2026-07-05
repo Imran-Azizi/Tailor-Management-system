@@ -8,6 +8,7 @@ import {
   hashSessionToken,
   hashRefreshToken,
 } from '../lib/sessionCookies.js';
+import { getEffectivePermissionCodes, isPrivilegedAccount } from '../services/rbac.service.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'tailor-secret-key-change-in-prod';
 
@@ -100,8 +101,12 @@ export async function authenticate(req, res, next) {
       }
     }
 
+    const permissionCodes = await getEffectivePermissionCodes(user);
+
     req.user = user;
     delete req.user.refreshToken;
+    req.user.permissions = permissionCodes;
+    req.permissions = new Set(permissionCodes);
     req.tenant = user.tenant || null;
     runTenantContext(
       { tenantId: user.tenantId, userId: user.id, isSuperAdmin },
@@ -121,6 +126,33 @@ export function authorize(...roles) {
       return res.status(403).json({ error: 'You do not have permission to perform this action.' });
     }
     next();
+  };
+}
+
+export function authorizePermission(permission, ...fallbackRoles) {
+  return (req, res, next) => {
+    if (!req.user) return res.status(401).json({ error: 'Authentication required.' });
+    if (isPrivilegedAccount(req.user.accountType)) return next();
+    if (fallbackRoles.includes(req.user.accountType)) return next();
+    if (req.permissions?.has(permission)) return next();
+    return res.status(403).json({
+      code: 'ACCESS_DENIED',
+      permission,
+      error: 'You do not have permission to perform this action.',
+    });
+  };
+}
+
+export function authorizeAnyPermission(...permissions) {
+  return (req, res, next) => {
+    if (!req.user) return res.status(401).json({ error: 'Authentication required.' });
+    if (isPrivilegedAccount(req.user.accountType)) return next();
+    if (permissions.some((permission) => req.permissions?.has(permission))) return next();
+    return res.status(403).json({
+      code: 'ACCESS_DENIED',
+      permissions,
+      error: 'You do not have permission to perform this action.',
+    });
   };
 }
 

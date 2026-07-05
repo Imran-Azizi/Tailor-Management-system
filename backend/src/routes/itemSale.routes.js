@@ -1,15 +1,16 @@
 import { Router } from "express";
 import * as itemSaleController from "../controllers/itemSale.controller.js";
-import { authenticate, authorize } from "../middleware/auth.middleware.js";
+import { authenticate, authorizeAnyPermission, authorizePermission } from "../middleware/auth.middleware.js";
+import { PERMISSIONS } from "../lib/permissions.js";
 
 export const itemSaleRoutes = Router();
 
 itemSaleRoutes.use(authenticate);
-itemSaleRoutes.get("/", authorize("ADMIN", "FINANCE"), itemSaleController.listSales);
-itemSaleRoutes.get("/stats", authorize("ADMIN", "FINANCE"), itemSaleController.stats);
+itemSaleRoutes.get("/", authorizePermission(PERMISSIONS.INVENTORY_VIEW), itemSaleController.listSales);
+itemSaleRoutes.get("/stats", authorizeAnyPermission(PERMISSIONS.FINANCE_REVENUE_VIEW, PERMISSIONS.FINANCE_PROFIT_VIEW), itemSaleController.stats);
 itemSaleRoutes.post(
   "/",
-  authorize("ADMIN", "FINANCE"),
+  authorizePermission(PERMISSIONS.INVENTORY_PRODUCTS_SELL),
   itemSaleController.createSale,
 );
 
