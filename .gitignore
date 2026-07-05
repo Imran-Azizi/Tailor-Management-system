@@ -126,10 +126,10 @@ playwright-report/
 playwright/.cache/
 
 # -----------------------------------------------------------------------------
-# Generated exports, reports & temp files
-# -----------------------------------------------------------------------------
+# Generated exports & downloaded report output (not React report UI components)
 exports/
-reports/
+**/report-exports/
+backend/reports/
 *.tmp
 *.temp
 *.bak

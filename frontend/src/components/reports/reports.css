@@ -1,0 +1,140 @@
+/* ============================================================
+   Unified report design system
+   - 8px spacing scale, 12/16px radius, soft shadows
+   - RTL-aware via logical properties + [dir]
+   - Print-ready (A4, repeating table headers, no chrome)
+   ============================================================ */
+
+.report-shell {
+  display: grid;
+  gap: 16px;
+  padding-bottom: 32px;
+  align-content: start;
+}
+
+/* RTL (Dari/Pashto) typography for reports lives in index.css so it
+   applies globally, not only on pages that import this kit. */
+
+/* --- KPI cards --- */
+.report-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+@media (max-width: 767px) {
+  .report-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+}
+@media (max-width: 440px) {
+  .report-kpi-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* --- Month / date-range banner --- */
+.report-month-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid var(--success-soft-border, #bbf7d0);
+  border-radius: 12px;
+  background: var(--success-soft, #f0fdf4);
+  color: var(--success, #16a34a);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: start;
+}
+.report-month-banner strong {
+  font-weight: 700;
+}
+.report-month-banner__empty {
+  margin-inline-start: auto;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+/* --- Numbers: keep digits LTR and tabular in any language --- */
+.report-num {
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-variant-numeric: tabular-nums lining-nums;
+  white-space: nowrap;
+}
+
+/* Numeric columns align to the inline end (right in LTR, left in RTL),
+   so labels stay on the reading side and values pair consistently. */
+.professional-report-table th.report-cell-num,
+.professional-report-table td.report-cell-num {
+  text-align: end !important;
+}
+.professional-report-page[dir="rtl"] .professional-report-table th.report-cell-num,
+.professional-report-page[dir="rtl"] .professional-report-table td.report-cell-num {
+  text-align: left !important;
+}
+
+/* --- Section/table cards get one consistent look --- */
+.report-shell .card {
+  border-radius: 16px;
+  border-color: var(--border);
+  box-shadow: 0 16px 36px -32px rgba(15, 23, 42, 0.55);
+}
+
+/* ============================================================
+   Print (A4) — clean, paginated, header rows repeat per page
+   ============================================================ */
+@media print {
+  .report-shell,
+  .professional-report-page {
+    display: block !important;
+    gap: 0 !important;
+  }
+  .mobile-filter-panel,
+  .report-no-print,
+  .no-print,
+  .page-hd-action,
+  .pagination,
+  .payment-history-pagination,
+  .all-transactions-pagination,
+  .report-pagination {
+    display: none !important;
+  }
+  .report-month-banner {
+    padding: 2mm 0 !important;
+    margin-bottom: 3mm !important;
+    border: 0 !important;
+    border-bottom: 1px solid #94a3b8 !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    color: #111 !important;
+  }
+  .report-kpi-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 3mm !important;
+    margin-bottom: 4mm !important;
+  }
+  .report-kpi-grid .stat-card {
+    min-height: 0 !important;
+    padding: 3mm !important;
+  }
+  .professional-report-table thead {
+    display: table-header-group;
+  }
+  .professional-report-table tbody tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .report-shell .card,
+  .report-chart-card {
+    margin-bottom: 4mm !important;
+  }
+  .recharts-responsive-container,
+  .recharts-wrapper,
+  .recharts-surface {
+    max-width: 100% !important;
+    overflow: hidden !important;
+  }
+}
