@@ -137,19 +137,20 @@ export function isOriginAllowed(origin, req, configuredOrigins) {
 }
 
 export function createCorsMiddlewareOptions(configuredOrigins) {
-  return {
-    origin: function corsOrigin(origin, callback) {
-      const req = this;
-      if (isOriginAllowed(origin, req, configuredOrigins)) {
-        callback(null, true);
-        return;
-      }
+  return function corsOptionsDelegate(req, callback) {
+    callback(null, {
+      origin(origin, originCallback) {
+        if (isOriginAllowed(origin, req, configuredOrigins)) {
+          originCallback(null, true);
+          return;
+        }
 
-      const normalizedRequestOrigin =
-        normalizeRequestOrigin(origin) || String(origin || "");
-      callback(createCorsBlockedError(normalizedRequestOrigin));
-    },
-    credentials: true,
-    optionsSuccessStatus: 200,
+        const normalizedRequestOrigin =
+          normalizeRequestOrigin(origin) || String(origin || "");
+        originCallback(createCorsBlockedError(normalizedRequestOrigin));
+      },
+      credentials: true,
+      optionsSuccessStatus: 200,
+    });
   };
 }
