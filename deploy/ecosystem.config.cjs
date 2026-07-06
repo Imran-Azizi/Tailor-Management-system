@@ -23,6 +23,7 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         PORT: 8000,
+        SERVE_FRONTEND: "true",
       },
     },
   ],

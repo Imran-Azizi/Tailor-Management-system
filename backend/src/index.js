@@ -29,6 +29,7 @@ import {
   createCorsMiddlewareOptions,
   parseConfiguredOrigins,
 } from "./lib/corsOrigins.js";
+import { mountFrontend } from "./lib/serveFrontend.js";
 
 const app = express();
 const parsePort = (value) => {
@@ -108,6 +109,8 @@ app.get("/api/health", (req, res) =>
 app.use("/api", (req, res) => {
   res.status(404).json({ error: "API route not found." });
 });
+
+mountFrontend(app, express.static);
 
 app.use(errorHandler);
 

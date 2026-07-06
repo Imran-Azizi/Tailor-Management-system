@@ -5,26 +5,19 @@ Deploy the Tailor Management System on a single VPS with **nginx** (frontend + r
 ## Architecture
 
 ```
-Browser → nginx (port 80/443)
-            ├── /            → frontend/dist (React SPA)
-            ├── /api/*       → Node.js backend :8000
-            └── /uploads/*   → Node.js backend :8000
+Browser → nginx (port 80/443) → Node.js (port 8000)
+                                      ├── /api/*     API routes
+                                      ├── /uploads/* uploaded files
+                                      └── /*         React SPA (frontend/dist)
 ```
 
-The frontend calls `/api/...` (same origin). nginx must proxy those requests to the backend.
+Node serves **both** the API and the built frontend. nginx forwards **all** traffic to port 8000.
 
 ## Why `/api/auth/csrf` returns 404
 
-This almost always means **nginx is not proxying `/api` to the backend**. The SPA `try_files` rule catches the request and returns 404 because no static file exists at that path.
+Your nginx is serving only static files (`try_files`) and **not** forwarding `/api` to Node.
 
-**Wrong nginx config (strips `/api`):**
-```nginx
-location /api/ {
-    proxy_pass http://127.0.0.1:8000/;  # BAD — backend receives /auth/csrf instead of /api/auth/csrf
-}
-```
-
-**Correct config:** use `deploy/nginx/hoshmandsafi.com.conf` (included in this repo).
+**Fix:** use the simplified config in `deploy/nginx/hoshmandsafi.com.conf` (proxy everything to port 8000).
 
 ---
 
@@ -77,7 +70,12 @@ COOKIE_SECURE=true
 ### `frontend/.env` (before build)
 
 ```env
-VITE_API_URL=/api
+VITE_API_URL=http://hoshmandsafi.com/api
+```
+
+After enabling HTTPS, update:
+```env
+VITE_API_URL=https://hoshmandsafi.com/api
 ```
 
 Rebuild after any change: `npm --prefix frontend run build`
