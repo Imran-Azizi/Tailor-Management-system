@@ -9,6 +9,7 @@ import {
   hashRefreshToken,
 } from '../lib/sessionCookies.js';
 import { getEffectivePermissionCodes, isPrivilegedAccount } from '../services/rbac.service.js';
+import { createTenantHostAccessError } from '../lib/tenantHost.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'tailor-secret-key-change-in-prod';
 
@@ -99,6 +100,16 @@ export async function authenticate(req, res, next) {
       if (isExpired) {
         return res.status(402).json({ code: 'SUBSCRIPTION_EXPIRED', error: 'Subscription expired.' });
       }
+    }
+
+    const hostViolation = createTenantHostAccessError(req, user);
+    if (hostViolation) {
+      return res.status(hostViolation.status || 403).json({
+        code: hostViolation.code,
+        error: hostViolation.error,
+        expectedHost: hostViolation.expectedHost || null,
+        redirectUrl: hostViolation.redirectUrl || null,
+      });
     }
 
     const permissionCodes = await getEffectivePermissionCodes(user);

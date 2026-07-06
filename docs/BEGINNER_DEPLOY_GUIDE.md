@@ -215,12 +215,14 @@ cd /var/www/Tailor-Management-system
 
 mkdir -p backend/uploads backend/storage backend/tmp
 
-npm --prefix backend install --omit=dev
+npm --prefix backend install
 npm --prefix frontend install
 npm --prefix frontend run build
 
-npm --prefix backend run prisma:generate
-npx --prefix backend prisma migrate deploy
+cd backend
+npx prisma generate
+npx prisma migrate deploy
+cd ..
 ```
 
 The frontend build takes a few minutes. At the end you should have a
@@ -368,7 +370,8 @@ migrations, restarts PM2, and verifies the deployment.
 | Browser shows old/broken page | Browser cache | Hard refresh `Ctrl+Shift+R` |
 | CORS blocked | Wrong `FRONTEND_URL` in `backend/.env` | Set it to your domain, then `pm2 restart tailor-api --update-env` |
 | Login works but session lost after refresh | Wrong cookie settings | HTTP → `COOKIE_SECURE=false`; HTTPS → `COOKIE_SECURE=true`; restart PM2 |
-| `P1000`/`P1001` database errors | Wrong `DATABASE_URL` password or PostgreSQL down | Check password matches Step 5; `systemctl status postgresql` |
+| `P1000`/`P1001` database errors | Wrong `DATABASE_URL` password or PostgreSQL down | Check password matches Step 5; `systemctl status postgresql`; then run `cd backend && npx prisma migrate deploy` |
+| `Could not find Prisma Schema` | Running Prisma from the wrong folder | Run `cd /var/www/Tailor-Management-system/backend` first, then `npx prisma migrate deploy` |
 | `EADDRINUSE: port 8000` | Two copies of the app running | `pm2 delete all` then Step 9 again |
 | `502 Bad Gateway` from nginx | Backend crashed | `pm2 logs tailor-api` to see the error, fix it, `pm2 restart tailor-api` |
 | Site unreachable at all | DNS not pointing to VPS, or firewall | `nslookup hoshmandsafi.com` must return `164.68.121.90`; `ufw status` must allow Nginx Full |

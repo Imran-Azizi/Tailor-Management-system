@@ -1,5 +1,6 @@
 import axios from "axios";
 import { normalizeDigits } from "./normalize.js";
+import { getTenantHostContext } from "./tenantHost.js";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
 const CSRF_HEADER_NAME = "X-CSRF-Token";
@@ -42,6 +43,16 @@ function isAuthLoginRequest(config = {}) {
   return String(config.url || "").includes("/auth/login");
 }
 
+function getTenantRequestHeaders() {
+  const hostContext = getTenantHostContext();
+  if (hostContext.hostType !== "tenant" || !hostContext.tenantSlug) {
+    return null;
+  }
+  return {
+    "X-Tenant-Slug": hostContext.tenantSlug,
+  };
+}
+
 function shouldRedirectToLogin(config = {}) {
   if (config.skipAuthRedirect) return false;
   return window.location.pathname !== "/login";
@@ -60,8 +71,9 @@ export function setAuthSessionExpiredHandler(handler) {
 export async function ensureCsrfToken() {
   if (csrfToken) return csrfToken;
   if (!csrfPromise) {
+    const headers = getTenantRequestHeaders();
     csrfPromise = csrfClient
-      .get("/auth/csrf")
+      .get("/auth/csrf", headers ? { headers } : undefined)
       .then(({ data }) => {
         csrfToken = data?.csrfToken || null;
         return csrfToken;
@@ -84,13 +96,31 @@ async function attachCsrfHeader(config) {
   return config;
 }
 
+function attachTenantHeaders(config) {
+  const tenantHeaders = getTenantRequestHeaders();
+  if (!tenantHeaders) return config;
+  config.headers = config.headers || {};
+  for (const [key, value] of Object.entries(tenantHeaders)) {
+    if (config.headers[key] === undefined) {
+      config.headers[key] = value;
+    }
+  }
+  return config;
+}
+
 function expireAuthSession() {
   clearCsrfToken();
   onAuthSessionExpired?.();
 }
 
+csrfClient.interceptors.request.use((config) => {
+  config.withCredentials = true;
+  return attachTenantHeaders(config);
+});
+
 api.interceptors.request.use(async (config) => {
   config.withCredentials = true;
+  config = attachTenantHeaders(config);
   config = await attachCsrfHeader(config);
 
   if (config.params !== undefined) {
@@ -120,6 +150,19 @@ api.interceptors.response.use(
     }
 
     const original = err.config;
+
+    if (
+      err.response?.status === 403 &&
+      err.response?.data?.redirectUrl &&
+      ["TENANT_HOST_REQUIRED", "TENANT_HOST_MISMATCH", "SUPER_ADMIN_HOST_REQUIRED"].includes(
+        err.response?.data?.code,
+      )
+    ) {
+      if (window.location.href !== err.response.data.redirectUrl) {
+        window.location.href = err.response.data.redirectUrl;
+      }
+      return Promise.reject(err);
+    }
 
     if (
       err.response?.status === 403 &&

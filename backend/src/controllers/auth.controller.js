@@ -13,6 +13,7 @@ import {
 } from '../lib/sessionCookies.js';
 import { JWT_SECRET } from '../middleware/auth.middleware.js';
 import { getEffectivePermissionCodes } from '../services/rbac.service.js';
+import { createTenantHostAccessError } from '../lib/tenantHost.js';
 
 const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'tailor-refresh-secret-change-in-prod';
 const ACCESS_EXP = '15m';
@@ -88,12 +89,22 @@ function isTenantExpired(tenant) {
 
 function getRequestedTenant(req) {
   return (
-    req.body?.tenantId ||
+    req.tenantHost?.slug ||
     req.body?.tenantSlug ||
-    req.headers['x-tenant-id'] ||
     req.headers['x-tenant-slug'] ||
+    req.body?.tenantId ||
+    req.headers['x-tenant-id'] ||
     null
   );
+}
+
+function respondHostAccessError(res, violation) {
+  return res.status(violation.status || 403).json({
+    code: violation.code,
+    error: violation.error,
+    expectedHost: violation.expectedHost || null,
+    redirectUrl: violation.redirectUrl || null,
+  });
 }
 
 function matchesRequestedTenant(user, requestedTenant) {
@@ -183,6 +194,11 @@ export async function login(req, res, next) {
       }
     }
 
+    const hostViolation = createTenantHostAccessError(req, user);
+    if (hostViolation) {
+      return respondHostAccessError(res, hostViolation);
+    }
+
     const refreshToken = signRefresh(user);
     const accessToken = signAccess(user, refreshToken);
 
@@ -225,6 +241,11 @@ export async function refresh(req, res, next) {
       if (isTenantExpired(user.tenant)) {
         return res.status(402).json({ code: 'SUBSCRIPTION_EXPIRED', error: 'Subscription expired.' });
       }
+    }
+
+    const hostViolation = createTenantHostAccessError(req, user);
+    if (hostViolation) {
+      return respondHostAccessError(res, hostViolation);
     }
 
     const newRefresh = signRefresh(user);

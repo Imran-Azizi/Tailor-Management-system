@@ -13,6 +13,10 @@ import api, {
   setAuthSessionExpiredHandler,
 } from "../lib/api.js";
 import { normalizePermissionList } from "../lib/permissions.js";
+import {
+  getExpectedUserUrl,
+  getTenantHostContext,
+} from "../lib/tenantHost.js";
 
 const AuthContext = createContext(null);
 const AUTH_CHANNEL_NAME = "tailor-auth-session";
@@ -22,6 +26,20 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const channelRef = useRef(null);
+
+  const syncUserHost = useCallback((nextUser) => {
+    const expectedUrl = getExpectedUserUrl(nextUser);
+    const hostContext = getTenantHostContext();
+    if (!expectedUrl || hostContext.hostType === "local") {
+      return false;
+    }
+    const expected = new URL(expectedUrl, window.location.origin);
+    if (expected.host !== window.location.host) {
+      window.location.href = expected.href;
+      return true;
+    }
+    return false;
+  }, []);
 
   const clearSessionState = useCallback(() => {
     setUser(null);
@@ -57,7 +75,7 @@ export function AuthProvider({ children }) {
     api
       .get("/auth/me", { skipAuthRedirect: true })
       .then(({ data }) => {
-        if (!cancelled) setUser(data);
+        if (!cancelled && !syncUserHost(data)) setUser(data);
       })
       .catch(() => {
         if (!cancelled) clearSessionState();
@@ -69,7 +87,7 @@ export function AuthProvider({ children }) {
     return () => {
       cancelled = true;
     };
-  }, [clearSessionState]);
+  }, [clearSessionState, syncUserHost]);
 
   useEffect(() => {
     document.title =
@@ -77,13 +95,21 @@ export function AuthProvider({ children }) {
   }, [user?.tenant?.systemName]);
 
   const login = useCallback(async (phoneNumber, password) => {
-    const { data } = await api.post("/auth/login", {
+    const hostContext = getTenantHostContext();
+    const payload = {
       phoneNumber,
       password,
-    });
+      ...(hostContext.hostType === "tenant" && hostContext.tenantSlug
+        ? { tenantSlug: hostContext.tenantSlug }
+        : {}),
+    };
+    const { data } = await api.post("/auth/login", payload);
+    if (syncUserHost(data.user)) {
+      return data.user;
+    }
     setUser(data.user);
     return data.user;
-  }, []);
+  }, [syncUserHost]);
 
   const logout = useCallback(async () => {
     try {

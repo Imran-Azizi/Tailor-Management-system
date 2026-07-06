@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
@@ -15,8 +15,11 @@ import {
 } from "react-icons/lu";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTheme } from "../context/ThemeContext.jsx";
+import { assetUrl } from "../lib/assets.js";
+import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { PERMISSIONS } from "../lib/permissions.js";
+import { getTenantHostContext } from "../lib/tenantHost.js";
 
 function firstAllowedMainPath(user, from = "/") {
   const permissions = new Set(user?.permissions || []);
@@ -124,14 +127,62 @@ export default function Login() {
   const isDariPashto =
     language.startsWith("dari") || language.startsWith("pashto");
   const from = location.state?.from?.pathname || "/dashboard";
+  const hostContext = getTenantHostContext();
 
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [tenantContext, setTenantContext] = useState(null);
+  const [tenantContextLoading, setTenantContextLoading] = useState(true);
+  const [tenantContextError, setTenantContextError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    setTenantContextLoading(true);
+    setTenantContextError("");
+
+    api
+      .get("/public/tenant-context", { skipAuthRedirect: true })
+      .then(({ data }) => {
+        if (!active) return;
+        setTenantContext(data);
+      })
+      .catch((error) => {
+        if (!active) return;
+        setTenantContext(null);
+        setTenantContextError(
+          error?.response?.data?.error || t("auth.loginFailed"),
+        );
+      })
+      .finally(() => {
+        if (active) setTenantContextLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [t]);
+
+  const tenantBrand = tenantContext?.tenant || null;
+  const loginTitle =
+    tenantBrand?.systemName || tenantBrand?.businessName || t("appName");
+  const loginSubtitle =
+    hostContext.hostType === "admin"
+      ? t("superAdmin.title", "Super Admin")
+      : tenantBrand?.businessName || t("auth.signInToContinue");
+  const isUnknownTenantHost =
+    hostContext.hostType === "tenant" &&
+    !tenantContextLoading &&
+    (!tenantContext || tenantContext?.hostType === "unknown-tenant");
+  const disableSubmit = loading || (hostContext.hostType === "tenant" && (tenantContextLoading || isUnknownTenantHost));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isUnknownTenantHost) {
+      toast.error(tenantContextError || "Tenant subdomain was not found.");
+      return;
+    }
     if (!phone.trim() || !password) {
       toast.error(t("auth.fillAllFields"));
       return;
@@ -153,6 +204,16 @@ export default function Login() {
         toast.error(t("auth.adminOnly", "Access denied. Admin accounts only."));
       }
     } catch (err) {
+      if (
+        err?.response?.status === 403 &&
+        ["TENANT_HOST_REQUIRED", "TENANT_HOST_MISMATCH", "SUPER_ADMIN_HOST_REQUIRED"].includes(
+          err?.response?.data?.code,
+        ) &&
+        err?.response?.data?.redirectUrl
+      ) {
+        window.location.href = err.response.data.redirectUrl;
+        return;
+      }
       if (err?.response?.status === 402) {
         navigate("/subscription-expired", { replace: true });
         return;
@@ -228,9 +289,18 @@ export default function Login() {
               alignItems: "center",
               justifyContent: "center",
               marginBottom: 14,
+              overflow: "hidden",
             }}
           >
-            <LuScissors size={26} color="#fff" />
+            {tenantBrand?.logoUrl ? (
+              <img
+                src={assetUrl(tenantBrand.logoUrl)}
+                alt={tenantBrand.businessName || tenantBrand.systemName || "Tenant logo"}
+                style={{ width: "100%", height: "100%", objectFit: "contain", background: "#fff" }}
+              />
+            ) : (
+              <LuScissors size={26} color="#fff" />
+            )}
           </div>
           <h1
             style={{
@@ -240,11 +310,26 @@ export default function Login() {
               margin: 0,
             }}
           >
-            {t("appName")}
+            {loginTitle}
           </h1>
           <p style={{ fontSize: 13, color: "var(--text3)", marginTop: 4 }}>
-            {t("auth.signInToContinue")}
+            {loginSubtitle}
           </p>
+          {hostContext.hostType === "tenant" && hostContext.tenantSlug ? (
+            <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>
+              {hostContext.tenantSlug}.hoshmandsafi.com
+            </p>
+          ) : null}
+          {hostContext.hostType === "tenant" && tenantContextLoading ? (
+            <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>
+              {t("common.loading")}
+            </p>
+          ) : null}
+          {isUnknownTenantHost ? (
+            <p style={{ fontSize: 12, color: "var(--danger)", marginTop: 8 }}>
+              {tenantContextError || "Tenant subdomain was not found."}
+            </p>
+          ) : null}
         </div>
 
         {/* Form */}
@@ -340,17 +425,17 @@ export default function Login() {
           {/* Submit */}
           <button
             type="submit"
-            disabled={loading}
+            disabled={disableSubmit}
             style={{
               marginTop: 4,
               padding: "11px 0",
-              background: loading ? "var(--primary-200)" : "var(--primary)",
+              background: disableSubmit ? "var(--primary-200)" : "var(--primary)",
               color: "#fff",
               border: "none",
               borderRadius: 8,
               fontSize: 14,
               fontWeight: 600,
-              cursor: loading ? "not-allowed" : "pointer",
+              cursor: disableSubmit ? "not-allowed" : "pointer",
               transition: "opacity .15s",
             }}
           >

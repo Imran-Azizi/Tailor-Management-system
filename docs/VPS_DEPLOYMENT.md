@@ -135,5 +135,5 @@ Then update `backend/.env` cookie settings for HTTPS and restart PM2.
 | `GET /api/auth/csrf 404` | Install nginx config from `deploy/nginx/`; ensure backend is running on port 8000 |
 | CORS blocked | Set `FRONTEND_URL=http://hoshmandsafi.com` in `backend/.env`; restart API |
 | Login succeeds but session lost | On HTTP use `COOKIE_SECURE=false`; on HTTPS use `COOKIE_SECURE=true` |
-| Database errors | Check `DATABASE_URL`; run `npx --prefix backend prisma migrate deploy` |
+| Database errors | Check `DATABASE_URL`; run `cd backend && npx prisma migrate deploy` |
 | Build fails on missing ReportKit | Ensure `frontend/src/components/reports/` is committed (not gitignored) |

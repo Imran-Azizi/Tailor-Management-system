@@ -20,6 +20,7 @@ import rakhtRoutes from "./routes/rakht.routes.js";
 import backupRoutes from "./routes/backup.routes.js";
 import damagedClothesRoutes from "./routes/damagedClothes.routes.js";
 import tenantRoutes from "./routes/tenant.routes.js";
+import publicRoutes from "./routes/public.routes.js";
 import { startCronJobs } from "./cron/notifications.cron.js";
 import { startBackupCron } from "./cron/backup.cron.js";
 import { itemRoutes } from "./routes/item.routes.js";
@@ -30,6 +31,7 @@ import {
   parseConfiguredOrigins,
 } from "./lib/corsOrigins.js";
 import { mountFrontend } from "./lib/serveFrontend.js";
+import { resolveTenantHost } from "./middleware/tenantHost.middleware.js";
 
 const app = express();
 const parsePort = (value) => {
@@ -64,6 +66,7 @@ app.use(
   }),
 );
 app.use(normalizeDigitsMiddleware);
+app.use(resolveTenantHost);
 app.use("/api", csrfProtection);
 app.use(
   "/uploads",
@@ -83,6 +86,7 @@ app.use(
 );
 
 // Routes
+app.use("/api/public", publicRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/tenants", tenantRoutes);
 app.use("/api/users", userRoutes);

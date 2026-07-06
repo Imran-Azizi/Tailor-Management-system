@@ -3,6 +3,7 @@ import crypto from "crypto";
 import fs from "fs/promises";
 import path from "path";
 import { prisma } from "../lib/prisma.js";
+import { getReservedSubdomains } from "../lib/tenantHost.js";
 import {
   getOrderFinancialPaid,
   getOrderFinancialRemaining,
@@ -95,6 +96,42 @@ async function uniqueTenantSlug(baseValue) {
     candidate = `${base.slice(0, 56)}-${suffix}`;
   }
   return candidate;
+}
+
+async function assertTenantSlugAvailable(candidate, excludeTenantId = null) {
+  const existing = await prisma.tenant.findFirst({
+    where: {
+      OR: [{ slug: candidate }, { tenantId: candidate }],
+      ...(excludeTenantId ? { id: { not: excludeTenantId } } : {}),
+    },
+    select: { id: true },
+  });
+  if (existing) {
+    const error = new Error("This subdomain is already in use.");
+    error.status = 409;
+    error.code = "SUBDOMAIN_IN_USE";
+    throw error;
+  }
+}
+
+async function resolveTenantSlug(input, fallbackValue, excludeTenantId = null) {
+  const raw = String(input || "").trim();
+  const reserved = getReservedSubdomains();
+
+  if (!raw) {
+    return uniqueTenantSlug(fallbackValue);
+  }
+
+  const normalized = slugify(raw);
+  if (reserved.has(normalized)) {
+    const error = new Error("This subdomain is reserved. Please choose another one.");
+    error.status = 400;
+    error.code = "SUBDOMAIN_RESERVED";
+    throw error;
+  }
+
+  await assertTenantSlugAvailable(normalized, excludeTenantId);
+  return normalized;
 }
 
 function tenantPayload(body) {
@@ -296,7 +333,10 @@ export async function createTenant(req, res, next) {
       });
     }
 
-    const tenantSlug = await uniqueTenantSlug(businessName);
+    const tenantSlug = await resolveTenantSlug(
+      req.body.subdomain || req.body.slug,
+      businessName,
+    );
     if (!ownerPassword) {
       return res.status(400).json({ error: "Owner password is required." });
     }
@@ -363,11 +403,21 @@ export async function updateTenant(req, res, next) {
       return res.status(400).json({ error: "Owner password must be at least 6 characters." });
     }
 
+    const nextSlug =
+      req.body.subdomain !== undefined || req.body.slug !== undefined
+        ? await resolveTenantSlug(
+            req.body.subdomain ?? req.body.slug,
+            req.body.systemName || req.body.businessName || existing.id,
+            existing.id,
+          )
+        : null;
+
     const tenant = await prisma.$transaction(async (tx) => {
       const updatedTenant = await tx.tenant.update({
         where: { id: req.params.id },
         data: {
           ...tenantPayload(req.body),
+          ...(nextSlug ? { slug: nextSlug, tenantId: nextSlug } : {}),
           ...(req.body.logoUpload ? { logoUrl: (newLogoUrl = await saveLogo(req.body.logoUpload)) } : {}),
           ...(req.body.removeLogo ? { logoUrl: null } : {}),
         },

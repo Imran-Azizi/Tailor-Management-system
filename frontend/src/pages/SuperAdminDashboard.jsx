@@ -28,6 +28,7 @@ import { getApiErrorMessage } from "../lib/feedback.js";
 const emptyForm = {
   businessName: "",
   systemName: "",
+  subdomain: "",
   ownerName: "",
   ownerPhone: "",
   ownerPassword: "",
@@ -139,6 +140,7 @@ function tenantToForm(tenant) {
     ...emptyForm,
     businessName: tenant.systemName || tenant.businessName || "",
     systemName: tenant.systemName || "",
+    subdomain: tenant.slug || "",
     address: tenant.address || "",
     phone: tenant.phone || "",
     mobile: tenant.mobile || "",
@@ -176,6 +178,14 @@ function trimPayload(form, mode) {
 function validateTenantForm(form, mode, t) {
   const errors = {};
   if (!form.systemName.trim()) errors.systemName = t("superAdmin.validation.systemName");
+  if (!form.subdomain.trim()) {
+    errors.subdomain = t("superAdmin.validation.subdomain", "Subdomain is required.");
+  } else if (!/^[a-z0-9-]{2,64}$/.test(form.subdomain.trim())) {
+    errors.subdomain = t(
+      "superAdmin.validation.subdomainFormat",
+      "Use only lowercase letters, numbers, and hyphens.",
+    );
+  }
 
   if (!form.ownerName.trim()) errors.ownerName = t("superAdmin.validation.ownerName");
   if (!form.ownerPhone.trim()) errors.ownerPhone = t("superAdmin.validation.ownerPhone");
@@ -260,6 +270,7 @@ function TenantModal({
       title: "Business",
       fields: [
         ["systemName", t("superAdmin.fields.systemName")],
+        ["subdomain", t("superAdmin.fields.subdomain", "Subdomain")],
         ["address", t("superAdmin.fields.address")],
         ["phone", t("superAdmin.fields.phone")],
         ["mobile", t("superAdmin.fields.mobile")],
@@ -324,6 +335,7 @@ function TenantModal({
                     const isPassword = key === "ownerPassword";
                     const isRequired =
                       key === "systemName" ||
+                      key === "subdomain" ||
                       ["ownerName", "ownerPhone"].includes(key) ||
                       (mode === "create" && key === "ownerPassword");
 
@@ -406,7 +418,14 @@ function TenantModal({
                           <select
                             className="inp"
                             value={form[key]}
-                            onChange={(e) => onChange(key, e.target.value)}
+                            onChange={(e) =>
+                              onChange(
+                                key,
+                                key === "subdomain"
+                                  ? e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "")
+                                  : e.target.value,
+                              )
+                            }
                             disabled={isPending}
                           >
                             <option value="TRIAL">{t("superAdmin.plan.TRIAL")}</option>
@@ -822,7 +841,7 @@ export default function SuperAdminDashboard() {
                           {tenant.systemName || tenant.businessName}
                         </h3>
                         <p className="mt-1 truncate text-xs text-[var(--text3)]">
-                          {t(`superAdmin.plan.${tenant.subscriptionPlan}`, tenant.subscriptionPlan)}
+                          {tenant.slug}.hoshmandsafi.com
                         </p>
                       </div>
                     </div>
@@ -951,8 +970,11 @@ export default function SuperAdminDashboard() {
                             <p className="truncate font-bold text-[var(--text1)]">
                               {tenant.systemName || tenant.businessName}
                             </p>
+                            <p className="mt-0.5 truncate text-[11px] text-[var(--text3)]">
+                              {tenant.slug}.hoshmandsafi.com
+                            </p>
                             {tenant.owner ? (
-                              <p className="mt-0.5 truncate text-[11px] text-[var(--text3)]">
+                              <p className="truncate text-[11px] text-[var(--text3)]">
                                 {tenant.owner.name} - {tenant.owner.phoneNumber}
                               </p>
                             ) : null}
