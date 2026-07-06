@@ -17,28 +17,9 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { useTheme } from "../context/ThemeContext.jsx";
 import { assetUrl } from "../lib/assets.js";
 import api from "../lib/api.js";
+import { getPostLoginPath } from "../lib/authRedirect.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
-import { PERMISSIONS } from "../lib/permissions.js";
 import { getTenantHostContext } from "../lib/tenantHost.js";
-
-function firstAllowedMainPath(user, from = "/") {
-  const permissions = new Set(user?.permissions || []);
-  const has = (permission) =>
-    user?.accountType === "ADMIN" ||
-    user?.accountType === "SUPER_ADMIN" ||
-    permissions.has(permission);
-
-  if (from && from !== "/login" && from !== "/dashboard") return from;
-  if (has(PERMISSIONS.DASHBOARD_VIEW)) return "/dashboard";
-  if (has(PERMISSIONS.ORDERS_CREATE)) return "/orders/create";
-  if (has(PERMISSIONS.ORDERS_VIEW)) return "/orders";
-  if (has(PERMISSIONS.FINANCE_VIEW)) return "/daily-tasks/all";
-  if (has(PERMISSIONS.FINANCE_EXPENSES_ADD)) return "/daily-tasks";
-  if (has(PERMISSIONS.INVENTORY_VIEW)) return "/item-sales-records";
-  if (has(PERMISSIONS.INVENTORY_PRODUCTS_SELL)) return "/other-items";
-  if (has(PERMISSIONS.SETTINGS_VIEW)) return "/tenant-settings";
-  return "/support-team";
-}
 
 function LangBtn() {
   const { i18n, t } = useTranslation();
@@ -189,16 +170,16 @@ export default function Login() {
     }
     setLoading(true);
     try {
-      const user = await login(phone.trim(), password);
+      const user = await login(phone.trim(), password, from);
       if (user.accountType === "SUPER_ADMIN") {
         toast.success(t("auth.welcomeBack", { name: user.name }));
-        navigate("/super-admin", { replace: true });
+        navigate(getPostLoginPath(user, from), { replace: true });
       } else if (user.accountType === "DOKHT" || user.accountType === "QICHIKAR") {
         toast.success(t("auth.welcomeBack", { name: user.name }));
-        navigate("/panel", { replace: true });
+        navigate(getPostLoginPath(user, from), { replace: true });
       } else if (["ADMIN", "DOKAN", "FINANCE"].includes(user.accountType)) {
         toast.success(t("auth.welcomeBack", { name: user.name }));
-        navigate(firstAllowedMainPath(user, from), { replace: true });
+        navigate(getPostLoginPath(user, from), { replace: true });
       } else {
         await logout();
         toast.error(t("auth.adminOnly", "Access denied. Admin accounts only."));

@@ -17,6 +17,7 @@ import {
   getExpectedUserUrl,
   getTenantHostContext,
 } from "../lib/tenantHost.js";
+import { getPostLoginPath } from "../lib/authRedirect.js";
 
 const AuthContext = createContext(null);
 const AUTH_CHANNEL_NAME = "tailor-auth-session";
@@ -27,8 +28,9 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const channelRef = useRef(null);
 
-  const syncUserHost = useCallback((nextUser) => {
-    const expectedUrl = getExpectedUserUrl(nextUser);
+  const syncUserHost = useCallback((nextUser, pathname) => {
+    const targetPath = pathname || getPostLoginPath(nextUser);
+    const expectedUrl = getExpectedUserUrl(nextUser, targetPath);
     const hostContext = getTenantHostContext();
     if (!expectedUrl || hostContext.hostType === "local") {
       return false;
@@ -75,7 +77,7 @@ export function AuthProvider({ children }) {
     api
       .get("/auth/me", { skipAuthRedirect: true })
       .then(({ data }) => {
-        if (!cancelled && !syncUserHost(data)) setUser(data);
+        if (!cancelled && !syncUserHost(data, getPostLoginPath(data))) setUser(data);
       })
       .catch(() => {
         if (!cancelled) clearSessionState();
@@ -94,7 +96,7 @@ export function AuthProvider({ children }) {
       user?.tenant?.systemName || "Tailoring Management System";
   }, [user?.tenant?.systemName]);
 
-  const login = useCallback(async (phoneNumber, password) => {
+  const login = useCallback(async (phoneNumber, password, fromPath) => {
     const hostContext = getTenantHostContext();
     const payload = {
       phoneNumber,
@@ -104,7 +106,7 @@ export function AuthProvider({ children }) {
         : {}),
     };
     const { data } = await api.post("/auth/login", payload);
-    if (syncUserHost(data.user)) {
+    if (syncUserHost(data.user, getPostLoginPath(data.user, fromPath))) {
       return data.user;
     }
     setUser(data.user);
