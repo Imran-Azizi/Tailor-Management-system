@@ -17,7 +17,11 @@ import {
   LuUserCog,
 } from "react-icons/lu";
 import api from "../lib/api.js";
-import { PERMISSION_CATEGORIES, dedupeCategoryItems, HIDDEN_UI_PERMISSION_CODES } from "../lib/permissionCategories.js";
+import {
+  PERMISSION_CATEGORIES,
+  dedupePermissionCategories,
+  HIDDEN_UI_PERMISSION_CODES,
+} from "../lib/permissionCategories.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { isRtlLanguage } from "../lib/locale.js";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -26,6 +30,18 @@ import { ErrorState, PageHeader, Spinner } from "../components/ui/index.jsx";
 const ROLE_COLORS = {
   DOKAN: "#0D9488",
   FINANCE: "#059669",
+};
+
+const CATEGORY_ACCENTS = {
+  dashboard: "#2563EB",
+  orders: "#7C3AED",
+  assignment: "#DB2777",
+  dailyTasks: "#D97706",
+  rakht: "#0F766E",
+  transactions: "#CA8A04",
+  items: "#EA580C",
+  management: "#475569",
+  other: "#64748B",
 };
 
 function roleLabel(role, t) {
@@ -50,6 +66,12 @@ function uniqueCodes(items) {
   return [...new Set(items.map((item) => item.permission))];
 }
 
+function relatedEntryLabel(entry, t) {
+  if (!entry) return "";
+  if (entry.labelKey) return t(entry.labelKey, entry.fallback || "");
+  return entry.fallback || "";
+}
+
 function GroupCheckbox({ checked, indeterminate, disabled, onChange, label }) {
   const ref = useRef(null);
   useEffect(() => {
@@ -72,20 +94,33 @@ function GroupCheckbox({ checked, indeterminate, disabled, onChange, label }) {
   );
 }
 
-function PermissionItem({ item, checked, disabled, onToggle, t, hideSubtitle }) {
+function PermissionItem({
+  item,
+  checked,
+  disabled,
+  onToggle,
+  t,
+  hideSubtitle,
+  relatedLabels = [],
+  accent = "var(--primary)",
+}) {
   const Icon = item.icon || LuShieldCheck;
   const isPage = item.type === "page";
-  const title = item.usePermissionLabel || !isPage
-    ? permissionLabel(item.permission, t)
-    : t(item.labelKey, item.fallback);
+  const title =
+    item.usePermissionLabel || !isPage
+      ? permissionLabel(item.permission, t)
+      : t(item.labelKey, item.fallback);
   const showSubtitle =
     !hideSubtitle && !item.hideSubtitle && isPage && !item.usePermissionLabel;
   const subtitle = showSubtitle ? permissionLabel(item.permission, t) : null;
+  const sharedLabels = [...new Set(relatedLabels)].filter(Boolean);
+  const sharedCount = sharedLabels.length;
   return (
     <label
       className={`permission-switch${checked ? " is-on" : ""}${
         disabled ? " is-disabled" : ""
       }`}
+      style={{ "--perm-accent": accent }}
     >
       <input
         type="checkbox"
@@ -99,6 +134,11 @@ function PermissionItem({ item, checked, disabled, onToggle, t, hideSubtitle }) 
       <span className="permission-switch-copy">
         <strong>{title}</strong>
         {subtitle ? <small>{subtitle}</small> : null}
+        {sharedCount > 1 ? (
+          <small className="permission-switch-shared">
+            {sharedLabels.join(" • ")}
+          </small>
+        ) : null}
       </span>
     </label>
   );
@@ -118,7 +158,8 @@ export default function PermissionsManagement() {
 
   const permissionsQuery = useQuery({
     queryKey: ["rbac-permissions"],
-    queryFn: () => api.get("/rbac/permissions").then((res) => res.data.permissions || []),
+    queryFn: () =>
+      api.get("/rbac/permissions").then((res) => res.data.permissions || []),
   });
 
   const usersQuery = useQuery({
@@ -131,7 +172,10 @@ export default function PermissionsManagement() {
   });
 
   const catalog = permissionsQuery.data || [];
-  const allCodes = useMemo(() => catalog.map((permission) => permission.code), [catalog]);
+  const allCodes = useMemo(
+    () => catalog.map((permission) => permission.code),
+    [catalog],
+  );
   const visibleCodes = useMemo(
     () => allCodes.filter((code) => !HIDDEN_UI_PERMISSION_CODES.has(code)),
     [allCodes],
@@ -150,8 +194,8 @@ export default function PermissionsManagement() {
     const available = new Set(visibleCodes);
     const covered = new Set();
     const mapped = PERMISSION_CATEGORIES.map((category) => {
-      const items = dedupeCategoryItems(
-        category.items.filter((item) => available.has(item.permission)),
+      const items = category.items.filter((item) =>
+        available.has(item.permission),
       );
       for (const item of items) covered.add(item.permission);
       return items.length ? { ...category, items } : null;
@@ -172,13 +216,17 @@ export default function PermissionsManagement() {
         })),
       });
     }
-    return mapped;
+    return dedupePermissionCategories(mapped);
   }, [visibleCodes]);
 
-  const serverCodes = useMemo(
-    () => activeUser?.permissions || [],
-    [activeUser],
-  );
+  const serverCodes = useMemo(() => {
+    if (!activeUser) return [];
+    // Show only this user's explicitly saved permissions. New users with no
+    // saved record start with zero — never role defaults or implied codes.
+    return activeUser.hasExplicitPermissions
+      ? activeUser.savedPermissions || []
+      : [];
+  }, [activeUser]);
   const visibleServerCodes = useMemo(
     () => serverCodes.filter((code) => visibleCodeSet.has(code)),
     [serverCodes, visibleCodeSet],
@@ -194,24 +242,26 @@ export default function PermissionsManagement() {
   );
   const isDirty = Boolean(
     activeUser &&
-      draft &&
-      !sameCodeSets(
-        draft.filter((code) => visibleCodeSet.has(code)),
-        visibleServerCodes,
-      ),
+    draft &&
+    !sameCodeSets(
+      draft.filter((code) => visibleCodeSet.has(code)),
+      visibleServerCodes,
+    ),
   );
   const dirtyUserIds = useMemo(() => {
     const ids = new Set();
     for (const user of users) {
       const userDraft = draftsByUser[user.id];
       if (!userDraft) continue;
-      const userVisibleServer = (user.permissions || []).filter((code) =>
-        visibleCodeSet.has(code),
-      );
-      if (!sameCodeSets(
-        userDraft.filter((code) => visibleCodeSet.has(code)),
-        userVisibleServer,
-      )) {
+      const userVisibleServer = (
+        user.hasExplicitPermissions ? user.savedPermissions || [] : []
+      ).filter((code) => visibleCodeSet.has(code));
+      if (
+        !sameCodeSets(
+          userDraft.filter((code) => visibleCodeSet.has(code)),
+          userVisibleServer,
+        )
+      ) {
         ids.add(user.id);
       }
     }
@@ -230,7 +280,10 @@ export default function PermissionsManagement() {
     if (!normalizedSearch) return categories;
     return categories
       .map((category) => {
-        const categoryText = t(category.labelKey, category.fallback).toLowerCase();
+        const categoryText = t(
+          category.labelKey,
+          category.fallback,
+        ).toLowerCase();
         if (categoryText.includes(normalizedSearch)) return category;
         const matching = category.items.filter((item) => {
           const menuText = item.labelKey
@@ -256,7 +309,15 @@ export default function PermissionsManagement() {
     onSuccess: (data) => {
       queryClient.setQueryData(["rbac-users", userSearch], (current = []) =>
         current.map((user) =>
-          user.id === data.userId ? { ...user, permissions: data.permissions } : user,
+          user.id === data.userId
+            ? {
+                ...user,
+                permissions: data.permissions || [],
+                savedPermissions: data.savedPermissions || [],
+                effectivePermissions: data.effectivePermissions || [],
+                hasExplicitPermissions: Boolean(data.hasExplicitPermissions),
+              }
+            : user,
         ),
       );
       setDraftsByUser((current) => {
@@ -323,11 +384,10 @@ export default function PermissionsManagement() {
 
   const saveChanges = () => {
     if (!activeUser || !draft || savingActive) return;
-    const hiddenFromServer = serverCodes.filter((code) =>
-      HIDDEN_UI_PERMISSION_CODES.has(code),
-    );
-    const merged = [...new Set([...draft, ...hiddenFromServer])].sort();
-    saveMutation.mutate({ userId: activeUser.id, permissions: merged });
+    saveMutation.mutate({
+      userId: activeUser.id,
+      permissions: [...new Set(draft)].sort(),
+    });
   };
 
   const setAllGroupsCollapsed = (collapsed) => {
@@ -415,7 +475,10 @@ export default function PermissionsManagement() {
                         {dirty ? (
                           <em
                             className="permissions-dirty-dot"
-                            title={t("permissions.unsavedBadge", "Unsaved changes")}
+                            title={t(
+                              "permissions.unsavedBadge",
+                              "Unsaved changes",
+                            )}
                           />
                         ) : null}
                       </strong>
@@ -425,16 +488,19 @@ export default function PermissionsManagement() {
                       <span
                         className="permissions-role"
                         style={{
-                          "--role-color": ROLE_COLORS[user.accountType] || "#64748b",
+                          "--role-color":
+                            ROLE_COLORS[user.accountType] || "#64748b",
                         }}
                       >
                         {roleLabel(user.accountType, t)}
                       </span>
                       <small>
                         {t("permissions.userCount", {
-                          count: (user.permissions || []).filter((code) =>
-                            visibleCodeSet.has(code),
-                          ).length,
+                          count: (
+                            user.hasExplicitPermissions
+                              ? user.savedPermissions || []
+                              : []
+                          ).filter((code) => visibleCodeSet.has(code)).length,
                           total: visibleCodes.length,
                           defaultValue: "{{count}}/{{total}}",
                         })}
@@ -444,7 +510,9 @@ export default function PermissionsManagement() {
                 );
               })}
               {!users.length ? (
-                <div className="permissions-empty">{t("permissions.noUsers")}</div>
+                <div className="permissions-empty">
+                  {t("permissions.noUsers")}
+                </div>
               ) : null}
             </div>
           </aside>
@@ -516,7 +584,9 @@ export default function PermissionsManagement() {
                     <LuSearch size={15} />
                     <input
                       value={permissionSearch}
-                      onChange={(event) => setPermissionSearch(event.target.value)}
+                      onChange={(event) =>
+                        setPermissionSearch(event.target.value)
+                      }
                       placeholder={t(
                         "permissions.searchPermissionsPlaceholder",
                         "Search permissions...",
@@ -555,6 +625,8 @@ export default function PermissionsManagement() {
                       ? false
                       : Boolean(collapsedGroups[category.key]);
                     const CategoryIcon = category.icon || LuShieldCheck;
+                    const categoryAccent =
+                      CATEGORY_ACCENTS[category.key] || "var(--primary)";
                     const pageItems = category.items.filter(
                       (item) => item.type === "page",
                     );
@@ -565,11 +637,13 @@ export default function PermissionsManagement() {
                       <section
                         key={category.key}
                         className={`permissions-group${collapsed ? " is-collapsed" : ""}`}
+                        style={{ "--group-accent": categoryAccent }}
                       >
                         <header
                           className="permissions-group-head"
                           role="button"
                           tabIndex={0}
+                          aria-expanded={!collapsed}
                           onClick={() =>
                             setCollapsedGroups((current) => ({
                               ...current,
@@ -592,19 +666,33 @@ export default function PermissionsManagement() {
                           </span>
                           <span className="permissions-group-title">
                             <h3>{t(category.labelKey, category.fallback)}</h3>
-                            <small>
-                              {t("permissions.groupCount", {
-                                count: enabledInGroup,
-                                total: codes.length,
-                                defaultValue: "{{count}}/{{total}} enabled",
-                              })}
-                            </small>
+                            <div className="permissions-group-meta">
+                              <small>
+                                {t("permissions.groupCount", {
+                                  count: enabledInGroup,
+                                  total: codes.length,
+                                  defaultValue: "{{count}}/{{total}} enabled",
+                                })}
+                              </small>
+                              <span
+                                className="permissions-group-progress"
+                                aria-hidden="true"
+                              >
+                                <span
+                                  style={{
+                                    width: `${codes.length ? (enabledInGroup / codes.length) * 100 : 0}%`,
+                                  }}
+                                />
+                              </span>
+                            </div>
                           </span>
                           <GroupCheckbox
                             checked={allEnabled}
                             indeterminate={someEnabled}
                             disabled={editingDisabled}
-                            onChange={(enabled) => toggleCategory(category, enabled)}
+                            onChange={(enabled) =>
+                              toggleCategory(category, enabled)
+                            }
                             label={t("permissions.selectAll", "Select all")}
                           />
                           <span className="permissions-group-chevron">
@@ -617,7 +705,10 @@ export default function PermissionsManagement() {
                               <>
                                 {actionItems.length ? (
                                   <p className="permissions-subheading">
-                                    {t("permissions.pagesHeading", "Page access")}
+                                    {t(
+                                      "permissions.pagesHeading",
+                                      "Page access",
+                                    )}
                                   </p>
                                 ) : null}
                                 <div className="permissions-grid">
@@ -625,10 +716,18 @@ export default function PermissionsManagement() {
                                     <PermissionItem
                                       key={item.key}
                                       item={item}
-                                      checked={selectedCodes.has(item.permission)}
+                                      checked={selectedCodes.has(
+                                        item.permission,
+                                      )}
                                       disabled={editingDisabled}
                                       onToggle={togglePermission}
                                       hideSubtitle={category.hidePageSubtitles}
+                                      relatedLabels={(item.relatedEntries || [])
+                                        .map((entry) =>
+                                          relatedEntryLabel(entry, t),
+                                        )
+                                        .filter(Boolean)}
+                                      accent={categoryAccent}
                                       t={t}
                                     />
                                   ))}
@@ -650,9 +749,17 @@ export default function PermissionsManagement() {
                                     <PermissionItem
                                       key={item.key}
                                       item={item}
-                                      checked={selectedCodes.has(item.permission)}
+                                      checked={selectedCodes.has(
+                                        item.permission,
+                                      )}
                                       disabled={editingDisabled}
                                       onToggle={togglePermission}
+                                      relatedLabels={(item.relatedEntries || [])
+                                        .map((entry) =>
+                                          relatedEntryLabel(entry, t),
+                                        )
+                                        .filter(Boolean)}
+                                      accent={categoryAccent}
                                       t={t}
                                     />
                                   ))}
@@ -741,6 +848,10 @@ export default function PermissionsManagement() {
           grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
           gap: 1rem;
           align-items: start;
+        }
+        .permissions-page .page-hd-action .btn {
+          min-height: 42px;
+          border-radius: 10px;
         }
         .permissions-users,
         .permissions-editor {
@@ -866,6 +977,7 @@ export default function PermissionsManagement() {
           min-width: 0;
           overflow: hidden;
           position: relative;
+          box-shadow: var(--sh);
         }
         .permissions-editor-head {
           display: flex;
@@ -876,6 +988,8 @@ export default function PermissionsManagement() {
           border-bottom: 1px solid var(--border);
           direction: inherit;
           text-align: start;
+          background:
+            linear-gradient(180deg, color-mix(in srgb, var(--surface2) 72%, var(--surface)), var(--surface));
         }
         .permissions-editor-head p,
         .permissions-editor-head h2 {
@@ -918,12 +1032,19 @@ export default function PermissionsManagement() {
         .permissions-summary {
           display: flex;
           align-items: center;
+          flex-wrap: wrap;
           gap: .55rem;
           margin: 1rem;
-          padding: .75rem .85rem;
-          border-radius: 10px;
+          padding: .8rem .9rem;
+          border-radius: 12px;
           color: var(--primary);
-          background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+          background:
+            linear-gradient(
+              135deg,
+              color-mix(in srgb, var(--primary) 10%, var(--surface)),
+              color-mix(in srgb, var(--primary) 4%, var(--surface2))
+            );
+          border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
           font-weight: 800;
           direction: inherit;
           text-align: start;
@@ -955,54 +1076,81 @@ export default function PermissionsManagement() {
         }
         .permissions-groups {
           display: grid;
-          gap: .8rem;
+          gap: .85rem;
           padding: 0 1rem 1rem;
         }
         .permissions-group {
           border: 1px solid var(--border);
-          border-radius: 12px;
+          border-radius: 14px;
           background: var(--surface);
           overflow: hidden;
+          box-shadow: 0 12px 28px -24px rgba(15, 23, 42, .75);
+          border-inline-start: 3px solid var(--group-accent, var(--primary));
         }
         .permissions-group-head {
           display: flex;
           align-items: center;
           gap: .65rem;
-          padding: .7rem .85rem;
+          padding: .8rem .9rem;
           cursor: pointer;
           user-select: none;
-          background: color-mix(in srgb, var(--surface2) 65%, var(--surface));
+          background:
+            linear-gradient(
+              90deg,
+              color-mix(in srgb, var(--group-accent, var(--primary)) 8%, var(--surface)),
+              color-mix(in srgb, var(--surface2) 65%, var(--surface))
+            );
         }
         .permissions-group-head:focus-visible {
           outline: 2px solid var(--primary);
           outline-offset: -2px;
         }
         .permissions-group-icon {
-          width: 32px;
-          height: 32px;
+          width: 36px;
+          height: 36px;
           flex-shrink: 0;
           display: grid;
           place-items: center;
-          border-radius: 9px;
-          color: var(--primary);
-          background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+          border-radius: 10px;
+          color: var(--group-accent, var(--primary));
+          background: color-mix(in srgb, var(--group-accent, var(--primary)) 12%, var(--surface));
+          border: 1px solid color-mix(in srgb, var(--group-accent, var(--primary)) 22%, transparent);
         }
         .permissions-group-title {
           flex: 1;
           min-width: 0;
           display: grid;
-          gap: .1rem;
+          gap: .28rem;
         }
         .permissions-group-title h3 {
           margin: 0;
           color: var(--text1);
-          font-size: .92rem;
+          font-size: .94rem;
           font-weight: 900;
         }
-        .permissions-group-title small {
+        .permissions-group-meta {
+          display: grid;
+          gap: .28rem;
+        }
+        .permissions-group-meta > small {
           color: var(--text3);
           font-size: .72rem;
           font-weight: 700;
+        }
+        .permissions-group-progress {
+          display: block;
+          width: min(180px, 100%);
+          height: 4px;
+          border-radius: 999px;
+          background: color-mix(in srgb, var(--text3) 16%, transparent);
+          overflow: hidden;
+        }
+        .permissions-group-progress > span {
+          display: block;
+          height: 100%;
+          border-radius: inherit;
+          background: var(--group-accent, var(--primary));
+          transition: width .2s ease;
         }
         .permissions-group-selectall {
           display: flex;
@@ -1049,25 +1197,30 @@ export default function PermissionsManagement() {
         }
         .permissions-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-          gap: .6rem;
+          grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+          gap: .65rem;
         }
         .permission-switch {
-          min-height: 58px;
+          min-height: 60px;
           display: flex;
           align-items: center;
           gap: .65rem;
-          padding: .65rem .7rem;
+          padding: .7rem .75rem;
           border: 1px solid var(--border);
-          border-radius: 11px;
+          border-radius: 12px;
           background: var(--surface2);
           cursor: pointer;
           direction: inherit;
           text-align: start;
+          transition: border-color .16s ease, background .16s ease, transform .16s ease;
+        }
+        .permission-switch:hover:not(.is-disabled) {
+          border-color: color-mix(in srgb, var(--perm-accent, var(--primary)) 30%, var(--border));
+          transform: translateY(-1px);
         }
         .permission-switch.is-on {
-          border-color: rgba(5, 150, 105, .36);
-          background: rgba(5, 150, 105, .08);
+          border-color: color-mix(in srgb, var(--perm-accent, #059669) 42%, transparent);
+          background: color-mix(in srgb, var(--perm-accent, #059669) 9%, var(--surface));
         }
         .permission-switch.is-disabled {
           opacity: .6;
@@ -1080,18 +1233,18 @@ export default function PermissionsManagement() {
           accent-color: var(--primary);
         }
         .permission-switch-icon {
-          width: 30px;
-          height: 30px;
+          width: 32px;
+          height: 32px;
           flex-shrink: 0;
           display: grid;
           place-items: center;
-          border-radius: 8px;
+          border-radius: 9px;
           color: var(--text2);
           background: color-mix(in srgb, var(--text3) 10%, var(--surface));
         }
         .permission-switch.is-on .permission-switch-icon {
-          color: #059669;
-          background: rgba(5, 150, 105, .12);
+          color: var(--perm-accent, #059669);
+          background: color-mix(in srgb, var(--perm-accent, #059669) 14%, var(--surface));
         }
         .permission-switch-copy {
           min-width: 0;
@@ -1109,6 +1262,11 @@ export default function PermissionsManagement() {
           color: var(--text3);
           font-size: .7rem;
           overflow-wrap: anywhere;
+        }
+        .permission-switch-shared {
+          margin-top: .15rem;
+          color: var(--text2) !important;
+          line-height: 1.6;
         }
         .permissions-savebar {
           position: sticky;
@@ -1157,6 +1315,13 @@ export default function PermissionsManagement() {
           }
         }
         @media (max-width: 560px) {
+          .permissions-page .page-hd-action {
+            width: 100%;
+          }
+          .permissions-page .page-hd-action .btn {
+            width: 100%;
+            justify-content: center;
+          }
           .permissions-editor-head {
             align-items: stretch;
             flex-direction: column;
@@ -1175,6 +1340,12 @@ export default function PermissionsManagement() {
           }
           .permissions-group-head {
             flex-wrap: wrap;
+          }
+          .permissions-group-selectall {
+            order: 4;
+          }
+          .permissions-group-chevron {
+            margin-inline-start: auto;
           }
           .permissions-savebar {
             flex-direction: column;

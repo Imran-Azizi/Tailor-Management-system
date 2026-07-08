@@ -25,6 +25,7 @@ export default defineConfig(({ mode }) => {
     build: {
       target: "es2020",
       cssCodeSplit: true,
+      reportCompressedSize: false,
       rollupOptions: {
         output: {
           manualChunks(id) {
@@ -45,11 +46,7 @@ export default defineConfig(({ mode }) => {
             if (id.includes("@tanstack/react-query")) {
               return "vendor-query";
             }
-            if (
-              id.includes("jspdf") ||
-              id.includes("html2canvas") ||
-              id.includes("jsbarcode")
-            ) {
+            if (id.includes("jspdf") || id.includes("html2canvas")) {
               return "vendor-print";
             }
             if (id.includes("recharts") || id.includes("d3-")) {

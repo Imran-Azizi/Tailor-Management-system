@@ -339,6 +339,7 @@ function AssignModal({ order, onClose, onAssigned }) {
     order.assignmentPrice != null ? String(order.assignmentPrice) : "",
   );
   const [saving, setSaving] = useState(false);
+  const [priceError, setPriceError] = useState("");
 
   const { data: workers = [] } = useQuery({
     queryKey: ["assignable-workers"],
@@ -369,11 +370,12 @@ function AssignModal({ order, onClose, onAssigned }) {
       if (selectedUserId) {
         parsedPrice = parseNumberLocale(price);
         if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
-          toast.error(t("assignment.invalidPrice"));
+          setPriceError(t("assignment.invalidPrice"));
           setSaving(false);
           return;
         }
       }
+      setPriceError("");
 
       await api.patch(`/orders/${order.id}/assign`, {
         assignedToId: selectedUserId || null,
@@ -496,13 +498,16 @@ function AssignModal({ order, onClose, onAssigned }) {
           </label>
           <input
             value={price}
-            onChange={(e) => setPrice(e.target.value)}
+            onChange={(e) => {
+              setPrice(e.target.value);
+              if (priceError) setPriceError("");
+            }}
             placeholder={t("assignment.pricePlaceholder")}
             inputMode="decimal"
             style={{
               width: "100%",
               padding: "9px 12px",
-              border: "1px solid var(--border)",
+              border: priceError ? "1px solid var(--danger)" : "1px solid var(--border)",
               borderRadius: 8,
               background: "var(--surface2)",
               color: "var(--text1)",
@@ -510,6 +515,11 @@ function AssignModal({ order, onClose, onAssigned }) {
               boxSizing: "border-box",
             }}
           />
+          {priceError && (
+            <p className="err-msg" role="alert" aria-live="polite" style={{ marginTop: 4 }}>
+              {priceError}
+            </p>
+          )}
         </div>
         <div style={{ marginBottom: 18 }}>
           <label
@@ -1247,7 +1257,7 @@ function RowDropdown({
         ? readOnlyReason
         : undefined;
   const deleteTitle = deleteLocked
-    ? t("orders.completedOrderLocked", { defaultValue: "Completed orders cannot be edited or deleted." })
+    ? t("orders.completedEditExpired", { defaultValue: "The 24-hour edit window for this completed order has expired." })
     : isReadOnly
       ? readOnlyReason
       : undefined;
@@ -1449,7 +1459,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
     qc.invalidateQueries({ queryKey: ["rakht-detail"] });
     qc.invalidateQueries({ queryKey: ["rakht-revenue-summary"] });
     qc.invalidateQueries({ queryKey: ["analytics"] });
-    qc.invalidateQueries({ queryKey: ["analytics-dashboard"] });
+    qc.invalidateQueries({ queryKey: ["analytics"] });
   };
 
   const deleteMut = useMutation({

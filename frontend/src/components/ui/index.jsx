@@ -270,14 +270,7 @@ export const Modal = ({
             onClick={onClose}
             type="button"
             aria-label="Close dialog"
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: "var(--text3)",
-              fontSize: 22,
-              lineHeight: 1,
-            }}
+            className="modal-close-btn"
           >
             ×
           </button>

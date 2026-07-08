@@ -276,7 +276,6 @@ export default function EditOrder() {
     );
     if (measurementError) {
       setError(measurementError);
-      toast.error(measurementError);
       setStep(2);
       return;
     }

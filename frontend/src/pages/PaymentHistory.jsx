@@ -245,12 +245,12 @@ export default function PaymentHistory() {
   };
 
   const paymentHistoryColumnOrder = [
+    "paidAt",
     "companyName",
-    "totalPrice",
+    "status",
     "paidAmount",
     "remainingAmount",
-    "status",
-    "paidAt",
+    "totalPrice",
     "user",
   ];
   const numericColumns = new Set(["totalPrice", "paidAmount", "remainingAmount"]);
@@ -438,6 +438,9 @@ export default function PaymentHistory() {
               <Select
                 classNamePrefix="rs"
                 isRtl={isRtl}
+                menuPortalTarget={
+                  typeof document !== "undefined" ? document.body : null
+                }
                 menuPosition="fixed"
                 value={companyFilter}
                 onChange={(option) => {
@@ -457,6 +460,9 @@ export default function PaymentHistory() {
               <Select
                 classNamePrefix="rs"
                 isRtl={isRtl}
+                menuPortalTarget={
+                  typeof document !== "undefined" ? document.body : null
+                }
                 menuPosition="fixed"
                 value={statusFilter}
                 onChange={(option) => {
@@ -696,6 +702,16 @@ export default function PaymentHistory() {
                     <strong>{row.companyName || "-"}</strong>
                     <Badge v={status.variant}>{status.label}</Badge>
                   </div>
+                  <div className="payment-history-mobile-card__meta">
+                    <span className="payment-history-mobile-card__meta-item">
+                      <b>{t("rakht.dateTime", { defaultValue: "Payment Date & Time" })}:</b>{" "}
+                      {formatDateTime(row.paidAt, language)}
+                    </span>
+                    <span className="payment-history-mobile-card__meta-item">
+                      <b>{t("common.user", { defaultValue: "User" })}:</b>{" "}
+                      {row.paidBy?.name || "-"}
+                    </span>
+                  </div>
                   <dl className="payment-history-mobile-card__details">
                     <div>
                       <dt>
@@ -728,16 +744,8 @@ export default function PaymentHistory() {
                       </dd>
                     </div>
                     <div>
-                      <dt>
-                        {t("rakht.dateTime", {
-                          defaultValue: "Payment Date & Time",
-                        })}
-                      </dt>
-                      <dd>{formatDateTime(row.paidAt, language)}</dd>
-                    </div>
-                    <div>
-                      <dt>{t("common.user", { defaultValue: "User" })}</dt>
-                      <dd>{row.paidBy?.name || "-"}</dd>
+                      <dt>{t("common.status", { defaultValue: "Status" })}</dt>
+                      <dd>{status.label}</dd>
                     </div>
                   </dl>
                 </article>

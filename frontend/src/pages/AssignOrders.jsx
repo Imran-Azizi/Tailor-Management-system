@@ -48,6 +48,27 @@ function formatMoney(value, language) {
   });
 }
 
+function getRoleAssignment(order, workerType) {
+  if (workerType === "QICHIKAR") {
+    return order?.qichikarAssignedTo || null;
+  }
+  if (workerType === "DOKHT") {
+    return order?.dokhtAssignedTo || null;
+  }
+  return null;
+}
+
+function formatOrderDate(value, language) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString(language || "en", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export default function AssignOrders() {
   const { t, i18n } = useTranslation();
   const qc = useQueryClient();
@@ -65,6 +86,8 @@ export default function AssignOrders() {
   const [selectedOrderId, setSelectedOrderId] = useState("");
   const [assignmentPrice, setAssignmentPrice] = useState("");
   const [assignmentNote, setAssignmentNote] = useState("");
+  const [searchFieldErrors, setSearchFieldErrors] = useState({ clothesType: "", billNumber: "" });
+  const [assignPriceError, setAssignPriceError] = useState("");
 
   const { data: workers = [], isLoading: loadingWorkers } = useQuery({
     queryKey: ["assignable-workers"],
@@ -154,21 +177,16 @@ export default function AssignOrders() {
 
   const searchByBill = async () => {
     const parsedBill = parseNumberLocale(billNumber);
+    const errors = { clothesType: "", billNumber: "" };
 
-    if (!clothesType) {
-      toast.error(
-        t("assignment.selectClothesTypeFirst", "Select clothes type first."),
-      );
+    if (!clothesType) errors.clothesType = t("assignment.selectClothesTypeFirst", "Select clothes type first.");
+    if (!Number.isFinite(parsedBill) || parsedBill <= 0) errors.billNumber = t("assignment.invalidBillNumber", "Enter a valid bill number.");
+
+    if (errors.clothesType || errors.billNumber) {
+      setSearchFieldErrors(errors);
       return;
     }
-
-    if (!Number.isFinite(parsedBill) || parsedBill <= 0) {
-      toast.error(
-        t("assignment.invalidBillNumber", "Enter a valid bill number."),
-      );
-      return;
-    }
-
+    setSearchFieldErrors({ clothesType: "", billNumber: "" });
     setLoadingResult(true);
     try {
       const { data } = await api.get("/orders/lookup", {
@@ -240,14 +258,6 @@ export default function AssignOrders() {
       }
 
       const parsedPrice = parseNumberLocale(assignmentPrice);
-      if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
-        throw new Error(
-          t(
-            "assignment.invalidPrice",
-            "Price must be a valid non-negative number.",
-          ),
-        );
-      }
 
       const { data: assigned } = await api.patch(
         `/orders/${selectedOrder.id}/assign`,
@@ -321,11 +331,15 @@ export default function AssignOrders() {
               <Field
                 label={t("assignment.clothesType", "Clothes type")}
                 required
+                error={searchFieldErrors.clothesType}
               >
                 <select
                   className="inp"
                   value={clothesType}
-                  onChange={(e) => setClothesType(e.target.value)}
+                  onChange={(e) => {
+                    setClothesType(e.target.value);
+                    if (searchFieldErrors.clothesType) setSearchFieldErrors((prev) => ({ ...prev, clothesType: "" }));
+                  }}
                 >
                   <option value="">
                     {t("assignment.selectClothesType", "Select clothes type")}
@@ -384,12 +398,19 @@ export default function AssignOrders() {
                 </select>
               </Field>
 
-              <Field label={t("orders.billNumber", "Bill Number")} required>
+              <Field
+                label={t("orders.billNumber", "Bill Number")}
+                required
+                error={searchFieldErrors.billNumber}
+              >
                 <div className="assign-orders-search-control">
                   <input
-                    className="inp"
+                    className={`inp${searchFieldErrors.billNumber ? " inp-err" : ""}`}
                     value={billNumber}
-                    onChange={(e) => setBillNumber(e.target.value)}
+                    onChange={(e) => {
+                      setBillNumber(e.target.value);
+                      if (searchFieldErrors.billNumber) setSearchFieldErrors((prev) => ({ ...prev, billNumber: "" }));
+                    }}
                     placeholder={t(
                       "assignment.billSearchPlaceholder",
                       "Search by bill number",
@@ -582,13 +603,21 @@ export default function AssignOrders() {
                           <div className="ao-money-input">
                             <AfCurrencyIcon size={13} />
                             <input
-                              className="inp"
+                              className={`inp${assignPriceError ? " inp-err" : ""}`}
                               value={assignmentPrice}
-                              onChange={(e) => setAssignmentPrice(e.target.value)}
+                              onChange={(e) => {
+                                setAssignmentPrice(e.target.value);
+                                if (assignPriceError) setAssignPriceError("");
+                              }}
                               placeholder={t("assignment.pricePlaceholder", "Enter price")}
                               inputMode="decimal"
                             />
                           </div>
+                          {assignPriceError && (
+                            <p className="err-msg" role="alert" aria-live="polite">
+                              {assignPriceError}
+                            </p>
+                          )}
                         </div>
                         <div className="ao-field">
                           <label className="ao-field-label">
@@ -609,7 +638,15 @@ export default function AssignOrders() {
                       <button
                         type="button"
                         className="btn btn-gold"
-                        onClick={() => assignMutation.mutate()}
+                        onClick={() => {
+                          const parsedPrice = parseNumberLocale(assignmentPrice);
+                          if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+                            setAssignPriceError(t("assignment.invalidPrice", "Price must be a valid non-negative number."));
+                            return;
+                          }
+                          setAssignPriceError("");
+                          assignMutation.mutate();
+                        }}
                         disabled={assignMutation.isPending || !workerType || !workerId}
                       >
                         {assignMutation.isPending ? (

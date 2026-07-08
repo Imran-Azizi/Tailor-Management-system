@@ -181,7 +181,7 @@ export default function Boxes() {
   };
 
   return (
-    <div className="page">
+    <div className="page boxes-page">
       <PageHeader
         title={t("boxesPage.title")}
         subtitle={t("boxesPage.subtitle", { count: boxes?.length || 0 })}

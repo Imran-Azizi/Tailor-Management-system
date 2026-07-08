@@ -1,5 +1,9 @@
 import { prisma } from "../lib/prisma.js";
+import { cacheGet, cacheSet } from "../lib/memoryCache.js";
 import { getRequestHostContext } from "../lib/tenantHost.js";
+
+const TENANT_HOST_CACHE = "tenant-host";
+const TENANT_HOST_TTL_MS = 5 * 60 * 1000;
 
 const tenantHostSelect = {
   id: true,
@@ -20,10 +24,18 @@ export async function resolveTenantHost(req, res, next) {
     req.tenantHost = null;
 
     if (hostContext.hostType === "tenant" && hostContext.tenantSlug) {
-      const tenant = await prisma.tenant.findUnique({
-        where: { slug: hostContext.tenantSlug },
-        select: tenantHostSelect,
-      });
+      const cacheKey = hostContext.tenantSlug;
+      let tenant = cacheGet(TENANT_HOST_CACHE, cacheKey);
+
+      if (tenant === undefined) {
+        tenant = await prisma.tenant.findUnique({
+          where: { slug: hostContext.tenantSlug },
+          select: tenantHostSelect,
+        });
+        if (tenant) {
+          cacheSet(TENANT_HOST_CACHE, cacheKey, tenant, TENANT_HOST_TTL_MS);
+        }
+      }
 
       if (!tenant) {
         req.hostContext = { ...hostContext, hostType: "unknown-tenant" };

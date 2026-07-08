@@ -150,7 +150,7 @@ const BILL_TEXT = {
 const BILL_EXTRA_TEXT = {
   en: {
     box: "Box",
-    itemPrice: "Item Price",
+    itemPrice: "Total",
     totalAllClothes: "Total Amount",
     totalDiscountAllClothes: "Discount",
     totalPaidAllClothes: "Paid Amount",
@@ -159,7 +159,7 @@ const BILL_EXTRA_TEXT = {
   },
   dari: {
     box: "صندوق",
-    itemPrice: "قیمت هر مورد",
+    itemPrice: "مجموع",
     totalAllClothes: "مبلغ مجموعی",
     totalDiscountAllClothes: "تخفیف",
     totalPaidAllClothes: "مبلغ پرداخت‌شده",
@@ -168,7 +168,7 @@ const BILL_EXTRA_TEXT = {
   },
   pashto: {
     box: "بکس",
-    itemPrice: "د هر توکي بیه",
+    itemPrice: "ټول",
     totalAllClothes: "ټول مبلغ",
     totalDiscountAllClothes: "تخفیف",
     totalPaidAllClothes: "ورکړل شوې پیسې",
@@ -463,13 +463,16 @@ function resolvePrintShop(...sources) {
   );
 }
 
-function PrintBillHeader({ settings, title, date, time, shop }) {
+function PrintBillHeader({ settings, title, date, time, shop, showBadge = true }) {
   const alignClass = settings.isRtl ? "text-right" : "text-left";
-  const rowDirClass = settings.isRtl ? "flex-row-reverse" : "flex-row";
+  const rowDirClass = settings.isRtl
+    ? "flex-row-reverse justify-start"
+    : "flex-row justify-between";
+  const brandDirClass = settings.isRtl ? "flex-row-reverse" : "flex-row";
   const shopInfoAlignClass = settings.isRtl
     ? "items-end text-right"
     : "items-start text-left";
-  const shopName = shop?.businessName || shop?.systemName || PRINT_SHOP_HEADER_NAME;
+  const shopName = shop?.systemName || shop?.businessName || PRINT_SHOP_HEADER_NAME;
   const tenantLogoUrl = String(shop?.logoUrl || "").trim();
   const defaultLogoUrl = SHOP_CONFIG.logoUrl || SHOP_CONFIG.logo || "";
   const logoUrl = assetUrl(tenantLogoUrl || defaultLogoUrl);
@@ -490,7 +493,7 @@ function PrintBillHeader({ settings, title, date, time, shop }) {
       className={`print-bill-header ${settings.isRtl ? "print-bill-header--rtl" : ""}`}
     >
       <div className={`print-bill-header-body ${rowDirClass}`}>
-        <div className={`print-bill-header-brand ${rowDirClass}`}>
+        <div className={`print-bill-header-brand ${brandDirClass}`}>
           <div className="print-bill-header-logo">
             {logoUrl ? (
               <img src={logoUrl} alt={shopName} className="print-bill-header-logo-img" />
@@ -514,7 +517,9 @@ function PrintBillHeader({ settings, title, date, time, shop }) {
           </div>
         </div>
         <div className={`print-bill-header-meta-block ${alignClass}`}>
-          <span className="print-bill-header-badge">{safeTitle}</span>
+          {showBadge && safeTitle ? (
+            <span className="print-bill-header-badge">{safeTitle}</span>
+          ) : null}
           <p className="print-bill-header-datetime" dir="ltr">
             {date} | {time}
           </p>
@@ -724,7 +729,7 @@ export function CustomerBill({ customer, order, shop }) {
       key: "discount",
       header: txt.discount,
       colorClass: "text-rose-700",
-      show: hasPositiveNumber(discount),
+      show: true,
       render: () => formatMoney(discount, settings.langCode),
     },
     {
@@ -1083,7 +1088,7 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
       key: "discount",
       header: safeExtraTxt("totalDiscountAllClothes"),
       colorClass: "text-rose-800",
-      show: hasPositiveNumber(totals.discount),
+      show: true,
       render: () => formatMoney(totals.discount, settings.langCode),
     },
     {
@@ -1555,6 +1560,7 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
       <PrintBillHeader
         settings={settings}
         title={safeTxt("tailorCopy")}
+        showBadge={false}
         date={date}
         time={time}
         shop={shop}

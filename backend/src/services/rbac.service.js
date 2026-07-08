@@ -1,13 +1,27 @@
 import { prisma } from "../lib/prisma.js";
 import {
+  cacheDeleteByPrefix,
+  cacheGet,
+  cacheSet,
+} from "../lib/memoryCache.js";
+import {
   ALL_PERMISSION_CODES,
   DEFAULT_ROLE_PERMISSIONS,
   PERMISSION_CATALOG,
   RBAC_MANAGED_ACCOUNT_TYPES,
+  expandModulePermissionCodes,
 } from "../lib/permissions.js";
 
 let catalogReady = false;
-const tenantRbacReady = new Set();
+const RBAC_SYNC_VERSION = 2;
+const tenantRbacReady = new Map();
+const PERMISSION_CACHE = "user-permissions";
+const PERMISSION_CACHE_TTL_MS = 60_000;
+
+export function invalidateUserPermissionCache(userId) {
+  if (!userId) return;
+  cacheDeleteByPrefix(PERMISSION_CACHE, `${userId}:`);
+}
 
 function assertTenantId(tenantId) {
   if (!tenantId) {
@@ -51,7 +65,7 @@ export async function ensurePermissionCatalog() {
 
 export async function ensureTenantRbac(tenantId) {
   assertTenantId(tenantId);
-  if (tenantRbacReady.has(tenantId)) return;
+  if (tenantRbacReady.get(tenantId) === RBAC_SYNC_VERSION) return;
 
   await ensurePermissionCatalog();
 
@@ -94,6 +108,20 @@ export async function ensureTenantRbac(tenantId) {
         },
       });
     }
+
+    // Remove permissions that are no longer part of the role defaults so
+    // Dokan/Finance roles stay empty after the zero-default policy change.
+    const allowedPermissionIds = defaultCodes
+      .map((code) => permissionByCode.get(code)?.id)
+      .filter(Boolean);
+    await prisma.rolePermission.deleteMany({
+      where: {
+        roleId: role.id,
+        ...(allowedPermissionIds.length
+          ? { permissionId: { notIn: allowedPermissionIds } }
+          : {}),
+      },
+    });
   }
 
   const tenantRoles = await prisma.role.findMany({
@@ -123,7 +151,7 @@ export async function ensureTenantRbac(tenantId) {
     });
   }
 
-  tenantRbacReady.add(tenantId);
+  tenantRbacReady.set(tenantId, RBAC_SYNC_VERSION);
 }
 
 export async function getEffectivePermissionCodes(user) {
@@ -131,9 +159,38 @@ export async function getEffectivePermissionCodes(user) {
   if (isPrivilegedAccount(user.accountType)) return [...ALL_PERMISSION_CODES];
   if (!user.tenantId) return [];
 
+  const cacheKey = `${user.id}:${user.tenantId}:${user.accountType}`;
+  const cached = cacheGet(PERMISSION_CACHE, cacheKey);
+  if (cached) return cached;
+
   await ensureTenantRbac(user.tenantId);
 
-  const [accountRole, assignedRoles, overrides] = await Promise.all([
+  const overrides = await prisma.userPermission.findMany({
+    where: { tenantId: user.tenantId, userId: user.id },
+    include: { permission: { select: { code: true } } },
+    orderBy: { updatedAt: "asc" },
+  });
+
+  // Dokan/Finance: permissions are per-user only — never inherited from role
+  // defaults. Until the admin saves permissions on the اجازه‌ها page the
+  // user has zero access.
+  if (RBAC_MANAGED_ACCOUNT_TYPES.includes(user.accountType)) {
+    if (!overrides.length) {
+      cacheSet(PERMISSION_CACHE, cacheKey, [], PERMISSION_CACHE_TTL_MS);
+      return [];
+    }
+    const codes = new Set();
+    for (const override of overrides) {
+      const code = override.permission?.code;
+      if (!code || !override.allowed) continue;
+      codes.add(code);
+    }
+    const result = expandModulePermissionCodes([...codes]).sort();
+    cacheSet(PERMISSION_CACHE, cacheKey, result, PERMISSION_CACHE_TTL_MS);
+    return result;
+  }
+
+  const [accountRole, assignedRoles] = await Promise.all([
     prisma.role.findFirst({
       where: {
         tenantId: user.tenantId,
@@ -157,11 +214,6 @@ export async function getEffectivePermissionCodes(user) {
         },
       },
     }),
-    prisma.userPermission.findMany({
-      where: { tenantId: user.tenantId, userId: user.id },
-      include: { permission: { select: { code: true } } },
-      orderBy: { updatedAt: "asc" },
-    }),
   ]);
 
   const codes = new Set();
@@ -181,7 +233,34 @@ export async function getEffectivePermissionCodes(user) {
     else codes.delete(code);
   }
 
-  return [...codes].sort();
+  const result = expandModulePermissionCodes([...codes]).sort();
+  cacheSet(PERMISSION_CACHE, cacheKey, result, PERMISSION_CACHE_TTL_MS);
+  return result;
+}
+
+async function getStoredPermissionState({ tenantId, userId, accountType }) {
+  const explicitRows = await prisma.userPermission.findMany({
+    where: { tenantId, userId },
+    include: { permission: { select: { code: true } } },
+    orderBy: { updatedAt: "asc" },
+  });
+
+  const savedPermissions = explicitRows
+    .filter((row) => row.allowed && row.permission?.code)
+    .map((row) => row.permission.code)
+    .sort();
+
+  const effectivePermissions = await getEffectivePermissionCodes({
+    id: userId,
+    tenantId,
+    accountType,
+  });
+
+  return {
+    savedPermissions,
+    effectivePermissions,
+    hasExplicitPermissions: explicitRows.length > 0,
+  };
 }
 
 export async function listPermissionCatalog() {
@@ -213,6 +292,7 @@ export async function listManagedUsers({ tenantId, search = "" }) {
     },
     select: {
       id: true,
+      tenantId: true,
       name: true,
       phoneNumber: true,
       accountType: true,
@@ -224,9 +304,19 @@ export async function listManagedUsers({ tenantId, search = "" }) {
 
   const enriched = [];
   for (const user of users) {
+    const permissionState = await getStoredPermissionState({
+      tenantId: user.tenantId,
+      userId: user.id,
+      accountType: user.accountType,
+    });
     enriched.push({
       ...user,
-      permissions: await getEffectivePermissionCodes(user),
+      permissions: permissionState.hasExplicitPermissions
+        ? permissionState.savedPermissions
+        : [],
+      savedPermissions: permissionState.savedPermissions,
+      effectivePermissions: permissionState.effectivePermissions,
+      hasExplicitPermissions: permissionState.hasExplicitPermissions,
     });
   }
   return enriched;
@@ -284,8 +374,19 @@ export async function replaceUserPermissions({
     }),
   ]);
 
+  invalidateUserPermissionCache(target.id);
+
+  const permissionState = await getStoredPermissionState({
+    userId: target.id,
+    tenantId,
+    accountType: target.accountType,
+  });
+
   return {
     userId: target.id,
-    permissions: await getEffectivePermissionCodes(target),
+    permissions: permissionState.savedPermissions,
+    savedPermissions: permissionState.savedPermissions,
+    effectivePermissions: permissionState.effectivePermissions,
+    hasExplicitPermissions: true,
   };
 }

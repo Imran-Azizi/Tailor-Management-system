@@ -379,26 +379,45 @@
   .all-transactions-page .page-hd-action .btn {
     width: 100%;
     min-width: 0;
-    min-height: 42px;
+    min-height: 48px;
     justify-content: center;
-    padding-inline: 8px;
+    padding-inline: 14px;
     white-space: normal;
+    border-radius: 12px;
+    font-size: 12.5px;
+    font-weight: 700;
   }
 
   .all-transactions-month-banner {
     width: 100%;
     margin: 0 !important;
-    padding: 11px 12px !important;
+    padding: 14px 14px !important;
     align-items: flex-start !important;
     flex-wrap: wrap;
-    border-radius: 12px !important;
-    line-height: 1.55;
+    border-radius: 14px !important;
+    line-height: 1.6;
+    gap: 8px !important;
   }
 
   .all-transactions-month-banner > span:first-of-type {
     min-width: 0;
     flex: 1;
     overflow-wrap: anywhere;
+  }
+
+  .all-transactions-month-banner .report-month-banner__empty {
+    width: 100%;
+    margin-inline-start: 0 !important;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--warning-soft) 85%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--warning-soft-border) 72%, transparent);
+    color: var(--warning-strong);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.7;
+    opacity: 1;
+    text-align: start;
   }
 
   .all-transactions-stats {
@@ -524,6 +543,6 @@
   }
 
   .all-transactions-page .page-hd-action .btn {
-    font-size: 11px;
+    font-size: 12px;
   }
 }

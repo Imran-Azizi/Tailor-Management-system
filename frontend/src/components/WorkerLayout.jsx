@@ -18,6 +18,7 @@ import {
   LuChevronDown,
 } from "react-icons/lu";
 import { useAuth } from "../context/AuthContext.jsx";
+import toast from "react-hot-toast";
 import { useTheme } from "../context/ThemeContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
 import { WorkerPanelProvider, useWorkerPanel } from "../context/WorkerPanelContext.jsx";
@@ -110,6 +111,7 @@ function UserMenu({ roleColor, onClose }) {
   const handleLogout = async () => {
     await logout();
     onClose();
+    toast.success(t("auth.loggedOut", t("feedback.loggedOut")));
     navigate("/login");
   };
 
@@ -203,7 +205,7 @@ function WorkerNotifDrawer({ open, roleColor, onClose }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["worker-notifs-drawer"] });
       qc.invalidateQueries({ queryKey: ["worker-notifs-count"] });
-      qc.invalidateQueries({ queryKey: ["worker-panel-notifs"] });
+      qc.invalidateQueries({ queryKey: ["worker-notifs-count"] });
     },
   });
 
@@ -212,7 +214,7 @@ function WorkerNotifDrawer({ open, roleColor, onClose }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["worker-notifs-drawer"] });
       qc.invalidateQueries({ queryKey: ["worker-notifs-count"] });
-      qc.invalidateQueries({ queryKey: ["worker-panel-notifs"] });
+      qc.invalidateQueries({ queryKey: ["worker-notifs-count"] });
     },
   });
 

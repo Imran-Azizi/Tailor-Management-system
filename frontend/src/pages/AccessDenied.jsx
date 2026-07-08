@@ -6,7 +6,25 @@ import { useAuth } from "../context/AuthContext.jsx";
 export default function AccessDenied() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, permissions } = useAuth();
+  const isManagedLimitedUser =
+    (user?.accountType === "DOKAN" || user?.accountType === "FINANCE") &&
+    permissions.length === 0;
+  const title = isManagedLimitedUser
+    ? t(
+        "accessDenied.noPermissionsTitle",
+        "ادمین به شما دسترسی هیچ گزینه را نداده است",
+      )
+    : t("accessDenied.title", "Access Denied");
+  const message = isManagedLimitedUser
+    ? t(
+        "accessDenied.noPermissionsMessage",
+        "ادمین به شما دسترسی هیچ گزینه را نداده است",
+      )
+    : t(
+        "accessDenied.message",
+        "Your account does not have permission to open this page.",
+      );
 
   return (
     <main className="page access-denied-page">
@@ -15,26 +33,25 @@ export default function AccessDenied() {
           <LuLockKeyhole size={28} />
         </span>
         <div>
-          <p className="access-denied-kicker">
-            {t("accessDenied.kicker", "Restricted area")}
-          </p>
-          <h1>{t("accessDenied.title", "Access Denied")}</h1>
-          <p>
-            {t(
-              "accessDenied.message",
-              "Your account does not have permission to open this page.",
-            )}
-          </p>
+          {!isManagedLimitedUser ? (
+            <p className="access-denied-kicker">
+              {t("accessDenied.kicker", "Restricted area")}
+            </p>
+          ) : null}
+          <h1>{title}</h1>
+          <p>{message}</p>
           {user?.name ? (
             <p className="access-denied-user">
               {t("accessDenied.signedInAs", "Signed in as")} {user.name}
             </p>
           ) : null}
         </div>
-        <button type="button" className="btn btn-outline" onClick={() => navigate(-1)}>
-          <LuArrowLeft size={15} />
-          {t("accessDenied.back", "Go Back")}
-        </button>
+        {!isManagedLimitedUser ? (
+          <button type="button" className="btn btn-outline" onClick={() => navigate(-1)}>
+            <LuArrowLeft size={15} />
+            {t("accessDenied.back", "Go Back")}
+          </button>
+        ) : null}
       </section>
 
       <style>{`

@@ -212,7 +212,7 @@ export default function CompletedWorkerOrders() {
       qc.invalidateQueries({ queryKey: ["order-detail"] });
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["analytics"] });
-      qc.invalidateQueries({ queryKey: ["analytics-dashboard"] });
+      qc.invalidateQueries({ queryKey: ["analytics"] });
       setConfirmPayment(null);
       toast.success(
         t(
@@ -581,16 +581,13 @@ export default function CompletedWorkerOrders() {
         dir={isRtl ? "rtl" : "ltr"}
       >
         <StatCard
-          label={t(
-            "completedWorkerOrders.pendingReceiptTotal",
-            "Pending Receipt",
-          )}
-          value={formatCurrency(stats.totalPendingReceiptAmount || 0, "en", {
+          label={t("completedWorkerOrders.totalPaid", "Total Recorded")}
+          value={formatCurrency(stats.totalPaidAmount || 0, "en", {
             minimumFractionDigits: 0,
             maximumFractionDigits: 0,
           })}
           Icon={AfCurrencyIcon}
-          accent="#B45309"
+          accent="#7C3AED"
         />
         <StatCard
           label={t("completedWorkerOrders.totalReceipt", "Total Receipt")}
@@ -602,13 +599,13 @@ export default function CompletedWorkerOrders() {
           accent="#0F766E"
         />
         <StatCard
-          label={t("completedWorkerOrders.totalPaid", "Total Paid")}
-          value={formatCurrency(stats.totalPaidAmount || 0, "en", {
+          label={t("completedWorkerOrders.pendingReceiptTotal", "Pending Receipt")}
+          value={formatCurrency(stats.totalPendingReceiptAmount || 0, "en", {
             minimumFractionDigits: 0,
             maximumFractionDigits: 0,
           })}
           Icon={AfCurrencyIcon}
-          accent="#7C3AED"
+          accent="#B45309"
         />
         <StatCard
           label={t("completedWorkerOrders.unpaidOrders", "Unpaid Orders")}

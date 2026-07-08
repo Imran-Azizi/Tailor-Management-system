@@ -79,27 +79,51 @@ function UserModal({ user, hasAdmin, onClose, onSaved }) {
   );
   const [showPw, setShowPw] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
 
-  const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
+  const set = (key, val) => {
+    setForm((f) => ({ ...f, [key]: val }));
+    if (fieldErrors[key]) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!user && !form.password) {
-      toast.error(t("users.passwordRequired"));
-      return;
+    const nextErrors = {};
+    if (!String(form.name || "").trim()) {
+      nextErrors.name = t("users.nameRequired", "Please enter the full name.");
     }
-    if (form.password && form.password.length < 6) {
-      toast.error(t("users.passwordMin"));
-      return;
+    if (!String(form.phoneNumber || "").trim()) {
+      nextErrors.phoneNumber = t(
+        "users.phoneRequired",
+        "Please enter the phone number.",
+      );
+    }
+    if (!form.accountType) {
+      nextErrors.accountType = t(
+        "users.roleRequired",
+        "Please select a role.",
+      );
+    }
+    if (!user && !form.password) {
+      nextErrors.password = t("users.passwordRequired");
+    } else if (form.password && form.password.length < 6) {
+      nextErrors.password = t("users.passwordMin");
     }
     if (
       form.accountType === "ADMIN" &&
       hasAdmin &&
       user?.accountType !== "ADMIN"
     ) {
-      toast.error(t("users.singleAdminOnly"));
-      return;
+      nextErrors.accountType = t("users.singleAdminOnly");
     }
+    setFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
     setSaving(true);
     try {
       const payload = {
@@ -123,7 +147,12 @@ function UserModal({ user, hasAdmin, onClose, onSaved }) {
       toast.error(
         err?.response?.data?.code === "TENANT_ADMIN_EXISTS"
           ? t("users.singleAdminOnly")
-          : getApiErrorMessage(err, t("users.saveFailed")),
+          : err?.response?.data?.code === "TENANT_USER_LIMIT_REACHED"
+            ? err?.response?.data?.error ||
+              t("users.limitReached", {
+                total: err?.response?.data?.limit?.totalAllowed ?? 30,
+              })
+            : getApiErrorMessage(err, t("users.saveFailed")),
       );
     } finally {
       setSaving(false);
@@ -203,6 +232,7 @@ function UserModal({ user, hasAdmin, onClose, onSaved }) {
         <form
           onSubmit={handleSubmit}
           autoComplete="off"
+          noValidate
           style={{ display: "flex", flexDirection: "column", gap: 14 }}
         >
           {/* Name */}
@@ -221,12 +251,23 @@ function UserModal({ user, hasAdmin, onClose, onSaved }) {
             <input
               name={user ? `edit-user-name-${user.id}` : "new-user-name"}
               autoComplete="off"
-              style={inputStyle}
+              className={fieldErrors.name ? "inp-err" : undefined}
+              style={{
+                ...inputStyle,
+                ...(fieldErrors.name
+                  ? { borderColor: "var(--danger)" }
+                  : null),
+              }}
               value={form.name}
               onChange={(e) => set("name", e.target.value)}
               placeholder={t("users.namePlaceholder")}
-              required
+              aria-invalid={Boolean(fieldErrors.name)}
             />
+            {fieldErrors.name ? (
+              <p className="err-msg" role="alert">
+                {fieldErrors.name}
+              </p>
+            ) : null}
           </div>
           {/* Phone */}
           <div>
@@ -255,14 +296,19 @@ function UserModal({ user, hasAdmin, onClose, onSaved }) {
               <input
                 name={user ? `edit-user-phone-${user.id}` : "new-user-phone"}
                 autoComplete="off"
-                className="inp with-leading-icon"
+                className={`inp with-leading-icon${fieldErrors.phoneNumber ? " inp-err" : ""}`}
                 style={inputStyle}
                 value={form.phoneNumber}
                 onChange={(e) => set("phoneNumber", e.target.value)}
                 placeholder="0700000000"
-                required
+                aria-invalid={Boolean(fieldErrors.phoneNumber)}
               />
             </div>
+            {fieldErrors.phoneNumber ? (
+              <p className="err-msg" role="alert">
+                {fieldErrors.phoneNumber}
+              </p>
+            ) : null}
           </div>
           {/* Role */}
           <div>
@@ -280,10 +326,16 @@ function UserModal({ user, hasAdmin, onClose, onSaved }) {
             <select
               name={user ? `edit-user-role-${user.id}` : "new-user-role"}
               autoComplete="off"
-              style={inputStyle}
+              className={fieldErrors.accountType ? "inp-err" : undefined}
+              style={{
+                ...inputStyle,
+                ...(fieldErrors.accountType
+                  ? { borderColor: "var(--danger)" }
+                  : null),
+              }}
               value={form.accountType}
               onChange={(e) => set("accountType", e.target.value)}
-              required
+              aria-invalid={Boolean(fieldErrors.accountType)}
             >
               {!form.accountType && (
                 <option value="" disabled>
@@ -304,6 +356,11 @@ function UserModal({ user, hasAdmin, onClose, onSaved }) {
                 </option>
               ))}
             </select>
+            {fieldErrors.accountType ? (
+              <p className="err-msg" role="alert">
+                {fieldErrors.accountType}
+              </p>
+            ) : null}
           </div>
           {/* Password */}
           <div>
@@ -321,7 +378,9 @@ function UserModal({ user, hasAdmin, onClose, onSaved }) {
                   (
                   {user
                     ? t("users.leaveBlank")
-                    : t("users.passwordRequired")}
+                    : t("users.passwordHint", {
+                        defaultValue: "required",
+                      })}
                   )
                 </span>
               </label>
@@ -338,7 +397,7 @@ function UserModal({ user, hasAdmin, onClose, onSaved }) {
                   }}
                 />
                 <input
-                  className="inp with-leading-icon with-trailing-icon"
+                  className={`inp with-leading-icon with-trailing-icon${fieldErrors.password ? " inp-err" : ""}`}
                   style={{
                     ...inputStyle,
                     paddingLeft: isRtl ? 36 : 36,
@@ -356,7 +415,7 @@ function UserModal({ user, hasAdmin, onClose, onSaved }) {
                   value={form.password}
                   onChange={(e) => set("password", e.target.value)}
                   placeholder="******"
-                  required={!user}
+                  aria-invalid={Boolean(fieldErrors.password)}
                 />
                 <button
                   type="button"
@@ -377,13 +436,11 @@ function UserModal({ user, hasAdmin, onClose, onSaved }) {
                   {showPw ? <LuEyeOff size={14} /> : <LuEye size={14} />}
                 </button>
               </div>
-              {form.password.length > 0 && form.password.length < 6 && (
-                <p
-                  style={{ fontSize: 11, color: "#DC2626", margin: "4px 0 0" }}
-                >
-                  {t("users.passwordMin")}
+              {fieldErrors.password ? (
+                <p className="err-msg" role="alert">
+                  {fieldErrors.password}
                 </p>
-              )}
+              ) : null}
           </div>
           {/* Active toggle */}
           {user && (
@@ -472,18 +529,28 @@ export default function UserManagement() {
     queryFn: () => api.get("/users").then((r) => r.data),
   });
 
+  const { data: userLimit } = useQuery({
+    queryKey: ["users", "limit"],
+    queryFn: () => api.get("/users/limit").then((r) => r.data),
+  });
+
   const deleteMut = useMutation({
     mutationFn: (id) => api.delete(`/users/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["users", "limit"] });
       toast.success(t("users.deleted"));
     },
     onError: (err) =>
       toast.error(getApiErrorMessage(err, t("users.deleteFailed"))),
   });
 
-  const handleSaved = () => qc.invalidateQueries({ queryKey: ["users"] });
+  const handleSaved = () => {
+    qc.invalidateQueries({ queryKey: ["users"] });
+    qc.invalidateQueries({ queryKey: ["users", "limit"] });
+  };
   const hasAdmin = users.some((user) => user.accountType === "ADMIN");
+  const isAtUserLimit = userLimit?.isAtLimit === true;
 
   const confirmDelete = (u) => {
     if (u.id === me?.id) {
@@ -495,7 +562,7 @@ export default function UserManagement() {
 
   return (
     <div
-      className="page"
+      className="page user-management-page"
       style={{
         padding: "20px 18px 56px",
         maxWidth: 1240,
@@ -504,6 +571,7 @@ export default function UserManagement() {
     >
       {/* Header */}
       <div
+        className="user-management-page__header"
         style={{
           display: "flex",
           alignItems: "center",
@@ -518,7 +586,10 @@ export default function UserManagement() {
           boxShadow: "var(--sh)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div
+          className="user-management-page__title-group"
+          style={{ display: "flex", alignItems: "center", gap: 10 }}
+        >
           <LuUsers size={20} style={{ color: "var(--primary)" }} />
           <h1 style={{ fontSize: 20, fontWeight: 700 }}>{t("users.title")}</h1>
           <span
@@ -536,19 +607,29 @@ export default function UserManagement() {
         </div>
         {canCreateUsers ? (
           <button
-            onClick={() => setModal("new")}
+            onClick={() => {
+              if (isAtUserLimit) {
+                toast.error(
+                  t("users.limitReached", { total: userLimit?.totalAllowed ?? 30 }),
+                );
+                return;
+              }
+              setModal("new");
+            }}
+            disabled={isAtUserLimit}
+            className="user-management-page__add-btn"
             style={{
               display: "flex",
               alignItems: "center",
               gap: 7,
               padding: "8px 16px",
-              background: "var(--primary)",
-              color: "#fff",
-              border: "none",
+              background: isAtUserLimit ? "var(--surface2)" : "var(--primary)",
+              color: isAtUserLimit ? "var(--text3)" : "#fff",
+              border: isAtUserLimit ? "1px solid var(--border)" : "none",
               borderRadius: 8,
               fontSize: 14,
               fontWeight: 600,
-              cursor: "pointer",
+              cursor: isAtUserLimit ? "not-allowed" : "pointer",
             }}
           >
             <LuUserPlus size={15} />
@@ -556,6 +637,31 @@ export default function UserManagement() {
           </button>
         ) : null}
       </div>
+
+      {userLimit ? (
+        <div
+          style={{
+            marginBottom: 16,
+            padding: "12px 16px",
+            borderRadius: 12,
+            border: `1px solid ${isAtUserLimit ? "#ef444440" : "var(--border)"}`,
+            background: isAtUserLimit ? "#ef444410" : "var(--surface)",
+            color: isAtUserLimit ? "#b91c1c" : "var(--text2)",
+            fontSize: 13,
+            lineHeight: 1.6,
+          }}
+        >
+          {isAtUserLimit ? (
+            <p style={{ margin: 0 }}>
+              {t("users.limitReached", { total: userLimit.totalAllowed })}
+            </p>
+          ) : (
+            <strong style={{ color: "var(--text1)" }}>
+              {t("users.canCreate", { count: userLimit.remaining })}
+            </strong>
+          )}
+        </div>
+      ) : null}
 
       {/* Table */}
       {isLoading ? (

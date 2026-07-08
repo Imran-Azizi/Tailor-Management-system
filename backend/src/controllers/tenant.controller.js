@@ -10,6 +10,12 @@ import {
   getOrderFinancialTotal,
 } from "../lib/orderFinancials.js";
 import { prepareTenantBackupDeletion } from "../services/backup.service.js";
+import {
+  countTenantUsers,
+  countTenantUsersBatch,
+  DEFAULT_USER_LIMIT,
+  getTenantUserLimitInfo,
+} from "../services/userLimit.service.js";
 
 const SALT_ROUNDS = 12;
 const DEFAULT_CURRENCY = "AFN";
@@ -71,8 +77,11 @@ const tenantWithOwnerSelect = {
 function serializeTenant(tenant) {
   if (!tenant) return tenant;
   const { users, ...rest } = tenant;
+  const normalizedSystemName = rest.systemName || rest.businessName || "";
   return {
     ...rest,
+    businessName: normalizedSystemName,
+    systemName: normalizedSystemName,
     owner: Array.isArray(users) ? users[0] || null : null,
   };
 }
@@ -148,6 +157,9 @@ function tenantPayload(body) {
   ].forEach((key) => {
     if (body[key] !== undefined) data[key] = typeof body[key] === "string" ? body[key].trim() : body[key];
   });
+  if (data.systemName && body.businessName === undefined) {
+    data.businessName = data.systemName;
+  }
 
   data.currency = DEFAULT_CURRENCY;
   data.language = DEFAULT_LANGUAGE;
@@ -722,6 +734,194 @@ export async function updateMyTenantSettings(req, res, next) {
     res.json(serializeTenant(tenant));
   } catch (err) {
     if (newLogoUrl) await deleteLogo(newLogoUrl).catch(() => {});
+    next(err);
+  }
+}
+
+function serializeTenantUserLimitRow(tenant, limitInfo) {
+  return {
+    id: tenant.id,
+    tenantId: tenant.tenantId,
+    slug: tenant.slug,
+    businessName: tenant.systemName || tenant.businessName,
+    systemName: tenant.systemName || tenant.businessName,
+    isActive: tenant.isActive,
+    ...limitInfo,
+  };
+}
+
+/** GET /api/tenants/user-limits */
+export async function listTenantUserLimits(req, res, next) {
+  try {
+    const search = String(req.query.search || "").trim();
+    const where = search
+      ? {
+          OR: [
+            { businessName: { contains: search, mode: "insensitive" } },
+            { systemName: { contains: search, mode: "insensitive" } },
+            { slug: { contains: search, mode: "insensitive" } },
+          ],
+        }
+      : {};
+
+    const tenants = await prisma.tenant.findMany({
+      where,
+      select: {
+        id: true,
+        tenantId: true,
+        slug: true,
+        businessName: true,
+        systemName: true,
+        isActive: true,
+        extraUserLimit: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const userCounts = await countTenantUsersBatch(tenants.map((t) => t.id));
+
+    const rows = tenants.map((tenant) => {
+      const currentUserCount = userCounts.get(tenant.id) || 0;
+      const limitInfo = {
+        defaultLimit: DEFAULT_USER_LIMIT,
+        extraUserLimit: tenant.extraUserLimit,
+        totalAllowed: DEFAULT_USER_LIMIT + tenant.extraUserLimit,
+        currentUserCount,
+        remaining: Math.max(
+          0,
+          DEFAULT_USER_LIMIT + tenant.extraUserLimit - currentUserCount,
+        ),
+        isAtLimit:
+          currentUserCount >= DEFAULT_USER_LIMIT + tenant.extraUserLimit,
+      };
+      return serializeTenantUserLimitRow(tenant, limitInfo);
+    });
+
+    res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** PUT /api/tenants/:id/user-limit */
+export async function updateTenantUserLimit(req, res, next) {
+  try {
+    const { extraUserLimit, note } = req.body;
+    if (extraUserLimit === undefined || extraUserLimit === null) {
+      return res.status(400).json({ error: "extraUserLimit is required." });
+    }
+
+    const parsedExtra = Number(extraUserLimit);
+    if (!Number.isInteger(parsedExtra) || parsedExtra < 0) {
+      return res.status(400).json({
+        error: "extraUserLimit must be a non-negative whole number.",
+      });
+    }
+
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        tenantId: true,
+        slug: true,
+        businessName: true,
+        systemName: true,
+        isActive: true,
+        extraUserLimit: true,
+      },
+    });
+    if (!tenant) {
+      return res.status(404).json({ error: "Tenant not found." });
+    }
+
+    const currentUserCount = await countTenantUsers(tenant.id);
+    const newTotalAllowed = DEFAULT_USER_LIMIT + parsedExtra;
+    if (currentUserCount > newTotalAllowed) {
+      return res.status(400).json({
+        code: "TENANT_USER_LIMIT_TOO_LOW",
+        error: `Cannot set total limit to ${newTotalAllowed}. This tenant already has ${currentUserCount} users.`,
+        currentUserCount,
+        requestedTotalAllowed: newTotalAllowed,
+      });
+    }
+
+    if (parsedExtra === tenant.extraUserLimit) {
+      const limitInfo = await getTenantUserLimitInfo(tenant.id);
+      return res.json(serializeTenantUserLimitRow(tenant, limitInfo));
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.tenantUserLimitHistory.create({
+        data: {
+          tenantId: tenant.id,
+          previousExtraLimit: tenant.extraUserLimit,
+          newExtraLimit: parsedExtra,
+          defaultLimit: DEFAULT_USER_LIMIT,
+          changedById: req.user.id,
+          note: note ? String(note).trim() : null,
+        },
+      });
+
+      return tx.tenant.update({
+        where: { id: tenant.id },
+        data: { extraUserLimit: parsedExtra },
+        select: {
+          id: true,
+          tenantId: true,
+          slug: true,
+          businessName: true,
+          systemName: true,
+          isActive: true,
+          extraUserLimit: true,
+        },
+      });
+    });
+
+    await writeAudit(req, "TENANT_USER_LIMIT_UPDATED", "Tenant", tenant.id, {
+      previousExtraLimit: tenant.extraUserLimit,
+      newExtraLimit: parsedExtra,
+      defaultLimit: DEFAULT_USER_LIMIT,
+      currentUserCount,
+      note: note ? String(note).trim() : null,
+    });
+
+    const limitInfo = await getTenantUserLimitInfo(updated.id);
+    res.json(serializeTenantUserLimitRow(updated, limitInfo));
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** GET /api/tenants/:id/user-limit/history */
+export async function getTenantUserLimitHistory(req, res, next) {
+  try {
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: req.params.id },
+      select: { id: true },
+    });
+    if (!tenant) {
+      return res.status(404).json({ error: "Tenant not found." });
+    }
+
+    const history = await prisma.tenantUserLimitHistory.findMany({
+      where: { tenantId: tenant.id },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: {
+        id: true,
+        previousExtraLimit: true,
+        newExtraLimit: true,
+        defaultLimit: true,
+        note: true,
+        createdAt: true,
+        changedBy: {
+          select: { id: true, name: true, phoneNumber: true },
+        },
+      },
+    });
+
+    res.json(history);
+  } catch (err) {
     next(err);
   }
 }

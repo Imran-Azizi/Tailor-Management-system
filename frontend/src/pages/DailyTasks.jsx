@@ -186,7 +186,7 @@ function DailyTaskForm({ onSuccess }) {
       toast.success(t("dailyTasks.created"));
       qc.invalidateQueries({ queryKey: ["daily-tasks"] });
       qc.invalidateQueries({ queryKey: ["analytics"] });
-      qc.invalidateQueries({ queryKey: ["analytics-dashboard"] });
+      qc.invalidateQueries({ queryKey: ["analytics"] });
       qc.invalidateQueries({ queryKey: ["design-contributors"] });
       reset({
         fromName: null,
@@ -278,15 +278,12 @@ function DailyTaskForm({ onSuccess }) {
   const onSubmit = (data) => {
     if (data.forRakht === "YES") {
       if (!foundOrders.length) {
-        setOrderSearchError(t("dailyTasks.orderNotFound"));
-        toast.error(t("dailyTasks.selectOrderForRakht"));
+        setOrderSearchError(t("dailyTasks.selectOrderForRakht"));
         return;
       }
 
       if (!selectedOrderIds.length) {
-        const message = t("dailyTasks.selectAtLeastOneOrderType");
-        setAllocationError(message);
-        toast.error(message);
+        setAllocationError(t("dailyTasks.selectAtLeastOneOrderType"));
         return;
       }
 
@@ -296,9 +293,7 @@ function DailyTaskForm({ onSuccess }) {
       });
 
       if (invalid) {
-        const message = t("dailyTasks.invalidOrderTypeAmount");
-        setAllocationError(message);
-        toast.error(message);
+        setAllocationError(t("dailyTasks.invalidOrderTypeAmount"));
         return;
       }
 

@@ -127,7 +127,7 @@ export default function OtherItems() {
       qc.invalidateQueries({ queryKey: ["items"] });
       qc.invalidateQueries({ queryKey: ["item-sales"] });
       qc.invalidateQueries({ queryKey: ["analytics"] });
-      qc.invalidateQueries({ queryKey: ["analytics-dashboard"] });
+      qc.invalidateQueries({ queryKey: ["analytics"] });
       qc.invalidateQueries({ queryKey: ["design-contributors"] });
       setCode("");
       setSelectedId("");

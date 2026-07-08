@@ -105,20 +105,31 @@ function withLocalizedItems(items, t) {
   }));
 }
 
-function filterSectionsByPermissions(sections, hasPermission) {
+function isStrictManagedRole(role) {
+  return role === "DOKAN" || role === "FINANCE";
+}
+
+function filterSectionsByPermissions(sections, hasPermission, role) {
+  const strictManagedRole = isStrictManagedRole(role);
   return sections
     .map((section) => {
       const items = section.items
         .map((item) => {
           const children = item.children
-            ?.filter((child) => hasPermission(ROUTE_PERMISSIONS[child.path]))
+            ?.filter((child) => {
+              const requiredPermission = ROUTE_PERMISSIONS[child.path];
+              if (strictManagedRole && !requiredPermission) return false;
+              return hasPermission(requiredPermission);
+            })
             .map((child) => ({ ...child }));
 
           if (item.children?.length) {
             return children?.length ? { ...item, children } : null;
           }
 
-          return hasPermission(ROUTE_PERMISSIONS[item.path]) ? item : null;
+          const requiredPermission = ROUTE_PERMISSIONS[item.path];
+          if (strictManagedRole && !requiredPermission) return null;
+          return hasPermission(requiredPermission) ? item : null;
         })
         .filter(Boolean);
 
@@ -133,8 +144,7 @@ export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
   const location = useLocation();
 
   const role = user?.accountType || "ADMIN";
-  const systemName = user?.tenant?.systemName || t("appName");
-  const businessName = user?.tenant?.businessName || t("appSubtitle");
+  const systemName = user?.tenant?.systemName || user?.tenant?.businessName || t("appName");
   const accent = getRoleAccent(role);
   const isRtl = (i18n.dir?.() || "ltr") === "rtl";
   const expandedStorageKey = `sidebar:expanded:${role}`;
@@ -142,14 +152,22 @@ export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
   const sections = useMemo(
     () =>
       withLocalizedLabels(
-        filterSectionsByPermissions(getSidebarSections(role), hasPermission),
+        filterSectionsByPermissions(getSidebarSections(role), hasPermission, role),
         t,
       ),
     [role, t, hasPermission],
   );
   const footerItems = useMemo(
-    () => withLocalizedItems(getSidebarFooterItems(role), t),
-    [role, t],
+    () =>
+      withLocalizedItems(
+        getSidebarFooterItems(role).filter((item) => {
+          const requiredPermission = ROUTE_PERMISSIONS[item.path];
+          if (isStrictManagedRole(role) && !requiredPermission) return false;
+          return hasPermission(requiredPermission);
+        }),
+        t,
+      ),
+    [role, t, hasPermission],
   );
   const validDropdownKeys = useMemo(
     () => getDropdownKeys(sections),
@@ -256,9 +274,6 @@ export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
             <h1 className="truncate text-sm font-semibold tracking-tight text-[var(--sb-title)]">
               {systemName}
             </h1>
-            <p className="truncate text-[11px] text-[var(--sb-subtitle)]">
-              {businessName}
-            </p>
           </div>
         )}
 

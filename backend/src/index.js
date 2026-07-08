@@ -1,6 +1,8 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import compression from "compression";
+import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import path from "path";
 import { errorHandler } from "./middleware/errorHandler.js";
@@ -51,9 +53,27 @@ const parseTrustProxy = (value) => {
 app.set("trust proxy", parseTrustProxy(process.env.TRUST_PROXY));
 
 const configuredOrigins = parseConfiguredOrigins();
-console.log("[CORS] Configured origins:", configuredOrigins);
+if (process.env.NODE_ENV !== "production") {
+  console.log("[CORS] Configured origins:", configuredOrigins);
+}
 
 const corsOptions = createCorsMiddlewareOptions(configuredOrigins);
+
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  }),
+);
+app.use(
+  compression({
+    threshold: 1024,
+    filter: (req, res) => {
+      if (req.headers["x-no-compression"]) return false;
+      return compression.filter(req, res);
+    },
+  }),
+);
 
 // Ensure preflight requests always succeed for allowed origins.
 app.options("*", cors(corsOptions));

@@ -29,6 +29,7 @@ import {
   getOrderFinancialTotal,
   getOrderGrossTotal,
   getOrderNetTotal,
+  getAggregateNetTotal,
 } from "../lib/orderFinancials.js";
 
 const COMPLETED_ORDER_LOCKED_MESSAGE =
@@ -42,8 +43,6 @@ const createCompletedOrderLockedError = () =>
   });
 
 const COMPLETED_ORDER_EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
-// Temporary: set to false to restore completed-order deletion protection.
-const ALLOW_COMPLETED_ORDER_DELETE_TEMPORARILY = true;
 
 const COMPLETED_ORDER_EDIT_EXPIRED_MESSAGE =
   "ویرایش سفارش تکمیل‌شده پس از ۲۴ ساعت غیرفعال می‌شود.";
@@ -984,6 +983,53 @@ export const getOrderBenefitDetails = async (
   };
 };
 
+export const getOrderBenefitDetailsBatch = async (
+  orderIds,
+  tx = prisma,
+  { includeReadyMadeOriginalExpense = false } = {},
+) => {
+  const uniqueIds = [...new Set((orderIds || []).filter(Boolean))];
+  if (!uniqueIds.length) return new Map();
+
+  const [orders, linkedDailyExpenses] = await Promise.all([
+    tx.order.findMany({
+      where: { id: { in: uniqueIds } },
+      include: ORDER_BENEFIT_INCLUDE_BASE,
+    }),
+    tx.dailyTask.findMany({
+      where: { orderId: { in: uniqueIds } },
+      orderBy: [{ taskDate: "desc" }, { createdAt: "desc" }],
+      include: {
+        createdBy: { select: { id: true, name: true } },
+      },
+    }),
+  ]);
+
+  const dailyByOrderId = new Map();
+  for (const expense of linkedDailyExpenses) {
+    if (!dailyByOrderId.has(expense.orderId)) {
+      dailyByOrderId.set(expense.orderId, []);
+    }
+    dailyByOrderId.get(expense.orderId).push(expense);
+  }
+
+  const result = new Map();
+  for (const order of orders) {
+    const daily = dailyByOrderId.get(order.id) || [];
+    const details = buildOrderBenefitDetails({
+      order,
+      linkedDailyExpenses: daily,
+      includeReadyMadeOriginalExpense,
+    });
+    result.set(order.id, {
+      ...details,
+      netProfitRecognizedAt: order.netProfitRecognizedAt || null,
+      dailyExpenses: daily,
+    });
+  }
+  return result;
+};
+
 export const recalculateOrderBenefit = async (orderId, tx = prisma) => {
   const details = await getOrderBenefitDetails(orderId, tx, {
     includeReadyMadeOriginalExpense: false,
@@ -1455,7 +1501,11 @@ export const getAllOrders = async ({
     ];
   }
 
-  const [data, total, summaryOrders] = await Promise.all([
+  const summaryWhere = {
+    AND: [where, { damagedClothesPenalties: { none: {} } }],
+  };
+
+  const [data, total, summaryAgg] = await Promise.all([
     findManyOrdersSafe(
       {
         where,
@@ -1466,11 +1516,9 @@ export const getAllOrders = async ({
       ORDER_LIST_INCLUDE_BASE,
     ),
     prisma.order.count({ where }),
-    prisma.order.findMany({
-      where: {
-        AND: [where, { damagedClothesPenalties: { none: {} } }],
-      },
-      select: {
+    prisma.order.aggregate({
+      where: summaryWhere,
+      _sum: {
         totalPrice: true,
         discount: true,
         paidAmount: true,
@@ -1479,28 +1527,12 @@ export const getAllOrders = async ({
     }),
   ]);
 
-  const summary = summaryOrders.reduce(
-    (acc, order) => {
-      acc.total = addScaled(acc.total, getOrderNetTotal(order), MONEY_SCALE);
-      acc.discount = addScaled(
-        acc.discount,
-        getOrderDiscount(order),
-        MONEY_SCALE,
-      );
-      acc.paid = addScaled(
-        acc.paid,
-        Number(order.paidAmount || 0),
-        MONEY_SCALE,
-      );
-      acc.remaining = addScaled(
-        acc.remaining,
-        Number(order.remaining || 0),
-        MONEY_SCALE,
-      );
-      return acc;
-    },
-    { total: 0, discount: 0, paid: 0, remaining: 0 },
-  );
+  const summary = {
+    total: getAggregateNetTotal(summaryAgg),
+    discount: toNumberScaled(summaryAgg._sum?.discount || 0, MONEY_SCALE),
+    paid: toNumberScaled(summaryAgg._sum?.paidAmount || 0, MONEY_SCALE),
+    remaining: toNumberScaled(summaryAgg._sum?.remaining || 0, MONEY_SCALE),
+  };
 
   const orderIds = data.map((order) => order.id).filter(Boolean);
   const dailyExpenseSums = orderIds.length
@@ -3987,8 +4019,8 @@ export const deleteOrder = async (id) =>
     if (!existing) {
       throw Object.assign(new Error("Order not found"), { status: 404 });
     }
-    if (existing.isCompleted && !ALLOW_COMPLETED_ORDER_DELETE_TEMPORARILY) {
-      throw createCompletedOrderLockedError();
+    if (existing.isCompleted && isCompletedEditWindowExpired(existing)) {
+      throw createCompletedOrderEditExpiredError();
     }
 
     const monthPolicy = await getMonthPolicy({ tx });

@@ -8,6 +8,7 @@ import {
   LuFileText,
   LuLayoutDashboard,
   LuListChecks,
+  LuLifeBuoy,
   LuListTodo,
   LuPackage,
   LuPackagePlus,
@@ -15,7 +16,6 @@ import {
   LuPencil,
   LuPrinter,
   LuScissors,
-  LuSearchCode,
   LuSettings,
   LuShieldAlert,
   LuShieldCheck,
@@ -28,16 +28,23 @@ import {
 } from "react-icons/lu";
 import { PERMISSIONS } from "./permissions.js";
 
-/** Permission codes excluded from the admin UI (still enforced by the backend). */
+/**
+ * Permission codes excluded from the admin UI (still enforced by the backend).
+ * This covers coarse module/API codes that back page permissions (granted
+ * automatically via implication) plus a few internal-only action codes.
+ */
 export const HIDDEN_UI_PERMISSION_CODES = new Set([
-  PERMISSIONS.CUSTOMERS_VIEW,
-  PERMISSIONS.CUSTOMERS_CREATE,
-  PERMISSIONS.CUSTOMERS_EDIT,
-  PERMISSIONS.CUSTOMERS_DELETE,
   PERMISSIONS.REPORTS_EXPORT,
   PERMISSIONS.REPORTS_PRINT,
   PERMISSIONS.INVENTORY_PRODUCTS_EDIT,
   PERMISSIONS.INVENTORY_PRODUCTS_DELETE,
+  PERMISSIONS.FINANCE_PROFIT_VIEW,
+  // Implied module/API codes — represented in the UI by page permissions.
+  PERMISSIONS.ORDERS_VIEW,
+  PERMISSIONS.INVENTORY_VIEW,
+  PERMISSIONS.SETTINGS_VIEW,
+  PERMISSIONS.FINANCE_DEBT_RECORDS_VIEW,
+  PERMISSIONS.FINANCE_PAYMENTS_MANAGE,
 ]);
 
 /**
@@ -71,6 +78,56 @@ export function dedupeCategoryItems(items) {
 }
 
 /**
+ * Collapse duplicate permission rows across all categories so each underlying
+ * permission code is editable exactly once in the UI. Shared permissions keep
+ * the first visible placement and collect related page/action labels as
+ * read-only context instead of rendering duplicate toggles.
+ */
+export function dedupePermissionCategories(categories) {
+  const seenByPermission = new Map();
+  const normalized = [];
+
+  for (const category of categories) {
+    const uniqueWithinCategory = dedupeCategoryItems(category.items || []);
+    const nextItems = [];
+
+    for (const item of uniqueWithinCategory) {
+      const relatedEntry = {
+        key: item.key,
+        type: item.type,
+        labelKey: item.labelKey,
+        fallback: item.fallback,
+      };
+      const existing = seenByPermission.get(item.permission);
+
+      if (!existing) {
+        const nextItem = {
+          ...item,
+          relatedEntries: [relatedEntry],
+        };
+        nextItems.push(nextItem);
+        seenByPermission.set(item.permission, nextItem);
+        continue;
+      }
+
+      existing.relatedEntries = [
+        ...(existing.relatedEntries || []),
+        relatedEntry,
+      ];
+
+      if (existing.type === "page") {
+        existing.usePermissionLabel = true;
+        existing.hideSubtitle = true;
+      }
+    }
+
+    if (nextItems.length) normalized.push({ ...category, items: nextItems });
+  }
+
+  return normalized;
+}
+
+/**
  * Permission categories mirroring the sidebar navigation structure, so
  * administrators can find permissions the same way users find pages.
  *
@@ -98,12 +155,6 @@ export const PERMISSION_CATEGORIES = [
         icon: LuLayoutDashboard,
         permission: PERMISSIONS.DASHBOARD_VIEW,
       },
-      {
-        key: "profitView",
-        type: "action",
-        icon: LuChartColumn,
-        permission: PERMISSIONS.FINANCE_PROFIT_VIEW,
-      },
     ],
   },
   {
@@ -126,7 +177,7 @@ export const PERMISSION_CATEGORIES = [
         labelKey: "common.allOrders",
         fallback: "All Orders",
         icon: LuPackage,
-        permission: PERMISSIONS.ORDERS_VIEW,
+        permission: PERMISSIONS.ORDERS_ALL_VIEW,
       },
       {
         key: "pendingOrders",
@@ -134,7 +185,7 @@ export const PERMISSION_CATEGORIES = [
         labelKey: "common.pendingOrders",
         fallback: "Pending Orders",
         icon: LuListTodo,
-        permission: PERMISSIONS.ORDERS_VIEW,
+        permission: PERMISSIONS.ORDERS_PENDING_VIEW,
       },
       {
         key: "completedOrders",
@@ -142,15 +193,7 @@ export const PERMISSION_CATEGORIES = [
         labelKey: "common.completedOrders",
         fallback: "Completed Orders",
         icon: LuListChecks,
-        permission: PERMISSIONS.ORDERS_VIEW,
-      },
-      {
-        key: "globalSearch",
-        type: "page",
-        labelKey: "globalSearch.title",
-        fallback: "Global Search",
-        icon: LuSearchCode,
-        permission: PERMISSIONS.ORDERS_VIEW,
+        permission: PERMISSIONS.ORDERS_COMPLETED_VIEW,
       },
       {
         key: "clothesStatus",
@@ -166,7 +209,7 @@ export const PERMISSION_CATEGORIES = [
         labelKey: "sidebar.damagedClothes",
         fallback: "Damaged Clothes",
         icon: LuShieldAlert,
-        permission: PERMISSIONS.FINANCE_DEBT_RECORDS_VIEW,
+        permission: PERMISSIONS.ORDERS_DAMAGED_VIEW,
       },
       {
         key: "printBills",
@@ -218,7 +261,7 @@ export const PERMISSION_CATEGORIES = [
         labelKey: "sidebar.completedFromWorkers",
         fallback: "Completed from Workers",
         icon: LuListChecks,
-        permission: PERMISSIONS.ORDERS_VIEW,
+        permission: PERMISSIONS.ORDERS_COMPLETED_WORKERS_VIEW,
       },
       {
         key: "workerPaymentReceipts",
@@ -226,7 +269,7 @@ export const PERMISSION_CATEGORIES = [
         labelKey: "sidebar.workerPaymentReceipts",
         fallback: "Worker Payment Receipts",
         icon: LuFileText,
-        permission: PERMISSIONS.FINANCE_PAYMENTS_MANAGE,
+        permission: PERMISSIONS.WORKER_RECEIPTS_VIEW,
       },
     ],
   },
@@ -286,7 +329,7 @@ export const PERMISSION_CATEGORIES = [
         labelKey: "rakht.allTitle",
         fallback: "All Rakhts",
         icon: LuFactory,
-        permission: PERMISSIONS.INVENTORY_VIEW,
+        permission: PERMISSIONS.RAKHT_LIST_VIEW,
       },
       {
         key: "rakhtPaymentHistory",
@@ -294,7 +337,7 @@ export const PERMISSION_CATEGORIES = [
         labelKey: "rakht.paymentHistory",
         fallback: "Payment History",
         icon: LuFileText,
-        permission: PERMISSIONS.FINANCE_PAYMENTS_MANAGE,
+        permission: PERMISSIONS.RAKHT_PAYMENTS_VIEW,
       },
       {
         key: "rakhtTotalRevenue",
@@ -318,7 +361,7 @@ export const PERMISSION_CATEGORIES = [
         labelKey: "sidebar.makeTransaction",
         fallback: "Make Loan",
         icon: LuWallet,
-        permission: PERMISSIONS.FINANCE_PAYMENTS_MANAGE,
+        permission: PERMISSIONS.TRANSACTIONS_CREATE_VIEW,
       },
       {
         key: "allTransactions",
@@ -326,7 +369,7 @@ export const PERMISSION_CATEGORIES = [
         labelKey: "sidebar.allTransactions",
         fallback: "All Loans",
         icon: LuWallet,
-        permission: PERMISSIONS.FINANCE_DEBT_RECORDS_VIEW,
+        permission: PERMISSIONS.TRANSACTIONS_VIEW,
       },
     ],
   },
@@ -351,7 +394,7 @@ export const PERMISSION_CATEGORIES = [
         labelKey: "sidebar.itemSalesRecords",
         fallback: "Sold Item Records",
         icon: LuChartColumn,
-        permission: PERMISSIONS.INVENTORY_VIEW,
+        permission: PERMISSIONS.ITEM_SALES_VIEW,
       },
     ],
   },
@@ -383,7 +426,7 @@ export const PERMISSION_CATEGORIES = [
         labelKey: "tenantSettings.title",
         fallback: "System Settings",
         icon: LuSettings,
-        permission: PERMISSIONS.SETTINGS_VIEW,
+        permission: PERMISSIONS.SETTINGS_TENANT_VIEW,
       },
       {
         key: "designs",
@@ -391,7 +434,7 @@ export const PERMISSION_CATEGORIES = [
         labelKey: "sidebar.settings",
         fallback: "Settings",
         icon: LuPalette,
-        permission: PERMISSIONS.SETTINGS_VIEW,
+        permission: PERMISSIONS.SETTINGS_DESIGNS_VIEW,
       },
       {
         key: "boxes",
@@ -407,7 +450,15 @@ export const PERMISSION_CATEGORIES = [
         labelKey: "common.notifications",
         fallback: "Notifications",
         icon: LuBell,
-        permission: PERMISSIONS.SETTINGS_VIEW,
+        permission: PERMISSIONS.SETTINGS_NOTIFICATIONS_VIEW,
+      },
+      {
+        key: "supportTeam",
+        type: "page",
+        labelKey: "supportTeam.title",
+        fallback: "Support Team",
+        icon: LuLifeBuoy,
+        permission: PERMISSIONS.SUPPORT_VIEW,
       },
       {
         key: "createUsers",

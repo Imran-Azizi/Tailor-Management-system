@@ -1531,7 +1531,7 @@ export default function WorkerPanel() {
           ["worker-panel-orders", ...workerScope, viewMonth, viewYear],
           (prev) => upsertOrderInWorkerPayload(prev, updatedOrder),
         );
-        qc.setQueryData(["worker-panel-notifs", ...workerScope], (prev = []) =>
+        qc.setQueryData(["worker-notifs-count", ...workerScope], (prev = []) =>
           Array.isArray(prev)
             ? prev.map((notif) =>
                 notif?.orderId === updatedOrder?.id
@@ -1540,17 +1540,8 @@ export default function WorkerPanel() {
               )
             : prev,
         );
-        qc.setQueryData(
-          ["worker-notifs-dropdown", ...workerScope],
-          (prev = []) =>
-            Array.isArray(prev)
-              ? prev.filter((notif) => notif?.orderId !== updatedOrder?.id)
-              : prev,
-        );
         qc.invalidateQueries({ queryKey: ["worker-panel-orders"] });
-        qc.invalidateQueries({ queryKey: ["worker-panel-notifs"] });
         qc.invalidateQueries({ queryKey: ["worker-notifs-count"] });
-        qc.invalidateQueries({ queryKey: ["worker-notifs-dropdown"] });
         refreshSearchResult();
       };
 

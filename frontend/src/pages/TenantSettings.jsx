@@ -25,7 +25,6 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { isRtlLanguage } from "../lib/locale.js";
 
 const emptyForm = {
-  businessName: "",
   systemName: "",
   address: "",
   phone: "",
@@ -71,7 +70,6 @@ function fileToLogoUpload(file) {
 function normalizeForm(settings) {
   return {
     ...emptyForm,
-    businessName: settings?.businessName || "",
     systemName: settings?.systemName || "",
     address: settings?.address || "",
     phone: settings?.phone || "",
@@ -88,7 +86,6 @@ function normalizeForm(settings) {
 
 function validate(form, t) {
   const errors = {};
-  if (!form.businessName.trim()) errors.businessName = t("tenantSettings.validation.businessName");
   if (!form.systemName.trim()) errors.systemName = t("tenantSettings.validation.systemName");
   if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
     errors.email = t("tenantSettings.validation.email");
@@ -266,7 +263,7 @@ export default function TenantSettings() {
     if (!settings) return false;
     const base = normalizeForm(settings);
     return (
-      ["businessName", "systemName", "address", "phone", "mobile", "email"].some(
+      ["systemName", "address", "phone", "mobile", "email"].some(
         (key) => (form[key] || "") !== (base[key] || ""),
       ) ||
       ["ownerName", "ownerPhone"].some((key) => (form[key] || "") !== (base[key] || "")) ||
@@ -299,11 +296,17 @@ export default function TenantSettings() {
     },
     onError: (error) => {
       if (error?.response?.data?.code === "INVALID_CURRENT_PASSWORD") {
-        toast.error(t("tenantSettings.validation.invalidCurrentPassword"));
+        setErrors((prev) => ({
+          ...prev,
+          currentPassword: t("tenantSettings.validation.invalidCurrentPassword"),
+        }));
         return;
       }
       if (error?.response?.data?.code === "PHONE_IN_USE") {
-        toast.error(t("tenantSettings.validation.phoneInUse"));
+        setErrors((prev) => ({
+          ...prev,
+          ownerPhone: t("tenantSettings.validation.phoneInUse"),
+        }));
         return;
       }
       toast.error(getApiErrorMessage(error, t("tenantSettings.toast.saveFailed")));
@@ -328,7 +331,6 @@ export default function TenantSettings() {
     if (Object.keys(nextErrors).length) return;
 
     const payload = {
-      businessName: form.businessName.trim(),
       systemName: form.systemName.trim(),
       address: form.address.trim(),
       phone: form.phone.trim(),
@@ -490,15 +492,6 @@ export default function TenantSettings() {
             </div>
 
             <div className="tenant-settings-fields-grid grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
-              <Field
-                icon={LuBuilding2}
-                label={t("tenantSettings.fields.businessName")}
-                value={form.businessName}
-                onChange={(event) => setValue("businessName", event.target.value)}
-                error={errors.businessName}
-                disabled={updateMut.isPending}
-                isRtl={isRtl}
-              />
               <Field
                 icon={LuBuilding2}
                 label={t("tenantSettings.fields.systemName")}

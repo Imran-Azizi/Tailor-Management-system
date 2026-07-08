@@ -10,6 +10,7 @@ import {
   myNotifications,
   readNotification,
   readAllNotifications,
+  getUserLimit,
 } from "../controllers/user.controller.js";
 import { authenticate, authorize } from "../middleware/auth.middleware.js";
 import { authorizeAnyPermission, authorizePermission } from "../middleware/auth.middleware.js";
@@ -22,6 +23,7 @@ router.use(authenticate);
 
 router.get("/assignable", authorizeAnyPermission(PERMISSIONS.USERS_VIEW, PERMISSIONS.ORDERS_EDIT), listAssignable);
 router.get("/dokan", authorizeAnyPermission(PERMISSIONS.USERS_VIEW, PERMISSIONS.FINANCE_EXPENSES_ADD), listDokanUsers);
+router.get("/limit", authorizePermission(PERMISSIONS.USERS_VIEW), getUserLimit);
 
 // My notifications (any authenticated user)
 router.get("/me/notifications", authorize("ADMIN", "DOKHT", "QICHIKAR"), myNotifications);

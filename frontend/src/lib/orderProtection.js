@@ -1,6 +1,4 @@
 export const COMPLETED_ORDER_EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
-// Temporary: set to false to restore completed-order deletion protection.
-export const ALLOW_COMPLETED_ORDER_DELETE_TEMPORARILY = true;
 
 export function getCompletedOrderProtection(order) {
   if (!order?.isCompleted) {
@@ -26,7 +24,7 @@ export function getCompletedOrderProtection(order) {
   return {
     isProtected: true,
     canEdit: !isExpired,
-    canDelete: ALLOW_COMPLETED_ORDER_DELETE_TEMPORARILY,
+    canDelete: !isExpired,
     isExpired,
     expiresAt,
     remainingMs,

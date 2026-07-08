@@ -1,6 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { parseNumberLocale, toAsciiDigits } from "../lib/normalize.js";
-import { getOrderBenefitDetails } from "./order.service.js";
+import { getOrderBenefitDetails, getOrderBenefitDetailsBatch } from "./order.service.js";
 import { buildOrderWorkedByUserWhere } from "./orderWorkerRelation.service.js";
 
 const WORKER_ROLES = ["DOKHT", "QICHIKAR"];
@@ -201,47 +201,50 @@ export const searchOrdersForPenalty = async ({
   const skip = (page - 1) * limit;
   const workerWhere = buildOrderWorkedByUserWhere({ userId, roleType });
 
-  const buildOrderRows = async (orders) =>
-    Promise.all(
-      orders.map(async (order) => {
-        const benefitDetails = await getOrderBenefitDetails(order.id);
-        const breakdown = getExpenseBreakdown(benefitDetails);
-        const assignedAmount = resolveWorkerAssignedAmountForOrder({
-          order,
-          userId,
-          roleType,
-        });
-        const { adjustedTotalExpense } = applyWorkerAssignedDeduction({
-          totalExpense: breakdown.totalExpense,
-          assignedAmount,
-        });
-
-        return {
-          id: order.id,
-          billNumber: order.billNumber ?? order.customer?.billNumber ?? null,
-          customerName: order.customer?.firstName || "-",
-          phoneNumber: order.customer?.phoneNumber || "-",
-          orderType: order.type,
-          orderName: order.orderName || null,
-          isDamageOrder: Array.isArray(order.damagedClothesPenalties)
-            ? order.damagedClothesPenalties.length > 0
-            : false,
-          damagedAssignedTo:
-            order.damagedClothesPenalties?.[0]?.user || null,
-          damagedAssignedRole:
-            order.damagedClothesPenalties?.[0]?.roleType || null,
-          orderStatus: getOrderWorkflowStatus(order),
-          totalOrderAmount: breakdown.totalOrderAmount,
-          rakhtExpense: breakdown.rakhtExpense,
-          dokhtExpense: breakdown.dokhtExpense,
-          qichikarExpense: breakdown.qichikarExpense,
-          dailyTaskExpense: breakdown.dailyTaskExpense,
-          totalExpense: adjustedTotalExpense,
-          expenseRows: breakdown.expenses,
-          createdAt: order.createdAt,
-        };
-      }),
+  const buildOrderRows = async (orders) => {
+    const benefitByOrderId = await getOrderBenefitDetailsBatch(
+      orders.map((order) => order.id),
     );
+
+    return orders.map((order) => {
+      const benefitDetails = benefitByOrderId.get(order.id);
+      const breakdown = getExpenseBreakdown(benefitDetails);
+      const assignedAmount = resolveWorkerAssignedAmountForOrder({
+        order,
+        userId,
+        roleType,
+      });
+      const { adjustedTotalExpense } = applyWorkerAssignedDeduction({
+        totalExpense: breakdown.totalExpense,
+        assignedAmount,
+      });
+
+      return {
+        id: order.id,
+        billNumber: order.billNumber ?? order.customer?.billNumber ?? null,
+        customerName: order.customer?.firstName || "-",
+        phoneNumber: order.customer?.phoneNumber || "-",
+        orderType: order.type,
+        orderName: order.orderName || null,
+        isDamageOrder: Array.isArray(order.damagedClothesPenalties)
+          ? order.damagedClothesPenalties.length > 0
+          : false,
+        damagedAssignedTo:
+          order.damagedClothesPenalties?.[0]?.user || null,
+        damagedAssignedRole:
+          order.damagedClothesPenalties?.[0]?.roleType || null,
+        orderStatus: getOrderWorkflowStatus(order),
+        totalOrderAmount: breakdown.totalOrderAmount,
+        rakhtExpense: breakdown.rakhtExpense,
+        dokhtExpense: breakdown.dokhtExpense,
+        qichikarExpense: breakdown.qichikarExpense,
+        dailyTaskExpense: breakdown.dailyTaskExpense,
+        totalExpense: adjustedTotalExpense,
+        expenseRows: breakdown.expenses,
+        createdAt: order.createdAt,
+      };
+    });
+  };
 
   if (isNumericQuery && Number.isFinite(queryAsInt)) {
     const exactBillWhere = {

@@ -192,6 +192,7 @@ export default function DamagedClothes() {
   const [selectedWorker, setSelectedWorker] = useState(null);
   const [searchText, setSearchText] = useState("");
   const [submittedSearch, setSubmittedSearch] = useState("");
+  const [searchFieldErrors, setSearchFieldErrors] = useState({ role: "", worker: "", search: "" });
   const [searchTriggered, setSearchTriggered] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -336,25 +337,25 @@ export default function DamagedClothes() {
   });
 
   const onSearch = () => {
-    if (!selectedRole?.value) {
-      toast.error(t("damagedClothes.validation.roleRequired"));
+    const errors = { role: "", worker: "", search: "" };
+    if (!selectedRole?.value) errors.role = t("damagedClothes.validation.roleRequired");
+    if (!selectedWorker?.value) errors.worker = t("damagedClothes.validation.workerRequired");
+    if (!searchText.trim()) errors.search = t("damagedClothes.validation.searchRequired");
+    if (errors.role || errors.worker || errors.search) {
+      setSearchFieldErrors(errors);
       return;
     }
-    if (!selectedWorker?.value) {
-      toast.error(t("damagedClothes.validation.workerRequired"));
-      return;
-    }
-    if (!searchText.trim()) {
-      toast.error(t("damagedClothes.validation.searchRequired"));
-      return;
-    }
+    setSearchFieldErrors({ role: "", worker: "", search: "" });
     setSubmittedSearch(searchText.trim());
     setSearchTriggered(true);
   };
 
   const openConfirm = (order) => {
     if (!selectedWorker?.value) {
-      toast.error(t("damagedClothes.validation.workerRequired"));
+      setSearchFieldErrors((prev) => ({
+        ...prev,
+        worker: t("damagedClothes.validation.workerRequired"),
+      }));
       return;
     }
     if (order?.isDamageOrder) {
@@ -458,14 +459,20 @@ export default function DamagedClothes() {
                       setSubmittedSearch("");
                       setSearchText("");
                       setSelectedOrder(null);
+                      setSearchFieldErrors((prev) => ({ ...prev, role: "", worker: "" }));
                     }}
                     placeholder={t("damagedClothes.rolePlaceholder")}
-                    styles={buildSelectStyles({ isRtl })}
+                    styles={buildSelectStyles({ hasError: Boolean(searchFieldErrors.role), isRtl })}
                     menuPortalTarget={typeof document !== "undefined" ? document.body : null}
                     menuPosition="fixed"
                     menuPlacement="auto"
                     menuShouldBlockScroll={false}
                   />
+                  {searchFieldErrors.role && (
+                    <p className="err-msg" role="alert" aria-live="polite">
+                      {searchFieldErrors.role}
+                    </p>
+                  )}
                 </div>
 
                 {/* Worker */}
@@ -494,6 +501,7 @@ export default function DamagedClothes() {
                       setSearchTriggered(false);
                       setSubmittedSearch("");
                       setSelectedOrder(null);
+                      setSearchFieldErrors((prev) => ({ ...prev, worker: "" }));
                     }}
                     isLoading={workersLoading}
                     isDisabled={!selectedRole?.value}
@@ -503,12 +511,17 @@ export default function DamagedClothes() {
                         ? t("common.loading", "Loading...")
                         : t("common.noData", "No data found")
                     }
-                    styles={buildSelectStyles({ isRtl })}
+                    styles={buildSelectStyles({ hasError: Boolean(searchFieldErrors.worker), isRtl })}
                     menuPortalTarget={typeof document !== "undefined" ? document.body : null}
                     menuPosition="fixed"
                     menuPlacement="auto"
                     menuShouldBlockScroll={false}
                   />
+                  {searchFieldErrors.worker && (
+                    <p className="err-msg" role="alert" aria-live="polite">
+                      {searchFieldErrors.worker}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -543,7 +556,7 @@ export default function DamagedClothes() {
                     }}
                   />
                   <input
-                    className="inp"
+                    className={`inp${searchFieldErrors.search ? " inp-err" : ""}`}
                     style={{
                       height: 50,
                       paddingInlineStart: 44,
@@ -554,9 +567,17 @@ export default function DamagedClothes() {
                       minWidth: 0,
                     }}
                     value={searchText}
-                    onChange={(e) => setSearchText(e.target.value)}
+                    onChange={(e) => {
+                      setSearchText(e.target.value);
+                      if (searchFieldErrors.search) setSearchFieldErrors((prev) => ({ ...prev, search: "" }));
+                    }}
                     placeholder={t("damagedClothes.searchPlaceholder")}
                   />
+                  {searchFieldErrors.search && (
+                    <p className="err-msg" role="alert" aria-live="polite">
+                      {searchFieldErrors.search}
+                    </p>
+                  )}
                 </div>
                 <button
                   type="submit"

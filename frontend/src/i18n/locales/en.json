@@ -55,7 +55,40 @@
     "filters": "Filters",
     "clear": "Clear",
     "apply": "Apply",
-    "notAvailable": "-"
+    "notAvailable": "-",
+    "required": "This field is required.",
+    "invalid": "Please enter a valid value.",
+    "invalidFormat": "Please use the correct format.",
+    "positiveNumber": "Please enter a number greater than zero.",
+    "selectRequired": "Please make a selection.",
+    "searchRequired": "Please enter a search value."
+  },
+  "validation": {
+    "required": "This field is required.",
+    "invalid": "Please enter a valid value.",
+    "invalidFormat": "Please use the correct format.",
+    "email": "Please enter a valid email address.",
+    "phone": "Please enter a valid phone number.",
+    "passwordMin": "Password must be at least {{min}} characters.",
+    "amountPositive": "Amount must be greater than zero.",
+    "amountExceeds": "Amount cannot exceed the remaining balance."
+  },
+  "feedback": {
+    "genericError": "Something went wrong. Please try again.",
+    "networkError": "The server could not be reached. Check your connection and try again.",
+    "timeoutError": "The request took too long. Please try again.",
+    "serverError": "A server error occurred. Please try again shortly.",
+    "permissionDenied": "You do not have permission to perform this action.",
+    "unauthorized": "Your session has expired. Please sign in again.",
+    "saved": "Saved successfully.",
+    "created": "Created successfully.",
+    "updated": "Updated successfully.",
+    "deleted": "Deleted successfully.",
+    "uploaded": "Uploaded successfully.",
+    "assigned": "Assigned successfully.",
+    "completed": "Completed successfully.",
+    "loggedOut": "You have been signed out.",
+    "actionFailed": "The action could not be completed. Please try again."
   },
   "sidebar": {
     "dokanPanel": "Dokan Panel",
@@ -96,9 +129,14 @@
     "signInToContinue": "Sign in to continue",
     "password": "Password",
     "logout": "Logout",
-    "fillAllFields": "Please fill all fields.",
-    "loginFailed": "Login failed. Check your credentials.",
+    "phoneRequired": "Please enter your phone number.",
+    "passwordRequired": "Please enter your password.",
+    "fillAllFields": "Please fill all required fields.",
+    "loginFailed": "Sign-in failed. Please check your credentials.",
     "welcomeBack": "Welcome back, {{name}}!",
+    "adminOnly": "Access denied. This account cannot sign in here.",
+    "tenantNotFound": "This business subdomain was not found.",
+    "loggedOut": "You have been signed out.",
     "contactAdmin": "Don't have access? Contact your admin."
   },
   "users": {
@@ -114,25 +152,74 @@
     "active": "Active",
     "inactive": "Inactive",
     "you": "You",
+    "nameRequired": "Please enter the full name.",
+    "phoneRequired": "Please enter the phone number.",
+    "roleRequired": "Please select a role.",
     "created": "User created successfully.",
     "updated": "User updated successfully.",
-    "deleted": "User deleted.",
-    "saveFailed": "Failed to save user.",
-    "deleteFailed": "Failed to delete user.",
+    "deleted": "User deleted successfully.",
+    "saveFailed": "Unable to save the user. Please try again.",
+    "deleteFailed": "Unable to delete the user. Please try again.",
     "cannotDeleteSelf": "You cannot delete your own account.",
     "confirmDelete": "Delete {{name}}? This cannot be undone.",
     "leaveBlank": "leave blank to keep",
-    "passwordRequired": "Password is required for new users.",
-    "passwordMin": "Min 6 characters",
+    "passwordRequired": "Please enter a password.",
+    "passwordMin": "Password must be at least 6 characters.",
+    "passwordHint": "required",
     "defaultPasswordHint": "Enter a secure password.",
     "selectRole": "Select a role",
     "singleAdminOnly": "This tenant already has an Admin. Only one Admin is allowed per tenant.",
+    "limitReached": "You cannot add more than {{total}} employees. Contact the super admin if you need more capacity.",
+    "limitSummary": "{{current}} of {{total}} employee slots used",
+    "limitRemaining": "{{count}} slots remaining",
+    "canCreate": "You can create {{count}} employees",
     "roles": {
       "admin": "Admin",
       "dokan": "Dokan",
       "dokht": "Tailor",
       "qichikar": "Cutter",
       "finance": "Finance"
+    }
+  },
+  "tenantUserLimits": {
+    "badge": "Tenant Capacity",
+    "title": "Tenant User Limit Management",
+    "subtitle": "View default limits, grant extra employee capacity, and monitor usage for every tenant.",
+    "tableTitle": "Tenant User Limits",
+    "tableSubtitle": "Default limit is 30 users. Super admin can increase or decrease extra capacity per tenant.",
+    "searchPlaceholder": "Search tenants...",
+    "noTenants": "No tenants found.",
+    "defaultLimit": "Default limit",
+    "extraUsers": "Extra users granted",
+    "extraUsersHelp": "Set the additional user slots granted beyond the default limit of 30.",
+    "currentUsers": "Current users",
+    "projectedTotal": "Total allowed after save",
+    "note": "Note",
+    "notePlaceholder": "Optional reason for this change",
+    "saveLimit": "Save limit",
+    "saved": "Tenant user limit updated.",
+    "saveFailed": "Failed to update tenant user limit.",
+    "editTitle": "Update tenant user limit",
+    "history": "History",
+    "historyTitle": "Limit change history",
+    "noHistory": "No limit changes recorded yet.",
+    "totalAfterChange": "Total allowed users: {{total}}",
+    "changedBy": "Changed by {{name}}",
+    "atLimit": "At limit",
+    "available": "Available",
+    "stats": {
+      "tenants": "Tenants",
+      "totalUsers": "Total users",
+      "atLimit": "Tenants at limit"
+    },
+    "columns": {
+      "tenant": "Tenant",
+      "defaultLimit": "Default",
+      "extraUsers": "Extra granted",
+      "totalAllowed": "Total allowed",
+      "currentUsers": "Current users",
+      "remaining": "Remaining",
+      "status": "Status"
     }
   },
   "dadAndStud": {
@@ -414,7 +501,7 @@
     "printCenterCopy": "Review each document in a cleaner presentation and print customer and tailor copies with one click.",
     "printEverything": "Print Everything",
     "orderCreatedSuccess": "Order created successfully.",
-    "pricePerItem": "Price per Item",
+    "pricePerItem": "Total",
     "afterDiscount": "After discount:",
     "fullyPaid": "Fully paid ✓",
     "emergencyShort": "Emergency",
@@ -478,10 +565,12 @@
     "billPlaceholder": "Enter bill number...",
     "phonePlaceholder": "Enter phone number...",
     "resultsTitle": "Results",
-    "noResults": "No orders found",
-    "invalidAmount": "Please enter a valid amount",
-    "paymentGreaterThanRemaining": "Payment cannot exceed remaining balance",
-    "paymentRecorded": "Payment recorded successfully"
+    "noResults": "No orders found for this search.",
+    "searchRequired": "Please enter a bill number or phone number.",
+    "invalidAmount": "Please enter a valid payment amount.",
+    "paymentGreaterThanRemaining": "Payment cannot exceed the remaining balance.",
+    "paymentRecorded": "Payment recorded successfully.",
+    "paymentFailed": "Unable to record payment. Please try again."
   },
   "workerPanel": {
     "statusCompleted": "Completed",
@@ -1149,12 +1238,12 @@
       "logoSize": "Logo must be 2MB or smaller."
     },
     "toast": {
-      "created": "Tenant created",
-      "updated": "Tenant updated",
-      "deleted": "Tenant deleted",
-      "createFailed": "Create failed",
-      "updateFailed": "Update failed",
-      "deleteFailed": "Delete failed"
+      "created": "Tenant created successfully.",
+      "updated": "Tenant updated successfully.",
+      "deleted": "Tenant deleted successfully.",
+      "createFailed": "Unable to create the tenant. Please try again.",
+      "updateFailed": "Unable to update the tenant. Please try again.",
+      "deleteFailed": "Unable to delete the tenant. Please try again."
     }
   },
   "tenantSettings": {
@@ -1179,7 +1268,7 @@
       "subtitle": "These details appear on customer documents, reports, and workspace labels."
     },
     "fields": {
-      "businessName": "Business Name",
+      "businessName": "System Name",
       "systemName": "System Name",
       "address": "Address",
       "phone": "Phone",
@@ -1209,7 +1298,7 @@
       "timezone": "Timezone"
     },
     "validation": {
-      "businessName": "Business name is required.",
+      "businessName": "System name is required.",
       "systemName": "System name is required.",
       "ownerName": "Owner name is required.",
       "ownerPhone": "Owner phone is required.",
@@ -1224,9 +1313,9 @@
       "logoSize": "Logo must be 2MB or smaller."
     },
     "toast": {
-      "saved": "Settings saved",
-      "loadFailed": "Failed to load settings",
-      "saveFailed": "Save failed"
+      "saved": "Settings saved successfully.",
+      "loadFailed": "Unable to load settings. Please try again.",
+      "saveFailed": "Unable to save settings. Please try again."
     }
   }
 }

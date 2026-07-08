@@ -57,6 +57,59 @@ const sanitizeDecimalInput = (raw, { maxFractionDigits } = {}) => {
   return `${parts[0]}.${safeFraction}`;
 };
 
+const moneyInputStyles = {
+  background: "var(--surface2)",
+  cursor: "not-allowed",
+};
+
+const formatMoneyValue = (value) =>
+  Number(value || 0).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+const buildRakhtSelectStyles = () => ({
+  control: (base, state) => ({
+    ...base,
+    minHeight: 44,
+    borderRadius: 12,
+    borderColor: state.isFocused ? "var(--primary)" : "var(--border)",
+    boxShadow: state.isFocused ? "0 0 0 3px rgba(217,119,6,.12)" : "none",
+    background: "var(--surface)",
+    "&:hover": {
+      borderColor: state.isFocused ? "var(--primary)" : "var(--border2)",
+    },
+  }),
+  valueContainer: (base) => ({
+    ...base,
+    paddingTop: 3,
+    paddingBottom: 3,
+  }),
+  input: (base) => ({ ...base, margin: 0, padding: 0 }),
+  placeholder: (base) => ({
+    ...base,
+    color: "var(--text3)",
+    fontSize: 13,
+  }),
+  singleValue: (base) => ({
+    ...base,
+    color: "var(--text1)",
+    fontSize: 13,
+  }),
+  menu: (base) => ({
+    ...base,
+    zIndex: 20,
+    borderRadius: 12,
+    overflow: "hidden",
+    border: "1px solid var(--border)",
+    boxShadow: "var(--sh-lg)",
+  }),
+  menuPortal: (base) => ({
+    ...base,
+    zIndex: 9999,
+  }),
+});
+
 const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
   onNext,
   onBack,
@@ -67,6 +120,7 @@ const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
   const isRtlLanguage = detectRtlLanguage(language);
+  const selectStyles = useMemo(() => buildRakhtSelectStyles(), []);
   const [validationError, setValidationError] = useState("");
 
   const { data: rakhtRows = [], isLoading } = useQuery({
@@ -335,7 +389,7 @@ const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
   };
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} className="rakht-step-form">
       <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>
         {t("createOrder.rakhtSelection", { defaultValue: "Rakht Selection" })}
       </h2>
@@ -364,7 +418,7 @@ const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
           })}
         </div>
       ) : (
-        <div style={{ display: "grid", gap: 14 }}>
+        <div className="rakht-step-stack">
           {selectionItems.map((item) => {
             const current = selections[item.key] || emptySelection;
             const companyName = current.companyName || "";
@@ -470,26 +524,26 @@ const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
             return (
               <div
                 key={item.key}
-                className="card"
-                style={{ padding: 14, border: "1px solid var(--border)" }}
+                className="card rakht-step-card"
               >
-                <p
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: "var(--text2)",
-                    marginBottom: 10,
-                  }}
-                >
-                  {typeLabel}
-                </p>
+                <div className="rakht-step-card__head">
+                  <p className="rakht-step-card__title">{typeLabel}</p>
+                  <span className="rakht-step-card__badge">
+                    {getOrderTypeLabel(item.type, language)}
+                  </span>
+                </div>
 
-                <div style={{ display: "grid", gap: 14 }}>
+                <div className="rakht-step-card__body">
+                  <div className="rakht-step-card__grid">
                   <Field
                     label={t("rakht.companyName", { defaultValue: "Company" })}
                   >
                     <Select
                       classNamePrefix="rs"
+                      menuPortalTarget={
+                        typeof document !== "undefined" ? document.body : null
+                      }
+                      menuPosition="fixed"
                       options={companyOptions}
                       placeholder={t("common.select", {
                         defaultValue: "Select",
@@ -507,18 +561,7 @@ const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
                           piecePrice: "",
                         });
                       }}
-                      styles={{
-                        control: (base, state) => ({
-                          ...base,
-                          minHeight: 40,
-                          borderRadius: 10,
-                          borderColor: state.isFocused
-                            ? "var(--primary)"
-                            : "var(--border)",
-                          boxShadow: "none",
-                        }),
-                        menu: (base) => ({ ...base, zIndex: 20 }),
-                      }}
+                      styles={selectStyles}
                     />
                   </Field>
 
@@ -527,6 +570,10 @@ const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
                   >
                     <Select
                       classNamePrefix="rs"
+                      menuPortalTarget={
+                        typeof document !== "undefined" ? document.body : null
+                      }
+                      menuPosition="fixed"
                       options={brandOptions}
                       isDisabled={!companyName}
                       placeholder={t("common.select", {
@@ -544,18 +591,7 @@ const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
                           piecePrice: "",
                         });
                       }}
-                      styles={{
-                        control: (base, state) => ({
-                          ...base,
-                          minHeight: 40,
-                          borderRadius: 10,
-                          borderColor: state.isFocused
-                            ? "var(--primary)"
-                            : "var(--border)",
-                          boxShadow: "none",
-                        }),
-                        menu: (base) => ({ ...base, zIndex: 20 }),
-                      }}
+                      styles={selectStyles}
                     />
                   </Field>
 
@@ -566,6 +602,10 @@ const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
                   >
                     <Select
                       classNamePrefix="rs"
+                      menuPortalTarget={
+                        typeof document !== "undefined" ? document.body : null
+                      }
+                      menuPosition="fixed"
                       options={tonOptions}
                       isDisabled={!selectedRakht}
                       placeholder={t("common.select", {
@@ -605,13 +645,7 @@ const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
                           METER_SCALE,
                         );
                         return (
-                          <span
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 8,
-                            }}
-                          >
+                          <span className="rakht-ton-option">
                             <span
                               style={{
                                 width: 12,
@@ -622,12 +656,9 @@ const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
                                 flexShrink: 0,
                               }}
                             />
-                            {opt.label}
+                            <span>{opt.label}</span>
                             {opt.ton && (
-                              <span
-                                style={{ fontSize: 11, color: "var(--text3)" }}
-                              >
-                                &nbsp;-&nbsp;
+                              <span className="rakht-ton-option__meta">
                                 {formatScaled(tonEffectiveAvail, {
                                   scale: 2,
                                 })}
@@ -640,21 +671,12 @@ const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
                           </span>
                         );
                       }}
-                      styles={{
-                        control: (base, state) => ({
-                          ...base,
-                          minHeight: 40,
-                          borderRadius: 10,
-                          borderColor: state.isFocused
-                            ? "var(--primary)"
-                            : "var(--border)",
-                          boxShadow: "none",
-                        }),
-                        menu: (base) => ({ ...base, zIndex: 20 }),
-                      }}
+                      styles={selectStyles}
                     />
                   </Field>
+                  </div>
 
+                  <div className="rakht-step-card__grid rakht-step-card__grid--compact">
                   <Field
                     label={t("rakht.requiredMeters", {
                       defaultValue: "Required Meters",
@@ -705,15 +727,10 @@ const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
                       />
                     </div>
                   </Field>
+                  </div>
 
                   {/* Selling Price per Meter (read-only) + Total Price (auto-calc) */}
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: 12,
-                    }}
-                  >
+                  <div className="rakht-step-card__pair-grid">
                     <Field
                       label={t("rakht.sellingPricePerMeter", {
                         defaultValue: "Selling Price / m (Purchase)",
@@ -727,10 +744,7 @@ const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
                           value={current.piecePrice || ""}
                           readOnly
                           disabled
-                          style={{
-                            background: "var(--surface2)",
-                            cursor: "not-allowed",
-                          }}
+                          style={moneyInputStyles}
                         />
                       </div>
                     </Field>
@@ -747,31 +761,19 @@ const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
                           className="inp"
                           value={
                             computedTotalPrice > 0
-                              ? computedTotalPrice.toLocaleString("en-US", {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })
+                              ? formatMoneyValue(computedTotalPrice)
                               : "0"
                           }
                           readOnly
                           disabled
-                          style={{
-                            background: "var(--surface2)",
-                            cursor: "not-allowed",
-                          }}
+                          style={moneyInputStyles}
                         />
                       </div>
                     </Field>
                   </div>
 
                   {/* Price for Customer (editable) + Total Price for Customer (auto-calc) */}
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: 12,
-                    }}
-                  >
+                  <div className="rakht-step-card__pair-grid">
                     <Field
                       label={t("rakht.priceForCustomer", {
                         defaultValue: "Price for Customer / m",
@@ -807,20 +809,13 @@ const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
                           className="inp"
                           value={
                             computedTotalPriceForCustomer > 0
-                              ? computedTotalPriceForCustomer.toLocaleString(
-                                  "en-US",
-                                  {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  },
-                                )
+                              ? formatMoneyValue(computedTotalPriceForCustomer)
                               : "0"
                           }
                           readOnly
                           disabled
                           style={{
-                            background: "var(--surface2)",
-                            cursor: "not-allowed",
+                            ...moneyInputStyles,
                             fontWeight: 700,
                             color: "var(--primary)",
                           }}
@@ -832,109 +827,66 @@ const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
                   {selectedTon ? (
                     <>
                       <div
-                        className={`info-box ${requiredMeters > 0 && requiredMeters > availableMeters ? "ib-red" : "ib-gold"}`}
-                        style={{
-                          marginTop: 2,
-                          display: "flex",
-                          justifyContent: isRtlLanguage
-                            ? "flex-end"
-                            : "flex-start",
-                        }}
+                        className={`rakht-step-summary-card ${requiredMeters > 0 && requiredMeters > availableMeters ? "rakht-step-summary-card--warning" : ""}`}
+                        dir={isRtlLanguage ? "rtl" : "ltr"}
                       >
-                        <div
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns:
-                              "repeat(auto-fit, minmax(190px, 1fr))",
-                            gap: 10,
-                            width: "100%",
-                            maxWidth: 760,
-                            direction: isRtlLanguage ? "rtl" : "ltr",
-                            textAlign: isRtlLanguage ? "right" : "left",
-                            justifyItems: isRtlLanguage ? "end" : "start",
-                          }}
-                        >
-                          <span>
-                            {t("rakht.availableMeters", {
-                              defaultValue: "Available",
-                            })}
-                            : {formatScaled(availableMeters, { scale: 2 })}
-                          </span>
-                          <span>
-                            {t("rakht.remainingAfterSelection", {
-                              defaultValue: "Remaining after selection",
-                            })}
-                            : {formatScaled(remainingAfter, { scale: 2 })}
-                          </span>
-                          <span>
-                            {t("rakht.companyName", {
-                              defaultValue: "Company",
-                            })}
-                            : {selectedRakht?.companyName}
-                          </span>
-                          <span
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 8,
-                              flexDirection: isRtlLanguage
-                                ? "row-reverse"
-                                : "row",
-                            }}
-                          >
-                            <span
-                              style={{
-                                width: 12,
-                                height: 12,
-                                borderRadius: "50%",
-                                border: "1px solid rgba(15,23,42,0.15)",
-                                background: selectedTon.colorHex || "#94A3B8",
-                              }}
-                            />
-                            {t("rakht.tonName", {
-                              defaultValue: "Ton Color Name",
-                            })}
-                            :{" "}
-                            {selectedTon.name}
-                          </span>
-                          {computedTotalPriceForCustomer > 0 && (
-                            <span
-                              style={{
-                                fontWeight: 700,
-                                color: "var(--primary)",
-                              }}
-                            >
-                              {t("rakht.totalPriceForCustomer", {
-                                defaultValue: "Total for Customer",
+                        <div className="rakht-step-summary-card__stats">
+                          <div className="rakht-step-summary-stat">
+                            <span className="rakht-step-summary-stat__label">
+                              {t("rakht.availableMeters", {
+                                defaultValue: "Available",
                               })}
-                              :{" "}
-                              {computedTotalPriceForCustomer.toLocaleString(
-                                "en-US",
-                                {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                },
-                              )}
                             </span>
+                            <strong className="rakht-step-summary-stat__value">
+                              {formatScaled(availableMeters, { scale: 2 })}
+                            </strong>
+                          </div>
+                          <div className="rakht-step-summary-stat">
+                            <span className="rakht-step-summary-stat__label">
+                              {t("rakht.remainingAfterSelection", {
+                                defaultValue: "Remaining after selection",
+                              })}
+                            </span>
+                            <strong className="rakht-step-summary-stat__value">
+                              {formatScaled(remainingAfter, { scale: 2 })}
+                            </strong>
+                          </div>
+                          <div className="rakht-step-summary-stat">
+                            <span className="rakht-step-summary-stat__label">
+                              {t("rakht.companyName", {
+                                defaultValue: "Company",
+                              })}
+                            </span>
+                            <strong className="rakht-step-summary-stat__value">
+                              {selectedRakht?.companyName || "-"}
+                            </strong>
+                          </div>
+                        </div>
+                        <div className="rakht-step-summary-card__footer">
+                          {computedTotalPriceForCustomer > 0 && (
+                            <div className="rakht-step-summary-stat rakht-step-summary-stat--primary">
+                              <span className="rakht-step-summary-stat__label">
+                                {t("rakht.totalPriceForCustomer", {
+                                  defaultValue: "Total for Customer",
+                                })}
+                              </span>
+                              <strong className="rakht-step-summary-stat__value">
+                                {formatMoneyValue(computedTotalPriceForCustomer)}
+                              </strong>
+                            </div>
                           )}
-                          <span
-                            style={{
-                              fontWeight: 700,
-                              color:
-                                rakhtBenefit >= 0
-                                  ? "var(--success, #16a34a)"
-                                  : "var(--danger, #ef4444)",
-                            }}
+                          <div
+                            className={`rakht-step-summary-stat rakht-step-summary-stat--benefit ${rakhtBenefit >= 0 ? "is-positive" : "is-negative"}`}
                           >
-                            {t("rakht.benefit", {
-                              defaultValue: "Rakht Benefit",
-                            })}
-                            :{" "}
-                            {rakhtBenefit.toLocaleString("en-US", {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </span>
+                            <span className="rakht-step-summary-stat__label">
+                              {t("rakht.benefit", {
+                                defaultValue: "Rakht Benefit",
+                              })}
+                            </span>
+                            <strong className="rakht-step-summary-stat__value">
+                              {formatMoneyValue(rakhtBenefit)}
+                            </strong>
+                          </div>
                         </div>
                       </div>
                       {requiredMeters > 0 &&
@@ -975,7 +927,7 @@ const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
         </div>
       ) : null}
 
-      <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+      <div className="rakht-step-actions">
         <button
           type="button"
           onClick={onBack}

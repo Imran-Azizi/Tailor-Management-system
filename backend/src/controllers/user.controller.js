@@ -2,6 +2,11 @@ import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma.js";
 import { getAfghanMonthDateRange } from "../lib/afghanistanDate.js";
 import { getNotificationRetentionWhere } from "../lib/notificationRetention.js";
+import {
+  assertCanCreateUser,
+  getTenantUserLimitInfo,
+  sendUserLimitReached,
+} from "../services/userLimit.service.js";
 
 const SALT_ROUNDS = 12;
 const USER_ACCOUNT_TYPES = ["ADMIN", "DOKAN", "DOKHT", "QICHIKAR", "FINANCE"];
@@ -32,6 +37,19 @@ function isSingleAdminConstraintError(error) {
     return target.length === 1 && target[0] === "tenantId";
   }
   return String(target || "").includes("User_one_admin_per_tenant_key");
+}
+
+/** GET /api/users/limit — current tenant user limit stats */
+export async function getUserLimit(req, res, next) {
+  try {
+    if (!req.user?.tenantId) {
+      return res.status(400).json({ error: "Tenant context is required." });
+    }
+    const limit = await getTenantUserLimitInfo(req.user.tenantId);
+    res.json(limit);
+  } catch (err) {
+    next(err);
+  }
 }
 
 /** GET /api/users */
@@ -116,6 +134,15 @@ export async function createUser(req, res, next) {
     }
     if (accountType === "ADMIN" && (await tenantHasAnotherAdmin())) {
       return sendAdminAlreadyExists(res);
+    }
+
+    try {
+      await assertCanCreateUser(req.user.tenantId);
+    } catch (limitErr) {
+      if (limitErr.code === "TENANT_USER_LIMIT_REACHED") {
+        return sendUserLimitReached(res, limitErr.limitInfo);
+      }
+      throw limitErr;
     }
 
     const hashed = await bcrypt.hash(password, SALT_ROUNDS);

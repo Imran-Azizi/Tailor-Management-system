@@ -6,6 +6,21 @@
   max-width: 100%;
 }
 
+.payment-history-mobile-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px 12px 0;
+  color: var(--text2);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.payment-history-mobile-card__meta-item {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 767px) {
   .payment-history-page {
     width: 100%;
@@ -53,11 +68,14 @@
   .payment-history-page .page-hd-action .btn {
     width: 100%;
     min-width: 0;
-    min-height: 42px;
+    min-height: 48px;
     justify-content: center;
-    padding-inline: 8px;
+    padding-inline: 14px;
     white-space: normal;
     text-align: center;
+    border-radius: 12px;
+    font-size: 12.5px;
+    font-weight: 700;
   }
 
   .payment-history-page .month-info-banner {
@@ -135,20 +153,15 @@
     width: 100%;
     max-width: 100%;
     overflow-x: auto !important;
-    padding-bottom: 0 !important;
-    scrollbar-width: none !important;
+    overflow-y: hidden;
+    padding-bottom: 8px !important;
     -webkit-overflow-scrolling: touch;
-  }
-
-  .payment-history-records-wrap::-webkit-scrollbar {
-    display: none !important;
-    width: 0 !important;
-    height: 0 !important;
+    scrollbar-width: thin !important;
   }
 
   .payment-history-records-table {
-    width: 900px !important;
-    min-width: 900px !important;
+    width: 920px !important;
+    min-width: 920px !important;
     table-layout: fixed;
     font-size: 11.5px;
   }
@@ -189,7 +202,7 @@
   }
 
   .payment-history-records-table thead .btn {
-    min-height: 24px;
+    min-height: 28px;
     justify-content: flex-start;
     font-size: 10px;
     line-height: 1.3;
@@ -214,6 +227,13 @@
   .payment-history-mobile-card__details {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     padding: 4px 8px 8px !important;
+  }
+
+  .payment-history-mobile-card__meta {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+    padding: 10px 12px 0;
   }
 
   .payment-history-mobile-card__details > div {
@@ -247,17 +267,21 @@
   }
 
   .payment-history-page .page-hd-action .btn {
-    min-height: 40px;
-    font-size: 11px;
+    min-height: 46px;
+    font-size: 12px;
   }
 
   .payment-history-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 
+  .payment-history-mobile-card__meta {
+    gap: 5px;
+  }
+
   .payment-history-records-table {
-    width: 850px !important;
-    min-width: 850px !important;
+    width: 900px !important;
+    min-width: 900px !important;
   }
 
   .payment-history-col--companyName {

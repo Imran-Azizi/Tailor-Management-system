@@ -112,6 +112,7 @@ export default function Login() {
 
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [tenantContext, setTenantContext] = useState(null);
@@ -151,7 +152,7 @@ export default function Login() {
   const loginSubtitle =
     hostContext.hostType === "admin"
       ? t("superAdmin.title", "Super Admin")
-      : tenantBrand?.businessName || t("auth.signInToContinue");
+      : t("auth.signInToContinue");
   const isUnknownTenantHost =
     hostContext.hostType === "tenant" &&
     !tenantContextLoading &&
@@ -161,13 +162,26 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isUnknownTenantHost) {
-      toast.error(tenantContextError || "Tenant subdomain was not found.");
+      toast.error(
+        tenantContextError ||
+          t("auth.tenantNotFound", "This business subdomain was not found."),
+      );
       return;
     }
-    if (!phone.trim() || !password) {
-      toast.error(t("auth.fillAllFields"));
-      return;
+
+    const nextErrors = {};
+    if (!phone.trim()) {
+      nextErrors.phone = t("auth.phoneRequired", "Please enter your phone number.");
     }
+    if (!password) {
+      nextErrors.password = t(
+        "auth.passwordRequired",
+        "Please enter your password.",
+      );
+    }
+    setFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
     setLoading(true);
     try {
       const user = await login(phone.trim(), password, from);
@@ -276,7 +290,7 @@ export default function Login() {
             {tenantBrand?.logoUrl ? (
               <img
                 src={assetUrl(tenantBrand.logoUrl)}
-                alt={tenantBrand.businessName || tenantBrand.systemName || "Tenant logo"}
+                alt={tenantBrand.systemName || tenantBrand.businessName || "Tenant logo"}
                 style={{ width: "100%", height: "100%", objectFit: "contain", background: "#fff" }}
               />
             ) : (
@@ -308,7 +322,8 @@ export default function Login() {
           ) : null}
           {isUnknownTenantHost ? (
             <p style={{ fontSize: 12, color: "var(--danger)", marginTop: 8 }}>
-              {tenantContextError || "Tenant subdomain was not found."}
+              {tenantContextError ||
+                t("auth.tenantNotFound", "This business subdomain was not found.")}
             </p>
           ) : null}
         </div>
@@ -317,6 +332,7 @@ export default function Login() {
         <form
           onSubmit={handleSubmit}
           style={{ display: "flex", flexDirection: "column", gap: 16 }}
+          noValidate
         >
           {/* Phone */}
           <div>
@@ -335,9 +351,14 @@ export default function Login() {
               <LuPhone size={15} className="ico" />
               <input
                 type="tel"
-                className="inp with-leading-icon"
+                className={`inp with-leading-icon${fieldErrors.phone ? " inp-err" : ""}`}
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => {
+                  setPhone(e.target.value);
+                  if (fieldErrors.phone) {
+                    setFieldErrors((prev) => ({ ...prev, phone: undefined }));
+                  }
+                }}
                 placeholder="0700000000"
                 style={{
                   borderRadius: 8,
@@ -346,8 +367,14 @@ export default function Login() {
                 }}
                 autoComplete="username"
                 disabled={loading}
+                aria-invalid={Boolean(fieldErrors.phone)}
               />
             </div>
+            {fieldErrors.phone ? (
+              <p className="err-msg" role="alert">
+                {fieldErrors.phone}
+              </p>
+            ) : null}
           </div>
 
           {/* Password */}
@@ -367,9 +394,14 @@ export default function Login() {
               <LuLock size={15} className="ico" />
               <input
                 type={showPw ? "text" : "password"}
-                className="inp with-leading-icon with-trailing-icon"
+                className={`inp with-leading-icon with-trailing-icon${fieldErrors.password ? " inp-err" : ""}`}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (fieldErrors.password) {
+                    setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                  }
+                }}
                 placeholder="********"
                 style={{
                   ...(isDariPashto ? { paddingInlineEnd: 60 } : {}),
@@ -379,6 +411,7 @@ export default function Login() {
                 }}
                 autoComplete="current-password"
                 disabled={loading}
+                aria-invalid={Boolean(fieldErrors.password)}
               />
               <button
                 type="button"
@@ -401,6 +434,11 @@ export default function Login() {
                 {showPw ? <LuEyeOff size={15} /> : <LuEye size={15} />}
               </button>
             </div>
+            {fieldErrors.password ? (
+              <p className="err-msg" role="alert">
+                {fieldErrors.password}
+              </p>
+            ) : null}
           </div>
 
           {/* Submit */}

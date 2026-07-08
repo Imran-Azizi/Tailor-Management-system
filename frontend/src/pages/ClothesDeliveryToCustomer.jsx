@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import {
@@ -321,6 +321,8 @@ export default function ClothesDeliveryToCustomer() {
   const [paying, setPaying] = useState(false);
   const [payments, setPayments] = useState({}); // orderId -> string
   const [paymentConfirmation, setPaymentConfirmation] = useState(null);
+  const [searchError, setSearchError] = useState("");
+  const [paymentErrors, setPaymentErrors] = useState({}); // orderId -> string
 
   const orders = result?.orders || [];
   const resultCountLabel = t("delivery.ordersFound", {
@@ -333,15 +335,14 @@ export default function ClothesDeliveryToCustomer() {
     const normalizedBill = toAsciiDigits(trimmed).replace(/\D/g, "");
     const normalizedPhone = normalizePhone(trimmed);
     if (!trimmed || (mode === "bill" && !normalizedBill)) {
-      toast.error(
-        t("common.search") +
-          " " +
-          (mode === "bill"
-            ? t("delivery.searchByBill")
-            : t("delivery.searchByPhone")),
+      setSearchError(
+        mode === "bill"
+          ? t("delivery.searchByBill")
+          : t("delivery.searchByPhone"),
       );
       return;
     }
+    setSearchError("");
     setLoading(true);
     try {
       const params =
@@ -356,9 +357,10 @@ export default function ClothesDeliveryToCustomer() {
         if ((o.remaining || 0) > 0) nextPayments[o.id] = String(o.remaining);
       });
       setPayments(nextPayments);
+      setPaymentErrors({});
     } catch {
       setResult(null);
-      toast.error(t("delivery.noResults"));
+      setSearchError(t("delivery.noResults"));
     } finally {
       setLoading(false);
     }
@@ -373,15 +375,16 @@ export default function ClothesDeliveryToCustomer() {
       amount = parseNumberLocale(raw);
 
       if (!Number.isFinite(amount) || amount <= 0) {
-        toast.error(t("delivery.invalidAmount"));
+        setPaymentErrors((prev) => ({ ...prev, [order.id]: t("delivery.invalidAmount") }));
         return;
       }
 
       if (amount - remaining > 0.001) {
-        toast.error(t("delivery.paymentGreaterThanRemaining"));
+        setPaymentErrors((prev) => ({ ...prev, [order.id]: t("delivery.paymentGreaterThanRemaining") }));
         return;
       }
     }
+    setPaymentErrors((prev) => { const next = { ...prev }; delete next[order.id]; return next; });
 
     const discountToAdd =
       remaining > 0.001 ? Math.max(0, remaining - amount) : 0;
@@ -529,37 +532,44 @@ export default function ClothesDeliveryToCustomer() {
             </button>
           </div>
 
-          <div className="grid gap-2">
-            <label
-              htmlFor="delivery-search-input"
-              className={`lbl ${isRtl ? "text-right" : "text-left"}`}
-            >
-              {mode === "bill"
-                ? t("orders.billNumber", "Bill Number")
-                : t("common.phone", "Phone")}
-            </label>
-            <input
-              id="delivery-search-input"
-              className="inp"
-              dir={isBillInputRtl ? "rtl" : "ltr"}
-              data-field-direction={isBillInputRtl ? "rtl" : "ltr"}
-              style={isBillInputRtl ? { textAlign: "right" } : undefined}
-              placeholder={
-                mode === "bill"
-                  ? t("delivery.billPlaceholder")
-                  : t("delivery.phonePlaceholder")
-              }
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") runSearch();
-              }}
-            />
-          </div>
-
-          <div className="delivery-search-actions flex justify-center">
+          <div className="delivery-search-bar">
+            <div className="delivery-search-field">
+              <label
+                htmlFor="delivery-search-input"
+                className={`lbl ${isRtl ? "text-right" : "text-left"}`}
+              >
+                {mode === "bill"
+                  ? t("orders.billNumber", "Bill Number")
+                  : t("common.phone", "Phone")}
+              </label>
+              <input
+                id="delivery-search-input"
+                className={`inp${searchError ? " inp-err" : ""}`}
+                dir={isBillInputRtl ? "rtl" : "ltr"}
+                data-field-direction={isBillInputRtl ? "rtl" : "ltr"}
+                style={isBillInputRtl ? { textAlign: "right" } : undefined}
+                placeholder={
+                  mode === "bill"
+                    ? t("delivery.billPlaceholder")
+                    : t("delivery.phonePlaceholder")
+                }
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  if (searchError) setSearchError("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") runSearch();
+                }}
+              />
+              {searchError && (
+                <p className="err-msg" role="alert" aria-live="polite">
+                  {searchError}
+                </p>
+              )}
+            </div>
             <button
-              className="btn btn-gold btn-sm"
+              className="btn btn-gold btn-sm delivery-search-button"
               onClick={runSearch}
               disabled={loading || paying}
               type="button"
@@ -731,20 +741,26 @@ export default function ClothesDeliveryToCustomer() {
                                   ) : (
                                     <div className="delivery-payment-controls">
                                       <input
-                                        className="delivery-payment-input h-10 w-full rounded-lg border border-amber-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-amber-400 dark:focus:ring-amber-500/20"
+                                        className={`delivery-payment-input h-10 w-full rounded-lg border px-3 text-sm text-gray-900 outline-none focus:ring-2 dark:text-slate-100 ${paymentErrors[o.id] ? "border-red-400 focus:border-red-500 focus:ring-red-200 dark:border-red-500 dark:focus:ring-red-500/20" : "border-amber-200 bg-white focus:border-amber-500 focus:ring-amber-200 dark:border-slate-700 dark:bg-slate-800 dark:focus:border-amber-400 dark:focus:ring-amber-500/20"}`}
                                         value={payments[o.id] ?? ""}
-                                        onChange={(e) =>
+                                        onChange={(e) => {
                                           setPayments((p) => ({
                                             ...p,
                                             [o.id]: e.target.value,
-                                          }))
-                                        }
+                                          }));
+                                          if (paymentErrors[o.id]) setPaymentErrors((prev) => { const next = { ...prev }; delete next[o.id]; return next; });
+                                        }}
                                         inputMode="decimal"
                                         dir="ltr"
                                         data-field-direction="ltr"
                                         placeholder={String(remaining)}
                                         disabled={paying}
                                       />
+                                      {paymentErrors[o.id] && (
+                                        <p className="err-msg" role="alert" aria-live="polite" style={{ gridColumn: "1 / -1" }}>
+                                          {paymentErrors[o.id]}
+                                        </p>
+                                      )}
                                       <button
                                         type="button"
                                         className="delivery-receive-button inline-flex h-10 items-center justify-center rounded-lg bg-amber-500 px-4 text-sm font-semibold text-white hover:bg-amber-600 dark:bg-amber-500 dark:hover:bg-amber-400 disabled:opacity-50"

@@ -178,103 +178,112 @@ export default function SupportTeam() {
       lang={language}
     >
       <section className="support-card-shell" aria-labelledby="support-card-title">
-        <article className="support-card">
-          <header className="support-card-head">
-            <span className="support-card-mark" aria-hidden="true">
-              <LuPhone size={22} />
-            </span>
-            <h1 id="support-card-title">{t("supportTeam.title")}</h1>
-          </header>
+        <div className="support-layout">
+          <article className="support-card">
+            <header className="support-card-head">
+              <span className="support-card-mark" aria-hidden="true">
+                <LuPhone size={22} />
+              </span>
+              <div>
+                <h1 id="support-card-title">{t("supportTeam.title")}</h1>
+                <p className="support-card-head__sub">
+                  {t("supportTeam.responseNote", {
+                    defaultValue: "Official contact details for quick support access.",
+                  })}
+                </p>
+              </div>
+            </header>
 
-          <div className="support-contact-list">
-            {phones.length ? (
-              <ContactRow
-                Icon={LuPhone}
-                label={t("supportTeam.contactNumbers")}
-                accent="#059669"
-                copyValue={phoneSummary}
-                t={t}
-                onCopy={copyValue}
-              >
-                <PhoneLinks phones={phones} />
-              </ContactRow>
-            ) : null}
+            <div className="support-contact-list">
+              {phones.length ? (
+                <ContactRow
+                  Icon={LuPhone}
+                  label={t("supportTeam.contactNumbers")}
+                  accent="#059669"
+                  copyValue={phoneSummary}
+                  t={t}
+                  onCopy={copyValue}
+                >
+                  <PhoneLinks phones={phones} />
+                </ContactRow>
+              ) : null}
 
-            {whatsappLink ? (
-              <ContactRow
-                Icon={FaWhatsapp}
-                label={t("supportTeam.whatsapp")}
-                accent="#047857"
-                href={whatsappLink.href}
-                copyValue={whatsappLink.href}
-                valueDir="ltr"
-                t={t}
-                onCopy={copyValue}
-              >
-                <a
-                  className="support-value-link support-value-link--whatsapp"
+              {whatsappLink ? (
+                <ContactRow
+                  Icon={FaWhatsapp}
+                  label={t("supportTeam.whatsapp")}
+                  accent="#047857"
                   href={whatsappLink.href}
-                  target="_blank"
-                  rel="noreferrer"
+                  copyValue={whatsappLink.href}
+                  valueDir="ltr"
+                  t={t}
+                  onCopy={copyValue}
                 >
-                  {t("supportTeam.whatsapp")}
-                </a>
-              </ContactRow>
-            ) : null}
+                  <a
+                    className="support-value-link support-value-link--whatsapp"
+                    href={whatsappLink.href}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {t("supportTeam.whatsapp")}
+                  </a>
+                </ContactRow>
+              ) : null}
 
-            {website ? (
-              <ContactRow
-                Icon={LuGlobe}
-                label={t("supportTeam.website")}
-                accent="#2563EB"
-                href={website}
-                copyValue={website}
-                valueDir="ltr"
-                t={t}
-                onCopy={copyValue}
-              >
-                <a
-                  className="support-value-link"
+              {website ? (
+                <ContactRow
+                  Icon={LuGlobe}
+                  label={t("supportTeam.website")}
+                  accent="#2563EB"
                   href={website}
-                  target="_blank"
-                  rel="noreferrer"
+                  copyValue={website}
+                  valueDir="ltr"
+                  t={t}
+                  onCopy={copyValue}
                 >
-                  {websiteLabel}
-                </a>
-              </ContactRow>
-            ) : null}
+                  <a
+                    className="support-value-link"
+                    href={website}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {websiteLabel}
+                  </a>
+                </ContactRow>
+              ) : null}
 
-            {email ? (
-              <ContactRow
-                Icon={LuMail}
-                label={t("supportTeam.companyEmail")}
-                accent="#0F766E"
-                href={`mailto:${email}`}
-                copyValue={email}
-                valueDir="ltr"
-                t={t}
-                onCopy={copyValue}
-              >
-                <a className="support-value-link" href={`mailto:${email}`}>
-                  {email}
-                </a>
-              </ContactRow>
-            ) : null}
+              {email ? (
+                <ContactRow
+                  Icon={LuMail}
+                  label={t("supportTeam.companyEmail")}
+                  accent="#0F766E"
+                  href={`mailto:${email}`}
+                  copyValue={email}
+                  valueDir="ltr"
+                  t={t}
+                  onCopy={copyValue}
+                >
+                  <a className="support-value-link" href={`mailto:${email}`}>
+                    {email}
+                  </a>
+                </ContactRow>
+              ) : null}
 
-            {address ? (
-              <ContactRow
-                Icon={LuMapPin}
-                label={t("supportTeam.companyAddress")}
-                accent="#B45309"
-                copyValue={address}
-                t={t}
-                onCopy={copyValue}
-              >
-                {address}
-              </ContactRow>
-            ) : null}
-          </div>
-        </article>
+              {address ? (
+                <ContactRow
+                  Icon={LuMapPin}
+                  label={t("supportTeam.companyAddress")}
+                  accent="#B45309"
+                  copyValue={address}
+                  t={t}
+                  onCopy={copyValue}
+                >
+                  {address}
+                </ContactRow>
+              ) : null}
+            </div>
+          </article>
+        </div>
       </section>
 
       <style>{`
@@ -294,18 +303,26 @@ export default function SupportTeam() {
 
         .support-card-shell {
           min-height: calc(100vh - 180px);
-          display: grid;
-          place-items: center;
+          display: block;
           width: 100%;
         }
 
+        .support-layout {
+          width: min(100%, 760px);
+          margin: 0 auto;
+          display: block;
+        }
+
         .support-card {
-          width: min(100%, 720px);
           border: 1px solid var(--border, #e2e8f0);
-          border-radius: 16px;
+          border-radius: 20px;
           background: var(--surface, #ffffff);
           box-shadow: 0 18px 48px rgba(15, 23, 42, .09);
           overflow: hidden;
+        }
+
+        .support-card {
+          width: 100%;
         }
 
         .support-card-head {
@@ -339,6 +356,13 @@ export default function SupportTeam() {
           font-weight: 900;
           line-height: 1.25;
           letter-spacing: 0;
+        }
+
+        .support-card-head__sub {
+          margin-top: .18rem;
+          color: var(--text2, #64748b);
+          font-size: .84rem;
+          line-height: 1.55;
         }
 
         .support-contact-list {
@@ -556,11 +580,11 @@ export default function SupportTeam() {
 
           .support-card-shell {
             min-height: auto;
-            place-items: start center;
+            display: block;
           }
 
           .support-card {
-            border-radius: 14px;
+            border-radius: 16px;
           }
 
           .support-card-head {

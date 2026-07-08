@@ -1005,7 +1005,7 @@ export default function AllDailyTasks() {
       qc.invalidateQueries({ queryKey: ["daily-tasks"] });
       qc.invalidateQueries({ queryKey: ["daily-task", vars.id] });
       qc.invalidateQueries({ queryKey: ["analytics"] });
-      qc.invalidateQueries({ queryKey: ["analytics-dashboard"] });
+      qc.invalidateQueries({ queryKey: ["analytics"] });
       qc.invalidateQueries({ queryKey: ["design-contributors"] });
       setEditTask(null);
     },
@@ -1024,7 +1024,7 @@ export default function AllDailyTasks() {
       toast.success(t("dailyTasks.deleted"));
       qc.invalidateQueries({ queryKey: ["daily-tasks"] });
       qc.invalidateQueries({ queryKey: ["analytics"] });
-      qc.invalidateQueries({ queryKey: ["analytics-dashboard"] });
+      qc.invalidateQueries({ queryKey: ["analytics"] });
       qc.invalidateQueries({ queryKey: ["design-contributors"] });
       setDeleteTask(null);
     },

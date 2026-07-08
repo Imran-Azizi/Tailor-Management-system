@@ -20,6 +20,7 @@ import Select from "react-select";
 import toast from "react-hot-toast";
 import api from "../../lib/api.js";
 import { getApiErrorMessage } from "../../lib/feedback.js";
+import { mapZodFieldErrors, nestFieldErrors } from "../../lib/toast.js";
 import {
   formatNumberLocale,
   formatSystemDate,
@@ -327,6 +328,9 @@ export default function RakhtManager() {
   const [viewItemId, setViewItemId] = useState(null);
   const [addMoreItem, setAddMoreItem] = useState(null);
   const [addMoreForm, setAddMoreForm] = useState(emptyAddMoreTonsForm());
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [addMoreFieldErrors, setAddMoreFieldErrors] = useState({});
+  const [paymentFieldErrors, setPaymentFieldErrors] = useState({});
   const [filterCompany, setFilterCompany] = useState(null);
   const [filterBrand, setFilterBrand] = useState(null);
   const [filterStatus, setFilterStatus] = useState({
@@ -467,6 +471,7 @@ export default function RakhtManager() {
   });
 
   const openEdit = (item) => {
+    setFieldErrors({});
     setEditing(item);
     setForm({
       companyName: item.companyName || "",
@@ -504,6 +509,7 @@ export default function RakhtManager() {
   };
 
   const openAddMoreTons = (item) => {
+    setAddMoreFieldErrors({});
     setAddMoreItem(item);
     setAddMoreForm(emptyAddMoreTonsForm());
   };
@@ -687,11 +693,11 @@ export default function RakhtManager() {
 
   const submitRemainingPayment = () => {
     if (!paymentCompany?.value) {
-      toast.error(
-        t("rakht.selectCompanyFirst", {
+      setPaymentFieldErrors({
+        companyName: t("rakht.selectCompanyFirst", {
           defaultValue: "Please select a company first.",
         }),
-      );
+      });
       return;
     }
 
@@ -699,23 +705,24 @@ export default function RakhtManager() {
     const amount = Number(sanitizeIntegerInput(payAmount || "0"));
 
     if (!Number.isFinite(amount) || amount <= 0) {
-      toast.error(
-        t("rakht.enterValidAmount", {
+      setPaymentFieldErrors({
+        amount: t("rakht.enterValidAmount", {
           defaultValue: "Please enter a valid payment amount.",
         }),
-      );
+      });
       return;
     }
 
     if (amount > remaining) {
-      toast.error(
-        t("rakht.paymentExceedsRemaining", {
+      setPaymentFieldErrors({
+        amount: t("rakht.paymentExceedsRemaining", {
           defaultValue: "Payment cannot exceed remaining amount.",
         }),
-      );
+      });
       return;
     }
 
+    setPaymentFieldErrors({});
     payRemainingMut.mutate({
       companyName: paymentCompany.value,
       amount,
@@ -728,13 +735,10 @@ export default function RakhtManager() {
       tonQuantity: form.tonQuantity,
     });
     if (!parsed.success) {
-      toast.error(
-        t("rakht.validationError", {
-          defaultValue: "Please fill all required fields with valid values.",
-        }),
-      );
+      setFieldErrors(nestFieldErrors(mapZodFieldErrors(parsed.error)));
       return;
     }
+    setFieldErrors({});
     saveMut.mutate(parsed.data);
   };
 
@@ -745,14 +749,10 @@ export default function RakhtManager() {
       tonQuantity: addMoreForm.tonQuantity,
     });
     if (!parsed.success) {
-      toast.error(
-        t("rakht.addMoreTonsValidationError", {
-          defaultValue:
-            "Please fill all new ton fields and payment values correctly.",
-        }),
-      );
+      setAddMoreFieldErrors(nestFieldErrors(mapZodFieldErrors(parsed.error)));
       return;
     }
+    setAddMoreFieldErrors({});
 
     addMoreMut.mutate({
       id: addMoreItem.id,
@@ -944,6 +944,7 @@ export default function RakhtManager() {
               onClick={() => {
                 setPaymentModalOpen(true);
                 setPayAmount("");
+                setPaymentFieldErrors({});
               }}
               className="btn btn-gold rakht-manager-action"
               style={{ gap: 6 }}
@@ -1500,6 +1501,7 @@ export default function RakhtManager() {
           setPaymentModalOpen(false);
           setPaymentCompany(null);
           setPayAmount("");
+          setPaymentFieldErrors({});
         }}
         title={t("rakht.giveRemainingMoney", {
           defaultValue: "Give Remaining Money",
@@ -1514,10 +1516,26 @@ export default function RakhtManager() {
             <Select
               classNamePrefix="rs"
               value={paymentCompany}
-              onChange={setPaymentCompany}
+              onChange={(val) => {
+                setPaymentCompany(val);
+                if (paymentFieldErrors.companyName) setPaymentFieldErrors((p) => ({ ...p, companyName: "" }));
+              }}
               options={paymentCompanyOptions}
               placeholder={t("common.select", { defaultValue: "Select" })}
+              styles={{
+                control: (base, state) => ({
+                  ...base,
+                  borderColor: paymentFieldErrors.companyName
+                    ? "var(--danger)"
+                    : state.isFocused
+                      ? "var(--primary)"
+                      : "var(--border)",
+                }),
+              }}
             />
+            {paymentFieldErrors.companyName && (
+              <p className="err-msg" role="alert" aria-live="polite">{paymentFieldErrors.companyName}</p>
+            )}
           </div>
 
           <div>
@@ -1569,15 +1587,19 @@ export default function RakhtManager() {
               })}
             </label>
             <input
-              className="inp"
+              className={`inp${paymentFieldErrors.amount ? " inp-err" : ""}`}
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
               value={payAmount}
-              onChange={(e) =>
-                setPayAmount(sanitizeIntegerInput(e.target.value))
-              }
+              onChange={(e) => {
+                setPayAmount(sanitizeIntegerInput(e.target.value));
+                if (paymentFieldErrors.amount) setPaymentFieldErrors((p) => ({ ...p, amount: "" }));
+              }}
             />
+            {paymentFieldErrors.amount && (
+              <p className="err-msg" role="alert" aria-live="polite">{paymentFieldErrors.amount}</p>
+            )}
           </div>
 
           <div>
@@ -1595,6 +1617,7 @@ export default function RakhtManager() {
                 setPaymentModalOpen(false);
                 setPaymentCompany(null);
                 setPayAmount("");
+                setPaymentFieldErrors({});
               }}
               disabled={payRemainingMut.isPending}
             >
@@ -1619,6 +1642,7 @@ export default function RakhtManager() {
         onClose={() => {
           setAddMoreItem(null);
           setAddMoreForm(emptyAddMoreTonsForm());
+          setAddMoreFieldErrors({});
         }}
         title={t("rakht.addMoreTons", { defaultValue: "Add More Tons" })}
         maxW={760}
@@ -1645,21 +1669,29 @@ export default function RakhtManager() {
                     }
                   : null
               }
-              onChange={handleAddMoreTonQtyChange}
+              onChange={(opt) => {
+                handleAddMoreTonQtyChange(opt);
+                if (addMoreFieldErrors.tonQuantity) setAddMoreFieldErrors((p) => ({ ...p, tonQuantity: "" }));
+              }}
               placeholder={t("common.select", { defaultValue: "Select" })}
               styles={{
                 control: (base, state) => ({
                   ...base,
                   minHeight: 40,
                   borderRadius: 10,
-                  borderColor: state.isFocused
-                    ? "var(--primary)"
-                    : "var(--border)",
+                  borderColor: addMoreFieldErrors.tonQuantity
+                    ? "var(--danger)"
+                    : state.isFocused
+                      ? "var(--primary)"
+                      : "var(--border)",
                   boxShadow: "none",
                 }),
                 menu: (base) => ({ ...base, zIndex: 20 }),
               }}
             />
+            {addMoreFieldErrors.tonQuantity && (
+              <p className="err-msg" role="alert" aria-live="polite">{addMoreFieldErrors.tonQuantity}</p>
+            )}
           </div>
 
           {addMoreForm.tons.length > 0 && (
@@ -1699,13 +1731,22 @@ export default function RakhtManager() {
                     </label>
                     <div className="iw">
                       <input
-                        className="inp"
+                        className={`inp${addMoreFieldErrors.tons?.[String(idx)]?.name ? " inp-err" : ""}`}
                         value={ton.name}
-                        onChange={(e) =>
-                          updateAddMoreTon(ton.id, "name", e.target.value)
-                        }
+                        onChange={(e) => {
+                          updateAddMoreTon(ton.id, "name", e.target.value);
+                          if (addMoreFieldErrors.tons?.[String(idx)]?.name)
+                            setAddMoreFieldErrors((p) => {
+                              const tons = { ...(p.tons || {}) };
+                              tons[String(idx)] = { ...(tons[String(idx)] || {}), name: "" };
+                              return { ...p, tons };
+                            });
+                        }}
                       />
                     </div>
+                    {addMoreFieldErrors.tons?.[String(idx)]?.name && (
+                      <p className="err-msg" role="alert" aria-live="polite">{addMoreFieldErrors.tons[String(idx)].name}</p>
+                    )}
                   </div>
 
                   <div
@@ -1753,20 +1794,25 @@ export default function RakhtManager() {
                       </label>
                       <div className="iw">
                         <input
-                          className="inp"
+                          className={`inp${addMoreFieldErrors.tons?.[String(idx)]?.totalMeters ? " inp-err" : ""}`}
                           type="text"
                           inputMode="numeric"
                           pattern="[0-9]*"
                           value={ton.totalMeters}
-                          onChange={(e) =>
-                            updateAddMoreTon(
-                              ton.id,
-                              "totalMeters",
-                              sanitizeIntegerInput(e.target.value),
-                            )
-                          }
+                          onChange={(e) => {
+                            updateAddMoreTon(ton.id, "totalMeters", sanitizeIntegerInput(e.target.value));
+                            if (addMoreFieldErrors.tons?.[String(idx)]?.totalMeters)
+                              setAddMoreFieldErrors((p) => {
+                                const tons = { ...(p.tons || {}) };
+                                tons[String(idx)] = { ...(tons[String(idx)] || {}), totalMeters: "" };
+                                return { ...p, tons };
+                              });
+                          }}
                         />
                       </div>
+                      {addMoreFieldErrors.tons?.[String(idx)]?.totalMeters && (
+                        <p className="err-msg" role="alert" aria-live="polite">{addMoreFieldErrors.tons[String(idx)].totalMeters}</p>
+                      )}
                     </div>
                   </div>
 
@@ -1835,19 +1881,23 @@ export default function RakhtManager() {
               <div className="iw">
                 <AfCurrencyIcon size={14} className="ico" />
                 <input
-                  className="inp"
+                  className={`inp${addMoreFieldErrors.totalPrice ? " inp-err" : ""}`}
                   type="number"
                   min="0"
                   step="1"
                   value={addMoreForm.totalPrice}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setAddMoreForm((prev) => ({
                       ...prev,
                       totalPrice: sanitizeIntegerInput(e.target.value),
-                    }))
-                  }
+                    }));
+                    if (addMoreFieldErrors.totalPrice) setAddMoreFieldErrors((p) => ({ ...p, totalPrice: "" }));
+                  }}
                 />
               </div>
+              {addMoreFieldErrors.totalPrice && (
+                <p className="err-msg" role="alert" aria-live="polite">{addMoreFieldErrors.totalPrice}</p>
+              )}
             </div>
             <div>
               <label className="lbl">
@@ -1858,19 +1908,23 @@ export default function RakhtManager() {
               <div className="iw">
                 <AfCurrencyIcon size={14} className="ico" />
                 <input
-                  className="inp"
+                  className={`inp${addMoreFieldErrors.givenMoney ? " inp-err" : ""}`}
                   type="number"
                   min="0"
                   step="1"
                   value={addMoreForm.givenMoney}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setAddMoreForm((prev) => ({
                       ...prev,
                       givenMoney: sanitizeIntegerInput(e.target.value),
-                    }))
-                  }
+                    }));
+                    if (addMoreFieldErrors.givenMoney) setAddMoreFieldErrors((p) => ({ ...p, givenMoney: "" }));
+                  }}
                 />
               </div>
+              {addMoreFieldErrors.givenMoney && (
+                <p className="err-msg" role="alert" aria-live="polite">{addMoreFieldErrors.givenMoney}</p>
+              )}
             </div>
           </div>
 
@@ -1887,6 +1941,7 @@ export default function RakhtManager() {
               onClick={() => {
                 setAddMoreItem(null);
                 setAddMoreForm(emptyAddMoreTonsForm());
+                setAddMoreFieldErrors({});
               }}
               className="btn btn-outline"
               style={{ flex: 1 }}
@@ -1913,6 +1968,7 @@ export default function RakhtManager() {
         onClose={() => {
           setModal(false);
           setEditing(null);
+          setFieldErrors({});
         }}
         title={t("rakht.editTitle", { defaultValue: "Edit Rakht" })}
       >
@@ -1924,13 +1980,17 @@ export default function RakhtManager() {
             <div className="iw">
               <LuFactory size={14} className="ico" />
               <input
-                className="inp"
+                className={`inp${fieldErrors.companyName ? " inp-err" : ""}`}
                 value={form.companyName}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, companyName: e.target.value }))
-                }
+                onChange={(e) => {
+                  setForm((p) => ({ ...p, companyName: e.target.value }));
+                  if (fieldErrors.companyName) setFieldErrors((p) => ({ ...p, companyName: "" }));
+                }}
               />
             </div>
+            {fieldErrors.companyName && (
+              <p className="err-msg" role="alert" aria-live="polite">{fieldErrors.companyName}</p>
+            )}
           </div>
 
           <div>
@@ -1940,13 +2000,17 @@ export default function RakhtManager() {
             <div className="iw">
               <LuFactory size={14} className="ico" />
               <input
-                className="inp"
+                className={`inp${fieldErrors.brandName ? " inp-err" : ""}`}
                 value={form.brandName}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, brandName: e.target.value }))
-                }
+                onChange={(e) => {
+                  setForm((p) => ({ ...p, brandName: e.target.value }));
+                  if (fieldErrors.brandName) setFieldErrors((p) => ({ ...p, brandName: "" }));
+                }}
               />
             </div>
+            {fieldErrors.brandName && (
+              <p className="err-msg" role="alert" aria-live="polite">{fieldErrors.brandName}</p>
+            )}
           </div>
 
           <div>
@@ -1961,21 +2025,29 @@ export default function RakhtManager() {
                   ? { value: form.tonQuantity, label: String(form.tonQuantity) }
                   : null
               }
-              onChange={handleTonQtyChange}
+              onChange={(opt) => {
+                handleTonQtyChange(opt);
+                if (fieldErrors.tonQuantity) setFieldErrors((p) => ({ ...p, tonQuantity: "" }));
+              }}
               placeholder={t("common.select", { defaultValue: "Select" })}
               styles={{
                 control: (base, state) => ({
                   ...base,
                   minHeight: 40,
                   borderRadius: 10,
-                  borderColor: state.isFocused
-                    ? "var(--primary)"
-                    : "var(--border)",
+                  borderColor: fieldErrors.tonQuantity
+                    ? "var(--danger)"
+                    : state.isFocused
+                      ? "var(--primary)"
+                      : "var(--border)",
                   boxShadow: "none",
                 }),
                 menu: (base) => ({ ...base, zIndex: 20 }),
               }}
             />
+            {fieldErrors.tonQuantity && (
+              <p className="err-msg" role="alert" aria-live="polite">{fieldErrors.tonQuantity}</p>
+            )}
           </div>
 
           {form.tons.length > 0 && (
@@ -2015,13 +2087,22 @@ export default function RakhtManager() {
                     </label>
                     <div className="iw">
                       <input
-                        className="inp"
+                        className={`inp${fieldErrors.tons?.[String(idx)]?.name ? " inp-err" : ""}`}
                         value={ton.name}
-                        onChange={(e) =>
-                          updateTon(ton.id, "name", e.target.value)
-                        }
+                        onChange={(e) => {
+                          updateTon(ton.id, "name", e.target.value);
+                          if (fieldErrors.tons?.[String(idx)]?.name)
+                            setFieldErrors((p) => {
+                              const tons = { ...(p.tons || {}) };
+                              tons[String(idx)] = { ...(tons[String(idx)] || {}), name: "" };
+                              return { ...p, tons };
+                            });
+                        }}
                       />
                     </div>
+                    {fieldErrors.tons?.[String(idx)]?.name && (
+                      <p className="err-msg" role="alert" aria-live="polite">{fieldErrors.tons[String(idx)].name}</p>
+                    )}
                   </div>
 
                   <div
@@ -2065,20 +2146,25 @@ export default function RakhtManager() {
                       </label>
                       <div className="iw">
                         <input
-                          className="inp"
+                          className={`inp${fieldErrors.tons?.[String(idx)]?.totalMeters ? " inp-err" : ""}`}
                           type="text"
                           inputMode="numeric"
                           pattern="[0-9]*"
                           value={ton.totalMeters}
-                          onChange={(e) =>
-                            updateTon(
-                              ton.id,
-                              "totalMeters",
-                              sanitizeIntegerInput(e.target.value),
-                            )
-                          }
+                          onChange={(e) => {
+                            updateTon(ton.id, "totalMeters", sanitizeIntegerInput(e.target.value));
+                            if (fieldErrors.tons?.[String(idx)]?.totalMeters)
+                              setFieldErrors((p) => {
+                                const tons = { ...(p.tons || {}) };
+                                tons[String(idx)] = { ...(tons[String(idx)] || {}), totalMeters: "" };
+                                return { ...p, tons };
+                              });
+                          }}
                         />
                       </div>
+                      {fieldErrors.tons?.[String(idx)]?.totalMeters && (
+                        <p className="err-msg" role="alert" aria-live="polite">{fieldErrors.tons[String(idx)].totalMeters}</p>
+                      )}
                     </div>
                   </div>
 
@@ -2171,19 +2257,23 @@ export default function RakhtManager() {
               <div className="iw">
                 <AfCurrencyIcon size={14} className="ico" />
                 <input
-                  className="inp"
+                  className={`inp${fieldErrors.totalPrice ? " inp-err" : ""}`}
                   type="number"
                   min="0"
                   step="1"
                   value={form.totalPrice}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setForm((p) => ({
                       ...p,
                       totalPrice: sanitizeIntegerInput(e.target.value),
-                    }))
-                  }
+                    }));
+                    if (fieldErrors.totalPrice) setFieldErrors((p) => ({ ...p, totalPrice: "" }));
+                  }}
                 />
               </div>
+              {fieldErrors.totalPrice && (
+                <p className="err-msg" role="alert" aria-live="polite">{fieldErrors.totalPrice}</p>
+              )}
             </div>
             <div>
               <label className="lbl">
@@ -2192,19 +2282,23 @@ export default function RakhtManager() {
               <div className="iw">
                 <AfCurrencyIcon size={14} className="ico" />
                 <input
-                  className="inp"
+                  className={`inp${fieldErrors.givenMoney ? " inp-err" : ""}`}
                   type="number"
                   min="0"
                   step="1"
                   value={form.givenMoney}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setForm((p) => ({
                       ...p,
                       givenMoney: sanitizeIntegerInput(e.target.value),
-                    }))
-                  }
+                    }));
+                    if (fieldErrors.givenMoney) setFieldErrors((p) => ({ ...p, givenMoney: "" }));
+                  }}
                 />
               </div>
+              {fieldErrors.givenMoney && (
+                <p className="err-msg" role="alert" aria-live="polite">{fieldErrors.givenMoney}</p>
+              )}
             </div>
           </div>
 

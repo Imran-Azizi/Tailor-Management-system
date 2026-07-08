@@ -69,13 +69,21 @@ function tenantSelect() {
 }
 
 async function serializeUser(user) {
+  const systemName =
+    user?.tenant?.systemName || user?.tenant?.businessName || null;
   return {
     id: user.id,
     tenantId: user.tenantId,
     name: user.name,
     phoneNumber: user.phoneNumber,
     accountType: user.accountType,
-    tenant: user.tenant || null,
+    tenant: user.tenant
+      ? {
+          ...user.tenant,
+          businessName: systemName,
+          systemName,
+        }
+      : null,
     permissions: user.permissions || await getEffectivePermissionCodes(user),
   };
 }

@@ -17,7 +17,7 @@ export default function SubscriptionExpired() {
         <LuClockAlert size={42} style={{ color: "var(--danger)", margin: "0 auto 14px" }} />
         <h1 className="page-title">Subscription expired</h1>
         <p className="page-subtitle">
-          {user?.tenant?.businessName || "This tenant"} cannot access the system until the subscription is renewed.
+          {user?.tenant?.systemName || user?.tenant?.businessName || "This tenant"} cannot access the system until the subscription is renewed.
         </p>
         <button className="btn btn-primary" onClick={logout} style={{ marginTop: 16 }}>
           Back to login

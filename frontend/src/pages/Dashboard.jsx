@@ -124,6 +124,8 @@ export default function Dashboard() {
   const isRtl = isRtlLanguage(language);
   const navigate = useNavigate();
   const { isAdmin, isFinance, user, hasPermission } = useAuth();
+  const hasFullDashboardAccess =
+    isAdmin || hasPermission(PERMISSIONS.DASHBOARD_VIEW);
   const { viewMonth, viewYear } = useMonth();
 
   const { data: dashboardData, isLoading } = useQuery({
@@ -416,30 +418,32 @@ export default function Dashboard() {
 
   const visibleStatCards = statCards
     .filter((card) => {
-      const requiredPermission =
-        {
-          otherItemsTotalProfit: PERMISSIONS.FINANCE_PROFIT_VIEW,
-          totalOrders: PERMISSIONS.ORDERS_VIEW,
-          completedOrders: PERMISSIONS.ORDERS_VIEW,
-          pendingOrders: PERMISSIONS.ORDERS_VIEW,
-          totalAmount: PERMISSIONS.FINANCE_REVENUE_VIEW,
-          collected: PERMISSIONS.FINANCE_REVENUE_VIEW,
-          totalDiscounts: PERMISSIONS.FINANCE_PROFIT_VIEW,
-          outstanding: PERMISSIONS.FINANCE_DEBT_RECORDS_VIEW,
-          rakhtRevenue: PERMISSIONS.FINANCE_REVENUE_VIEW,
-          orderBenefit: PERMISSIONS.FINANCE_PROFIT_VIEW,
-          orderExpenses: PERMISSIONS.FINANCE_VIEW,
-          otherExpenses: PERMISSIONS.FINANCE_VIEW,
-          totalLoan: PERMISSIONS.FINANCE_DEBT_RECORDS_VIEW,
-          damagedClothesMoney: PERMISSIONS.FINANCE_DEBT_RECORDS_VIEW,
-          qichikarMoney: PERMISSIONS.FINANCE_PAYMENTS_MANAGE,
-          dokhtMoney: PERMISSIONS.FINANCE_PAYMENTS_MANAGE,
-          emergency: PERMISSIONS.ORDERS_VIEW,
-          damagedClothes: PERMISSIONS.FINANCE_DEBT_RECORDS_VIEW,
-        }[card.key] || null;
-      if (requiredPermission && !hasPermission(requiredPermission))
-        return false;
-      if (card.adminOnly && !isAdmin && !requiredPermission) return false;
+      if (!hasFullDashboardAccess) {
+        const requiredPermission =
+          {
+            otherItemsTotalProfit: PERMISSIONS.FINANCE_PROFIT_VIEW,
+            totalOrders: PERMISSIONS.ORDERS_VIEW,
+            completedOrders: PERMISSIONS.ORDERS_VIEW,
+            pendingOrders: PERMISSIONS.ORDERS_VIEW,
+            totalAmount: PERMISSIONS.FINANCE_REVENUE_VIEW,
+            collected: PERMISSIONS.FINANCE_REVENUE_VIEW,
+            totalDiscounts: PERMISSIONS.FINANCE_PROFIT_VIEW,
+            outstanding: PERMISSIONS.FINANCE_DEBT_RECORDS_VIEW,
+            rakhtRevenue: PERMISSIONS.FINANCE_REVENUE_VIEW,
+            orderBenefit: PERMISSIONS.FINANCE_PROFIT_VIEW,
+            orderExpenses: PERMISSIONS.FINANCE_VIEW,
+            otherExpenses: PERMISSIONS.FINANCE_VIEW,
+            totalLoan: PERMISSIONS.FINANCE_DEBT_RECORDS_VIEW,
+            damagedClothesMoney: PERMISSIONS.FINANCE_DEBT_RECORDS_VIEW,
+            qichikarMoney: PERMISSIONS.FINANCE_PAYMENTS_MANAGE,
+            dokhtMoney: PERMISSIONS.FINANCE_PAYMENTS_MANAGE,
+            emergency: PERMISSIONS.ORDERS_VIEW,
+            damagedClothes: PERMISSIONS.FINANCE_DEBT_RECORDS_VIEW,
+          }[card.key] || null;
+        if (requiredPermission && !hasPermission(requiredPermission))
+          return false;
+        if (card.adminOnly && !isAdmin && !requiredPermission) return false;
+      }
       if (!card.hideWhenZero) return true;
       const numericValue = Number(String(card.value).replace(/[^0-9.-]/g, ""));
       return Number.isFinite(numericValue) ? numericValue !== 0 : true;

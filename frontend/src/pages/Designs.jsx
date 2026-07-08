@@ -357,7 +357,6 @@ function ContributorSection() {
     const result = validateAndBuildPayload();
     if (result.error) {
       setFormError(result.error);
-      toast.error(result.error);
       return;
     }
 
@@ -368,7 +367,6 @@ function ContributorSection() {
           defaultValue: "Please verify password before updating.",
         });
         setFormError(msg);
-        toast.error(msg);
         return;
       }
       updateMut.mutate(result.payload);

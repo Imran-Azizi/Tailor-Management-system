@@ -24,6 +24,7 @@ import {
   LuChartColumn,
   LuBuilding2,
   LuSettings,
+  LuUsers,
 } from "react-icons/lu";
 import AfCurrencyIcon from "../ui/AfCurrencyIcon.jsx";
 
@@ -56,6 +57,13 @@ const SUPER_ADMIN_SECTIONS = [
         fallback: "Backup & Restore",
         path: "/super-admin/backups",
         icon: LuDatabaseBackup,
+      },
+      {
+        key: "tenantUserLimits",
+        label: "tenantUserLimits.title",
+        fallback: "Tenant User Limits",
+        path: "/super-admin/user-limits",
+        icon: LuUsers,
       },
       {
         key: "superAdminSettings",

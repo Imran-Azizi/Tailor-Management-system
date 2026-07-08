@@ -33,12 +33,14 @@ export function getTenantContext(req, res) {
       });
     }
 
+    const systemName =
+      req.tenantHost.systemName || req.tenantHost.businessName || null;
     payload.tenant = {
       id: req.tenantHost.id,
       tenantId: req.tenantHost.tenantId,
       slug: req.tenantHost.slug,
-      businessName: req.tenantHost.businessName,
-      systemName: req.tenantHost.systemName,
+      businessName: systemName,
+      systemName,
       logoUrl: req.tenantHost.logoUrl,
       subscriptionStatus: req.tenantHost.subscriptionStatus,
       expiryDate: req.tenantHost.expiryDate,

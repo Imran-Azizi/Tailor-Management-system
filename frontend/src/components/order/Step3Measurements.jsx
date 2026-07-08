@@ -2,7 +2,6 @@ import { forwardRef, useImperativeHandle, useState } from "react";
 import { parseNumberLocale } from "../../lib/normalize.js";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import toast from "react-hot-toast";
 import Select from "react-select";
 import {
   LuChevronDown,
@@ -563,7 +562,6 @@ const Step3Measurements = forwardRef(function Step3Measurements({
           });
           setFieldErrors(nextFieldErrors);
           setError(message);
-          toast.error(message);
           return;
         }
       }

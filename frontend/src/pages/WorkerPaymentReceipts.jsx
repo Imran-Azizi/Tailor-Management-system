@@ -118,7 +118,7 @@ export default function WorkerPaymentReceipts() {
       qc.invalidateQueries({ queryKey: ["worker-panel-transaction-summary"] });
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["analytics"] });
-      qc.invalidateQueries({ queryKey: ["analytics-dashboard"] });
+      qc.invalidateQueries({ queryKey: ["analytics"] });
       setEditingReceipt(null);
       setEditReceiptAmount("");
       toast.success(

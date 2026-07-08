@@ -839,6 +839,7 @@ function UserDropdown({ onClose }) {
   const handleLogout = async () => {
     await logout();
     onClose();
+    toast.success(t("auth.loggedOut", t("feedback.loggedOut")));
     navigate("/login");
   };
 

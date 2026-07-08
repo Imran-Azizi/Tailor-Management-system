@@ -2,6 +2,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext.jsx";
 import AccessDenied from "../pages/AccessDenied.jsx";
+import { getPostLoginPath } from "../lib/authRedirect.js";
 
 const WORKER_ROLES = ["DOKHT", "QICHIKAR"];
 const MAIN_PANEL_ROLES = ["SUPER_ADMIN", "ADMIN", "DOKAN", "FINANCE"];
@@ -94,24 +95,29 @@ export function WorkerProtectedRoute({ children }) {
 }
 
 /** Shows a professional denied state if user lacks the required role/permission. */
-export function RoleRoute({ children, roles, permission, permissions }) {
+export function RoleRoute({
+  children,
+  roles,
+  permission,
+  permissions,
+  permissionRoles,
+}) {
   const { user, hasPermission, hasAnyPermission } = useAuth();
   if (roles && !roles.includes(user?.accountType)) {
-    const fallback =
-      user?.accountType === "SUPER_ADMIN"
-        ? "/super-admin"
-        : user?.accountType === "DOKAN"
-        ? "/orders/create"
-        : user?.accountType === "FINANCE"
-          ? "/orders"
-          : "/dashboard";
-    return <Navigate to={fallback} replace />;
+    return <Navigate to={getPostLoginPath(user)} replace />;
   }
   const requiredPermissions = permissions || (permission ? [permission] : []);
-  if (requiredPermissions.length && !hasAnyPermission(requiredPermissions)) {
+  const shouldEnforcePermission =
+    requiredPermissions.length &&
+    (!permissionRoles || permissionRoles.includes(user?.accountType));
+  if (shouldEnforcePermission && !hasAnyPermission(requiredPermissions)) {
     return <AccessDenied />;
   }
-  if (permission && !hasPermission(permission)) {
+  if (
+    permission &&
+    shouldEnforcePermission &&
+    !hasPermission(permission)
+  ) {
     return <AccessDenied />;
   }
   return children;
