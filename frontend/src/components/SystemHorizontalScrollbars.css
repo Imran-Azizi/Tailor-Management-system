@@ -53,6 +53,9 @@
   }
 
   .system-horizontal-scrollbar__thumb {
+    position: absolute;
+    top: 0;
+    left: 0;
     height: 100%;
     min-width: 64px;
     border: 2px solid #e2e8f0;
@@ -62,7 +65,12 @@
       inset 0 1px 0 rgba(255, 255, 255, 0.26),
       0 1px 4px rgba(15, 23, 42, 0.34);
     cursor: grab;
-    will-change: transform;
+    will-change: transform, right;
+  }
+
+  .system-horizontal-scrollbar--rtl .system-horizontal-scrollbar__thumb {
+    left: auto;
+    transform: none;
   }
 
   .system-horizontal-scrollbar__thumb:active {

@@ -12,6 +12,9 @@ const KNOWN_VIEWPORT_SELECTOR = [
   ".assign-orders-records-table-wrap",
   ".contributor-list-desktop-wrap",
   ".payment-history-records-wrap",
+  ".completed-worker-orders-table-wrap",
+  ".dt-table-scroll-wrap",
+  ".user-management-table-wrap",
   ".superadmin-table-wrap",
   '[style*="overflow-x"]',
 ].join(",");
@@ -95,6 +98,71 @@ function setNormalizedScrollLeft(element, value) {
   }
 }
 
+function isRtlScrollContext(element) {
+  return Boolean(
+    element.closest('[dir="rtl"]') ||
+      document.documentElement.getAttribute("dir") === "rtl",
+  );
+}
+
+function alignToRtlScrollStart(viewport) {
+  if (!isRtlScrollContext(viewport)) return;
+
+  const maxScroll = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+  if (maxScroll <= 0) return;
+
+  const direction = window.getComputedStyle(viewport).direction;
+  if (direction === "rtl") {
+    // Normalized maxScroll = physical right edge (RTL reading start).
+    setNormalizedScrollLeft(viewport, maxScroll);
+    return;
+  }
+
+  viewport.scrollLeft = maxScroll;
+}
+
+function getThumbRatio(viewport, maxScroll) {
+  if (maxScroll <= 0) {
+    return isRtlScrollContext(viewport) ? 1 : 0;
+  }
+
+  if (!isRtlScrollContext(viewport)) {
+    return getNormalizedScrollLeft(viewport) / maxScroll;
+  }
+
+  const direction = window.getComputedStyle(viewport).direction;
+  if (direction === "rtl") {
+    return getNormalizedScrollLeft(viewport) / maxScroll;
+  }
+
+  return Math.min(maxScroll, Math.max(0, viewport.scrollLeft)) / maxScroll;
+}
+
+function setScrollFromThumbRatio(viewport, ratio, maxScroll) {
+  const nextRatio = Math.min(1, Math.max(0, ratio));
+  const direction = window.getComputedStyle(viewport).direction;
+
+  if (!isRtlScrollContext(viewport) || direction === "rtl") {
+    setNormalizedScrollLeft(viewport, nextRatio * maxScroll);
+    return;
+  }
+
+  viewport.scrollLeft = nextRatio * maxScroll;
+}
+
+function applyThumbPosition(thumb, thumbLeft, maxThumbLeft, rtl) {
+  if (rtl) {
+    thumb.style.left = "auto";
+    thumb.style.transform = "none";
+    thumb.style.right = `${Math.max(0, maxThumbLeft - thumbLeft)}px`;
+    return;
+  }
+
+  thumb.style.right = "auto";
+  thumb.style.left = "0";
+  thumb.style.transform = `translateX(${thumbLeft}px)`;
+}
+
 function getColumnCount(table) {
   return table.tHead?.rows?.[0]?.cells?.length || table.rows?.[0]?.cells?.length || 0;
 }
@@ -154,7 +222,10 @@ export default function SystemHorizontalScrollbars() {
       const controller = document.createElement("div");
       const track = document.createElement("div");
       const thumb = document.createElement("div");
-      controller.className = "system-horizontal-scrollbar";
+      const rtlScrollbar = isRtlScrollContext(viewport);
+      controller.className = rtlScrollbar
+        ? "system-horizontal-scrollbar system-horizontal-scrollbar--rtl"
+        : "system-horizontal-scrollbar";
       controller.setAttribute("aria-hidden", "true");
       track.className = "system-horizontal-scrollbar__track";
       track.setAttribute("role", "scrollbar");
@@ -179,9 +250,11 @@ export default function SystemHorizontalScrollbars() {
         maxScroll: 0,
         thumbLeft: 0,
         thumbWidth: MIN_THUMB_WIDTH,
+        rtlScrollbar,
       };
       let drag = null;
       let rafId = 0;
+      let lastAlignedScrollWidth = 0;
 
       const update = () => {
         if (!viewport.isConnected || !table.isConnected) {
@@ -196,6 +269,16 @@ export default function SystemHorizontalScrollbars() {
         const maxScroll = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
         const trackWidth = track.clientWidth || viewport.clientWidth;
         const canScroll = isVisible && maxScroll > 1 && trackWidth > 0;
+
+        if (
+          canScroll &&
+          rtlScrollbar &&
+          viewport.scrollWidth !== lastAlignedScrollWidth
+        ) {
+          alignToRtlScrollStart(viewport);
+          lastAlignedScrollWidth = viewport.scrollWidth;
+        }
+
         const thumbWidth = canScroll
           ? Math.min(
               trackWidth,
@@ -206,20 +289,21 @@ export default function SystemHorizontalScrollbars() {
             )
           : trackWidth;
         const maxThumbLeft = Math.max(0, trackWidth - thumbWidth);
-        const scrollLeft = getNormalizedScrollLeft(viewport);
+        const thumbRatio = getThumbRatio(viewport, maxScroll);
         const thumbLeft =
           canScroll && maxScroll > 0
-            ? Math.round((scrollLeft / maxScroll) * maxThumbLeft)
+            ? Math.round(thumbRatio * maxThumbLeft)
             : 0;
+        const scrollLeft = getNormalizedScrollLeft(viewport);
 
-        metrics = { canScroll, maxScroll, thumbLeft, thumbWidth };
+        metrics = { canScroll, maxScroll, thumbLeft, thumbWidth, rtlScrollbar };
         controller.classList.toggle("is-visible", canScroll);
         controller.setAttribute("aria-hidden", String(!canScroll));
         track.tabIndex = canScroll ? 0 : -1;
         track.setAttribute("aria-valuemax", String(Math.round(maxScroll)));
         track.setAttribute("aria-valuenow", String(Math.round(scrollLeft)));
         thumb.style.width = `${thumbWidth}px`;
-        thumb.style.transform = `translateX(${thumbLeft}px)`;
+        applyThumbPosition(thumb, thumbLeft, maxThumbLeft, rtlScrollbar);
       };
 
       const scheduleUpdate = () => {
@@ -230,7 +314,7 @@ export default function SystemHorizontalScrollbars() {
       const scrollToThumbLeft = (thumbLeft) => {
         const maxThumbLeft = Math.max(1, track.clientWidth - metrics.thumbWidth);
         const ratio = Math.min(1, Math.max(0, thumbLeft / maxThumbLeft));
-        setNormalizedScrollLeft(viewport, ratio * metrics.maxScroll);
+        setScrollFromThumbRatio(viewport, ratio, metrics.maxScroll);
       };
 
       const onPointerDown = (event) => {

@@ -332,7 +332,7 @@ export default function PaymentHistory() {
             "Review payment records with filters, summaries, exports, and company-level detail.",
         })}
         action={
-          <div className="page-hd-action">
+          <>
             <button
               type="button"
               className="btn btn-outline btn-sm"
@@ -355,7 +355,7 @@ export default function PaymentHistory() {
                 ? t("common.loading", { defaultValue: "Loading..." })
                 : t("rakht.exportPdf", { defaultValue: "Export PDF" })}
             </button>
-          </div>
+          </>
         }
       />
 
@@ -601,10 +601,7 @@ export default function PaymentHistory() {
             })}
           />
         ) : (
-          <div
-            className="tbl-wrap professional-report-table-wrap payment-history-records-wrap"
-            style={{ overflowX: "auto" }}
-          >
+          <div className="professional-report-table-wrap payment-history-records-wrap">
             <table className="tbl professional-report-table payment-history-records-table">
               <thead>
                 <tr>

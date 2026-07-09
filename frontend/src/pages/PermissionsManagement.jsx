@@ -1305,13 +1305,139 @@ export default function PermissionsManagement() {
         @media (max-width: 900px) {
           .permissions-layout {
             grid-template-columns: 1fr;
+            gap: .85rem;
           }
           .permissions-users {
             position: static;
             max-height: none;
           }
           .permissions-user-list {
-            max-height: 320px;
+            max-height: 280px;
+          }
+          .permissions-page .page-hd {
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: flex-start !important;
+            gap: 10px !important;
+            padding: 14px 16px !important;
+          }
+          .permissions-page .page-hd > div:first-child {
+            flex: 1 1 auto;
+            min-width: 0;
+          }
+          .permissions-page .page-hd h1 {
+            font-size: 17px !important;
+            line-height: 1.35;
+          }
+          .permissions-page .page-hd p {
+            font-size: 12px !important;
+            line-height: 1.6;
+          }
+          .permissions-page .page-hd-action {
+            width: auto !important;
+            flex: 0 0 auto;
+          }
+          .permissions-page .page-hd-action .btn {
+            min-height: 40px;
+            padding-inline: 14px;
+            white-space: nowrap;
+          }
+        }
+        @media (max-width: 767px) {
+          .permissions-page {
+            padding-inline: 12px;
+            padding-bottom: 28px;
+          }
+          .permissions-user {
+            padding: .75rem;
+          }
+          .permissions-user-meta {
+            justify-items: start;
+          }
+          .permissions-grid {
+            grid-template-columns: minmax(0, 1fr);
+          }
+          .permission-switch {
+            min-height: 56px;
+            padding: .65rem .7rem;
+          }
+          .permission-switch-copy strong {
+            font-size: .82rem;
+          }
+          .permissions-group-head {
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: .55rem;
+            padding: .7rem .75rem;
+          }
+          .permissions-group-title h3 {
+            font-size: .88rem;
+          }
+          .permissions-group-selectall {
+            order: 4;
+            width: 100%;
+            justify-content: center;
+          }
+          .permissions-group-chevron {
+            margin-inline-start: auto;
+          }
+          .permissions-editor-head {
+            align-items: stretch;
+            flex-direction: column;
+            padding: .85rem;
+          }
+          .permissions-editor-actions {
+            width: 100%;
+          }
+          .permissions-editor-actions .btn {
+            flex: 1;
+            justify-content: center;
+            min-height: 40px;
+          }
+          .permissions-summary {
+            margin: .85rem;
+            padding: .7rem .8rem;
+            font-size: .82rem;
+          }
+          .permissions-summary em {
+            width: 100%;
+            margin-inline-start: 0;
+            margin-top: .2rem;
+          }
+          .permissions-toolbar {
+            flex-direction: column;
+            align-items: stretch;
+            margin-inline: .85rem;
+          }
+          .permissions-search--inline {
+            min-width: 0;
+            width: 100%;
+          }
+          .permissions-toolbar-actions {
+            width: 100%;
+          }
+          .permissions-toolbar-actions .btn {
+            flex: 1;
+            justify-content: center;
+            min-height: 38px;
+          }
+          .permissions-groups {
+            padding-inline: .85rem;
+          }
+          .permissions-savebar {
+            flex-direction: column;
+            align-items: stretch;
+            padding: .75rem .85rem;
+          }
+          .permissions-savebar-actions {
+            flex-direction: column;
+            width: 100%;
+          }
+          .permissions-savebar-actions .btn,
+          .permissions-save-btn {
+            width: 100%;
+            justify-content: center;
+            min-height: 42px;
           }
         }
         @media (max-width: 560px) {
@@ -1322,41 +1448,21 @@ export default function PermissionsManagement() {
             width: 100%;
             justify-content: center;
           }
-          .permissions-editor-head {
-            align-items: stretch;
-            flex-direction: column;
+          .permissions-user-list {
+            max-height: 240px;
           }
-          .permissions-editor-actions .btn {
-            width: 100%;
-            justify-content: center;
+          .permissions-user-copy strong,
+          .permissions-user-copy small {
+            white-space: normal;
+            overflow-wrap: anywhere;
           }
-          .permissions-toolbar {
-            flex-direction: column;
-            align-items: stretch;
+          .permissions-user-meta {
+            display: none;
           }
-          .permissions-toolbar-actions .btn {
-            flex: 1;
-            justify-content: center;
-          }
-          .permissions-group-head {
-            flex-wrap: wrap;
-          }
-          .permissions-group-selectall {
-            order: 4;
-          }
-          .permissions-group-chevron {
-            margin-inline-start: auto;
-          }
-          .permissions-savebar {
-            flex-direction: column;
-            align-items: stretch;
-          }
-          .permissions-savebar-actions {
-            flex-direction: column;
-          }
-          .permissions-savebar-actions .btn {
-            width: 100%;
-            justify-content: center;
+          .permissions-selflock {
+            margin: .85rem .85rem 0;
+            font-size: .8rem;
+            line-height: 1.55;
           }
         }
       `}</style>

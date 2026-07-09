@@ -22,6 +22,10 @@
 }
 
 @media (max-width: 767px) {
+  .payment-history-page[dir="rtl"] .page-hd-action {
+    direction: rtl;
+  }
+
   .payment-history-page {
     width: 100%;
     overflow-x: clip;
@@ -59,23 +63,29 @@
   }
 
   .payment-history-page .page-hd-action {
-    display: grid;
+    display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
-    gap: 8px;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .payment-history-page .page-hd-action > .page-hd-action {
+    display: contents;
   }
 
   .payment-history-page .page-hd-action .btn {
     width: 100%;
     min-width: 0;
-    min-height: 48px;
+    min-height: 50px;
     justify-content: center;
-    padding-inline: 14px;
-    white-space: normal;
+    padding-inline: 18px;
+    white-space: nowrap;
     text-align: center;
     border-radius: 12px;
-    font-size: 12.5px;
+    font-size: 13px;
     font-weight: 700;
+    gap: 8px;
   }
 
   .payment-history-page .month-info-banner {
@@ -154,9 +164,15 @@
     max-width: 100%;
     overflow-x: auto !important;
     overflow-y: hidden;
-    padding-bottom: 8px !important;
+    padding-bottom: 0 !important;
     -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin !important;
+    scrollbar-width: none !important;
+  }
+
+  .payment-history-records-wrap::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
   }
 
   .payment-history-records-table {
@@ -267,8 +283,9 @@
   }
 
   .payment-history-page .page-hd-action .btn {
-    min-height: 46px;
-    font-size: 12px;
+    min-height: 48px;
+    font-size: 12.5px;
+    padding-inline: 16px;
   }
 
   .payment-history-summary {

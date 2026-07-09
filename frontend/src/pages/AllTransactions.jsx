@@ -246,7 +246,7 @@ export default function AllTransactions() {
           "View and search all recorded transactions",
         )}
         action={
-          <div className="page-hd-action">
+          <>
             <button
               className="btn btn-outline btn-sm"
               onClick={() => refetch()}
@@ -267,7 +267,7 @@ export default function AllTransactions() {
                 ? t("common.loading", "Loading...")
                 : t("common.exportPdf", "Export PDF")}
             </button>
-          </div>
+          </>
         }
       />
 

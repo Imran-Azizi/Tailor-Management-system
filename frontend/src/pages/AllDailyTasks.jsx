@@ -363,7 +363,10 @@ function ActionMenu({
 
 function TableSkeleton() {
   return (
-    <div className="tbl-wrap dt-desktop-table" style={{ padding: "10px 0" }}>
+    <div
+      className="tbl-wrap dt-table-scroll-wrap"
+      style={{ padding: "10px 0" }}
+    >
       <table className="tbl">
         <tbody>
           {[...Array(7)].map((_, i) => (
@@ -1223,11 +1226,15 @@ export default function AllDailyTasks() {
         title={t("dailyTasks.allTitle")}
         subtitle={t("dailyTasks.allSubtitle")}
         action={
-          <div ref={reportMenuRef} style={{ position: "relative" }}>
+          <div
+            ref={reportMenuRef}
+            className="dt-page-header-action"
+            style={{ position: "relative" }}
+          >
             <button
               ref={reportMenuButtonRef}
               type="button"
-              className="btn btn-outline btn-sm dt-toolbar-btn"
+              className="btn btn-outline btn-sm dt-toolbar-btn dt-report-trigger"
               style={{ gap: 6, minWidth: 136, height: 38 }}
               onClick={() => {
                 setReportMenuOpen((prev) => {
@@ -1489,20 +1496,12 @@ export default function AllDailyTasks() {
         </div>
 
         {isLoading ? (
-          <>
-            <TableSkeleton />
-            <div
-              className="dt-mobile-cards"
-              style={{ display: "none", padding: "14px" }}
-            >
-              <Spinner />
-            </div>
-          </>
+          <TableSkeleton />
         ) : tasks.length === 0 ? (
           <EmptyTasksState t={t} />
         ) : (
           <>
-            <div className="tbl-wrap professional-report-table-wrap dt-desktop-table">
+            <div className="tbl-wrap professional-report-table-wrap dt-table-scroll-wrap order-scroll-x">
               <table className="tbl professional-report-table dt-table">
                 <thead>
                   <tr>
@@ -1533,7 +1532,10 @@ export default function AllDailyTasks() {
                         {t("dailyTasks.recipientName")}
                       </div>
                     </th>
-                    <th className="dt-cell-center" style={{ textAlign: "center" }}>
+                    <th
+                      className="dt-cell-center"
+                      style={{ textAlign: "center" }}
+                    >
                       <div
                         style={{
                           display: "inline-flex",
@@ -1545,7 +1547,10 @@ export default function AllDailyTasks() {
                         {t("dailyTasks.amount")}
                       </div>
                     </th>
-                    <th className="dt-cell-center" style={{ textAlign: "center" }}>
+                    <th
+                      className="dt-cell-center"
+                      style={{ textAlign: "center" }}
+                    >
                       <div
                         style={{
                           display: "inline-flex",
@@ -1585,31 +1590,6 @@ export default function AllDailyTasks() {
                   ))}
                 </tbody>
               </table>
-            </div>
-
-            <div
-              className="dt-mobile-cards"
-              style={{
-                display: "none",
-                flexDirection: "column",
-                gap: 10,
-                padding: "12px 14px",
-              }}
-            >
-              {tasks.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  onView={openView}
-                  openMenu={openMenu}
-                  setOpenMenu={setOpenMenu}
-                  canManage={canManageExpenses}
-                  isMonthEditable={isMonthEditable}
-                  disabledReason={effectiveDisabledReason}
-                  onEdit={openEdit}
-                  onDelete={requestDelete}
-                />
-              ))}
             </div>
           </>
         )}
@@ -1678,7 +1658,10 @@ export default function AllDailyTasks() {
               <input
                 type="number"
                 className="inp"
-                style={{ direction: "ltr", textAlign: isRtl ? "right" : "left" }}
+                style={{
+                  direction: "ltr",
+                  textAlign: isRtl ? "right" : "left",
+                }}
                 min="1"
                 step="1"
                 value={editForm.amount}
@@ -1691,7 +1674,10 @@ export default function AllDailyTasks() {
               <input
                 type="datetime-local"
                 className="inp"
-                style={{ direction: "ltr", textAlign: isRtl ? "right" : "left" }}
+                style={{
+                  direction: "ltr",
+                  textAlign: isRtl ? "right" : "left",
+                }}
                 value={editForm.taskDate}
                 onChange={(e) =>
                   setEditForm((s) => ({ ...s, taskDate: e.target.value }))
@@ -1708,7 +1694,10 @@ export default function AllDailyTasks() {
                 onChange={(e) =>
                   setEditForm((s) => ({ ...s, note: e.target.value }))
                 }
-                style={{ resize: "vertical", textAlign: isRtl ? "right" : "left" }}
+                style={{
+                  resize: "vertical",
+                  textAlign: isRtl ? "right" : "left",
+                }}
               />
             </Field>
           </div>
@@ -2116,9 +2105,17 @@ export default function AllDailyTasks() {
           box-shadow: var(--sh-md);
         }
 
-        @media (max-width: 680px) {
-          .dt-desktop-table { display: none !important; }
-          .dt-mobile-cards { display: flex !important; }
+        @media (max-width: 767px) {
+          .dt-table-scroll-wrap {
+            display: block !important;
+            width: 100%;
+            max-width: 100%;
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch;
+          }
+          .dt-table {
+            min-width: 860px;
+          }
           .dt-toolbar { gap: 10px !important; }
           .dt-search-form { min-width: 100% !important; }
           .dt-toolbar > .btn,
@@ -2133,12 +2130,6 @@ export default function AllDailyTasks() {
           }
           .dt-search-form > div {
             flex-basis: 100% !important;
-          }
-          .dt-mobile-card__head {
-            align-items: flex-start !important;
-          }
-          .dt-mobile-party-flow {
-            flex-wrap: wrap;
           }
         }
 

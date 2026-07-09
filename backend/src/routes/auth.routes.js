@@ -23,19 +23,8 @@ const sensitiveAccountLimiter = rateLimit({
   },
 });
 
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    code: 'TOO_MANY_LOGIN_ATTEMPTS',
-    error: 'Too many login attempts. Please try again later.',
-  },
-});
-
 router.get('/csrf', csrf);
-router.post('/login', loginLimiter, login);
+router.post('/login', login);
 router.post('/refresh', refresh);
 router.post('/logout', logout);
 router.get('/me', authenticate, me);

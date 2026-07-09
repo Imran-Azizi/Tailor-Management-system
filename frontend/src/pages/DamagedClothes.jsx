@@ -1154,7 +1154,7 @@ function RecordsPanel({
         </div>
         <button
           type="button"
-          className="btn btn-outline"
+          className="btn btn-outline damaged-clothes-records-refresh"
           onClick={onRefresh}
           disabled={recordsLoading}
           style={{ height: 36, borderRadius: 10, gap: 6 }}

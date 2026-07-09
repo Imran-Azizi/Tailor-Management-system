@@ -350,6 +350,73 @@ export default function CompletedWorkerOrders() {
     [dokhtUserId, dokhtUsers],
   );
 
+  const tableColumns = useMemo(() => {
+    const columns = [
+      {
+        key: "select",
+        className: "completed-worker-orders-col--select",
+        heading: t("common.select", "Select"),
+      },
+      {
+        key: "actions",
+        className: "completed-worker-orders-col--actions",
+        heading: t("common.actions", "Actions"),
+      },
+      {
+        key: "paymentAmount",
+        className: "completed-worker-orders-col--paymentAmount",
+        heading: t("completedWorkerOrders.paymentAmount", "Payment Amount"),
+      },
+      {
+        key: "receiptStatus",
+        className: "completed-worker-orders-col--receiptStatus",
+        heading: t("completedWorkerOrders.receiptStatus", "Receipt Status"),
+      },
+      {
+        key: "paymentStatus",
+        className: "completed-worker-orders-col--paymentStatus",
+        heading: t("completedWorkerOrders.paymentStatus", "Payment Status"),
+      },
+      {
+        key: "status",
+        className: "completed-worker-orders-col--status",
+        heading: t("common.status", "Status"),
+      },
+      {
+        key: "completionDate",
+        className: "completed-worker-orders-col--completionDate",
+        heading: t("completedWorkerOrders.completionDate", "Completion Date"),
+      },
+      {
+        key: "orderType",
+        className: "completed-worker-orders-col--orderType",
+        heading: t("workerPanel.orderType", "Order Type"),
+      },
+      {
+        key: "customer",
+        className: "completed-worker-orders-col--customer",
+        heading: t("common.customer", "Customer"),
+      },
+      {
+        key: "billNumber",
+        className: "completed-worker-orders-col--billNumber",
+        heading: t("orders.billNumber", "Bill Number"),
+      },
+      {
+        key: "workerRole",
+        className: "completed-worker-orders-col--workerRole",
+        heading: t("completedWorkerOrders.workerRole", "Worker Role"),
+      },
+      {
+        key: "workerName",
+        className: "completed-worker-orders-col--workerName",
+        heading: t("completedWorkerOrders.workerName", "Worker Name"),
+      },
+    ];
+
+    return isRtl ? [...columns].reverse() : columns;
+  }, [isRtl, t]);
+
   const activeFilterCount = [
     Boolean(search.trim()),
     paymentStatus !== "ALL",
@@ -815,7 +882,7 @@ export default function CompletedWorkerOrders() {
             />
           ) : (
             <>
-            <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 via-slate-50 to-sky-50 px-4 py-3 shadow-sm dark:border-slate-700 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
+            <div className="completed-worker-orders-selection-bar mb-2.5 flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 via-slate-50 to-sky-50 px-4 py-3 shadow-sm dark:border-slate-700 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
               <label className="inline-flex items-center gap-2.5 text-sm font-semibold text-slate-900 dark:text-slate-100">
                 <input
                   type="checkbox"
@@ -826,7 +893,7 @@ export default function CompletedWorkerOrders() {
                 {t("completedWorkerOrders.selectAll", "Select All")}
               </label>
 
-              <div className="inline-flex items-center gap-3">
+              <div className="completed-worker-orders-selection-actions inline-flex flex-wrap items-center gap-3">
                 <span className="text-[13px] text-[var(--text2)]">
                   {t("completedWorkerOrders.selectedOrders", "Selected")}:{" "}
                   <b>{selectedItems.length}</b>
@@ -849,46 +916,15 @@ export default function CompletedWorkerOrders() {
               </div>
             </div>
 
-            <div className="tbl-wrap order-scroll-x">
-              <table className="tbl">
+            <div className="tbl-wrap completed-worker-orders-table-wrap order-scroll-x">
+              <table className="tbl completed-worker-orders-table">
                 <thead>
                   <tr>
-                    <th>{t("common.select", "Select")}</th>
-                    <th>{t("common.actions", "Actions")}</th>
-                    <th>
-                      {t(
-                        "completedWorkerOrders.paymentAmount",
-                        "Payment Amount",
-                      )}
-                    </th>
-                    <th>
-                      {t(
-                        "completedWorkerOrders.receiptStatus",
-                        "Receipt Status",
-                      )}
-                    </th>
-                    <th>
-                      {t(
-                        "completedWorkerOrders.paymentStatus",
-                        "Payment Status",
-                      )}
-                    </th>
-                    <th>{t("common.status", "Status")}</th>
-                    <th>
-                      {t(
-                        "completedWorkerOrders.completionDate",
-                        "Completion Date",
-                      )}
-                    </th>
-                    <th>{t("workerPanel.orderType", "Order Type")}</th>
-                    <th>{t("common.customer", "Customer")}</th>
-                    <th>{t("orders.billNumber", "Bill Number")}</th>
-                    <th>
-                      {t("completedWorkerOrders.workerRole", "Worker Role")}
-                    </th>
-                    <th>
-                      {t("completedWorkerOrders.workerName", "Worker Name")}
-                    </th>
+                    {tableColumns.map((column) => (
+                      <th key={column.key} className={column.className}>
+                        {column.heading}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -908,19 +944,12 @@ export default function CompletedWorkerOrders() {
                       order.workerPaymentStatus === "PAID_TO_WORKER" &&
                       order.moneyReceiptStatus !== "RECEIVED";
                     const isSelected = Boolean(selectedRowKeys[rowKey]);
-                    return (
-                      <tr
-                        key={rowKey}
-                        ref={
-                          isHighlighted
-                            ? (node) => {
-                                rowRefs.current[highlightOrderId] = node;
-                              }
-                            : undefined
-                        }
-                        className={isHighlighted ? "row-highlight" : undefined}
-                      >
-                        <td>
+                    const cells = {
+                      select: (
+                        <td
+                          key="select"
+                          className="completed-worker-orders-checkbox-cell"
+                        >
                           <input
                             type="checkbox"
                             checked={isSelected}
@@ -936,10 +965,15 @@ export default function CompletedWorkerOrders() {
                             )}
                           />
                         </td>
-                        <td>
+                      ),
+                      actions: (
+                        <td
+                          key="actions"
+                          className="completed-worker-orders-col--actions"
+                        >
                           <button
                             type="button"
-                            className="btn btn-gold btn-sm"
+                            className="btn btn-gold btn-sm completed-worker-orders-row-action"
                             onClick={() => handleSavePayment(order)}
                             disabled={
                               payWorkerMut.isPending || !editUiState.canSubmit
@@ -954,10 +988,15 @@ export default function CompletedWorkerOrders() {
                               : t("common.edit", "Edit")}
                           </button>
                         </td>
-                        <td>
-                          <div style={{ minWidth: 160 }}>
+                      ),
+                      paymentAmount: (
+                        <td
+                          key="paymentAmount"
+                          className="completed-worker-orders-col--paymentAmount"
+                        >
+                          <div className="completed-worker-orders-payment-field">
                             <input
-                              className="inp"
+                              className="inp completed-worker-orders-payment-input"
                               value={paymentInputValue}
                               onChange={(e) =>
                                 setPendingPayments((prev) => ({
@@ -971,26 +1010,61 @@ export default function CompletedWorkerOrders() {
                               )}
                               inputMode="decimal"
                               disabled={!editUiState.canEditAmount}
-                              style={{ minWidth: 140 }}
                             />
                           </div>
                         </td>
-                        <td>{receiptBadge(order.moneyReceiptStatus, t)}</td>
-                        <td>{paymentBadge(order.workerPaymentStatus, t)}</td>
-                        <td>
+                      ),
+                      receiptStatus: (
+                        <td
+                          key="receiptStatus"
+                          className="completed-worker-orders-col--receiptStatus"
+                        >
+                          {receiptBadge(order.moneyReceiptStatus, t)}
+                        </td>
+                      ),
+                      paymentStatus: (
+                        <td
+                          key="paymentStatus"
+                          className="completed-worker-orders-col--paymentStatus"
+                        >
+                          {paymentBadge(order.workerPaymentStatus, t)}
+                        </td>
+                      ),
+                      status: (
+                        <td
+                          key="status"
+                          className="completed-worker-orders-col--status"
+                        >
                           <Badge v="green">
                             {t("common.completed", "Completed")}
                           </Badge>
                         </td>
-                        <td>
+                      ),
+                      completionDate: (
+                        <td
+                          key="completionDate"
+                          className="completed-worker-orders-col--completionDate completed-worker-orders-date-cell"
+                        >
                           {formatDateLocale(
                             order.completedAt || order.updatedAt,
                             language,
                           )}
                         </td>
-                        <td>{orderLabel.typeWithSequenceLabel}</td>
-                        <td>
-                          <div className="grid gap-0.5">
+                      ),
+                      orderType: (
+                        <td
+                          key="orderType"
+                          className="completed-worker-orders-col--orderType"
+                        >
+                          {orderLabel.typeWithSequenceLabel}
+                        </td>
+                      ),
+                      customer: (
+                        <td
+                          key="customer"
+                          className="completed-worker-orders-col--customer"
+                        >
+                          <div className="completed-worker-orders-customer-cell grid gap-0.5">
                             <strong className="text-[var(--text1)]">
                               {getOrderPrimaryDisplayName(
                                 order,
@@ -998,19 +1072,53 @@ export default function CompletedWorkerOrders() {
                                 language,
                               )}
                             </strong>
-                            <span className="text-xs text-[var(--text3)]">
+                            <span className="completed-worker-orders-phone text-xs text-[var(--text3)]">
                               {order.customer?.phoneNumber || "-"}
                             </span>
                           </div>
                         </td>
-                        <td>#{order.customer?.billNumber || "-"}</td>
-                        <td>
+                      ),
+                      billNumber: (
+                        <td
+                          key="billNumber"
+                          className="completed-worker-orders-col--billNumber"
+                        >
+                          #{order.customer?.billNumber || "-"}
+                        </td>
+                      ),
+                      workerRole: (
+                        <td
+                          key="workerRole"
+                          className="completed-worker-orders-col--workerRole"
+                        >
                           {workerRoleLabel(
                             order.workerRole || order.assignedTo?.accountType,
                             t,
                           )}
                         </td>
-                        <td>{order.assignedTo?.name || "-"}</td>
+                      ),
+                      workerName: (
+                        <td
+                          key="workerName"
+                          className="completed-worker-orders-col--workerName"
+                        >
+                          {order.assignedTo?.name || "-"}
+                        </td>
+                      ),
+                    };
+                    return (
+                      <tr
+                        key={rowKey}
+                        ref={
+                          isHighlighted
+                            ? (node) => {
+                                rowRefs.current[highlightOrderId] = node;
+                              }
+                            : undefined
+                        }
+                        className={isHighlighted ? "row-highlight" : undefined}
+                      >
+                        {tableColumns.map((column) => cells[column.key])}
                       </tr>
                     );
                   })}

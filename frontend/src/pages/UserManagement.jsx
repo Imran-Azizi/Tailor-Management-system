@@ -669,9 +669,9 @@ export default function UserManagement() {
           {t("common.loading")}
         </p>
       ) : (
-        <div className="card" style={{ overflow: "hidden" }}>
-          <div className="tbl-wrap">
-            <table className="tbl" style={{ minWidth: 560 }}>
+        <div className="card user-management-card" style={{ overflow: "hidden" }}>
+          <div className="tbl-wrap user-management-table-wrap">
+            <table className="tbl user-management-table" style={{ minWidth: 560 }}>
               <thead>
                 <tr className="" style={{ background: "var(--surface2)" }}>
                   {[
@@ -775,7 +775,7 @@ export default function UserManagement() {
                       </span>
                     </td>
                     <td>
-                      <div style={{ display: "flex", gap: 6 }}>
+                      <div className="user-management-actions" style={{ display: "flex", gap: 6 }}>
                         {canEditUsers ? (
                           <button
                             onClick={() => setModal(u)}

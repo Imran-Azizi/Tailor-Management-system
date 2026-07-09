@@ -796,19 +796,16 @@ function LangDropdown({ onClose }) {
     { code: "pashto", label: t("common.pashto"), flag: "PS" },
   ];
   const current = normalizeLanguage(i18n.resolvedLanguage || i18n.language);
-  const isRtl = isRtlLanguage(current);
+  const pageRtl =
+    typeof document !== "undefined" &&
+    document.documentElement.getAttribute("dir") === "rtl";
 
   return (
     <div
-      className={`dd-menu language-dd-menu ${
-        isRtl ? "language-dd-menu--rtl" : "language-dd-menu--ltr"
+      className={`dd-menu language-dd-menu app-language-dd-menu ${
+        pageRtl ? "language-dd-menu--rtl" : "language-dd-menu--ltr"
       }`}
-      dir={isRtl ? "rtl" : "ltr"}
-      style={{
-        maxWidth: "calc(100vw - 16px)",
-        maxHeight: "min(70vh, 420px)",
-        overflowY: "auto",
-      }}
+      dir="ltr"
     >
       {langs.map((lang) => (
         <button
@@ -1207,7 +1204,7 @@ export default function Navbar({ onHamburger, pageTitle }) {
           </button>
         )}
 
-        <div className="dd-wrap" ref={langRef}>
+        <div className="dd-wrap navbar-lang-wrap" ref={langRef}>
           <button
             className="nav-btn"
             onClick={() => {

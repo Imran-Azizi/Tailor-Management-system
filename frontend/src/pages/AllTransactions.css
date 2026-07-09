@@ -337,6 +337,10 @@
 }
 
 @media (max-width: 767px) {
+  .all-transactions-page--rtl .page-hd-action {
+    direction: rtl;
+  }
+
   .all-transactions-page {
     width: 100%;
     gap: 12px !important;
@@ -370,22 +374,28 @@
   }
 
   .all-transactions-page .page-hd-action {
-    display: grid;
+    display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
-    gap: 8px;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .all-transactions-page .page-hd-action > .page-hd-action {
+    display: contents;
   }
 
   .all-transactions-page .page-hd-action .btn {
     width: 100%;
     min-width: 0;
-    min-height: 48px;
+    min-height: 50px;
     justify-content: center;
-    padding-inline: 14px;
-    white-space: normal;
+    padding-inline: 18px;
+    white-space: nowrap;
     border-radius: 12px;
-    font-size: 12.5px;
+    font-size: 13px;
     font-weight: 700;
+    gap: 8px;
   }
 
   .all-transactions-month-banner {

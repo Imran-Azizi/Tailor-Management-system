@@ -75,20 +75,22 @@ function LangMenu({ onClose }) {
     { code: "pashto", label: t("common.pashto"), flag: "PS" },
   ];
   const current = normalizeLanguage(i18n.resolvedLanguage || i18n.language);
-  const isRtl = isRtlLanguage(current);
+  const pageRtl =
+    typeof document !== "undefined" &&
+    document.documentElement.getAttribute("dir") === "rtl";
 
   return (
     <div
-      className={`language-dd-menu worker-language-dd-menu ${
-        isRtl ? "language-dd-menu--rtl" : "language-dd-menu--ltr"
+      className={`dd-menu language-dd-menu app-language-dd-menu worker-language-dd-menu ${
+        pageRtl ? "language-dd-menu--rtl" : "language-dd-menu--ltr"
       }`}
-      dir={isRtl ? "rtl" : "ltr"}
+      dir="ltr"
     >
       {langs.map((l) => (
         <button
           key={l.code}
           type="button"
-          className={`language-dd-item${current === l.code ? " on" : ""}`}
+          className={`dd-item language-dd-item${current === l.code ? " on" : ""}`}
           onClick={() => {
             i18n.changeLanguage(l.code);
             localStorage.setItem("lang", l.code);
@@ -581,7 +583,7 @@ function WorkerLayoutInner() {
 
           <div className="worker-controls ms-auto flex flex-wrap items-center justify-end gap-2">
             <div
-              style={{ position: "relative" }}
+              className="dd-wrap worker-lang-wrap"
               ref={langRef}
               onMouseDown={(e) => e.stopPropagation()}
             >
