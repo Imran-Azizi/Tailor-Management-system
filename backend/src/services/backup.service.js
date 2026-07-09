@@ -284,18 +284,28 @@ async function sendBackupEmail({ record, filePath, manifest }) {
 }
 
 async function writeAudit({ req, action, entityId, metadata, tenantId = null, client = prisma }) {
-  await client.auditLog.create({
-    data: {
-      tenantId,
-      actorId: req?.user?.id,
-      action,
-      entity: "Backup",
-      entityId,
-      metadata,
-      ipAddress: req?.ip,
-      userAgent: req?.headers?.["user-agent"],
-    },
-  });
+  const actorId = req?.user?.id;
+  const data = {
+    tenantId,
+    action,
+    entity: "Backup",
+    entityId,
+    metadata,
+    ipAddress: req?.ip,
+    userAgent: req?.headers?.["user-agent"],
+  };
+
+  // actorId must reference an existing User row (FK). Scheduled/system backups
+  // use a display name only — never a synthetic id like "schedule".
+  if (actorId) {
+    const actor = await client.user.findUnique({
+      where: { id: actorId },
+      select: { id: true },
+    });
+    if (actor) data.actorId = actor.id;
+  }
+
+  await client.auditLog.create({ data });
 }
 
 async function permanentlyDeleteBackupFile(record) {
@@ -673,11 +683,16 @@ async function saveArchive({ type, scope, data, req, optionsOverride = {} }) {
 
 export async function createBackup({ trigger = "manual", initiatedBy = "system", req = null } = {}) {
   const data = await fullSystemData();
+  const displayName =
+    initiatedBy === "schedule"
+      ? "Scheduled Backup"
+      : String(initiatedBy || "System");
+
   return saveArchive({
     type: trigger === "scheduled" ? "DAILY_BACKUP" : "SYSTEM_BACKUP",
     scope: { type: "SYSTEM", name: "All System" },
     data,
-    req: req || { user: { id: initiatedBy, name: initiatedBy } },
+    req: req || { user: { id: null, name: displayName } },
   });
 }
 
