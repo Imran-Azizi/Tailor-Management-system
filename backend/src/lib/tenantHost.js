@@ -144,10 +144,19 @@ export function getRequestHostContext(req) {
   return resolveHostContext(getForwardedHost(req));
 }
 
-export function buildHostUrl(req, host, pathname = "/login") {
+export function buildHostUrl(req, host, pathname = "/") {
   if (!host) return null;
   const protocol = getRequestProtocol(req);
   return `${protocol}://${host}${pathname.startsWith("/") ? pathname : `/${pathname}`}`;
+}
+
+export function resolveUserHomePath(user) {
+  if (!user) return "/login";
+  if (user.accountType === "SUPER_ADMIN") return "/super-admin";
+  if (user.accountType === "DOKHT" || user.accountType === "QICHIKAR") {
+    return "/panel/dashboard";
+  }
+  return "/dashboard";
 }
 
 export function buildTenantHost(slug, rootDomain = getRootDomain()) {
@@ -169,7 +178,7 @@ export function createTenantHostAccessError(req, user) {
       code: "SUPER_ADMIN_HOST_REQUIRED",
       error: "Super admin accounts must sign in on the admin subdomain.",
       expectedHost: adminHost,
-      redirectUrl: buildHostUrl(req, adminHost),
+      redirectUrl: buildHostUrl(req, adminHost, resolveUserHomePath(user)),
     };
   }
 
@@ -195,6 +204,6 @@ export function createTenantHostAccessError(req, user) {
         : "TENANT_HOST_REQUIRED",
     error: "This account must be used from its assigned tenant subdomain.",
     expectedHost: tenantHost,
-    redirectUrl: buildHostUrl(req, tenantHost),
+    redirectUrl: buildHostUrl(req, tenantHost, resolveUserHomePath(user)),
   };
 }

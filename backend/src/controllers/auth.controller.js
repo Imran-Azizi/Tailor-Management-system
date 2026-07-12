@@ -105,15 +105,6 @@ function getRequestedTenant(req) {
   );
 }
 
-function respondHostAccessError(res, violation) {
-  return res.status(violation.status || 403).json({
-    code: violation.code,
-    error: violation.error,
-    expectedHost: violation.expectedHost || null,
-    redirectUrl: violation.redirectUrl || null,
-  });
-}
-
 function matchesRequestedTenant(user, requestedTenant) {
   if (!requestedTenant || user.accountType === 'SUPER_ADMIN') return false;
   return (
@@ -201,20 +192,23 @@ export async function login(req, res, next) {
       }
     }
 
-    const hostViolation = createTenantHostAccessError(req, user);
-    if (hostViolation) {
-      return respondHostAccessError(res, hostViolation);
-    }
-
     const refreshToken = signRefresh(user);
     const accessToken = signAccess(user, refreshToken);
 
     await prisma.user.update({ where: { id: user.id }, data: { refreshToken: hashRefreshToken(refreshToken) } });
     setAuthCookies(res, { accessToken, refreshToken });
 
-    res.json({
-      user: await serializeUser(user),
-    });
+    const serializedUser = await serializeUser(user);
+    const hostViolation = createTenantHostAccessError(req, user);
+    const response = { user: serializedUser };
+
+    if (hostViolation) {
+      response.redirectUrl = hostViolation.redirectUrl;
+      response.hostRedirect = true;
+      response.code = hostViolation.code;
+    }
+
+    res.json(response);
   } catch (err) {
     next(err);
   }
@@ -250,17 +244,22 @@ export async function refresh(req, res, next) {
       }
     }
 
-    const hostViolation = createTenantHostAccessError(req, user);
-    if (hostViolation) {
-      return respondHostAccessError(res, hostViolation);
-    }
-
     const newRefresh = signRefresh(user);
     const newAccess = signAccess(user, newRefresh);
     await prisma.user.update({ where: { id: user.id }, data: { refreshToken: hashRefreshToken(newRefresh) } });
     setAuthCookies(res, { accessToken: newAccess, refreshToken: newRefresh });
 
-    res.json({ user: await serializeUser(user) });
+    const serializedUser = await serializeUser(user);
+    const hostViolation = createTenantHostAccessError(req, user);
+    const response = { user: serializedUser };
+
+    if (hostViolation) {
+      response.redirectUrl = hostViolation.redirectUrl;
+      response.hostRedirect = true;
+      response.code = hostViolation.code;
+    }
+
+    res.json(response);
   } catch (err) {
     next(err);
   }

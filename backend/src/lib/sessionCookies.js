@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { getRootDomain } from "./tenantHost.js";
 
 export const ACCESS_COOKIE_NAME = "tailor_access";
 export const REFRESH_COOKIE_NAME = "tailor_session";
@@ -13,6 +14,20 @@ const CSRF_SECRET =
 
 function isProduction() {
   return process.env.NODE_ENV === "production";
+}
+
+function cookieDomain() {
+  const configured = String(process.env.COOKIE_DOMAIN || "").trim();
+  if (configured) {
+    return configured.startsWith(".") ? configured : `.${configured}`;
+  }
+
+  const rootDomain = getRootDomain();
+  if (rootDomain && isProduction()) {
+    return `.${rootDomain}`;
+  }
+
+  return undefined;
 }
 
 function cookieSecure() {
@@ -70,11 +85,13 @@ export function getCookie(req, name) {
 }
 
 function cookieOptions({ httpOnly = true } = {}) {
+  const domain = cookieDomain();
   return {
     httpOnly,
     secure: cookieSecure(),
     sameSite: cookieSameSite(),
     path: "/",
+    ...(domain ? { domain } : {}),
   };
 }
 

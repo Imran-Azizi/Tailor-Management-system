@@ -106,6 +106,12 @@ export function AuthProvider({ children }) {
         : {}),
     };
     const { data } = await api.post("/auth/login", payload);
+
+    if (data?.redirectUrl) {
+      window.location.href = data.redirectUrl;
+      return data.user;
+    }
+
     if (syncUserHost(data.user, getPostLoginPath(data.user, fromPath))) {
       return data.user;
     }
