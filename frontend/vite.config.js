@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+import { VitePWA } from "vite-plugin-pwa";
 import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig(({ mode }) => {
@@ -7,7 +8,78 @@ export default defineConfig(({ mode }) => {
   const proxyTarget = env.VITE_PROXY_TARGET || "http://localhost:8000";
 
   return {
-    plugins: [react()],
+    plugins: [
+      react(),
+      VitePWA({
+        registerType: "autoUpdate",
+        injectRegister: "auto",
+        includeAssets: ["system_icon.png", "logo.png"],
+        manifest: {
+          id: "/",
+          name: "Hoshmand Safi",
+          short_name: "Hoshmand",
+          description:
+            "Tailor management system for orders, customers, inventory, and finance.",
+          theme_color: "#D97706",
+          background_color: "#F8FAFC",
+          display: "standalone",
+          orientation: "any",
+          scope: "/",
+          start_url: "/",
+          dir: "auto",
+          lang: "en",
+          categories: ["business", "productivity"],
+          icons: [
+            {
+              src: "/system_icon.png",
+              sizes: "192x192",
+              type: "image/png",
+              purpose: "any",
+            },
+            {
+              src: "/system_icon.png",
+              sizes: "512x512",
+              type: "image/png",
+              purpose: "any",
+            },
+            {
+              src: "/system_icon.png",
+              sizes: "512x512",
+              type: "image/png",
+              purpose: "maskable",
+            },
+          ],
+        },
+        workbox: {
+          globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"],
+          navigateFallback: null,
+          cleanupOutdatedCaches: true,
+          runtimeCaching: [
+            {
+              urlPattern: ({ request, url }) =>
+                request.method !== "GET" ||
+                url.pathname.startsWith("/api") ||
+                url.pathname.startsWith("/uploads"),
+              handler: "NetworkOnly",
+            },
+            {
+              urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
+              handler: "CacheFirst",
+              options: {
+                cacheName: "external-fonts",
+                expiration: {
+                  maxEntries: 12,
+                  maxAgeSeconds: 60 * 60 * 24 * 365,
+                },
+              },
+            },
+          ],
+        },
+        devOptions: {
+          enabled: false,
+        },
+      }),
+    ],
     resolve: {
       alias: {
         "@": fileURLToPath(new URL("./src", import.meta.url)),

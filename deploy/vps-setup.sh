@@ -40,7 +40,7 @@ npm --prefix frontend run build
 
 echo "==> Database setup..."
 npm --prefix backend run prisma:generate
-npx --prefix backend prisma migrate deploy
+npm --prefix backend run prisma:migrate:deploy
 echo "Run seed once if this is a fresh install:"
 echo "  npm --prefix backend run db:seed"
 

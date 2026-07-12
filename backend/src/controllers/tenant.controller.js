@@ -41,7 +41,6 @@ const tenantSelect = {
   address: true,
   phone: true,
   mobile: true,
-  email: true,
   logoUrl: true,
   currency: true,
   language: true,
@@ -151,7 +150,6 @@ function tenantPayload(body) {
     "address",
     "phone",
     "mobile",
-    "email",
     "subscriptionPlan",
     "subscriptionStatus",
   ].forEach((key) => {

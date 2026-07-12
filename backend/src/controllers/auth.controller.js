@@ -56,7 +56,6 @@ function tenantSelect() {
     address: true,
     phone: true,
     mobile: true,
-    email: true,
     logoUrl: true,
     currency: true,
     language: true,

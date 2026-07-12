@@ -1,11 +1,15 @@
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import {
+  LuCalendar,
+  LuClock,
   LuDownload,
   LuFileText,
+  LuMapPin,
   LuPhone,
   LuPrinter,
   LuScissors,
+  LuStore,
 } from "react-icons/lu";
 import AfCurrencyIcon from "../ui/AfCurrencyIcon.jsx";
 import {
@@ -463,15 +467,7 @@ function resolvePrintShop(...sources) {
   );
 }
 
-function PrintBillHeader({ settings, title, date, time, shop, showBadge = true }) {
-  const alignClass = settings.isRtl ? "text-right" : "text-left";
-  const rowDirClass = settings.isRtl
-    ? "flex-row-reverse justify-start"
-    : "flex-row justify-between";
-  const brandDirClass = settings.isRtl ? "flex-row-reverse" : "flex-row";
-  const shopInfoAlignClass = settings.isRtl
-    ? "items-end text-right"
-    : "items-start text-left";
+function PrintBillHeader({ settings, shop }) {
   const shopName = shop?.systemName || shop?.businessName || PRINT_SHOP_HEADER_NAME;
   const tenantLogoUrl = String(shop?.logoUrl || "").trim();
   const defaultLogoUrl = SHOP_CONFIG.logoUrl || SHOP_CONFIG.logo || "";
@@ -479,6 +475,7 @@ function PrintBillHeader({ settings, title, date, time, shop, showBadge = true }
   const shopAddress = shop?.address || getPrintableText(SHOP_CONFIG.address, settings, "");
   const shopPhones = [shop?.phone, shop?.mobile].filter(Boolean);
   const fallbackPhones = SHOP_CONFIG.phones || [];
+  const phoneList = shopPhones.length ? shopPhones : fallbackPhones;
   const shopInitials = String(shopName || "KR")
     .split(" ")
     .map((part) => part[0])
@@ -486,14 +483,12 @@ function PrintBillHeader({ settings, title, date, time, shop, showBadge = true }
     .slice(0, 2)
     .toUpperCase();
 
-  const safeTitle = getPrintableText(title, settings, "");
-
   return (
     <header
-      className={`print-bill-header ${settings.isRtl ? "print-bill-header--rtl" : ""}`}
+      className={`print-bill-header ${settings.isRtl ? "print-bill-header--rtl" : "print-bill-header--ltr"}`}
     >
-      <div className={`print-bill-header-body ${rowDirClass}`}>
-        <div className={`print-bill-header-brand ${brandDirClass}`}>
+      <div className="print-bill-header-body">
+        <div className="print-bill-header-brand">
           <div className="print-bill-header-logo">
             {logoUrl ? (
               <img src={logoUrl} alt={shopName} className="print-bill-header-logo-img" />
@@ -503,29 +498,64 @@ function PrintBillHeader({ settings, title, date, time, shop, showBadge = true }
               </div>
             )}
           </div>
-          <div className={`print-bill-header-shop ${shopInfoAlignClass}`}>
-            <p className="print-bill-header-name">{shopName}</p>
-            {shopAddress ? (
-              <p className="print-bill-header-meta print-shop-meta">{shopAddress}</p>
-            ) : null}
-            <p
-              className="print-bill-header-meta print-bill-header-meta--ltr print-shop-meta"
-              dir="ltr"
-            >
-              {(shopPhones.length ? shopPhones : fallbackPhones).join(" | ")}
+          <div
+            className="print-bill-header-shop"
+            dir={settings.isRtl ? "rtl" : "ltr"}
+          >
+            <p className="print-bill-header-name print-bill-header-info-row">
+              <LuStore className="print-bill-header-line-icon print-bill-header-line-icon--name" aria-hidden="true" />
+              <span className="print-bill-header-info-text">{shopName}</span>
             </p>
+            {shopAddress ? (
+              <p className="print-bill-header-meta print-bill-header-address print-bill-header-info-row print-shop-meta">
+                <LuMapPin className="print-bill-header-line-icon print-bill-header-line-icon--address" aria-hidden="true" />
+                <span className="print-bill-header-info-text">{shopAddress}</span>
+              </p>
+            ) : null}
+            {phoneList.length ? (
+              <div
+                className="print-bill-header-phones print-bill-header-meta--ltr"
+                dir="ltr"
+              >
+                {phoneList.map((phone, index) => (
+                  <span className="print-bill-header-phone-item" key={`${phone}-${index}`}>
+                    <LuPhone className="print-bill-header-line-icon print-bill-header-line-icon--phone" aria-hidden="true" />
+                    <span className="print-bill-header-phone-text">{phone}</span>
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
-        </div>
-        <div className={`print-bill-header-meta-block ${alignClass}`}>
-          {showBadge && safeTitle ? (
-            <span className="print-bill-header-badge">{safeTitle}</span>
-          ) : null}
-          <p className="print-bill-header-datetime" dir="ltr">
-            {date} | {time}
-          </p>
         </div>
       </div>
     </header>
+  );
+}
+
+function PrintBillFooter({ settings, title, date, time, showBadge = true }) {
+  const safeTitle = getPrintableText(title, settings, "");
+  const hasBadge = showBadge && safeTitle;
+
+  return (
+    <footer
+      className={`print-bill-footer ${settings.isRtl ? "print-bill-footer--rtl" : "print-bill-footer--ltr"}${hasBadge ? "" : " print-bill-footer--no-badge"}`}
+    >
+      <div className="print-bill-footer-body">
+        {hasBadge ? (
+          <span className="print-bill-footer-badge">{safeTitle}</span>
+        ) : null}
+        <div className="print-bill-footer-datetime">
+          <span className="print-bill-footer-datetime-item" dir="ltr">
+            <LuCalendar className="print-bill-footer-icon" aria-hidden="true" />
+            <span className="print-bill-footer-date">{date}</span>
+          </span>
+          <span className="print-bill-footer-datetime-item" dir="ltr">
+            <LuClock className="print-bill-footer-icon" aria-hidden="true" />
+            <span className="print-bill-footer-time">{time}</span>
+          </span>
+        </div>
+      </div>
+    </footer>
   );
 }
 
@@ -757,13 +787,7 @@ export function CustomerBill({ customer, order, shop }) {
       className="print-a6-sheet print-bill-sheet print-customer-bill overflow-hidden rounded-lg border border-slate-200 bg-white shadow-md"
       style={billTypographyStyle}
     >
-      <PrintBillHeader
-        settings={settings}
-        title={safeTxt("customerBill")}
-        date={date}
-        time={time}
-        shop={shop}
-      />
+      <PrintBillHeader settings={settings} shop={shop} />
 
       {isEmergency && (
         <div
@@ -876,6 +900,12 @@ export function CustomerBill({ customer, order, shop }) {
           </tr>
         </tbody>
       </table>
+      <PrintBillFooter
+        settings={settings}
+        title={safeTxt("customerBill")}
+        date={date}
+        time={time}
+      />
     </div>
   );
 }
@@ -1118,13 +1148,7 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
       className="print-a6-sheet print-bill-sheet print-customer-bill print-customer-bill--combined overflow-hidden rounded-lg border border-slate-200 bg-white shadow-md"
       style={billTypographyStyle}
     >
-      <PrintBillHeader
-        settings={settings}
-        title={safeTxt("customerBill")}
-        date={date}
-        time={time}
-        shop={shop}
-      />
+      <PrintBillHeader settings={settings} shop={shop} />
 
       {billIsEmergency ? (
         <div
@@ -1263,6 +1287,12 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
           </tr>
         </tbody>
       </table>
+      <PrintBillFooter
+        settings={settings}
+        title={safeTxt("customerBill")}
+        date={date}
+        time={time}
+      />
     </div>
   );
 }
@@ -1557,14 +1587,7 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
       className="print-a6-sheet print-bill-sheet print-shop-bill overflow-hidden rounded-lg border border-slate-200 bg-white shadow-md"
       style={billTypographyStyle}
     >
-      <PrintBillHeader
-        settings={settings}
-        title={safeTxt("tailorCopy")}
-        showBadge={false}
-        date={date}
-        time={time}
-        shop={shop}
-      />
+      <PrintBillHeader settings={settings} shop={shop} />
 
       {order?.isEmergency && (
         <div
@@ -1735,6 +1758,13 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
           </div>
         </div>
       )}
+      <PrintBillFooter
+        settings={settings}
+        title={safeTxt("tailorCopy")}
+        date={date}
+        time={time}
+        showBadge={false}
+      />
     </div>
   );
 }
@@ -1947,6 +1977,89 @@ export function printElement(id, options = {}) {
           .print-a6-sheet[dir="rtl"] .print-tailor-ledger-note-text{
             direction:rtl;
             text-align:right;
+          }
+          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-body{
+            display:flex !important;
+            justify-content:flex-end !important;
+            direction:ltr !important;
+            align-items:stretch !important;
+          }
+          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-brand{
+            display:flex !important;
+            direction:rtl !important;
+            align-items:center !important;
+            align-self:stretch !important;
+            justify-self:end !important;
+            width:100% !important;
+            max-width:100% !important;
+            gap:10px !important;
+          }
+          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-shop{
+            flex:1 1 auto !important;
+            direction:rtl !important;
+            text-align:right !important;
+            align-items:stretch !important;
+            gap:3px !important;
+            min-width:0 !important;
+          }
+          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-name,
+          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-address{
+            width:100% !important;
+            text-align:right !important;
+          }
+          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-name{
+            font-size:12px !important;
+            font-weight:800 !important;
+            line-height:1.4 !important;
+          }
+          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-address .print-bill-header-info-text{
+            font-size:8.5px !important;
+            line-height:1.5 !important;
+            -webkit-line-clamp:2 !important;
+          }
+          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-info-row{
+            display:flex !important;
+            align-items:flex-start !important;
+            gap:4px !important;
+            width:100% !important;
+          }
+          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-info-row{
+            flex-direction:row !important;
+            direction:rtl !important;
+            justify-content:flex-start !important;
+            unicode-bidi:isolate !important;
+          }
+          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-line-icon--name{
+            width:9px !important;
+            height:9px !important;
+          }
+          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-line-icon--address,
+          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-line-icon--phone{
+            width:8px !important;
+            height:8px !important;
+          }
+          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-phone-item{
+            flex-direction:row-reverse !important;
+          }
+          .print-a6-sheet[dir="rtl"] .print-bill-footer--rtl .print-bill-footer-body{
+            flex-direction:row-reverse !important;
+            direction:rtl !important;
+          }
+          .print-a6-sheet[dir="rtl"] .print-bill-footer--rtl .print-bill-footer-datetime{
+            flex-direction:row-reverse !important;
+          }
+          .print-a6-sheet[dir="ltr"] .print-bill-header--ltr .print-bill-header-body{
+            display:flex !important;
+            justify-content:flex-start !important;
+            direction:ltr !important;
+          }
+          .print-a6-sheet[dir="ltr"] .print-bill-header--ltr .print-bill-header-brand{
+            width:max-content !important;
+            max-width:100% !important;
+            justify-self:start !important;
+          }
+          .print-a6-sheet[dir="ltr"] .print-bill-header--ltr .print-bill-header-shop{
+            flex:0 1 auto !important;
           }
           .print-a6-sheet[dir="rtl"] .print-tailor-ledger-cell--measure,
           .print-a6-sheet[dir="rtl"] [dir="ltr"]{

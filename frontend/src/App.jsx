@@ -2,7 +2,9 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
+import { PwaProvider } from "./context/PwaContext.jsx";
 import { MonthProvider } from "./context/MonthContext.jsx";
+import PwaInstallPrompt from "./components/pwa/PwaInstallPrompt.jsx";
 import {
   ProtectedRoute,
   RoleRoute,
@@ -81,7 +83,8 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <MonthProvider>
+        <PwaProvider>
+          <MonthProvider>
           <BrowserRouter
             future={{
               v7_startTransition: true,
@@ -537,8 +540,10 @@ export default function App() {
                 />
               </Routes>
             </Suspense>
+            <PwaInstallPrompt />
           </BrowserRouter>
         </MonthProvider>
+        </PwaProvider>
       </AuthProvider>
     </ThemeProvider>
   );

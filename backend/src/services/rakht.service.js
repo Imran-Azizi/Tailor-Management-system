@@ -798,7 +798,11 @@ export const createRakht = async (payload) => {
       0,
       MONEY_SCALE,
     );
-    const totalPriceAfter = addScaled(totalPriceBefore, totalPrice, MONEY_SCALE);
+    const totalPriceAfter = addScaled(
+      totalPriceBefore,
+      totalPrice,
+      MONEY_SCALE,
+    );
     const totalPaidAfter = addScaled(totalPaidBefore, givenMoney, MONEY_SCALE);
     const remainingAfter = maxScaled(
       subScaled(totalPriceAfter, totalPaidAfter, MONEY_SCALE),
@@ -955,10 +959,9 @@ export const addRakhtTons = async (id, payload) => {
   const additionalGivenMoney = toNonNegativeInt(payload.givenMoney || 0);
 
   if (additionalGivenMoney > additionalTotalPrice) {
-    throw Object.assign(
-      new Error("Given money cannot exceed total price."),
-      { status: 400 },
-    );
+    throw Object.assign(new Error("Given money cannot exceed total price."), {
+      status: 400,
+    });
   }
 
   const nextTotalPrice = addScaled(
@@ -971,7 +974,8 @@ export const addRakhtTons = async (id, payload) => {
     additionalGivenMoney,
     MONEY_SCALE,
   );
-  const nextTonQuantity = toPositiveInt(existing.tonQuantity) + incomingTons.length;
+  const nextTonQuantity =
+    toPositiveInt(existing.tonQuantity) + incomingTons.length;
 
   const updated = await prisma.rakht.update({
     where: { id },

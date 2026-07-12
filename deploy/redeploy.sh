@@ -18,7 +18,7 @@ npm --prefix frontend run build
 
 echo "==> Running database migrations..."
 npm --prefix backend run prisma:generate
-npx --prefix backend prisma migrate deploy
+npm --prefix backend run prisma:migrate:deploy
 
 echo "==> Restarting API with PM2..."
 if pm2 describe tailor-api >/dev/null 2>&1; then

@@ -41,7 +41,6 @@ model Tenant {
   address            String?
   phone              String?
   mobile             String?
-  email              String?
   logoUrl            String?
   currency           String             @default("AFN")
   language           String             @default("fa")
@@ -51,57 +50,57 @@ model Tenant {
   subscriptionStart  DateTime?
   expiryDate         DateTime?
   isActive           Boolean            @default(true)
-  extraUserLimit       Int                @default(0)
+  extraUserLimit     Int                @default(0)
 
-  users                    User[]
-  userLimitHistory         TenantUserLimitHistory[]
-  customers                Customer[]
-  orders                   Order[]
-  outfits                  Outfit[]
-  waskats                  Waskat[]
-  korties                  Korty[]
-  yakhanQaqs               YakhanQaq[]
-  readyMadeOrders          ReadyMadeOrder[]
-  readyMadeWaskatOrders    ReadyMadeWaskatOrder[]
-  workerPaymentReceipts    WorkerPaymentReceipt[]
-  orderDrafts              OrderDraft[]
-  rakhts                   Rakht[]
-  rakhtPaymentHistories    RakhtPaymentHistory[]
-  rakhtTons                RakhtTon[]
-  notifications            Notification[]
-  userNotifications        UserNotification[]
-  boxes                    Box[]
-  yakhans                  Yakhan[]
-  astins                   Astin[]
-  shoulderStates           ShoulderState[]
-  neckOutfits              NeckOutfit[]
-  neckWaskats              NeckWaskat[]
-  damans                   Daman[]
-  jibRows                  JibRow[]
-  jibBaghles               JibBaghle[]
-  jibTenbans               JibTenban[]
-  patyShips                PatyShip[]
-  buttonShips              ButtonShip[]
-  tenbanShips              TenbanShip[]
-  outfitDesigns            OutfitDesign[]
-  yakhanQaqNecks           YakhanQaqNeck[]
-  yakhanQaqSleeves         YakhanQaqSleeve[]
-  yakhanQaqSkirts          YakhanQaqSkirt[]
-  yakhanQaqDesignOptions   YakhanQaqDesignOption[]
-  yakhanQaqButtonShips     YakhanQaqButtonShip[]
-  yakhanQaqPantShips       YakhanQaqPantShip[]
-  readyMadeClothes         ReadyMadeClothing[]
-  readyMadeWaskatClothes   ReadyMadeWaskatClothing[]
-  dailyTasks               DailyTask[]
-  transactions             Transaction[]
-  damagedClothesPenalties  DamagedClothesPenalty[]
-  items                    Item[]
-  itemSales                ItemSale[]
-  contributors             Contributor[]
-  auditLogs                AuditLog[]
-  roles                    Role[]
-  userRoles                UserRole[]
-  userPermissions          UserPermission[]
+  users                   User[]
+  userLimitHistory        TenantUserLimitHistory[]
+  customers               Customer[]
+  orders                  Order[]
+  outfits                 Outfit[]
+  waskats                 Waskat[]
+  korties                 Korty[]
+  yakhanQaqs              YakhanQaq[]
+  readyMadeOrders         ReadyMadeOrder[]
+  readyMadeWaskatOrders   ReadyMadeWaskatOrder[]
+  workerPaymentReceipts   WorkerPaymentReceipt[]
+  orderDrafts             OrderDraft[]
+  rakhts                  Rakht[]
+  rakhtPaymentHistories   RakhtPaymentHistory[]
+  rakhtTons               RakhtTon[]
+  notifications           Notification[]
+  userNotifications       UserNotification[]
+  boxes                   Box[]
+  yakhans                 Yakhan[]
+  astins                  Astin[]
+  shoulderStates          ShoulderState[]
+  neckOutfits             NeckOutfit[]
+  neckWaskats             NeckWaskat[]
+  damans                  Daman[]
+  jibRows                 JibRow[]
+  jibBaghles              JibBaghle[]
+  jibTenbans              JibTenban[]
+  patyShips               PatyShip[]
+  buttonShips             ButtonShip[]
+  tenbanShips             TenbanShip[]
+  outfitDesigns           OutfitDesign[]
+  yakhanQaqNecks          YakhanQaqNeck[]
+  yakhanQaqSleeves        YakhanQaqSleeve[]
+  yakhanQaqSkirts         YakhanQaqSkirt[]
+  yakhanQaqDesignOptions  YakhanQaqDesignOption[]
+  yakhanQaqButtonShips    YakhanQaqButtonShip[]
+  yakhanQaqPantShips      YakhanQaqPantShip[]
+  readyMadeClothes        ReadyMadeClothing[]
+  readyMadeWaskatClothes  ReadyMadeWaskatClothing[]
+  dailyTasks              DailyTask[]
+  transactions            Transaction[]
+  damagedClothesPenalties DamagedClothesPenalty[]
+  items                   Item[]
+  itemSales               ItemSale[]
+  contributors            Contributor[]
+  auditLogs               AuditLog[]
+  roles                   Role[]
+  userRoles               UserRole[]
+  userPermissions         UserPermission[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -177,21 +176,21 @@ model BackupRecord {
 }
 
 model BackupSchedule {
-  id                 String   @id @default("default")
-  enabled            Boolean  @default(false)
-  frequency          String   @default("DAILY")
+  id                 String    @id @default("default")
+  enabled            Boolean   @default(false)
+  frequency          String    @default("DAILY")
   customCron         String?
-  backupTime         String   @default("02:00")
-  retentionDays      Int      @default(35)
-  compressionEnabled Boolean  @default(true)
-  encryptionEnabled  Boolean  @default(false)
-  deleteOldAfterDays Int      @default(35)
-  totalStorageBytes  Int      @default(1073741824)
+  backupTime         String    @default("02:00")
+  retentionDays      Int       @default(35)
+  compressionEnabled Boolean   @default(true)
+  encryptionEnabled  Boolean   @default(false)
+  deleteOldAfterDays Int       @default(35)
+  totalStorageBytes  Int       @default(1073741824)
   lastRunAt          DateTime?
   nextRunAt          DateTime?
   updatedById        String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 }
 
 enum TransactionKind {
@@ -222,42 +221,42 @@ enum DraftStatus {
 }
 
 model User {
-  id           String      @id @default(uuid())
-  tenantId     String?
-  tenant       Tenant?     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  name         String
-  phoneNumber  String
-  accountType  AccountType
-  password     String
-  latestPassword String?
-  isActive     Boolean     @default(true)
-  refreshToken String?
-  roles        UserRole[]
-  permissions  UserPermission[] @relation("UserPermissionUser")
+  id                 String           @id @default(uuid())
+  tenantId           String?
+  tenant             Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name               String
+  phoneNumber        String
+  accountType        AccountType
+  password           String
+  latestPassword     String?
+  isActive           Boolean          @default(true)
+  refreshToken       String?
+  roles              UserRole[]
+  permissions        UserPermission[] @relation("UserPermissionUser")
   grantedPermissions UserPermission[] @relation("UserPermissionGrantedBy")
 
-  assignedOrders                 Order[]                 @relation("AssignedOrders")
-  assignedByOrders               Order[]                 @relation("AssignedByOrders")
-  receivedOrders                 Order[]                 @relation("ReceivedOrders")
-  qichikarAssignedOrders         Order[]                 @relation("QichikarAssignedOrders")
-  dokhtAssignedOrders            Order[]                 @relation("DokhtAssignedOrders")
-  qichikarReceivedOrders         Order[]                 @relation("QichikarReceivedOrders")
-  dokhtReceivedOrders            Order[]                 @relation("DokhtReceivedOrders")
-  workerPaidOrders               Order[]                 @relation("WorkerPaidByOrders")
-  qichikarPaidOrders             Order[]                 @relation("QichikarPaidByOrders")
-  dokhtPaidOrders                Order[]                 @relation("DokhtPaidByOrders")
-  workerPaymentReceipts          WorkerPaymentReceipt[]  @relation("WorkerPaymentReceiptWorker")
-  createdWorkerPaymentReceipts   WorkerPaymentReceipt[]  @relation("WorkerPaymentReceiptAdmin")
+  assignedOrders                 Order[]                  @relation("AssignedOrders")
+  assignedByOrders               Order[]                  @relation("AssignedByOrders")
+  receivedOrders                 Order[]                  @relation("ReceivedOrders")
+  qichikarAssignedOrders         Order[]                  @relation("QichikarAssignedOrders")
+  dokhtAssignedOrders            Order[]                  @relation("DokhtAssignedOrders")
+  qichikarReceivedOrders         Order[]                  @relation("QichikarReceivedOrders")
+  dokhtReceivedOrders            Order[]                  @relation("DokhtReceivedOrders")
+  workerPaidOrders               Order[]                  @relation("WorkerPaidByOrders")
+  qichikarPaidOrders             Order[]                  @relation("QichikarPaidByOrders")
+  dokhtPaidOrders                Order[]                  @relation("DokhtPaidByOrders")
+  workerPaymentReceipts          WorkerPaymentReceipt[]   @relation("WorkerPaymentReceiptWorker")
+  createdWorkerPaymentReceipts   WorkerPaymentReceipt[]   @relation("WorkerPaymentReceiptAdmin")
   notifications                  UserNotification[]
-  transactions                   Transaction[]           @relation("UserTransactions")
-  createdTransactions            Transaction[]           @relation("CreatedTransactions")
-  damagedClothesPenalties        DamagedClothesPenalty[] @relation("DamagedPenaltyUser")
-  createdDamagedClothesPenalties DamagedClothesPenalty[] @relation("DamagedPenaltyCreator")
-  createdDailyTasks              DailyTask[]             @relation("CreatedDailyTasks")
+  transactions                   Transaction[]            @relation("UserTransactions")
+  createdTransactions            Transaction[]            @relation("CreatedTransactions")
+  damagedClothesPenalties        DamagedClothesPenalty[]  @relation("DamagedPenaltyUser")
+  createdDamagedClothesPenalties DamagedClothesPenalty[]  @relation("DamagedPenaltyCreator")
+  createdDailyTasks              DailyTask[]              @relation("CreatedDailyTasks")
   orderDrafts                    OrderDraft[]
   rakhtPaymentHistories          RakhtPaymentHistory[]
-  createdOrders                  Order[]                 @relation("CreatedOrders")
-  financeCreatedOrders           Order[]                 @relation("FinanceCreatedOrders")
+  createdOrders                  Order[]                  @relation("CreatedOrders")
+  financeCreatedOrders           Order[]                  @relation("FinanceCreatedOrders")
   createdItems                   Item[]
   createdItemSales               ItemSale[]
   auditLogs                      AuditLog[]
@@ -266,11 +265,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([tenantId, phoneNumber])
   @@index([phoneNumber])
   @@index([accountType])
   @@index([tenantId])
   @@index([tenantId, accountType])
-  @@unique([tenantId, phoneNumber])
 }
 
 model Permission {
@@ -355,15 +354,15 @@ model UserPermission {
 }
 
 model UserNotification {
-  id      String  @id @default(uuid())
+  id       String  @id @default(uuid())
   tenantId String  @default("default-tenant")
   tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userId  String
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  orderId String?
-  message String
-  type    String  @default("ASSIGNMENT")
-  isRead  Boolean @default(false)
+  userId   String
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId  String?
+  message  String
+  type     String  @default("ASSIGNMENT")
+  isRead   Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -392,9 +391,9 @@ model Customer {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  @@unique([tenantId, billNumber])
   @@index([phoneNumber])
   @@index([tenantId])
-  @@unique([tenantId, billNumber])
 }
 
 model Order {
@@ -833,9 +832,9 @@ model ReadyMadeClothing {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  @@unique([tenantId, clothingCode])
   @@index([clothingCode])
   @@index([tenantId])
-  @@unique([tenantId, clothingCode])
 }
 
 model ReadyMadeOrder {
@@ -890,9 +889,9 @@ model ReadyMadeWaskatClothing {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  @@unique([tenantId, waskatCode])
   @@index([waskatCode])
   @@index([tenantId])
-  @@unique([tenantId, waskatCode])
 }
 
 model ReadyMadeWaskatOrder {
@@ -970,8 +969,8 @@ model Yakhan {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([tenantId])
   @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model Astin {
@@ -982,8 +981,8 @@ model Astin {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([tenantId])
   @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model ShoulderState {
@@ -994,8 +993,8 @@ model ShoulderState {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([tenantId])
   @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model NeckOutfit {
@@ -1006,8 +1005,8 @@ model NeckOutfit {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([tenantId])
   @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model NeckWaskat {
@@ -1018,8 +1017,8 @@ model NeckWaskat {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([tenantId])
   @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model Daman {
@@ -1030,8 +1029,8 @@ model Daman {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([tenantId])
   @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model JibRow {
@@ -1042,8 +1041,8 @@ model JibRow {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([tenantId])
   @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model JibBaghle {
@@ -1054,8 +1053,8 @@ model JibBaghle {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([tenantId])
   @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model JibTenban {
@@ -1066,8 +1065,8 @@ model JibTenban {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([tenantId])
   @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model PatyShip {
@@ -1078,8 +1077,8 @@ model PatyShip {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([tenantId])
   @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model ButtonShip {
@@ -1090,8 +1089,8 @@ model ButtonShip {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([tenantId])
   @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model TenbanShip {
@@ -1102,8 +1101,8 @@ model TenbanShip {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([tenantId])
   @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model OutfitDesign {
@@ -1114,8 +1113,8 @@ model OutfitDesign {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([tenantId])
   @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model YakhanQaqNeck {
@@ -1126,8 +1125,8 @@ model YakhanQaqNeck {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([tenantId])
   @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model YakhanQaqSleeve {
@@ -1138,8 +1137,8 @@ model YakhanQaqSleeve {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([tenantId])
   @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model YakhanQaqSkirt {
@@ -1150,8 +1149,8 @@ model YakhanQaqSkirt {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([tenantId])
   @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model YakhanQaqDesignOption {
@@ -1162,8 +1161,8 @@ model YakhanQaqDesignOption {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([tenantId])
   @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model YakhanQaqButtonShip {
@@ -1174,8 +1173,8 @@ model YakhanQaqButtonShip {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([tenantId])
   @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model YakhanQaqPantShip {
@@ -1186,8 +1185,8 @@ model YakhanQaqPantShip {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([tenantId])
   @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model Contributor {
@@ -1270,18 +1269,18 @@ model Transaction {
 }
 
 model DamagedClothesPenalty {
-  id                 String      @id @default(uuid())
-  tenantId           String      @default("default-tenant")
-  tenant             Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  transactionId      String      @unique
-  transaction        Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
-  userId             String
-  user               User        @relation("DamagedPenaltyUser", fields: [userId], references: [id], onDelete: Restrict)
-  orderId            String
-  order              Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  roleType           AccountType
-  reason             String
-  confirmedDuplicate Boolean     @default(false)
+  id                  String      @id @default(uuid())
+  tenantId            String      @default("default-tenant")
+  tenant              Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  transactionId       String      @unique
+  transaction         Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  userId              String
+  user                User        @relation("DamagedPenaltyUser", fields: [userId], references: [id], onDelete: Restrict)
+  orderId             String
+  order               Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  roleType            AccountType
+  reason              String
+  confirmedDuplicate  Boolean     @default(false)
   workerPaymentStatus String?
 
   billNumber   Int
@@ -1300,6 +1299,7 @@ model DamagedClothesPenalty {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  @@unique([orderId])
   @@index([userId])
   @@index([tenantId])
   @@index([tenantId, createdAt])
@@ -1307,7 +1307,6 @@ model DamagedClothesPenalty {
   @@index([createdById])
   @@index([roleType])
   @@index([createdAt])
-  @@unique([orderId])
 }
 
 enum ItemType {
@@ -1335,12 +1334,12 @@ model Item {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
+  @@unique([tenantId, code])
   @@index([type])
   @@index([tenantId])
   @@index([tenantId, type])
   @@index([brand])
   @@index([name])
-  @@unique([tenantId, code])
 }
 
 model ItemSale {

@@ -777,8 +777,7 @@ function drawDashboardStatsCards(
     },
     {
       label:
-        statLabels.totalDamagedClothesMoney ||
-        "Total Money of Damaged Orders",
+        statLabels.totalDamagedClothesMoney || "Total Money of Damaged Orders",
       value: formatAfCurrency(
         stats.totalDamagedClothesMoney || 0,
         language,

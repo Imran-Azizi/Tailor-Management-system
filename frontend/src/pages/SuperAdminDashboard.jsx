@@ -35,7 +35,6 @@ const emptyForm = {
   address: "",
   phone: "",
   mobile: "",
-  email: "",
   logoUrl: "",
   logoFile: null,
   removeLogo: false,
@@ -144,7 +143,6 @@ function tenantToForm(tenant) {
     address: tenant.address || "",
     phone: tenant.phone || "",
     mobile: tenant.mobile || "",
-    email: tenant.email || "",
     logoUrl: tenant.logoUrl || "",
     ownerName: tenant.owner?.name || "",
     ownerPhone: tenant.owner?.phoneNumber || "",
@@ -200,10 +198,6 @@ function validateTenantForm(form, mode, t) {
     } else if (form.logoFile.size > logoMaxBytes) {
       errors.logoFile = t("superAdmin.validation.logoSize");
     }
-  }
-
-  if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-    errors.email = t("superAdmin.validation.email");
   }
 
   return errors;
@@ -274,7 +268,6 @@ function TenantModal({
         ["address", t("superAdmin.fields.address")],
         ["phone", t("superAdmin.fields.phone")],
         ["mobile", t("superAdmin.fields.mobile")],
-        ["email", t("superAdmin.fields.email")],
         ["logoFile", t("superAdmin.fields.logoFile")],
       ],
     },
@@ -454,6 +447,36 @@ function TenantModal({
                             <option value="EXPIRED">{t("superAdmin.status.EXPIRED")}</option>
                             <option value="SUSPENDED">{t("superAdmin.status.SUSPENDED")}</option>
                           </select>
+                        </label>
+                      );
+                    }
+
+                    if (key === "address") {
+                      return (
+                        <label key={key} className="superadmin-address-field flex flex-col gap-1.5 lg:col-span-3">
+                          <span className={cn("text-xs font-semibold text-[var(--text3)]", !isRtl && "uppercase tracking-wide")}>
+                            {label}
+                          </span>
+                          <textarea
+                            className={`inp resize-y leading-relaxed${errors[key] ? " err" : ""}`}
+                            rows={4}
+                            aria-invalid={errors[key] ? "true" : undefined}
+                            value={form[key]}
+                            onChange={(e) => onChange(key, e.target.value)}
+                            disabled={isPending}
+                            dir={isRtl ? "rtl" : "ltr"}
+                            placeholder={t("superAdmin.fields.addressPlaceholder")}
+                            style={
+                              isRtl
+                                ? { textAlign: "right", unicodeBidi: "plaintext" }
+                                : undefined
+                            }
+                          />
+                          {errors[key] ? (
+                            <span className="err-msg" role="alert" aria-live="polite">
+                              {errors[key]}
+                            </span>
+                          ) : null}
                         </label>
                       );
                     }

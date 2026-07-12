@@ -1,6 +1,28 @@
 {
   "appName": "Hoshmand Safi",
   "appSubtitle": "Tailor Management System",
+  "pwa": {
+    "title": "Install app on your phone",
+    "titleWithName": "Install {{name}} on your phone",
+    "description": "Install the tailor management system for faster access.",
+    "descriptionWithName": "Install {{name}} on your home screen for faster access.",
+    "install": "Install",
+    "later": "Later",
+    "close": "Dismiss",
+    "menuInstall": "Install App",
+    "settingsHint": "Tap install to add this system to your phone home screen.",
+    "settingsHintIos": "Tap install to see how to add this system to your iPhone home screen.",
+    "installed": "App installed successfully",
+    "iosGuide": {
+      "title": "Add to Home Screen",
+      "lead": "Install {{name}} on your iPhone for quick access like a native app.",
+      "step1": "Tap the Share button",
+      "step1Hint": "at the bottom of Safari",
+      "step2": "Select \"Add to Home Screen\"",
+      "step3": "Tap \"Add\" to confirm",
+      "gotIt": "Got it"
+    }
+  },
   "common": {
     "dashboard": "Dashboard",
     "createOrder": "Create Order",
@@ -120,6 +142,8 @@
     "allCaughtUp": "All caught up!",
     "markAllRead": "Mark all read",
     "viewDataByMonth": "View Data by Month",
+    "selectYear": "Year",
+    "selectMonth": "Month",
     "futureMonthDisabled": "Future months are locked until the current month is fully completed.",
     "pastMonthReadOnly": "Past months are read-only. No editing allowed.",
     "currentMonth": "Current month"
@@ -1191,9 +1215,9 @@
       "businessName": "System Name",
       "systemName": "System Name",
       "address": "Address",
+      "addressPlaceholder": "Street, district, city, and other location details",
       "phone": "Contact Number",
       "mobile": "Contact Number",
-      "email": "Email",
       "logoFile": "Tenant Logo",
       "currency": "Currency",
       "language": "Language",
@@ -1233,7 +1257,6 @@
       "ownerPhone": "Owner phone is required.",
       "passwordLength": "Password must be at least 6 characters.",
       "ownerPasswordRequired": "Owner password is required.",
-      "email": "Enter a valid email address.",
       "logoType": "Logo must be PNG, JPG, JPEG, WEBP, or SVG.",
       "logoSize": "Logo must be 2MB or smaller."
     },
@@ -1271,9 +1294,9 @@
       "businessName": "System Name",
       "systemName": "System Name",
       "address": "Address",
+      "addressPlaceholder": "Street, district, city, and other location details",
       "phone": "Phone",
       "mobile": "Mobile",
-      "email": "Email",
       "ownerName": "Owner Name",
       "ownerPhone": "Owner Phone",
       "currentPassword": "Current Password",
@@ -1308,7 +1331,6 @@
       "passwordMatch": "New password and confirmation do not match.",
       "invalidCurrentPassword": "Current password is incorrect.",
       "phoneInUse": "This phone number is already in use.",
-      "email": "Enter a valid email address.",
       "logoType": "Logo must be PNG, JPG, JPEG, WEBP, or SVG.",
       "logoSize": "Logo must be 2MB or smaller."
     },

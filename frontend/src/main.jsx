@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { registerSW } from "virtual:pwa-register";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
@@ -13,6 +14,8 @@ import {
 
 patchLocaleFormatters();
 installEnglishDigitInputNormalizer();
+
+registerSW({ immediate: true });
 
 const qc = new QueryClient({
   defaultOptions: {

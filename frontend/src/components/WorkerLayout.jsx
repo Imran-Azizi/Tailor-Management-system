@@ -16,8 +16,10 @@ import {
   LuMoon,
   LuLanguages,
   LuChevronDown,
+  LuSmartphone,
 } from "react-icons/lu";
 import { useAuth } from "../context/AuthContext.jsx";
+import { usePwa } from "../context/PwaContext.jsx";
 import toast from "react-hot-toast";
 import { useTheme } from "../context/ThemeContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
@@ -108,6 +110,7 @@ function LangMenu({ onClose }) {
 function UserMenu({ roleColor, onClose }) {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
+  const { canOfferInstall, install, installing } = usePwa();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -149,6 +152,28 @@ function UserMenu({ roleColor, onClose }) {
           {user?.accountType}
         </span>
       </div>
+      {canOfferInstall && (
+        <div
+          onClick={() => {
+            onClose();
+            install();
+          }}
+          style={{
+            padding: "11px 14px",
+            display: "flex",
+            alignItems: "center",
+            gap: 9,
+            cursor: installing ? "wait" : "pointer",
+            color: "var(--primary)",
+            fontSize: 13,
+            fontWeight: 500,
+            opacity: installing ? 0.7 : 1,
+          }}
+        >
+          <LuSmartphone size={14} />
+          <span>{t("pwa.menuInstall")}</span>
+        </div>
+      )}
       <div
         onClick={handleLogout}
         style={{

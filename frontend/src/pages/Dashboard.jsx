@@ -779,9 +779,7 @@ export default function Dashboard() {
               tickLine={false}
               width={32}
             />
-            <Tooltip
-              content={lineChartTooltip}
-            />
+            <Tooltip content={lineChartTooltip} />
             <Bar
               dataKey="count"
               fill="#2563EB"

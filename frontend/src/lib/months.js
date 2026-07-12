@@ -120,6 +120,16 @@ export function getDisplayYearForLanguage(year, month, language) {
   return getDisplayMonthYearForLanguage(month, year, language).year;
 }
 
+export function getPreviousMonthYear(month, year) {
+  const m = Number(month);
+  const y = Number(year);
+  if (!Number.isFinite(m) || !Number.isFinite(y)) {
+    return { month: 1, year: y || new Date().getFullYear() };
+  }
+  if (m <= 1) return { month: 12, year: y - 1 };
+  return { month: m - 1, year: y };
+}
+
 /**
  * Returns the current Gregorian (English calendar) month and year
  * @param {Date} date

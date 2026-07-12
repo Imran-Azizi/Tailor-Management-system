@@ -9,7 +9,6 @@ import {
   LuEyeOff,
   LuImage,
   LuLockKeyhole,
-  LuMail,
   LuMapPin,
   LuPhone,
   LuRefreshCw,
@@ -23,13 +22,13 @@ import { assetUrl } from "../lib/assets.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { isRtlLanguage } from "../lib/locale.js";
+import PwaInstallPanel from "../components/pwa/PwaInstallPanel.jsx";
 
 const emptyForm = {
   systemName: "",
   address: "",
   phone: "",
   mobile: "",
-  email: "",
   logoUrl: "",
   logoFile: null,
   removeLogo: false,
@@ -74,7 +73,6 @@ function normalizeForm(settings) {
     address: settings?.address || "",
     phone: settings?.phone || "",
     mobile: settings?.mobile || "",
-    email: settings?.email || "",
     logoUrl: settings?.logoUrl || "",
     ownerName: settings?.owner?.name || "",
     ownerPhone: settings?.owner?.phoneNumber || "",
@@ -87,9 +85,6 @@ function normalizeForm(settings) {
 function validate(form, t) {
   const errors = {};
   if (!form.systemName.trim()) errors.systemName = t("tenantSettings.validation.systemName");
-  if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-    errors.email = t("tenantSettings.validation.email");
-  }
   if (!form.ownerName.trim()) errors.ownerName = t("tenantSettings.validation.ownerName");
   if (!form.ownerPhone.trim()) errors.ownerPhone = t("tenantSettings.validation.ownerPhone");
   if (form.currentPassword || form.newPassword || form.confirmPassword) {
@@ -112,8 +107,53 @@ function validate(form, t) {
   return errors;
 }
 
+function TextareaField({ icon: Icon, label, error, isRtl, rows = 4, className, ...textareaProps }) {
+  return (
+    <label
+      className={cn(
+        "tenant-settings-field tenant-settings-address-field flex min-w-0 flex-col gap-1.5 sm:col-span-2",
+        className,
+      )}
+    >
+      <span className={cn("text-xs font-bold text-[var(--text2)]", !isRtl && "uppercase tracking-wide")}>
+        {label}
+      </span>
+      <span className="relative block">
+        <Icon
+          size={15}
+          className="pointer-events-none absolute text-[var(--text3)]"
+          style={isRtl ? { insetInlineEnd: 12, top: 12 } : { insetInlineStart: 12, top: 12 }}
+        />
+        <textarea
+          className={cn("inp w-full resize-y leading-relaxed", error && "err")}
+          rows={rows}
+          aria-invalid={error ? "true" : undefined}
+          dir={isRtl ? "rtl" : "ltr"}
+          style={
+            isRtl
+              ? {
+                  paddingInlineStart: 12,
+                  paddingInlineEnd: 38,
+                  paddingBlock: 12,
+                  textAlign: "right",
+                  unicodeBidi: "plaintext",
+                }
+              : { paddingInlineStart: 38, paddingBlock: 12 }
+          }
+          {...textareaProps}
+        />
+      </span>
+      {error ? (
+        <span className="err-msg" role="alert" aria-live="polite">
+          {error}
+        </span>
+      ) : null}
+    </label>
+  );
+}
+
 function Field({ icon: Icon, label, error, isRtl, ...inputProps }) {
-  const isReadableLtr = inputProps.inputMode === "tel" || inputProps.inputMode === "email";
+  const isReadableLtr = inputProps.inputMode === "tel";
   return (
     <label className="tenant-settings-field flex min-w-0 flex-col gap-1.5">
       <span className={cn("text-xs font-bold text-[var(--text2)]", !isRtl && "uppercase tracking-wide")}>
@@ -263,7 +303,7 @@ export default function TenantSettings() {
     if (!settings) return false;
     const base = normalizeForm(settings);
     return (
-      ["systemName", "address", "phone", "mobile", "email"].some(
+      ["systemName", "address", "phone", "mobile"].some(
         (key) => (form[key] || "") !== (base[key] || ""),
       ) ||
       ["ownerName", "ownerPhone"].some((key) => (form[key] || "") !== (base[key] || "")) ||
@@ -335,7 +375,6 @@ export default function TenantSettings() {
       address: form.address.trim(),
       phone: form.phone.trim(),
       mobile: form.mobile.trim(),
-      email: form.email.trim(),
       ownerName: form.ownerName.trim(),
       ownerPhone: form.ownerPhone.trim(),
     };
@@ -418,6 +457,8 @@ export default function TenantSettings() {
             </button>
           </div>
         </section>
+
+        <PwaInstallPanel />
 
         <form onSubmit={submit} className="tenant-settings-form-grid grid grid-cols-1 gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
           <section className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_18px_45px_-34px_rgba(15,23,42,.65)]">
@@ -519,23 +560,14 @@ export default function TenantSettings() {
                 isRtl={isRtl}
                 inputMode="tel"
               />
-              <Field
-                icon={LuMail}
-                label={t("tenantSettings.fields.email")}
-                value={form.email}
-                onChange={(event) => setValue("email", event.target.value)}
-                error={errors.email}
-                disabled={updateMut.isPending}
-                isRtl={isRtl}
-                inputMode="email"
-              />
-              <Field
+              <TextareaField
                 icon={LuMapPin}
                 label={t("tenantSettings.fields.address")}
                 value={form.address}
                 onChange={(event) => setValue("address", event.target.value)}
                 disabled={updateMut.isPending}
                 isRtl={isRtl}
+                placeholder={t("tenantSettings.fields.addressPlaceholder")}
               />
             </div>
 

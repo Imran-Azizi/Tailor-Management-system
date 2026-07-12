@@ -28,6 +28,7 @@ import {
   LuDownload,
   LuLock,
   LuSettings,
+  LuSmartphone,
 } from "react-icons/lu";
 import { useTheme } from "../context/ThemeContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -69,6 +70,7 @@ import {
 } from "../lib/months.js";
 import AfCurrencyIcon from "./ui/AfCurrencyIcon.jsx";
 import { EmptyState, Modal, NotificationText, Spinner } from "./ui/index.jsx";
+import { usePwa } from "../context/PwaContext.jsx";
 
 function useOutside(ref, fn) {
   useEffect(() => {
@@ -564,6 +566,7 @@ function MonthDropdown({ onClose }) {
     viewYear,
     setViewMonth,
     setViewYear,
+    goToCurrentMonth,
     monthPolicy,
     isSelectableMonth,
     getMonthDisabledReason,
@@ -628,6 +631,8 @@ function MonthDropdown({ onClose }) {
   };
 
   const selectedAccessMode = getMonthAccessMode(activeMonth, activeYear);
+  const isViewingCurrentMonth =
+    activeMonth === currentGregorianMonth && activeYear === currentGregorianYear;
   const modeConfig = {
     editable: {
       Icon: LuCircleCheck,
@@ -649,86 +654,109 @@ function MonthDropdown({ onClose }) {
 
   return (
     <div
-      className={`dd-menu month-dd absolute z-50 ${isRtl ? "left-0 right-auto" : "right-0 left-auto"} min-w-[270px]`}
-      style={{
-        minWidth: "min(270px, 92vw)",
-        width: "min(320px, 92vw)",
-        maxWidth: "calc(100vw - 16px)",
-        maxHeight: "min(70vh, 520px)",
-        overflowY: "auto",
-      }}
+      className={`dd-menu month-dd absolute z-50 ${isRtl ? "left-0 right-auto" : "right-0 left-auto"}`}
+      role="dialog"
+      aria-label={t("navbar.viewDataByMonth", "View Data by Month")}
     >
       <div className="month-dd-header">
-        <LuCalendarCheck size={13} />
-        <span>{t("navbar.viewDataByMonth", "View Data by Month")}</span>
+        <span className="month-dd-header__icon">
+          <LuCalendarCheck size={15} />
+        </span>
+        <span className="month-dd-header__title">
+          {t("navbar.viewDataByMonth", "View Data by Month")}
+        </span>
       </div>
 
-      <div className={mode.cls}>
-        <mode.Icon size={11} />
-        <span>{mode.label}</span>
+      {!isViewingCurrentMonth ? (
+        <button
+          type="button"
+          className="month-current-btn"
+          onClick={() => {
+            goToCurrentMonth();
+            onClose();
+          }}
+        >
+          <LuCircleCheck size={14} />
+          <span>{currentMonthText}</span>
+        </button>
+      ) : (
+        <div className={mode.cls}>
+          <mode.Icon size={12} />
+          <span>{mode.label}</span>
+        </div>
+      )}
+
+      <div className="month-dd-section">
+        <p className="month-dd-section-label">{t("navbar.selectYear", "Year")}</p>
+        <div className="month-year-row">
+          {years.map((y) => {
+            const yearEnabled = MONTHS.some((m) => isSelectableMonth(m.value, y));
+            const isCurrentYear = y === currentGregorianYear;
+            const isSelectedYear = activeYear === y;
+            return (
+              <button
+                key={y}
+                type="button"
+                className={`month-year-btn${isSelectedYear ? " on" : ""}${isCurrentYear ? " current-year" : ""}`}
+                disabled={!yearEnabled}
+                title={
+                  yearEnabled
+                    ? isCurrentYear
+                      ? currentMonthText
+                      : ""
+                    : futureMonthDisabledText
+                }
+                aria-pressed={isSelectedYear}
+                onClick={() => setYear(y)}
+              >
+                {getDisplayYearForLanguage(y, activeMonth, language)}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="month-year-row">
-        {years.map((y) => {
-          const yearEnabled = MONTHS.some((m) => isSelectableMonth(m.value, y));
-          const isCurrentYear = y === currentGregorianYear;
-          return (
-            <button
-              key={y}
-              type="button"
-              className={`month-year-btn${activeYear === y ? " on" : ""}${isCurrentYear ? " current-year" : ""}`}
-              disabled={!yearEnabled}
-              title={
-                yearEnabled
-                  ? isCurrentYear
-                    ? currentMonthText
-                    : ""
-                  : futureMonthDisabledText
-              }
-              onClick={() => setYear(y)}
-            >
-              {getDisplayYearForLanguage(y, activeMonth, language)}
-            </button>
-          );
-        })}
-      </div>
+      <div className="month-dd-section month-dd-section--grid">
+        <p className="month-dd-section-label">{t("navbar.selectMonth", "Month")}</p>
+        <div className="month-grid">
+          {MONTHS.map((m) => {
+            const disabled = !isSelectableMonth(m.value, activeYear);
+            const reason = getMonthDisabledReason(m.value, activeYear);
+            const accessMode = getMonthAccessMode(m.value, activeYear);
+            const isCurrentMonth =
+              m.value === currentGregorianMonth &&
+              activeYear === currentGregorianYear;
+            const isSelected = activeMonth === m.value;
 
-      <div className="month-grid">
-        {MONTHS.map((m) => {
-          const disabled = !isSelectableMonth(m.value, activeYear);
-          const reason = getMonthDisabledReason(m.value, activeYear);
-          const accessMode = getMonthAccessMode(m.value, activeYear);
-          const isCurrentMonth =
-            m.value === currentGregorianMonth &&
-            activeYear === currentGregorianYear;
+            let tooltip = "";
+            if (isCurrentMonth) {
+              tooltip = currentMonthText;
+            } else if (reason === "past_month_readonly") {
+              tooltip = pastMonthReadOnlyText;
+            } else if (reason === "future_month_locked") {
+              tooltip = futureMonthDisabledText;
+            }
 
-          let tooltip = "";
-          if (isCurrentMonth) {
-            tooltip = currentMonthText;
-          } else if (reason === "past_month_readonly") {
-            tooltip = pastMonthReadOnlyText;
-          } else if (reason === "future_month_locked") {
-            tooltip = futureMonthDisabledText;
-          }
-
-          return (
-            <button
-              key={m.value}
-              type="button"
-              className={`month-cell${activeMonth === m.value ? " on" : ""}${isCurrentMonth ? " current" : ""}${accessMode === "readonly" ? " readonly" : ""}`}
-              disabled={disabled}
-              title={tooltip}
-              aria-label={tooltip}
-              onClick={() => {
-                if (disabled) return;
-                setMonth(m.value);
-                onClose();
-              }}
-            >
-              {getDisplayMonthLabelForLanguage(m.value, activeYear, language)}
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={m.value}
+                type="button"
+                className={`month-cell${isSelected ? " on" : ""}${isCurrentMonth ? " current" : ""}${accessMode === "readonly" ? " readonly" : ""}${disabled ? " disabled" : ""}`}
+                disabled={disabled}
+                title={tooltip}
+                aria-label={tooltip || getDisplayMonthLabelForLanguage(m.value, activeYear, language)}
+                aria-pressed={isSelected}
+                onClick={() => {
+                  if (disabled) return;
+                  setMonth(m.value);
+                  onClose();
+                }}
+              >
+                {getDisplayMonthLabelForLanguage(m.value, activeYear, language)}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {isAdmin && (
@@ -740,7 +768,7 @@ function MonthDropdown({ onClose }) {
               disabled={reportLoading}
               onClick={handleGenerateReport}
             >
-              {reportLoading ? <Spinner size={12} /> : <LuDownload size={12} />}
+              {reportLoading ? <Spinner size={12} /> : <LuDownload size={14} />}
               {reportLoading
                 ? t("report.generating", "Generating...")
                 : t("report.generate", "Generate Report")}
@@ -829,6 +857,7 @@ function LangDropdown({ onClose }) {
 function UserDropdown({ onClose }) {
   const { t, i18n } = useTranslation();
   const { user, logout, isAdmin, isSuperAdmin } = useAuth();
+  const { canOfferInstall, install, installing } = usePwa();
   const navigate = useNavigate();
   const roleColor = ROLE_COLORS[user?.accountType] || "var(--text3)";
   const isRtl = (i18n.dir?.() || "ltr") === "rtl";
@@ -894,6 +923,19 @@ function UserDropdown({ onClose }) {
           {user?.accountType}
         </span>
       </div>
+      {canOfferInstall && (
+        <div
+          className="dd-item user-dd-item"
+          onClick={() => {
+            onClose();
+            install();
+          }}
+          style={{ opacity: installing ? 0.7 : 1 }}
+        >
+          <LuSmartphone size={14} />
+          <span>{t("pwa.menuInstall")}</span>
+        </div>
+      )}
       {isAdmin && (
         <div
           className="dd-item user-dd-item"
