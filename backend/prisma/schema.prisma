@@ -95,6 +95,7 @@ model Tenant {
   transactions            Transaction[]
   damagedClothesPenalties DamagedClothesPenalty[]
   items                   Item[]
+  itemCategories          ItemCategory[]
   itemSales               ItemSale[]
   contributors            Contributor[]
   auditLogs               AuditLog[]
@@ -258,6 +259,7 @@ model User {
   createdOrders                  Order[]                  @relation("CreatedOrders")
   financeCreatedOrders           Order[]                  @relation("FinanceCreatedOrders")
   createdItems                   Item[]
+  createdItemCategories          ItemCategory[]           @relation("ItemCategoryCreatedBy")
   createdItemSales               ItemSale[]
   auditLogs                      AuditLog[]
   tenantUserLimitChanges         TenantUserLimitHistory[] @relation("TenantUserLimitChangedBy")
@@ -1309,35 +1311,49 @@ model DamagedClothesPenalty {
   @@index([createdAt])
 }
 
-enum ItemType {
-  WATCH
-  PERFUME
-  BOOT
-  RING
-  SLIPPER
+model ItemCategory {
+  id          String   @id @default(uuid())
+  tenantId    String   @default("default-tenant")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  color       String?
+  iconKey     String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  items       Item[]
+  createdById String
+  createdBy   User     @relation("ItemCategoryCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, isActive])
 }
 
 model Item {
-  id            String     @id @default(uuid())
-  tenantId      String     @default("default-tenant")
-  tenant        Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  type          ItemType
+  id            String       @id @default(uuid())
+  tenantId      String       @default("default-tenant")
+  tenant        Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  categoryId    String
+  category      ItemCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   name          String
   brand         String
   code          String
-  quantity      Int        @default(0)
+  quantity      Int          @default(0)
   originalPrice Float
   notes         String?
   sales         ItemSale[]
   createdById   String
-  createdBy     User       @relation(fields: [createdById], references: [id], onDelete: Restrict)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  createdBy     User         @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   @@unique([tenantId, code])
-  @@index([type])
+  @@index([categoryId])
   @@index([tenantId])
-  @@index([tenantId, type])
+  @@index([tenantId, categoryId])
   @@index([brand])
   @@index([name])
 }
@@ -1348,7 +1364,8 @@ model ItemSale {
   tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   itemId        String
   item          Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  type          ItemType
+  categoryId    String
+  categoryName  String
   name          String
   brand         String
   code          String
@@ -1363,7 +1380,7 @@ model ItemSale {
   @@index([itemId])
   @@index([tenantId])
   @@index([tenantId, createdAt])
-  @@index([type])
+  @@index([categoryId])
   @@index([brand])
   @@index([code])
   @@index([createdAt])

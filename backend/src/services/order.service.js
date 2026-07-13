@@ -31,6 +31,14 @@ import {
   getOrderNetTotal,
   getAggregateNetTotal,
 } from "../lib/orderFinancials.js";
+import {
+  buildCarryForwardPendingScope,
+  buildCarryForwardUnsettledWorkerScope,
+  buildCurrentMonthScope,
+  mergeMonthScopedSummaries,
+  parseMonthYear,
+  summarizeOrderAggregateForMonthView,
+} from "../lib/monthRollover.js";
 
 const COMPLETED_ORDER_LOCKED_MESSAGE =
   "سفارش تکمیل‌شده قابل ویرایش یا حذف نیست.";
@@ -1504,7 +1512,8 @@ export const getAllOrders = async ({
     AND: [where, { damagedClothesPenalties: { none: {} } }],
   };
 
-  const [data, total, summaryAgg] = await Promise.all([
+  const monthContext = parseMonthYear(parsedMonth, parsedYear);
+  const summaryQueries = [
     findManyOrdersSafe(
       {
         where,
@@ -1515,23 +1524,66 @@ export const getAllOrders = async ({
       ORDER_LIST_INCLUDE_BASE,
     ),
     prisma.order.count({ where }),
-    prisma.order.aggregate({
-      where: summaryWhere,
-      _sum: {
-        totalPrice: true,
-        discount: true,
-        paidAmount: true,
-        remaining: true,
-      },
-    }),
-  ]);
+  ];
 
-  const summary = {
-    total: getAggregateNetTotal(summaryAgg),
-    discount: toNumberScaled(summaryAgg._sum?.discount || 0, MONEY_SCALE),
-    paid: toNumberScaled(summaryAgg._sum?.paidAmount || 0, MONEY_SCALE),
-    remaining: toNumberScaled(summaryAgg._sum?.remaining || 0, MONEY_SCALE),
-  };
+  if (monthContext.hasMonthFilter && status !== "completed") {
+    summaryQueries.push(
+      prisma.order.aggregate({
+        where: {
+          AND: [
+            summaryWhere,
+            buildCurrentMonthScope(monthContext),
+          ],
+        },
+        _sum: {
+          totalPrice: true,
+          discount: true,
+          paidAmount: true,
+          remaining: true,
+        },
+      }),
+      prisma.order.aggregate({
+        where: {
+          AND: [
+            summaryWhere,
+            buildCarryForwardPendingScope(monthContext),
+          ],
+        },
+        _sum: { remaining: true },
+      }),
+    );
+  } else {
+    summaryQueries.push(
+      prisma.order.aggregate({
+        where: summaryWhere,
+        _sum: {
+          totalPrice: true,
+          discount: true,
+          paidAmount: true,
+          remaining: true,
+        },
+      }),
+    );
+  }
+
+  const summaryResults = await Promise.all(summaryQueries);
+  const data = summaryResults[0];
+  const total = summaryResults[1];
+
+  let summary;
+  if (monthContext.hasMonthFilter && status !== "completed") {
+    const currentMonthAgg = summaryResults[2];
+    const carryForwardAgg = summaryResults[3];
+    summary = mergeMonthScopedSummaries(
+      summarizeOrderAggregateForMonthView(currentMonthAgg),
+      summarizeOrderAggregateForMonthView(carryForwardAgg, {
+        includeFinancialTotals: false,
+      }),
+    );
+  } else {
+    const summaryAgg = summaryResults[2];
+    summary = summarizeOrderAggregateForMonthView(summaryAgg);
+  }
 
   const orderIds = data.map((order) => order.id).filter(Boolean);
   const dailyExpenseSums = orderIds.length
@@ -1788,20 +1840,12 @@ export const getCompletedOrdersFromWorkers = async ({
 
   const parsedMonth = month != null ? Number(month) : null;
   const parsedYear = year != null ? Number(year) : null;
-  if (
-    parsedMonth &&
-    parsedYear &&
-    Number.isFinite(parsedMonth) &&
-    Number.isFinite(parsedYear)
-  ) {
-    const { start: monthStart, end: monthEnd } = getAfghanMonthDateRange({
-      month: parsedMonth,
-      year: parsedYear,
-    });
+  const monthContext = parseMonthYear(parsedMonth, parsedYear);
+  if (monthContext.hasMonthFilter) {
     where.AND.push({
       OR: [
-        { entryMonth: parsedMonth, entryYear: parsedYear },
-        { entryMonth: null, createdAt: { gte: monthStart, lte: monthEnd } },
+        buildCurrentMonthScope(monthContext),
+        buildCarryForwardUnsettledWorkerScope(monthContext),
       ],
     });
   }

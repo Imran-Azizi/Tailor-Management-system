@@ -26,6 +26,7 @@ import publicRoutes from "./routes/public.routes.js";
 import { startCronJobs } from "./cron/notifications.cron.js";
 import { startBackupCron } from "./cron/backup.cron.js";
 import { itemRoutes } from "./routes/item.routes.js";
+import { itemCategoryRoutes } from "./routes/itemCategory.routes.js";
 import { itemSaleRoutes } from "./routes/itemSale.routes.js";
 import rbacRoutes from "./routes/rbac.routes.js";
 import {
@@ -122,6 +123,7 @@ app.use("/api/rakhts", rakhtRoutes);
 app.use("/api/backups", backupRoutes);
 app.use("/api/damaged-clothes", damagedClothesRoutes);
 app.use("/api/items", itemRoutes);
+app.use("/api/item-categories", itemCategoryRoutes);
 app.use("/api/item-sales", itemSaleRoutes);
 app.use("/api/rbac", rbacRoutes);
 

@@ -17,6 +17,13 @@ import {
   getOrderFinancialRemaining,
   getOrderFinancialTotal,
 } from "../lib/orderFinancials.js";
+import {
+  buildCarryForwardPendingScope,
+  buildCurrentMonthScope,
+  buildOpenOrdersScope,
+  computeOutstandingWorkerMoneyByRole,
+  parseMonthYear,
+} from "../lib/monthRollover.js";
 
 const toPositiveMoney = (value) =>
   Math.max(0, toNumberScaled(value || 0, MONEY_SCALE));
@@ -171,20 +178,14 @@ export const getDashboardStats = async ({
   year,
   financeUserId,
 } = {}) => {
-  const parsedMonth = month != null ? Number(month) : null;
-  const parsedYear = year != null ? Number(year) : null;
-
-  const hasMonthFilter =
-    parsedMonth &&
-    parsedYear &&
-    Number.isFinite(parsedMonth) &&
-    Number.isFinite(parsedYear);
-
-  const monthRange = hasMonthFilter
-    ? getAfghanMonthDateRange({ month: parsedMonth, year: parsedYear })
-    : null;
-  const monthStart = monthRange?.start || null;
-  const monthEnd = monthRange?.end || null;
+  const monthContext = parseMonthYear(month, year);
+  const {
+    month: parsedMonth,
+    year: parsedYear,
+    hasMonthFilter,
+    monthStart,
+    monthEnd,
+  } = monthContext;
 
   // Finance user data isolation: scope all order queries to their created orders.
   const financeWhere = financeUserId
@@ -197,10 +198,7 @@ export const getDashboardStats = async ({
   if (hasMonthFilter) {
     monthWhere = {
       ...financeWhere,
-      OR: [
-        { entryMonth: parsedMonth, entryYear: parsedYear },
-        { entryMonth: null, createdAt: { gte: monthStart, lte: monthEnd } },
-      ],
+      ...buildCurrentMonthScope(monthContext),
     };
   } else {
     monthWhere = { ...financeWhere };
@@ -222,24 +220,26 @@ export const getDashboardStats = async ({
   const carryForwardPendingWhere = hasMonthFilter
     ? {
         ...financeWhere,
-        isCompleted: false,
-        OR: [
-          { entryYear: { lt: parsedYear } },
-          { entryYear: parsedYear, entryMonth: { lte: parsedMonth } },
-          { entryMonth: null, createdAt: { lte: monthEnd } },
-        ],
+        ...buildCarryForwardPendingScope(monthContext),
       }
     : { ...monthWhere, isCompleted: false };
 
+  const pendingOrdersWhere = hasMonthFilter
+    ? {
+        ...financeWhere,
+        ...buildOpenOrdersScope(monthContext),
+      }
+    : { ...financeWhere, isCompleted: false };
+
   const carryForwardRemainingWhere = hasMonthFilter
+    ? carryForwardPendingWhere
+    : { ...monthWhere, isCompleted: false };
+
+  const currentMonthPendingWhere = hasMonthFilter
     ? {
         ...financeWhere,
         isCompleted: false,
-        OR: [
-          { entryYear: { lt: parsedYear } },
-          { entryYear: parsedYear, entryMonth: { lte: parsedMonth } },
-          { entryMonth: null, createdAt: { lte: monthEnd } },
-        ],
+        ...buildCurrentMonthScope(monthContext),
       }
     : { ...monthWhere, isCompleted: false };
 
@@ -269,6 +269,9 @@ export const getDashboardStats = async ({
   const financialCarryForwardRemainingWhere = withNonDamagedOrders(
     carryForwardRemainingWhere,
   );
+  const financialCurrentMonthPendingWhere = withNonDamagedOrders(
+    currentMonthPendingWhere,
+  );
 
   const now = new Date();
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -286,17 +289,17 @@ export const getDashboardStats = async ({
     emergencyOrders,
     todayOrders,
     revenueData,
-    totalDiscountAllOrdersAggregate,
     recentOrders,
     ordersByType,
     damagedClothesTotal,
     damagedClothesAmountAggregate,
     financialMonthSummary,
-    financialRemainingSummary,
+    financialCarryForwardRemainingSummary,
+    financialCurrentMonthPendingSummary,
   ] = await Promise.all([
     prisma.order.count({ where: monthWhere }),
     prisma.order.count({ where: { ...monthWhere, isCompleted: true } }),
-    prisma.order.count({ where: carryForwardPendingWhere }),
+    prisma.order.count({ where: pendingOrdersWhere }),
     // Global pending: all incomplete orders regardless of month (carry-over support)
     prisma.order.count({ where: { ...financeWhere, isCompleted: false } }),
     prisma.order.count({
@@ -312,10 +315,6 @@ export const getDashboardStats = async ({
     prisma.order.aggregate({
       where: financialMonthWhere,
       _sum: { totalPrice: true, discount: true },
-    }),
-    prisma.order.aggregate({
-      where: financeWhere,
-      _sum: { discount: true },
     }),
     prisma.order.findMany({
       where: recentOrdersWhere,
@@ -345,6 +344,7 @@ export const getDashboardStats = async ({
     }),
     computeFinancialSummary(financialMonthWhere),
     computeFinancialSummary(financialCarryForwardRemainingWhere),
+    computeFinancialSummary(financialCurrentMonthPendingWhere),
   ]);
 
   // Daily expense and rakht totals are month-scoped when filters are active.
@@ -436,12 +436,6 @@ export const getDashboardStats = async ({
     otherDailyTaskAmount._sum?.amount || 0,
   );
 
-  const paidDateRange = hasMonthFilter
-    ? {
-        gte: monthStart,
-        lte: monthEnd,
-      }
-    : undefined;
 
   const [
     allOrdersBenefitAggregate,
@@ -449,10 +443,8 @@ export const getDashboardStats = async ({
     linkedDailyExpenseAggregate,
     otherItemsProfitAggregate,
     pendingPrepaymentAggregate,
-    qichikarPaidAggregate,
-    dokhtPaidAggregate,
-    legacyQichikarPaidAggregate,
-    legacyDokhtPaidAggregate,
+    qichikarOutstanding,
+    dokhtOutstanding,
   ] = await Promise.all([
     prisma.order.aggregate({
       where: {
@@ -491,42 +483,8 @@ export const getDashboardStats = async ({
       },
       _sum: { paidAmount: true },
     }),
-    prisma.order.aggregate({
-      where: {
-        ...(financeUserId ? { createdByFinanceId: String(financeUserId) } : {}),
-        qichikarPaymentStatus: "PAID_TO_WORKER",
-        qichikarPaidAt: paidDateRange || { not: null },
-      },
-      _sum: { qichikarPaymentAmount: true },
-    }),
-    prisma.order.aggregate({
-      where: {
-        ...(financeUserId ? { createdByFinanceId: String(financeUserId) } : {}),
-        dokhtPaymentStatus: "PAID_TO_WORKER",
-        dokhtPaidAt: paidDateRange || { not: null },
-      },
-      _sum: { dokhtPaymentAmount: true },
-    }),
-    prisma.order.aggregate({
-      where: {
-        ...(financeUserId ? { createdByFinanceId: String(financeUserId) } : {}),
-        workerPaymentStatus: "PAID_TO_WORKER",
-        workerPaidAt: paidDateRange || { not: null },
-        qichikarPaymentStatus: "UNPAID",
-        assignedTo: { accountType: "QICHIKAR" },
-      },
-      _sum: { workerPaymentAmount: true },
-    }),
-    prisma.order.aggregate({
-      where: {
-        ...(financeUserId ? { createdByFinanceId: String(financeUserId) } : {}),
-        workerPaymentStatus: "PAID_TO_WORKER",
-        workerPaidAt: paidDateRange || { not: null },
-        dokhtPaymentStatus: "UNPAID",
-        assignedTo: { accountType: "DOKHT" },
-      },
-      _sum: { workerPaymentAmount: true },
-    }),
+    computeOutstandingWorkerMoneyByRole("QICHIKAR", financeWhere),
+    computeOutstandingWorkerMoneyByRole("DOKHT", financeWhere),
   ]);
 
   const totalOrderBenefit = Number(
@@ -588,6 +546,27 @@ export const getDashboardStats = async ({
     };
   });
 
+  const monthScopedSummary = hasMonthFilter
+    ? {
+        total: financialMonthSummary.revenue,
+        discount: toNumberScaled(revenueData._sum?.discount || 0, MONEY_SCALE),
+        paid: financialMonthSummary.paid,
+        remaining: addScaled(
+          financialCurrentMonthPendingSummary.remaining,
+          financialCarryForwardRemainingSummary.remaining,
+          MONEY_SCALE,
+        ),
+        carriedForwardRemaining:
+          financialCarryForwardRemainingSummary.remaining,
+      }
+    : {
+        total: financialMonthSummary.revenue,
+        discount: toNumberScaled(revenueData._sum?.discount || 0, MONEY_SCALE),
+        paid: financialMonthSummary.paid,
+        remaining: financialMonthSummary.remaining,
+        carriedForwardRemaining: 0,
+      };
+
   const monthlyRevenue = await getMonthlyRevenue(financeUserId, {
     month: hasMonthFilter ? parsedMonth : null,
     year: hasMonthFilter ? parsedYear : null,
@@ -606,13 +585,12 @@ export const getDashboardStats = async ({
     // Legacy fields kept for non-filtered views
     monthOrders: hasMonthFilter ? totalOrders : completedOrders,
     yearOrders: totalOrders,
-    totalRevenue: financialMonthSummary.revenue,
+    totalRevenue: monthScopedSummary.total,
     totalGrossOrderPrice: revenueData._sum.totalPrice || 0,
-    totalDiscount: revenueData._sum.discount || 0,
-    totalDiscountAllOrders:
-      totalDiscountAllOrdersAggregate._sum?.discount || 0,
-    totalPaid: financialMonthSummary.paid,
-    totalRemaining: financialRemainingSummary.remaining,
+    totalDiscount: monthScopedSummary.discount,
+    totalPaid: monthScopedSummary.paid,
+    totalRemaining: monthScopedSummary.remaining,
+    carriedForwardOrderRemaining: monthScopedSummary.carriedForwardRemaining,
     recentOrders: recentOrdersWithRevenue,
     monthlyRevenue,
     ordersByType: ordersByType.map((o) => ({
@@ -629,12 +607,10 @@ export const getDashboardStats = async ({
     totalExpenses: dailyTaskExpenseTotal,
     totalRakhtPrice: rakhtPriceAggregate._sum?.totalPrice || 0,
     totalLoan: loanAggregate._sum?.amount || 0,
-    totalQichikarUsersMoney:
-      (qichikarPaidAggregate._sum?.qichikarPaymentAmount || 0) +
-      (legacyQichikarPaidAggregate._sum?.workerPaymentAmount || 0),
-    totalDokhtUsersMoney:
-      (dokhtPaidAggregate._sum?.dokhtPaymentAmount || 0) +
-      (legacyDokhtPaidAggregate._sum?.workerPaymentAmount || 0),
+    totalQichikarUsersMoney: qichikarOutstanding.outstanding,
+    totalDokhtUsersMoney: dokhtOutstanding.outstanding,
+    unpaidQichikarWorkerOrders: qichikarOutstanding.unpaidCount,
+    unpaidDokhtWorkerOrders: dokhtOutstanding.unpaidCount,
     totalOrderBenefit,
     pendingPrepaymentIncome,
     totalAllOrdersBenefit,

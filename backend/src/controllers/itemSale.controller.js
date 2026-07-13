@@ -1,6 +1,4 @@
-// (file reverted to blank as per undo request)
 import { prisma } from "../lib/prisma.js";
-import { ITEM_TYPES } from "./item.controller.js";
 
 const LOW_STOCK_LIMIT = 5;
 
@@ -26,15 +24,8 @@ function dateEnd(value) {
 
 function buildWhere(query) {
   const where = {};
-  const type = normalizeText(query.type).toUpperCase();
-  if (type) {
-    if (!ITEM_TYPES.includes(type)) {
-      const err = new Error("Invalid item type.");
-      err.status = 400;
-      throw err;
-    }
-    where.type = type;
-  }
+  const categoryId = normalizeText(query.categoryId);
+  if (categoryId) where.categoryId = categoryId;
   if (query.brand)
     where.brand = { contains: normalizeText(query.brand), mode: "insensitive" };
   if (query.name)
@@ -122,7 +113,10 @@ export async function createSale(req, res, next) {
     }
 
     const sale = await prisma.$transaction(async (tx) => {
-      const item = await tx.item.findUnique({ where: { id: itemId } });
+      const item = await tx.item.findUnique({
+        where: { id: itemId },
+        include: { category: { select: { id: true, name: true } } },
+      });
       if (!item) {
         const err = new Error("Item not found.");
         err.status = 404;
@@ -143,7 +137,8 @@ export async function createSale(req, res, next) {
       const created = await tx.itemSale.create({
         data: {
           itemId,
-          type: item.type,
+          categoryId: item.categoryId,
+          categoryName: item.category.name,
           name: item.name,
           brand: item.brand,
           code: item.code,
@@ -177,8 +172,8 @@ export async function stats(req, res, next) {
       salesCount,
       lowStockItems,
       inventory,
-      salesByType,
-      byType,
+      salesByCategory,
+      byCategory,
     ] = await Promise.all([
       prisma.itemSale.findMany({
         where,
@@ -187,15 +182,15 @@ export async function stats(req, res, next) {
       prisma.itemSale.count({ where }),
       prisma.item.count({ where: { quantity: { lte: LOW_STOCK_LIMIT } } }),
       prisma.item.findMany({
-        select: { quantity: true, originalPrice: true, type: true },
+        select: { quantity: true, originalPrice: true, categoryId: true },
       }),
       prisma.itemSale.groupBy({
-        by: ["type"],
+        by: ["categoryId", "categoryName"],
         where,
         _sum: { customerPrice: true, profit: true, quantitySold: true },
       }),
       prisma.item.groupBy({
-        by: ["type"],
+        by: ["categoryId"],
         _sum: { quantity: true },
         _count: { _all: true },
       }),
@@ -253,8 +248,8 @@ export async function stats(req, res, next) {
       lowStockItems,
       totalInventoryValue,
       monthlySummary: Object.values(monthlySummary),
-      salesByType,
-      inventoryByType: byType,
+      salesByCategory,
+      inventoryByCategory: byCategory,
       lowStockLimit: LOW_STOCK_LIMIT,
     });
   } catch (error) {

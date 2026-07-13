@@ -25,6 +25,7 @@ const TENANT_SCOPED_MODELS = new Set([
   "Transaction",
   "DamagedClothesPenalty",
   "Item",
+  "ItemCategory",
   "ItemSale",
   "AuditLog",
   "Role",
@@ -71,6 +72,7 @@ const TENANT_NAMED_MODELS = new Set([
   "YakhanQaqDesignOption",
   "YakhanQaqButtonShip",
   "YakhanQaqPantShip",
+  "ItemCategory",
 ]);
 
 const WRITE_OPERATIONS = new Set(["create", "createMany"]);

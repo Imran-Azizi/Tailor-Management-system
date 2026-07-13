@@ -1,7 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 
-export const ITEM_TYPES = ["WATCH", "PERFUME", "BOOT", "RING", "SLIPPER"];
 const LOW_STOCK_LIMIT = 5;
 
 function normalizeText(value) {
@@ -28,17 +27,33 @@ function parseMoney(value, field) {
   return number;
 }
 
-function validateType(type) {
-  if (!ITEM_TYPES.includes(type)) {
-    const err = new Error("Invalid item type.");
+async function validateCategoryId(categoryId) {
+  const category = await prisma.itemCategory.findUnique({
+    where: { id: categoryId },
+    select: { id: true, isActive: true },
+  });
+  if (!category) {
+    const err = new Error("Invalid item category.");
+    err.status = 400;
+    throw err;
+  }
+  if (!category.isActive) {
+    const err = new Error("This item category is inactive.");
     err.status = 400;
     throw err;
   }
 }
 
-function buildItemPayload(body, { partial = false } = {}) {
-  const type = normalizeText(body.type).toUpperCase();
-  if (!partial || type) validateType(type);
+async function buildItemPayload(body, { partial = false } = {}) {
+  const categoryId = normalizeText(body.categoryId);
+  if (!partial || categoryId) {
+    if (!categoryId) {
+      const err = new Error("Item category is required.");
+      err.status = 400;
+      throw err;
+    }
+    await validateCategoryId(categoryId);
+  }
 
   const name = normalizeText(body.name);
   const brand = normalizeText(body.brand);
@@ -51,7 +66,7 @@ function buildItemPayload(body, { partial = false } = {}) {
   }
 
   const data = {};
-  if (type) data.type = type;
+  if (categoryId) data.categoryId = categoryId;
   if (name) data.name = name;
   if (brand) data.brand = brand;
   if (code) data.code = code;
@@ -87,14 +102,14 @@ function getPagination(req) {
 
 function buildWhere(query) {
   const where = {};
-  const type = normalizeText(query.type).toUpperCase();
-  if (type) {
-    validateType(type);
-    where.type = type;
-  }
-  if (query.brand) where.brand = { contains: normalizeText(query.brand), mode: "insensitive" };
-  if (query.name) where.name = { contains: normalizeText(query.name), mode: "insensitive" };
-  if (query.code) where.code = { contains: normalizeText(query.code), mode: "insensitive" };
+  const categoryId = normalizeText(query.categoryId);
+  if (categoryId) where.categoryId = categoryId;
+  if (query.brand)
+    where.brand = { contains: normalizeText(query.brand), mode: "insensitive" };
+  if (query.name)
+    where.name = { contains: normalizeText(query.name), mode: "insensitive" };
+  if (query.code)
+    where.code = { contains: normalizeText(query.code), mode: "insensitive" };
   if (query.search) {
     const search = normalizeText(query.search);
     where.OR = [
@@ -105,7 +120,8 @@ function buildWhere(query) {
     ];
   }
   if (query.stockStatus === "out") where.quantity = { equals: 0 };
-  if (query.stockStatus === "low") where.quantity = { gt: 0, lte: LOW_STOCK_LIMIT };
+  if (query.stockStatus === "low")
+    where.quantity = { gt: 0, lte: LOW_STOCK_LIMIT };
   if (query.lowStock) where.quantity = { lte: Number(query.lowStock) };
   return where;
 }
@@ -118,6 +134,9 @@ export async function listItems(req, res, next) {
       prisma.item.findMany({
         where,
         include: {
+          category: {
+            select: { id: true, name: true, color: true, iconKey: true },
+          },
           createdBy: { select: { id: true, name: true, accountType: true } },
         },
         skip: (page - 1) * pageSize,
@@ -134,13 +153,21 @@ export async function listItems(req, res, next) {
 
 export async function createItem(req, res, next) {
   try {
-    const data = buildItemPayload(req.body);
+    const data = await buildItemPayload(req.body);
     const item = await prisma.item.create({
       data: { ...data, createdById: req.user.id },
+      include: {
+        category: {
+          select: { id: true, name: true, color: true, iconKey: true },
+        },
+      },
     });
     res.status(201).json(item);
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
       error.status = 409;
       error.message = "Duplicate item code.";
     }
@@ -150,14 +177,22 @@ export async function createItem(req, res, next) {
 
 export async function updateItem(req, res, next) {
   try {
-    const data = buildItemPayload(req.body, { partial: true });
+    const data = await buildItemPayload(req.body, { partial: true });
     const item = await prisma.item.update({
       where: { id: req.params.id },
       data,
+      include: {
+        category: {
+          select: { id: true, name: true, color: true, iconKey: true },
+        },
+      },
     });
     res.json(item);
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
       error.status = 409;
       error.message = "Duplicate item code.";
     }
@@ -179,6 +214,9 @@ export async function getItem(req, res, next) {
     const item = await prisma.item.findUnique({
       where: { id: req.params.id },
       include: {
+        category: {
+          select: { id: true, name: true, color: true, iconKey: true },
+        },
         createdBy: { select: { id: true, name: true, accountType: true } },
       },
     });
