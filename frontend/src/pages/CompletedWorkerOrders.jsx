@@ -570,6 +570,15 @@ export default function CompletedWorkerOrders() {
         </div>
       )}
 
+      {isAdmin ? (
+        <div className="info-box ib-blue" style={{ marginBottom: 12 }}>
+          {t(
+            "completedWorkerOrders.rolloverHint",
+            "Unsettled worker orders from previous months remain visible until payment is completed.",
+          )}
+        </div>
+      ) : null}
+
       {highlightOrderId && (
         <div
           style={{

@@ -11,10 +11,7 @@ import {
 import api from "../lib/api.js";
 import { formatCurrency } from "../lib/currency.js";
 import { formatSystemDateTime } from "../lib/locale.js";
-import {
-  ITEM_CATEGORIES,
-  getItemCategoryLabel,
-} from "../components/design/ItemsTab.jsx";
+import { getItemCategoryLabel } from "../lib/itemCategories.js";
 import {
   PageHeader,
   StatCard,
@@ -28,7 +25,7 @@ const EMPTY_FILTERS = {
   name: "",
   code: "",
   brand: "",
-  type: "",
+  categoryId: "",
   stockStatus: "",
 };
 
@@ -37,6 +34,16 @@ export default function ItemSalesRecords() {
   const language = i18n.resolvedLanguage || i18n.language;
   const isRtl = i18n.dir?.(language) === "rtl";
   const [filters, setFilters] = useState(EMPTY_FILTERS);
+
+  const categoriesQuery = useQuery({
+    queryKey: ["item-categories", "records"],
+    queryFn: () =>
+      api
+        .get("/item-categories")
+        .then((res) => res.data.categories || []),
+  });
+
+  const categories = categoriesQuery.data || [];
 
   const activeFilters = useMemo(
     () =>
@@ -165,15 +172,16 @@ export default function ItemSalesRecords() {
               </span>
               <select
                 className="inp"
-                value={filters.type}
-                onChange={(event) => setFilter("type", event.target.value)}
+                value={filters.categoryId}
+                onChange={(event) => setFilter("categoryId", event.target.value)}
+                disabled={categoriesQuery.isLoading}
               >
                 <option value="">
                   {t("common.all", { defaultValue: "All" })}
                 </option>
-                {ITEM_CATEGORIES.map((category) => (
-                  <option key={category.key} value={category.key}>
-                    {getItemCategoryLabel(category.key, t)}
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
                   </option>
                 ))}
               </select>
@@ -230,7 +238,7 @@ export default function ItemSalesRecords() {
               <tbody>
                 {sales.map((sale) => (
                   <tr key={sale.id}>
-                    <td>{getItemCategoryLabel(sale.type, t)}</td>
+                    <td>{getItemCategoryLabel(sale.categoryName, t)}</td>
                     <td>
                       <strong>{sale.name}</strong>
                     </td>

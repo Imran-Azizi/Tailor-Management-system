@@ -5,8 +5,10 @@ import toast from "react-hot-toast";
 import {
   LuBoxes,
   LuPackagePlus,
+  LuPencil,
   LuSearch,
   LuSparkles,
+  LuTrash2,
   LuTriangleAlert,
 } from "react-icons/lu";
 import ItemList from "./ItemList.jsx";
@@ -17,7 +19,11 @@ import { ConfirmDeleteModal, LoadingState } from "../ui/index.jsx";
 
 const LOW_STOCK_LIMIT = 5;
 
-export default function ItemCategoryCard({ category }) {
+export default function ItemCategoryCard({
+  category,
+  onEditCategory,
+  onDeleteCategory,
+}) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
   const isRtl = i18n.dir?.(language) === "rtl";
@@ -28,11 +34,11 @@ export default function ItemCategoryCard({ category }) {
   const [search, setSearch] = useState("");
 
   const query = useQuery({
-    queryKey: ["items", category.key, search],
+    queryKey: ["items", category.id, search],
     queryFn: () =>
       api
         .get("/items", {
-          params: { type: category.key, search, pageSize: 100 },
+          params: { categoryId: category.id, search, pageSize: 100 },
         })
         .then((res) => res.data),
   });
@@ -54,8 +60,9 @@ export default function ItemCategoryCard({ category }) {
   }, [items]);
 
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ["items", category.key] });
+    qc.invalidateQueries({ queryKey: ["items", category.id] });
     qc.invalidateQueries({ queryKey: ["items"] });
+    qc.invalidateQueries({ queryKey: ["item-categories"] });
   };
 
   const createMut = useMutation({
@@ -123,8 +130,8 @@ export default function ItemCategoryCard({ category }) {
     setEditing(null);
   };
 
-  // Card background color (like DesignCard)
   const bg = `${category.color}12`;
+  const CategoryIcon = category.Icon;
 
   return (
     <div
@@ -151,7 +158,7 @@ export default function ItemCategoryCard({ category }) {
                 marginInlineStart: isRtl ? 8 : 0,
               }}
             >
-              <category.Icon size={22} />
+              <CategoryIcon size={22} />
             </span>
             <div>
               <p style={{ fontWeight: 700, fontSize: 14 }}>{category.label}</p>
@@ -163,20 +170,46 @@ export default function ItemCategoryCard({ category }) {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            className="btn btn-sm items-category-add-btn"
-            style={{
-              background: bg,
-              color: category.color,
-              border: `1px solid ${category.color}30`,
-              gap: 4,
-            }}
-            onClick={openCreate}
-          >
-            <LuPackagePlus size={12} />{" "}
-            {t("items.add", { defaultValue: "Add Item" })}
-          </button>
+          <div className="items-category-actions">
+            {onEditCategory ? (
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                onClick={onEditCategory}
+                aria-label={t("items.categories.editTitle", {
+                  defaultValue: "Edit Category",
+                })}
+              >
+                <LuPencil size={14} />
+              </button>
+            ) : null}
+            {onDeleteCategory ? (
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost text-danger"
+                onClick={onDeleteCategory}
+                aria-label={t("items.categories.deleteTitle", {
+                  defaultValue: "Delete Category",
+                })}
+              >
+                <LuTrash2 size={14} />
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="btn btn-sm items-category-add-btn"
+              style={{
+                background: bg,
+                color: category.color,
+                border: `1px solid ${category.color}30`,
+                gap: 4,
+              }}
+              onClick={openCreate}
+            >
+              <LuPackagePlus size={12} />{" "}
+              {t("items.add", { defaultValue: "Add Item" })}
+            </button>
+          </div>
         </div>
 
         <div

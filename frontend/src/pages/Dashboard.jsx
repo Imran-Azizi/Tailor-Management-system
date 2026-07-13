@@ -276,10 +276,7 @@ export default function Dashboard() {
     {
       key: "totalDiscounts",
       label: t("dashboardPage.totalDiscounts", "Total Discounts"),
-      value: formatMoney(
-        data.totalDiscountAllOrders ?? data.totalDiscount ?? 0,
-        language,
-      ),
+      value: formatMoney(data.totalDiscount ?? 0, language),
       Icon: AfCurrencyIcon,
       accent: "#9333EA",
       adminOnly: true,
@@ -290,6 +287,13 @@ export default function Dashboard() {
       key: "outstanding",
       label: t("dashboardPage.outstanding"),
       value: formatMoney(data.totalRemaining, language),
+      sub:
+        Number(data.carriedForwardOrderRemaining || 0) > 0
+          ? t("dashboardPage.carriedForwardOrderRemaining", {
+              amount: formatMoney(data.carriedForwardOrderRemaining, language),
+              defaultValue: "Includes {{amount}} carried from prior months",
+            })
+          : undefined,
       Icon: AfCurrencyIcon,
       accent: "#DC2626",
       onClick: () => navigate("/orders/remaining"),
@@ -374,6 +378,14 @@ export default function Dashboard() {
         "Total Money for Qichikar Workers",
       ),
       value: formatMoney(data.totalQichikarUsersMoney ?? 0, language),
+      sub:
+        Number(data.unpaidQichikarWorkerOrders || 0) > 0
+          ? t("dashboardPage.unpaidQichikarWorkersHint", {
+              count: data.unpaidQichikarWorkerOrders,
+              defaultValue:
+                "{{count}} unpaid worker orders awaiting settlement",
+            })
+          : undefined,
       Icon: AfCurrencyIcon,
       accent: "#DB2777",
       onClick: () => navigate("/orders/completed-workers?workerRole=QICHIKAR"),
@@ -387,6 +399,14 @@ export default function Dashboard() {
         "Total Money for Dokht Workers",
       ),
       value: formatMoney(data.totalDokhtUsersMoney ?? 0, language),
+      sub:
+        Number(data.unpaidDokhtWorkerOrders || 0) > 0
+          ? t("dashboardPage.unpaidDokhtWorkersHint", {
+              count: data.unpaidDokhtWorkerOrders,
+              defaultValue:
+                "{{count}} unpaid worker orders awaiting settlement",
+            })
+          : undefined,
       Icon: AfCurrencyIcon,
       accent: "#7C3AED",
       onClick: () => navigate("/orders/completed-workers?workerRole=DOKHT"),
@@ -637,6 +657,7 @@ export default function Dashboard() {
             key={card.key}
             label={card.label}
             value={card.value}
+            sub={card.sub}
             Icon={card.Icon}
             accent={card.accent}
             onClick={card.onClick}

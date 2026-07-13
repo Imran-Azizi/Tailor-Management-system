@@ -15,9 +15,9 @@ import api from "../lib/api.js";
 import { formatCurrency } from "../lib/currency.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import {
-  ITEM_CATEGORIES,
+  decorateCategory,
   getItemCategoryLabel,
-} from "../components/design/ItemsTab.jsx";
+} from "../lib/itemCategories.js";
 import {
   PageHeader,
   StatCard,
@@ -31,19 +31,29 @@ export default function OtherItems() {
   const language = i18n.resolvedLanguage || i18n.language;
   const isRtl = i18n.dir?.(language) === "rtl";
   const qc = useQueryClient();
-  const [type, setType] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [brand, setBrand] = useState("");
   const [code, setCode] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [customerPrice, setCustomerPrice] = useState("");
   const [quantitySold, setQuantitySold] = useState("1");
 
-  const itemsQuery = useQuery({
-    queryKey: ["items", "sell", type],
-    enabled: !!type,
+  const categoriesQuery = useQuery({
+    queryKey: ["item-categories", "sell"],
     queryFn: () =>
       api
-        .get("/items", { params: { type, pageSize: 100 } })
+        .get("/item-categories")
+        .then((res) => (res.data.categories || []).map(decorateCategory)),
+  });
+
+  const categories = categoriesQuery.data || [];
+
+  const itemsQuery = useQuery({
+    queryKey: ["items", "sell", categoryId],
+    enabled: !!categoryId,
+    queryFn: () =>
+      api
+        .get("/items", { params: { categoryId, pageSize: 100 } })
         .then((res) => res.data.items || []),
   });
 
@@ -65,7 +75,7 @@ export default function OtherItems() {
     setBrand("");
     setCode("");
     setSelectedId("");
-  }, [type]);
+  }, [categoryId]);
 
   useEffect(() => {
     setCode("");
@@ -163,15 +173,16 @@ export default function OtherItems() {
               </span>
               <select
                 className="inp"
-                value={type}
-                onChange={(event) => setType(event.target.value)}
+                value={categoryId}
+                onChange={(event) => setCategoryId(event.target.value)}
+                disabled={categoriesQuery.isLoading}
               >
                 <option value="">
                   {t("common.select", { defaultValue: "Select..." })}
                 </option>
-                {ITEM_CATEGORIES.map((category) => (
-                  <option key={category.key} value={category.key}>
-                    {getItemCategoryLabel(category.key, t)}
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
                   </option>
                 ))}
               </select>
@@ -183,7 +194,7 @@ export default function OtherItems() {
                 className="inp"
                 value={brand}
                 onChange={(event) => setBrand(event.target.value)}
-                disabled={!type || itemsQuery.isLoading}
+                disabled={!categoryId || itemsQuery.isLoading}
               >
                 <option value="">
                   {t("items.allBrands", { defaultValue: "All Brands" })}
@@ -207,7 +218,7 @@ export default function OtherItems() {
                   value={code}
                   onChange={(event) => setCode(event.target.value)}
                   placeholder="ITM-001"
-                  disabled={!type}
+                  disabled={!categoryId}
                 />
               </div>
             </label>
@@ -220,7 +231,7 @@ export default function OtherItems() {
                 className="inp"
                 value={selectedId}
                 onChange={(event) => setSelectedId(event.target.value)}
-                disabled={!type || itemsQuery.isLoading}
+                disabled={!categoryId || itemsQuery.isLoading}
               >
                 <option value="">
                   {t("common.select", { defaultValue: "Select..." })}
@@ -238,7 +249,7 @@ export default function OtherItems() {
             <LoadingState
               message={t("common.loading", { defaultValue: "Loading..." })}
             />
-          ) : !type ? (
+          ) : !categoryId ? (
             <EmptyState
               Icon={LuBarcode}
               message={t("items.sell.chooseType", {
@@ -258,7 +269,7 @@ export default function OtherItems() {
                 <StatCard
                   label={t("items.fields.brand", { defaultValue: "Brand" })}
                   value={selectedItem.brand}
-                  sub={getItemCategoryLabel(selectedItem.type, t)}
+                  sub={getItemCategoryLabel(selectedItem.category, t)}
                   Icon={LuBarcode}
                   accent="#7C3AED"
                 />

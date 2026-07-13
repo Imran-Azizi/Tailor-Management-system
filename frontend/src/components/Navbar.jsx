@@ -791,17 +791,20 @@ function MonthSelector() {
   useOutside(viewRef, () => setViewOpen(false));
 
   const viewLabel = formatMonthYearLabel(viewMonth, viewYear, language);
+  const monthTitle = t("navbar.viewDataByMonth", "View Data by Month");
+
+  const toggleMonthPanel = () => setViewOpen((open) => !open);
 
   return (
-    <div className="month-selector-wrap">
-      <div className="dd-wrap" ref={viewRef}>
+    <div className="month-selector-wrap" ref={viewRef}>
+      <div className="dd-wrap month-selector-dd">
         <button
           type="button"
-          className="month-pill view-pill"
-          onClick={() => {
-            setViewOpen((o) => !o);
-          }}
-          title={t("navbar.viewDataByMonth", "View Data by Month")}
+          className="month-pill view-pill month-pill--desktop"
+          onClick={toggleMonthPanel}
+          title={monthTitle}
+          aria-expanded={viewOpen}
+          aria-haspopup="dialog"
         >
           <LuCalendarCheck size={13} />
           <span className="month-pill-label">{viewLabel}</span>
@@ -810,6 +813,19 @@ function MonthSelector() {
             className={`month-chevron${viewOpen ? " open" : ""}`}
           />
         </button>
+
+        <button
+          type="button"
+          className="nav-btn month-pill-mobile month-pill--mobile"
+          onClick={toggleMonthPanel}
+          title={monthTitle}
+          aria-label={monthTitle}
+          aria-expanded={viewOpen}
+          aria-haspopup="dialog"
+        >
+          <LuCalendarCheck size={17} />
+        </button>
+
         {viewOpen && <MonthDropdown onClose={() => setViewOpen(false)} />}
       </div>
     </div>
@@ -991,6 +1007,7 @@ export default function Navbar({ onHamburger, pageTitle }) {
   const showNotifications = isWorker || canViewAdminNotifications;
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [draftListOpen, setDraftListOpen] = useState(false);
   const [selectedDraft, setSelectedDraft] = useState(null);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -1005,6 +1022,7 @@ export default function Navbar({ onHamburger, pageTitle }) {
   });
   const langRef = useRef();
   const userRef = useRef();
+  const mobileSearchInputRef = useRef();
   useOutside(langRef, () => setLangOpen(false));
   useOutside(userRef, () => setUserOpen(false));
   const location = useLocation();
@@ -1130,7 +1148,25 @@ export default function Navbar({ onHamburger, pageTitle }) {
 
   useEffect(() => {
     setSearch("");
+    setMobileSearchOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!mobileSearchOpen) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") setMobileSearchOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [mobileSearchOpen]);
+
+  useEffect(() => {
+    if (!mobileSearchOpen) return;
+    const frame = window.requestAnimationFrame(() => {
+      mobileSearchInputRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [mobileSearchOpen]);
 
   const toggleEmergencyAlarmMuted = () => {
     setEmergencyAlarmMuted((prev) => {
@@ -1146,6 +1182,23 @@ export default function Navbar({ onHamburger, pageTitle }) {
 
   const canUseGlobalSearch = isAdmin || isFinance;
 
+  const searchPlaceholder = canUseGlobalSearch
+    ? t(
+        "globalSearch.placeholder",
+        "Search by name, phone, or bill number...",
+      )
+    : t("navbar.searchPlaceholder");
+
+  const closeMobileSearch = () => setMobileSearchOpen(false);
+
+  const openMobileSearch = () => {
+    setMobileSearchOpen(true);
+    setNotifOpen(false);
+    setLangOpen(false);
+    setUserOpen(false);
+    setDraftListOpen(false);
+  };
+
   const submitTopbarSearch = () => {
     const term = search.trim();
     if (!term) return;
@@ -1157,6 +1210,7 @@ export default function Navbar({ onHamburger, pageTitle }) {
     }
 
     setSearch("");
+    closeMobileSearch();
   };
 
   const onSearch = (e) => {
@@ -1193,18 +1247,11 @@ export default function Navbar({ onHamburger, pageTitle }) {
 
         {(isAdmin || isFinance || isWorker) && <MonthSelector />}
 
-        <div className="nav-search">
+        <div className="nav-search nav-search--desktop">
           <LuSearch size={14} className="ns-ico" />
           <input
             type="text"
-            placeholder={
-              canUseGlobalSearch
-                ? t(
-                    "globalSearch.placeholder",
-                    "Search by name, phone, or bill number...",
-                  )
-                : t("navbar.searchPlaceholder")
-            }
+            placeholder={searchPlaceholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={onSearch}
@@ -1221,28 +1268,86 @@ export default function Navbar({ onHamburger, pageTitle }) {
           </button>
         </div>
 
+        <button
+          type="button"
+          className="nav-btn nav-search-mobile-btn"
+          onClick={openMobileSearch}
+          aria-label={t("common.search", "Search")}
+          title={t("common.search", "Search")}
+        >
+          <LuSearch size={17} />
+        </button>
+
+        {mobileSearchOpen ? (
+          <>
+            <button
+              type="button"
+              className="nav-search-backdrop"
+              onClick={closeMobileSearch}
+              aria-label={t("common.close", "Close")}
+            />
+            <div
+              className="nav-search-panel"
+              role="search"
+              aria-label={t("common.search", "Search")}
+            >
+              <div className="nav-search-panel__inner">
+                <div className="nav-search nav-search--mobile">
+                  <LuSearch size={15} className="ns-ico" />
+                  <input
+                    ref={mobileSearchInputRef}
+                    type="search"
+                    enterKeyHint="search"
+                    placeholder={searchPlaceholder}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    onKeyDown={onSearch}
+                  />
+                  <button
+                    type="button"
+                    className="ns-go"
+                    onClick={submitTopbarSearch}
+                    disabled={!search.trim()}
+                    aria-label={t("common.search", "Search")}
+                    title={t("common.search", "Search")}
+                  >
+                    <LuArrowRight size={14} />
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  className="nav-search-panel__close"
+                  onClick={closeMobileSearch}
+                  aria-label={t("common.close", "Close")}
+                >
+                  <LuX size={16} />
+                </button>
+              </div>
+            </div>
+          </>
+        ) : null}
+
         {canManageOrders && (
           <button
             type="button"
-            className="nav-btn"
+            className="nav-btn nav-drafts-btn"
             onClick={() => {
               setDraftListOpen(true);
               setNotifOpen(false);
               setLangOpen(false);
               setUserOpen(false);
+              setMobileSearchOpen(false);
             }}
             disabled={isDraftsLoading}
             title={t("orders.drafts", "Drafts")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              paddingInline: 10,
-              minWidth: 86,
-            }}
+            aria-label={t("orders.drafts", "Drafts")}
           >
-            <LuFileText size={16} />
-            <span className="nbl">{drafts.length}</span>
+            <LuFileText size={15} />
+            {drafts.length > 0 ? (
+              <span className="nav-drafts-btn__count">
+                {drafts.length > 99 ? "99+" : drafts.length}
+              </span>
+            ) : null}
           </button>
         )}
 

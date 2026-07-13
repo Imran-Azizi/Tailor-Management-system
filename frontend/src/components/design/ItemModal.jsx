@@ -78,7 +78,7 @@ export default function ItemModal({
     }
 
     onSave({
-      type: category.key,
+      categoryId: category.id,
       name,
       brand,
       code,
