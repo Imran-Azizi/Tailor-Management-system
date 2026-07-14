@@ -35,7 +35,6 @@ import {
 } from "../lib/orderType.js";
 import {
   PageHeader,
-  Spinner,
   Badge,
   Modal,
   Pagination,
@@ -45,6 +44,7 @@ import {
   ConfirmDeleteModal,
 } from "../components/ui/index.jsx";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
+import { TableSkeleton, StatCardsSkeleton } from "../components/ui/Skeleton.jsx";
 import OrderCreatorBadge from "../components/order/OrderCreatorBadge.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
@@ -626,7 +626,10 @@ function OrderViewModal({ orderId, open, onClose }) {
       bodyClassName="order-details-modal-body"
     >
       {isLoading ? (
-        <Spinner />
+        <div style={{ padding: 16 }}>
+          <StatCardsSkeleton count={3} />
+          <TableSkeleton rows={6} cols={4} compact />
+        </div>
       ) : data == null ? (
         <EmptyState message={t("orders.orderNotFound", "Order not found")} />
       ) : (
@@ -1710,7 +1713,9 @@ export default function AllOrders({ filter, mode = "orders" }) {
 
       <Card noPad>
         {isLoading ? (
-          <Spinner />
+          <div style={{ padding: 16 }}>
+            <TableSkeleton rows={8} cols={6} />
+          </div>
         ) : (
           <>
             <div className="all-orders-desktop">

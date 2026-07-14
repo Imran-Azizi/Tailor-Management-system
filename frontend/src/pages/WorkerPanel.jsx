@@ -38,6 +38,8 @@ import {
 } from "../lib/orderCompletionStatus.js";
 
 import { useAuth } from "../context/AuthContext.jsx";
+import { visiblePollInterval } from "../lib/queryPoll.js";
+import { TableSkeleton } from "../components/ui/Skeleton.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
 import { useWorkerPanel } from "../context/WorkerPanelContext.jsx";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
@@ -1478,14 +1480,15 @@ export default function WorkerPanel() {
       api
         .get("/orders", {
           params: {
-            limit: 200,
+            limit: 100,
             month: viewMonth,
             year: viewYear,
           },
         })
         .then((r) => r.data),
     enabled: Boolean(user?.id && user?.accountType),
-    refetchInterval: 30000,
+    staleTime: 20_000,
+    refetchInterval: visiblePollInterval(60_000),
   });
 
   const orders = Array.isArray(orderPayload)
@@ -1498,11 +1501,12 @@ export default function WorkerPanel() {
       queryFn: () =>
         api
           .get("/damaged-clothes/my-penalties", {
-            params: { page: 1, limit: 100 },
+            params: { page: 1, limit: 50 },
           })
           .then((r) => r.data),
       enabled: Boolean(user?.id),
-      refetchInterval: 30000,
+      staleTime: 30_000,
+      refetchInterval: visiblePollInterval(90_000),
     });
 
   const receiveMut = useMutation({

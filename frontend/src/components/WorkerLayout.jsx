@@ -23,6 +23,7 @@ import { usePwa } from "../context/PwaContext.jsx";
 import toast from "react-hot-toast";
 import { useTheme } from "../context/ThemeContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
+import { visiblePollInterval } from "../lib/queryPoll.js";
 import { WorkerPanelProvider, useWorkerPanel } from "../context/WorkerPanelContext.jsx";
 import WorkerSidebar from "./WorkerSidebar.jsx";
 import api from "../lib/api.js";
@@ -222,7 +223,8 @@ function WorkerNotifDrawer({ open, roleColor, onClose }) {
         .get("/users/me/notifications", { params: { unread: true } })
         .then((r) => r.data),
     enabled: Boolean(user?.id && user?.accountType) && open,
-    refetchInterval: open ? 20_000 : false,
+    staleTime: 20_000,
+    refetchInterval: open ? visiblePollInterval(45_000) : false,
   });
 
   const notifs = Array.isArray(notifsRaw) ? notifsRaw : [];
@@ -501,7 +503,8 @@ function WorkerLayoutInner() {
         .get("/users/me/notifications", { params: { unread: true } })
         .then((r) => r.data),
     enabled: Boolean(user?.id && user?.accountType),
-    refetchInterval: 30_000,
+    staleTime: 30_000,
+    refetchInterval: visiblePollInterval(60_000),
   });
 
   const unreadNotifs = Array.isArray(unreadNotifsRaw) ? unreadNotifsRaw : [];

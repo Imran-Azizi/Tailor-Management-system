@@ -116,8 +116,12 @@ export function AuthProvider({ children }) {
       return data.user;
     }
     setUser(data.user);
+    // Warm server-state cache so dashboard opens with less cold-start wait
+    if (data.user?.id) {
+      queryClient.setQueryData(["auth", "me"], data.user);
+    }
     return data.user;
-  }, [syncUserHost]);
+  }, [queryClient, syncUserHost]);
 
   const logout = useCallback(async () => {
     try {

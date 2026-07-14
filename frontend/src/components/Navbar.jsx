@@ -34,6 +34,7 @@ import { useTheme } from "../context/ThemeContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
 import api from "../lib/api.js";
+import { visiblePollInterval } from "../lib/queryPoll.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import {
   formatSystemNotificationMessage,
@@ -1037,7 +1038,8 @@ export default function Navbar({ onHamburger, pageTitle }) {
           params: { unread: true, month: viewMonth, year: viewYear },
         })
         .then((r) => r.data),
-    refetchInterval: 60_000,
+    staleTime: 45_000,
+    refetchInterval: visiblePollInterval(90_000),
     enabled: canViewAdminNotifications,
   });
 
@@ -1050,7 +1052,8 @@ export default function Navbar({ onHamburger, pageTitle }) {
           params: { unread: true, month: viewMonth, year: viewYear },
         })
         .then((r) => r.data),
-    refetchInterval: 30_000,
+    staleTime: 45_000,
+    refetchInterval: visiblePollInterval(60_000),
     enabled: isAdmin,
   });
 
@@ -1063,7 +1066,8 @@ export default function Navbar({ onHamburger, pageTitle }) {
           params: { unread: true, month: viewMonth, year: viewYear },
         })
         .then((r) => r.data),
-    refetchInterval: 30_000,
+    staleTime: 45_000,
+    refetchInterval: visiblePollInterval(60_000),
     enabled: !!isWorker,
   });
 

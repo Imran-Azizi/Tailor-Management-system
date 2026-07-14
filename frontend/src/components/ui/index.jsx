@@ -537,3 +537,14 @@ export const ProgBar = ({ value, max }) => {
     </div>
   );
 };
+
+export {
+  PageSkeleton,
+  DashboardSkeleton,
+  TableSkeleton,
+  StatCardsSkeleton,
+  CardSkeleton,
+  FormSkeleton,
+  ListSkeleton,
+  SkeletonPulse,
+} from "./Skeleton.jsx";

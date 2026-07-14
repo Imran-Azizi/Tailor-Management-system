@@ -98,6 +98,10 @@ export default defineConfig(({ mode }) => {
       target: "es2020",
       cssCodeSplit: true,
       reportCompressedSize: false,
+      chunkSizeWarningLimit: 900,
+      modulePreload: {
+        polyfill: true,
+      },
       rollupOptions: {
         output: {
           manualChunks(id) {
@@ -130,8 +134,11 @@ export default defineConfig(({ mode }) => {
             if (id.includes("react-select")) {
               return "vendor-select";
             }
-            if (id.includes("react-hot-toast") || id.includes("react-icons")) {
-              return "vendor-ui";
+            if (id.includes("react-hot-toast")) {
+              return "vendor-toast";
+            }
+            if (id.includes("react-icons")) {
+              return "vendor-icons";
             }
 
             return "vendor-misc";

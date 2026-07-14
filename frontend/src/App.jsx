@@ -13,6 +13,8 @@ import {
 import { useAuth } from "./context/AuthContext.jsx";
 import ScrollToTop from "./components/ScrollToTop.jsx";
 import SystemHorizontalScrollbars from "./components/SystemHorizontalScrollbars.jsx";
+import NavigationProgress from "./components/navigation/NavigationProgress.jsx";
+import RouteSuspenseFallback from "./components/navigation/RouteSuspenseFallback.jsx";
 import { PERMISSIONS } from "./lib/permissions.js";
 import { getPostLoginPath } from "./lib/authRedirect.js";
 import AccessDenied from "./pages/AccessDenied.jsx";
@@ -93,7 +95,8 @@ export default function App() {
           >
             <ScrollToTop />
             <SystemHorizontalScrollbars />
-            <Suspense fallback={null}>
+            <NavigationProgress />
+            <Suspense fallback={<RouteSuspenseFallback />}>
               <Routes>
                 {/* Public */}
                 <Route path="/login" element={<Login />} />

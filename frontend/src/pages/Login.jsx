@@ -297,6 +297,10 @@ export default function Login() {
               <img
                 src={assetUrl(tenantBrand.logoUrl)}
                 alt={tenantBrand.systemName || tenantBrand.businessName || "Tenant logo"}
+                width={64}
+                height={64}
+                decoding="async"
+                fetchPriority="high"
                 style={{ width: "100%", height: "100%", objectFit: "contain", background: "#fff" }}
               />
             ) : (

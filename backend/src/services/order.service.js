@@ -1318,7 +1318,9 @@ export const getAllOrders = async ({
   financeUserId,
   creatorUserId,
 } = {}) => {
-  const skip = (Number(page) - 1) * Number(limit);
+  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
+  const safePage = Math.max(1, Number(page) || 1);
+  const skip = (safePage - 1) * safeLimit;
   const where = {};
   const normalizedSearch = String(normalizeText(search || "") || "")
     .replace(/\s+/g, " ")
@@ -1518,7 +1520,7 @@ export const getAllOrders = async ({
       {
         where,
         skip,
-        take: Number(limit),
+        take: safeLimit,
         orderBy: [{ assignedToId: "desc" }, { createdAt: "desc" }],
       },
       ORDER_LIST_INCLUDE_BASE,
@@ -1637,8 +1639,8 @@ export const getAllOrders = async ({
     data: enrichedData,
     total,
     summary,
-    page: Number(page),
-    limit: Number(limit),
+    page: safePage,
+    limit: safeLimit,
   };
 };
 

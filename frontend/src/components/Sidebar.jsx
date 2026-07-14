@@ -19,6 +19,7 @@ import {
   getSidebarFooterItems,
   getSidebarSections,
 } from "./sidebar/sidebarConfig.js";
+import { visiblePollInterval } from "../lib/queryPoll.js";
 
 function getDropdownKeys(sections) {
   return new Set(
@@ -225,7 +226,8 @@ export default function Sidebar({ collapsed, onToggle, open, onNavigate }) {
         })
         .then((r) => r.data),
     enabled: Boolean(user?.id) && hasPermission(PERMISSIONS.ORDERS_VIEW),
-    refetchInterval: 30_000,
+    staleTime: 60_000,
+    refetchInterval: visiblePollInterval(90_000),
   });
 
   const pendingCount =

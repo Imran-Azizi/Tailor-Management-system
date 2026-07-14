@@ -1063,8 +1063,6 @@ export const LOCALE_PATCHES = {
       title: "Completed Worker Orders",
       subtitle:
         "Review finished worker orders and register payment for each completion.",
-      rolloverHint:
-        "Unsettled worker orders from previous months remain visible until payment is completed.",
       tableTitle: "Completed Worker Orders",
       paid: "Paid to worker",
       unpaid: "Unpaid",
@@ -1921,8 +1919,6 @@ export const LOCALE_PATCHES = {
       title: "سفارش‌های تکمیل‌شده کارگران",
       subtitle:
         "سفارش‌های تکمیل‌شدهٔ کارمندان را بررسی کنید و پرداخت هر مورد را ثبت نمایید.",
-      rolloverHint:
-        "سفارش‌های تسویه‌نشده ماه‌های قبل تا زمان پرداخت کامل در این فهرست باقی می‌مانند.",
       tableTitle: "سفارش‌های تکمیل‌شده کارگران",
       paid: "پرداخت‌شده به کارگر",
       unpaid: "پرداخت‌نشده",
@@ -3088,8 +3084,6 @@ export const LOCALE_PATCHES = {
       title: "د کارکوونکو بشپړ شوي فرمایشونه",
       subtitle:
         "د کارکوونکو بشپړ شوي فرمایشونه وڅېړئ او د هر بشپړ شوي کار پیسې ثبت کړئ.",
-      rolloverHint:
-        "د تیرو میاشتوو نه تسویه شوي فرمایشونه تر بشپړې تادیې پورې په دې لست کې پاتې کیږي.",
       tableTitle: "د کارکوونکو بشپړ شوي فرمایشونه",
       paid: "کارکوونکي ته ورکړل شو",
       unpaid: "نه ورکړل شوی",

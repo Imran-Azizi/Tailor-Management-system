@@ -20,6 +20,7 @@ import {
 } from "react-icons/lu";
 import api from "../lib/api.js";
 import { formatCurrency } from "../lib/currency.js";
+import { visiblePollInterval } from "../lib/queryPoll.js";
 import {
   formatSystemDate,
   isRtlLanguage,
@@ -163,11 +164,12 @@ export default function WorkerDashboard() {
     queryFn: () =>
       api
         .get("/orders", {
-          params: { limit: 200, month: viewMonth, year: viewYear },
+          params: { limit: 100, month: viewMonth, year: viewYear },
         })
         .then((r) => r.data),
     enabled: Boolean(user?.id && user?.accountType),
-    refetchInterval: 30000,
+    staleTime: 20_000,
+    refetchInterval: visiblePollInterval(60_000),
   });
 
   const orders = Array.isArray(orderPayload)
@@ -188,7 +190,8 @@ export default function WorkerDashboard() {
         })
         .then((r) => r.data),
     enabled: Boolean(user?.id && user?.accountType),
-    refetchInterval: 15000,
+    staleTime: 15_000,
+    refetchInterval: visiblePollInterval(45_000),
     refetchOnWindowFocus: true,
   });
 
@@ -197,11 +200,12 @@ export default function WorkerDashboard() {
     queryFn: () =>
       api
         .get("/damaged-clothes/my-penalties", {
-          params: { page: 1, limit: 100 },
+          params: { page: 1, limit: 50 },
         })
         .then((r) => r.data),
     enabled: Boolean(user?.id),
-    refetchInterval: 30000,
+    staleTime: 30_000,
+    refetchInterval: visiblePollInterval(90_000),
   });
 
   const pendingAssignedOrders = useMemo(() => {

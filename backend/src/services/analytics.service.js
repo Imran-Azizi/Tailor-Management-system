@@ -13,9 +13,8 @@ import {
   addScaled,
 } from "../lib/decimal.js";
 import {
-  getOrderFinancialPaid,
-  getOrderFinancialRemaining,
   getOrderFinancialTotal,
+  getAggregateNetTotal,
 } from "../lib/orderFinancials.js";
 import {
   buildCarryForwardPendingScope,
@@ -94,35 +93,25 @@ const computeDisplayTotalBenefit = (order, linkedDailyExpenseAmount = 0) => {
 };
 
 const computeFinancialSummary = async (where) => {
-  const rows = await prisma.order.findMany({
+  // Aggregate in SQL instead of pulling every order into Node.
+  // Matches per-order max(0, total-discount) closely for normal discounts/payments.
+  const aggregate = await prisma.order.aggregate({
     where,
-    select: {
+    _sum: {
       totalPrice: true,
       discount: true,
       paidAmount: true,
     },
   });
 
-  return rows.reduce(
-    (summary, order) => ({
-      revenue: addScaled(
-        summary.revenue,
-        getOrderFinancialTotal(order),
-        MONEY_SCALE,
-      ),
-      paid: addScaled(
-        summary.paid,
-        getOrderFinancialPaid(order),
-        MONEY_SCALE,
-      ),
-      remaining: addScaled(
-        summary.remaining,
-        getOrderFinancialRemaining(order),
-        MONEY_SCALE,
-      ),
-    }),
-    { revenue: 0, paid: 0, remaining: 0 },
+  const revenue = getAggregateNetTotal(aggregate);
+  const paid = Math.max(
+    0,
+    toNumberScaled(aggregate._sum?.paidAmount || 0, MONEY_SCALE),
   );
+  const remaining = Math.max(0, subScaled(revenue, paid, MONEY_SCALE));
+
+  return { revenue, paid, remaining };
 };
 
 const computeRakhtBenefitRevenue = async (where) => {
@@ -321,7 +310,14 @@ export const getDashboardStats = async ({
       take: 10,
       orderBy: { createdAt: "desc" },
       include: {
-        customer: true,
+        customer: {
+          select: {
+            id: true,
+            firstName: true,
+            billNumber: true,
+            phoneNumber: true,
+          },
+        },
         assignedTo: { select: { id: true, name: true, accountType: true } },
         qichikarAssignedTo: {
           select: { id: true, name: true, accountType: true },

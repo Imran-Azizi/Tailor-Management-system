@@ -11,6 +11,10 @@ export function normalizeText(input) {
 export function toAsciiDigits(input) {
   if (input === null || input === undefined) return input;
   let s = String(input);
+  // Fast path: already ASCII digits / no Eastern numerals
+  if (!/[\u0660-\u0669\u06F0-\u06F9\uFF10-\uFF19\u066B\u066C]/.test(s)) {
+    return s;
+  }
   s = s.replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660));
   s = s.replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06f0));
   s = s.replace(/[\uFF10-\uFF19]/g, (d) => String(d.charCodeAt(0) - 0xff10));
@@ -105,18 +109,27 @@ export function normalizeDigits(input, options = {}) {
     return normalizeFormData(input, normalizedOptions);
   }
   if (Array.isArray(input)) {
-    return input.map((item) => normalizeDigits(item, normalizedOptions));
+    // Preserve referential identity when nothing changed (common for large lists)
+    let changed = false;
+    const next = input.map((item) => {
+      const value = normalizeDigits(item, normalizedOptions);
+      if (value !== item) changed = true;
+      return value;
+    });
+    return changed ? next : input;
   }
   if (!isPlainObject(input)) return input;
 
-  return Object.fromEntries(
-    Object.entries(input).map(([key, value]) => {
-      if (shouldSkipDigitNormalization(key, normalizedOptions.skipKeys)) {
-        return [key, value];
-      }
-      return [key, normalizeDigits(value, normalizedOptions)];
-    }),
-  );
+  let changed = false;
+  const nextEntries = Object.entries(input).map(([key, value]) => {
+    if (shouldSkipDigitNormalization(key, normalizedOptions.skipKeys)) {
+      return [key, value];
+    }
+    const nextValue = normalizeDigits(value, normalizedOptions);
+    if (nextValue !== value) changed = true;
+    return [key, nextValue];
+  });
+  return changed ? Object.fromEntries(nextEntries) : input;
 }
 
 export const normalizeDigitsDeep = normalizeDigits;
