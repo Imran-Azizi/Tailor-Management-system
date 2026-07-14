@@ -24,6 +24,8 @@ const WORK_RECEIVED_PIPE_REGEX =
   /^(Worker|Qichikar|Dokht) Name:\s*(.+?)\s*\|\s*Bill Number:\s*(\d+)\s*\|\s*Order Type:\s*(.+?)\s*\|\s*Customer Name:\s*(.+?)\s*\|\s*(?:accepted|received)(?: and self-assigned)? this order\.?$/i;
 const WORK_RECEIVED_REGEX =
   /^(.+?) (?:received|accepted)(?: and self-assigned)?(?: the)? order - (.+?) - Bill #(\d+) \((.+?)\)\.?$/i;
+const WORK_DECLINED_PIPE_REGEX =
+  /^(Worker|Qichikar|Dokht) Name:\s*(.+?)\s*\|\s*Bill Number:\s*(\d+)\s*\|\s*Order Type:\s*(.+?)\s*\|\s*Customer Name:\s*(.+?)\s*\|\s*declined this order\.?$/i;
 const BOX_CAPACITY_FULL_REGEX =
   /^capacity of this box is full(?: \((.+?)\))? - (.+?) - Bill #(\d+) - (.+?)\.?$/i;
 const BOX_NOT_FOUND_REGEX =
@@ -313,6 +315,18 @@ const parseKnownUserNotification = (notification) => {
     };
   }
 
+  matched = msg.match(WORK_DECLINED_PIPE_REGEX);
+  if (matched) {
+    return {
+      kind: "WORK_DECLINED",
+      workerRole: normalizeWorkerRoleFromText(matched[1]),
+      actor: matched[2],
+      billNumber: matched[3],
+      orderType: normalizeOrderTypeFromText(matched[4]),
+      customerName: matched[5],
+    };
+  }
+
   matched = msg.match(BOX_CAPACITY_FULL_REGEX);
   if (matched) {
     return {
@@ -487,6 +501,22 @@ export function formatUserNotificationMessage(
     return buildCompactMessage(
       t("notificationMessages.workReceivedTitle", "Order received"),
       t("notificationMessages.workReceivedShort", "Worker received the order."),
+      workerLine,
+      context,
+    );
+  }
+
+  if (parsed.kind === "WORK_DECLINED") {
+    return buildCompactMessage(
+      t("notificationMessages.workDeclinedTitle", "Order declined"),
+      t(
+        "notificationMessages.workDeclinedShort",
+        "{{worker}} did not accept the order for {{customer}}.",
+        {
+          worker: parsed.actor || t("notificationMessages.workerLabel", "Worker"),
+          customer: parsed.customerName || "-",
+        },
+      ),
       workerLine,
       context,
     );

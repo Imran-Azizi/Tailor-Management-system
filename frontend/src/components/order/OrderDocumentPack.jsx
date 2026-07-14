@@ -784,7 +784,7 @@ export function CustomerBill({ customer, order, shop }) {
     <div
       lang={settings.htmlLang}
       dir={settings.dir}
-      className="print-a6-sheet print-bill-sheet print-customer-bill overflow-hidden rounded-lg border border-slate-200 bg-white shadow-md"
+      className="print-a6-sheet print-bill-sheet print-customer-bill overflow-hidden bg-white"
       style={billTypographyStyle}
     >
       <PrintBillHeader settings={settings} shop={shop} />
@@ -1145,7 +1145,7 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
     <div
       lang={settings.htmlLang}
       dir={settings.dir}
-      className="print-a6-sheet print-bill-sheet print-customer-bill print-customer-bill--combined overflow-hidden rounded-lg border border-slate-200 bg-white shadow-md"
+      className="print-a6-sheet print-bill-sheet print-customer-bill print-customer-bill--combined overflow-hidden bg-white"
       style={billTypographyStyle}
     >
       <PrintBillHeader settings={settings} shop={shop} />
@@ -1584,7 +1584,7 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
     <div
       lang={settings.htmlLang}
       dir={settings.dir}
-      className="print-a6-sheet print-bill-sheet print-shop-bill overflow-hidden rounded-lg border border-slate-200 bg-white shadow-md"
+      className="print-a6-sheet print-bill-sheet print-shop-bill overflow-hidden bg-white"
       style={billTypographyStyle}
     >
       <PrintBillHeader settings={settings} shop={shop} />
@@ -1769,27 +1769,30 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
   );
 }
 export function printElement(id, options = {}) {
-  const element = document.getElementById(id);
-  if (!element) return false;
+  const wrapper = document.getElementById(id);
+  if (!wrapper) return false;
+
+  const billEl = wrapper.querySelector(".print-a6-sheet") || wrapper;
 
   const printWindow = window.open("", "_blank", "width=800,height=1000");
   if (!printWindow) return false;
 
   const dir =
     options.dir ||
-    element.getAttribute("dir") ||
+    billEl.getAttribute("dir") ||
+    wrapper.getAttribute("dir") ||
     document.documentElement.getAttribute("dir") ||
     "ltr";
 
   const lang =
     options.lang ||
-    element.getAttribute("lang") ||
+    billEl.getAttribute("lang") ||
+    wrapper.getAttribute("lang") ||
     document.documentElement.getAttribute("lang") ||
     "en";
 
   const title = options.title || "Order Document";
-  const includeWrapper = options.includeWrapper !== false;
-  const printMarkup = includeWrapper ? element.outerHTML : element.innerHTML;
+  const printMarkup = billEl.outerHTML;
   const isRtl = dir === "rtl";
   const bodyFont = isRtl
     ? "'Noto Naskh Arabic','Noto Sans Arabic','Inter',sans-serif"
@@ -1832,7 +1835,7 @@ export function printElement(id, options = {}) {
   const baseHref = options.baseHref || `${window.location.origin}/`;
 
   printWindow.document.write(`
-    <html lang="${lang}" dir="${dir}">
+    <html lang="${lang}" dir="${dir}" class="print-bill-popup">
       <head>
         <meta charset="UTF-8" />
         <base href="${baseHref}" />
@@ -1845,243 +1848,61 @@ export function printElement(id, options = {}) {
         <style>${serializedCss}</style>
         <style>
           *{box-sizing:border-box}
-          @page{size:A6 portrait;margin:0}
-          html{width:105mm;height:148mm;margin:0}
-          body{
-            margin:0;
-            font-family:${bodyFont};
-            line-height:1.4;
-            background:#fff;
-            width:105mm;
-            height:148mm;
-            min-height:148mm;
-            max-height:148mm;
-            padding:1.5mm;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            color:#1e293b;
-            direction:${dir};
-            text-align:${isRtl ? "right" : "left"};
-            -webkit-print-color-adjust:exact;
-            print-color-adjust:exact;
-            text-rendering:optimizeLegibility;
-            overflow:hidden;
-            box-sizing:border-box;
+          @page{size:105mm 148mm;margin:0}
+          @page bill-a6{size:105mm 148mm;margin:0}
+          html.print-bill-popup,html.print-bill-popup body{
+            margin:0;padding:0;width:105mm;height:148mm;min-height:148mm;max-height:148mm;
+            overflow:hidden;background:#fff;
+            -webkit-print-color-adjust:exact;print-color-adjust:exact;
           }
-          .print-a6-sheet,.print-bill-sheet{
-            --bill-primary:#D97706;
-            --bill-primary-dark:#B45309;
-            --bill-primary-darker:#92400E;
-            --bill-primary-light:#FFF7ED;
-            --bill-primary-muted:#FFEDD5;
-            --bill-border:#E2E8F0;
-            --bill-border-strong:#CBD5E1;
-            --bill-text:#1E293B;
-            --bill-table-head:#FFFBEB;
-            --bill-surface:#FFFFFF;
-            --bill-surface-alt:#F8FAFC;
-            width:100%;
-            max-width:102mm;
-            margin:0 auto;
-            flex-shrink:0;
-            box-sizing:border-box;
-            transform:scale(var(--print-a6-scale,1));
-            transform-origin:center center;
-            page-break-inside:avoid;
-            break-inside:avoid;
+          html.print-bill-popup body{
+            display:flex;align-items:flex-start;justify-content:center;
+            font-family:${bodyFont};line-height:1.4;color:#1e293b;
+            direction:${dir};text-align:${isRtl ? "right" : "left"};
+            padding:0.5mm;box-sizing:border-box;
           }
-          .print-bill-header{
-            background:linear-gradient(180deg,#FFF7ED 0%,#fff 72%) !important;
-            border-bottom:2px solid #D97706 !important;
-            padding:6px 8px !important;
+          .print-a6-sheet{
+            position:relative;
+            page:bill-a6;width:104mm;max-width:104mm;min-height:147mm;
+            margin:0;padding:0;border:none;border-radius:0;box-shadow:none;
+            display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;
+            transform:scale(var(--print-a6-scale,1));transform-origin:top center;
+            page-break-inside:avoid;break-inside:avoid;
+            -webkit-print-color-adjust:exact;print-color-adjust:exact;
           }
-          .print-bill-header::before{
-            content:"";
-            position:absolute;
-            top:0;
-            left:0;
-            right:0;
-            height:3px;
-            background:linear-gradient(90deg,#B45309,#D97706,#B45309);
+          .print-a6-sheet::after{
+            content:"";position:absolute;inset:0;
+            border:0.8mm solid #B45309;border-radius:inherit;
+            pointer-events:none;z-index:40;box-sizing:border-box;
+            -webkit-print-color-adjust:exact;print-color-adjust:exact;
           }
-          .print-bill-header-name{color:#92400E !important}
-          .print-bill-header-badge{background:#D97706 !important;color:#fff !important}
-          .print-bill-section-head{
-            background:#FFF7ED !important;
-            color:#92400E !important;
-            border-color:#FFEDD5 !important;
+          .print-a6-sheet.print-customer-bill > :not(.print-bill-header):not(.print-bill-footer),
+          .print-a6-sheet.print-shop-bill > :not(.print-bill-header):not(.print-bill-footer){
+            padding-inline:2.5mm;box-sizing:border-box;
           }
-          .print-a6-sheet .border-slate-800{border-color:#CBD5E1 !important}
-          .print-bill-header .print-shop-meta{line-height:1.3}
-          .print-a6-sheet table th,.print-a6-sheet table td{vertical-align:top}
-          .print-tailor-detail-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:0}
-          .print-tailor-detail-grid--split{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-          .print-tailor-detail-grid--split .print-tailor-ledger-table:first-child{border-inline-end:1px solid #CBD5E1!important}
-          .print-tailor-ledger-cell{vertical-align:top}
-          .print-tailor-ledger-text{display:block;max-width:100%;overflow:visible;white-space:normal;overflow-wrap:anywhere;word-break:break-word;text-overflow:clip}
-          .print-tailor-ledger-headcell--style,.print-tailor-ledger-cell--style-label{border-inline-start:2px solid #CBD5E1}
-          .print-tailor-ledger-note-row{height:auto}
-          .print-tailor-ledger-note-cell{padding:0!important;border-inline-end:0!important;vertical-align:top}
-          .print-tailor-ledger-note-standalone{overflow:hidden;border-inline-start:1px solid #CBD5E1;border-inline-end:1px solid #CBD5E1;border-bottom:1px solid #CBD5E1}
-          .print-tailor-ledger-note-standalone:last-child{border-bottom:0}
-          .print-tailor-ledger-note-box{min-height:28px;padding:3px 4px;background:#f8fafc}
-          .print-ready-made-design-note .print-tailor-ledger-note-box{min-height:36px;padding:5px 6px}
-          .print-tailor-ledger-note-label{margin-bottom:2px;font-size:7px;font-weight:800;line-height:1.25;color:#64748b}
-          .print-tailor-ledger-note-text{display:block;max-width:100%;font-size:8px;font-weight:700;line-height:1.3;color:#1e293b;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}
-          .print-ready-made-design-note .print-tailor-ledger-note-text{font-size:8.7px;line-height:1.4}
-          .print-bill-table-wrap,.print-customer-combined-wrap,.print-tailor-ledger-wrap{
-            overflow:hidden !important;
-            overflow-x:hidden !important;
-            overflow-y:hidden !important;
-            max-width:100%;
-            scrollbar-width:none !important;
-            -ms-overflow-style:none !important;
-            padding-bottom:0 !important;
-          }
-          .print-bill-table-wrap::-webkit-scrollbar,
-          .print-customer-combined-wrap::-webkit-scrollbar,
-          .print-tailor-ledger-wrap::-webkit-scrollbar{display:none;width:0!important;height:0!important}
-          .print-bill-number{display:inline-block;font-size:9.5px;font-weight:800;color:#92400E;letter-spacing:.02em}
-          .print-bill-th{font-size:8px;font-weight:800;color:#64748B;line-height:1.25}
-          .print-bill-th--upper{text-transform:uppercase;letter-spacing:.05em}
-          .print-bill-kv-strip{background:linear-gradient(180deg,#FFFBEB 0%,#fff 100%)}
-          .print-bill-kv-value{font-weight:700;color:#1e293b;line-height:1.3}
-          .print-bill-kv-value--qty{color:#92400E;font-weight:800}
-          .print-tailor-fabric-grid{display:grid}
-          .print-bill-closing-table tbody tr:last-child td,.print-bill-closing-section .print-tailor-fabric-grid > div:last-child{border-bottom:0!important}
-          .print-customer-combined-table th,.print-customer-combined-table td{max-width:100%;overflow-wrap:anywhere;word-break:break-word}
-          .print-customer-finance-table thead,.print-customer-finance-table th{background:#FFFBEB;color:#1e293b}
-          .print-reference-detail-table thead,.print-reference-detail-table th{background:#FFFBEB !important}
-          .print-customer-amount{display:inline-flex;align-items:center;justify-content:center;max-width:100%;min-width:0;padding:2px 5px;border-radius:4px;background:#f8fafc;box-shadow:inset 0 0 0 1px rgba(217,119,6,.12);line-height:1.35;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
-          .print-customer-amount--final{background:#FFF7ED;box-shadow:inset 0 0 0 1px rgba(217,119,6,.2)}
-          .print-customer-combined-table{min-width:0!important;width:100%;background:#fff;font-size:7.4px}
-          .print-customer-combined-table tbody tr:nth-child(even){background:#fafafa}
-          .print-a6-sheet[dir="rtl"] .border-r{border-right-width:0;border-inline-end-width:1px}
-          .print-a6-sheet[dir="rtl"] .border-r-2{border-right-width:0;border-inline-end-width:2px}
-          .print-a6-sheet[dir="rtl"]{
-            text-align:right;
-            letter-spacing:normal;
-            word-spacing:normal;
-            font-feature-settings:"rlig" 1,"liga" 1,"calt" 1;
-          }
-          .print-a6-sheet[dir="rtl"] .print-bill-header-name,
-          .print-a6-sheet[dir="rtl"] .print-bill-header-meta,
-          .print-a6-sheet[dir="rtl"] .print-bill-section-head,
-          .print-a6-sheet[dir="rtl"] .print-customer-combined-table th,
-          .print-a6-sheet[dir="rtl"] .print-customer-combined-table td,
-          .print-a6-sheet[dir="rtl"] .print-customer-finance-table th,
-          .print-a6-sheet[dir="rtl"] .print-customer-finance-table td,
-          .print-a6-sheet[dir="rtl"] .print-tailor-ledger-headcell,
-          .print-a6-sheet[dir="rtl"] .print-tailor-ledger-cell,
-          .print-a6-sheet[dir="rtl"] .print-tailor-ledger-note-text{
-            direction:rtl;
-            text-align:right;
-          }
-          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-body{
-            display:flex !important;
-            justify-content:flex-end !important;
-            direction:ltr !important;
-            align-items:stretch !important;
-          }
-          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-brand{
-            display:flex !important;
-            direction:rtl !important;
-            align-items:center !important;
-            align-self:stretch !important;
-            justify-self:end !important;
-            width:100% !important;
-            max-width:100% !important;
-            gap:10px !important;
-          }
-          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-shop{
-            flex:1 1 auto !important;
-            direction:rtl !important;
-            text-align:right !important;
-            align-items:stretch !important;
-            gap:3px !important;
-            min-width:0 !important;
-          }
-          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-name,
-          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-address{
-            width:100% !important;
-            text-align:right !important;
-          }
-          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-name{
-            font-size:12px !important;
-            font-weight:800 !important;
-            line-height:1.4 !important;
-          }
-          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-address .print-bill-header-info-text{
-            font-size:8.5px !important;
-            line-height:1.5 !important;
-            -webkit-line-clamp:2 !important;
-          }
-          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-info-row{
-            display:flex !important;
-            align-items:flex-start !important;
-            gap:4px !important;
-            width:100% !important;
-          }
-          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-info-row{
-            flex-direction:row !important;
-            direction:rtl !important;
-            justify-content:flex-start !important;
-            unicode-bidi:isolate !important;
-          }
-          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-line-icon--name{
-            width:9px !important;
-            height:9px !important;
-          }
-          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-line-icon--address,
-          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-line-icon--phone{
-            width:8px !important;
-            height:8px !important;
-          }
-          .print-a6-sheet[dir="rtl"] .print-bill-header--rtl .print-bill-header-phone-item{
-            flex-direction:row-reverse !important;
-          }
-          .print-a6-sheet[dir="rtl"] .print-bill-footer--rtl .print-bill-footer-body{
-            flex-direction:row-reverse !important;
-            direction:rtl !important;
-          }
-          .print-a6-sheet[dir="rtl"] .print-bill-footer--rtl .print-bill-footer-datetime{
-            flex-direction:row-reverse !important;
-          }
-          .print-a6-sheet[dir="ltr"] .print-bill-header--ltr .print-bill-header-body{
-            display:flex !important;
-            justify-content:flex-start !important;
-            direction:ltr !important;
-          }
-          .print-a6-sheet[dir="ltr"] .print-bill-header--ltr .print-bill-header-brand{
-            width:max-content !important;
-            max-width:100% !important;
-            justify-self:start !important;
-          }
-          .print-a6-sheet[dir="ltr"] .print-bill-header--ltr .print-bill-header-shop{
-            flex:0 1 auto !important;
-          }
-          .print-a6-sheet[dir="rtl"] .print-tailor-ledger-cell--measure,
-          .print-a6-sheet[dir="rtl"] [dir="ltr"]{
-            direction:ltr;
-            unicode-bidi:embed;
-          }
-          .print-a6-sheet[dir="rtl"] .print-tailor-ledger-cell--measure{text-align:center}
+          .print-bill-footer{margin-top:auto;flex-shrink:0}
+          .print-bill-header{flex-shrink:0}
           @media print{
             *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
-            html,body{width:105mm;height:148mm;min-height:148mm;max-height:148mm}
-            body{padding:1.5mm;margin:0;display:flex;align-items:center;justify-content:center}
-            .print-a6-sheet,.print-bill-sheet{margin:0 auto;page-break-inside:avoid;break-inside:avoid}
-            .print-a6-sheet *{page-break-inside:avoid;break-inside:avoid}
+            html,body{width:105mm;height:148mm;min-height:148mm;max-height:148mm;margin:0;padding:0}
+            .print-a6-sheet{width:104mm!important;max-width:104mm!important;min-height:147mm!important}
           }
         </style>
       </head>
-      <body dir="${dir}">
+      <body dir="${dir}" class="print-bill-popup-body">
         ${printMarkup}
       </body>
     </html>
   `);
   printWindow.document.close();
+
+  const closePrintWindow = () => {
+    try {
+      printWindow.close();
+    } catch {
+      // Popup may already be closed by the user.
+    }
+  };
 
   const printNow = () => {
     try {
@@ -2090,7 +1911,7 @@ export function printElement(id, options = {}) {
       if (sheet) {
         const probe = doc.createElement("div");
         probe.style.cssText =
-          "position:absolute;visibility:hidden;pointer-events:none;width:102mm;height:145mm;inset:0";
+          "position:absolute;visibility:hidden;pointer-events:none;width:104mm;height:147mm;inset:0";
         doc.body.appendChild(probe);
         const available = probe.getBoundingClientRect();
         probe.remove();
@@ -2109,8 +1930,14 @@ export function printElement(id, options = {}) {
     } catch {
       // Measurement is best-effort; static A6 CSS remains in place.
     }
-    printWindow.print();
-    printWindow.close();
+
+    if ("onafterprint" in printWindow) {
+      printWindow.onafterprint = closePrintWindow;
+      printWindow.print();
+    } else {
+      printWindow.print();
+      setTimeout(closePrintWindow, 1200);
+    }
   };
 
   const waitForStyles = () => {
@@ -2182,7 +2009,7 @@ export function printElement(id, options = {}) {
 
 export function PrintSafeSheet({ id, children, className = "" }) {
   const baseClassName =
-    "mx-auto w-full max-w-[560px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[var(--sh-md)] dark:border-slate-700 dark:bg-slate-900 [&_.print-bill-table-wrap]:overflow-hidden print:max-w-[105mm] print:rounded-none print:border-slate-300 print:bg-white print:text-black print:shadow-none";
+    "print-bill-safe-sheet mx-auto w-full max-w-[105mm] overflow-visible rounded-xl border border-slate-200 bg-transparent shadow-[var(--sh-md)] dark:border-slate-700 dark:bg-transparent [&_.print-bill-table-wrap]:overflow-hidden print:max-w-[105mm] print:m-0 print:overflow-visible print:rounded-none print:border-0 print:bg-transparent print:shadow-none";
 
   return (
     <div
@@ -2199,22 +2026,39 @@ export async function exportPdf(id, filename) {
   try {
     const { default: jsPDF } = await import("jspdf");
     const { default: html2canvas } = await import("html2canvas");
-    const element = document.getElementById(id);
+    const wrapper = document.getElementById(id);
+    const element = wrapper?.querySelector(".print-a6-sheet") || wrapper;
     if (!element) return;
 
     const canvas = await html2canvas(element, {
       scale: 2.5,
       backgroundColor: "#ffffff",
       useCORS: true,
+      width: element.scrollWidth,
+      height: element.scrollHeight,
     });
     const pdf = new jsPDF({
       orientation: "portrait",
       unit: "mm",
       format: "a6",
     });
-    const width = pdf.internal.pageSize.getWidth();
-    const height = (canvas.height * width) / canvas.width;
-    pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, width, height);
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const renderWidth = pageWidth;
+    const renderHeight = (canvas.height * renderWidth) / canvas.width;
+    const fitScale =
+      renderHeight > pageHeight ? pageHeight / renderHeight : 1;
+    const finalWidth = renderWidth * fitScale;
+    const finalHeight = renderHeight * fitScale;
+    const offsetX = (pageWidth - finalWidth) / 2;
+    pdf.addImage(
+      canvas.toDataURL("image/png"),
+      "PNG",
+      offsetX,
+      0,
+      finalWidth,
+      finalHeight,
+    );
     pdf.save(filename);
   } catch (error) {
     toast.error(

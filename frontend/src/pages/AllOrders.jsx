@@ -20,7 +20,7 @@ import toast from "react-hot-toast";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { PERMISSIONS } from "../lib/permissions.js";
-import { parseNumberLocale, toAsciiDigits } from "../lib/normalize.js";
+import { toAsciiDigits } from "../lib/normalize.js";
 import { formatCurrency } from "../lib/currency.js";
 import {
   getOrderGrossTotal,
@@ -335,11 +335,7 @@ function AssignModal({ order, onClose, onAssigned }) {
     order.assignedToId || "",
   );
   const [note, setNote] = useState(order.assignmentNote || "");
-  const [price, setPrice] = useState(
-    order.assignmentPrice != null ? String(order.assignmentPrice) : "",
-  );
   const [saving, setSaving] = useState(false);
-  const [priceError, setPriceError] = useState("");
 
   const { data: workers = [] } = useQuery({
     queryKey: ["assignable-workers"],
@@ -366,21 +362,9 @@ function AssignModal({ order, onClose, onAssigned }) {
         return;
       }
 
-      let parsedPrice = null;
-      if (selectedUserId) {
-        parsedPrice = parseNumberLocale(price);
-        if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
-          setPriceError(t("assignment.invalidPrice"));
-          setSaving(false);
-          return;
-        }
-      }
-      setPriceError("");
-
       await api.patch(`/orders/${order.id}/assign`, {
         assignedToId: selectedUserId || null,
         assignmentNote: note || null,
-        assignmentPrice: selectedUserId ? parsedPrice : null,
       });
       toast.success(
         selectedUserId ? t("assignment.assigned") : t("assignment.unassigned"),
@@ -483,43 +467,6 @@ function AssignModal({ order, onClose, onAssigned }) {
               </option>
             ))}
           </select>
-        </div>
-        <div style={{ marginBottom: 14 }}>
-          <label
-            style={{
-              fontSize: 13,
-              fontWeight: 500,
-              color: "var(--text2)",
-              display: "block",
-              marginBottom: 5,
-            }}
-          >
-            {t("assignment.price")}
-          </label>
-          <input
-            value={price}
-            onChange={(e) => {
-              setPrice(e.target.value);
-              if (priceError) setPriceError("");
-            }}
-            placeholder={t("assignment.pricePlaceholder")}
-            inputMode="decimal"
-            style={{
-              width: "100%",
-              padding: "9px 12px",
-              border: priceError ? "1px solid var(--danger)" : "1px solid var(--border)",
-              borderRadius: 8,
-              background: "var(--surface2)",
-              color: "var(--text1)",
-              fontSize: 14,
-              boxSizing: "border-box",
-            }}
-          />
-          {priceError && (
-            <p className="err-msg" role="alert" aria-live="polite" style={{ marginTop: 4 }}>
-              {priceError}
-            </p>
-          )}
         </div>
         <div style={{ marginBottom: 18 }}>
           <label

@@ -773,7 +773,6 @@
     "failedUpdateStatus": "به‌روزرسانی وضعیت ناموفق بود",
     "orderCompletedAdminNotified": "سفارش تکمیل شد — ادمین خبر شد",
     "failedCompleteOrder": "تکمیل سفارش ناموفق بود",
-    "waitingForQichikar": "منتظر تکمیل قیچی‌کار",
     "sameRoleClaimConflict": "این سفارش توسط کارگر دیگری دریافت شده",
     "allOrders": "همه سفارش‌ها",
     "receivedOn": "دریافت شده در",

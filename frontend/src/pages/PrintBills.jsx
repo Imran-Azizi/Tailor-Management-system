@@ -347,6 +347,7 @@ export default function PrintBills() {
         fontFamily: billSettings.fontFamily,
       }}
     >
+      <div className="no-print">
       <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>
         {t("orders.printBills")}
       </h2>
@@ -689,18 +690,18 @@ export default function PrintBills() {
           </div>
         </form>
       </div>
+      </div>
 
       <div style={{ display: "none" }}>
         {customer && orders.length > 0 && (
           <div>
-            <PrintSafeSheet id="preview-customer" className="max-w-[148mm]">
+            <PrintSafeSheet id="preview-customer">
               <CustomerCombinedBill customer={customer} orders={orders} shop={shop} />
             </PrintSafeSheet>
             {orderMeta.map(({ order, index, itemLabel }) => (
               <PrintSafeSheet
                 key={order.id || `${order.type}-${index}`}
                 id={getTailorPreviewId(order, index)}
-                className="max-w-[148mm]"
               >
                 <TailorBill
                   customer={customer}

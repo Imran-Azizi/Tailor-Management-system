@@ -5878,7 +5878,7 @@ select.inp{
   body{background:white!important;color:black!important}
 }
 
-/* PRINT (A5) and in-page document preview styles */
+/* PRINT (A5 legacy — bills use @page bill-a6 in bill-print.css) */
 @page { size: A5 portrait; margin: 12mm; }
 @media print {
   .no-print{display:none!important}
@@ -6045,6 +6045,13 @@ select.inp{
   --bill-primary-muted:#FFEDD5;
   --bill-border:#E2E8F0;
   --bill-border-strong:#CBD5E1;
+  --bill-frame-border-color:#B45309;
+  --bill-frame-border-width:3px;
+  --bill-frame-border-width-print:0.8mm;
+  --bill-frame-accent:rgba(71,85,105,.18);
+  --bill-padding-x:3mm;
+  --bill-padding-y-top:0;
+  --bill-padding-y-bottom:0;
   --bill-text:#1E293B;
   --bill-text-muted:#64748B;
   --bill-surface:#FFFFFF;
@@ -6763,18 +6770,44 @@ select.inp{
   .print-tailor-ledger-note-text{font-size:8.2px;line-height:1.3}
 }
 
-/* A6 bill sheet — screen preview & print base */
+/* A6 bill sheet — screen preview base */
 .print-a6-sheet.print-customer-bill,
 .print-a6-sheet.print-shop-bill,
 .print-bill-sheet{
+  position:relative;
   width:100%;
   max-width:105mm;
+  box-sizing:border-box;
   margin-inline:auto;
   overflow:hidden;
-  border:1px solid var(--bill-border-strong) !important;
-  border-radius:6px !important;
+  padding:0;
+  border:none !important;
+  border-radius:4px !important;
   background:var(--bill-surface) !important;
   box-shadow:none !important;
+  -webkit-print-color-adjust:exact;
+  print-color-adjust:exact;
+}
+/* Guaranteed 4-side frame overlay — always visible over content */
+.print-a6-sheet.print-customer-bill::after,
+.print-a6-sheet.print-shop-bill::after,
+.print-a6-sheet.print-bill-sheet::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  border:var(--bill-frame-border-width) solid var(--bill-frame-border-color);
+  border-radius:inherit;
+  pointer-events:none;
+  z-index:40;
+  box-sizing:border-box;
+  -webkit-print-color-adjust:exact;
+  print-color-adjust:exact;
+}
+/* Body content inset — header/footer stay full width inside frame */
+.print-a6-sheet.print-customer-bill > :not(.print-bill-header):not(.print-bill-footer),
+.print-a6-sheet.print-shop-bill > :not(.print-bill-header):not(.print-bill-footer){
+  padding-inline:var(--bill-padding-x);
+  box-sizing:border-box;
 }
 @media (max-width:480px){
   .print-bill-header{
@@ -7069,40 +7102,12 @@ select.inp{
   unicode-bidi:embed;
 }
 
-/* A6 print page — centered, minimal margins, no overflow */
+/* A6 print page — see bill-print.css for full print layout */
 @page bill-a6{
-  size:A6 portrait;
+  size:105mm 148mm;
   margin:0;
 }
 @media print{
-  body:has(.print-a6-sheet){
-    width:105mm;
-    height:148mm;
-    min-height:148mm;
-    max-height:148mm;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    padding:1.5mm;
-    margin:0;
-    overflow:hidden;
-    box-sizing:border-box;
-  }
-  .print-a6-sheet,
-  .print-bill-sheet{
-    width:100%;
-    max-width:102mm;
-    margin:0 auto !important;
-    flex-shrink:0;
-    transform:scale(var(--print-a6-scale,1));
-    transform-origin:center center;
-    page-break-inside:avoid;
-    break-inside:avoid;
-  }
-  .print-a6-sheet *{
-    page-break-inside:avoid;
-    break-inside:avoid;
-  }
   .print-bill-header{
     min-height:58px;
     padding:8px 10px !important;
@@ -7206,8 +7211,8 @@ select.inp{
   .print-customer-finance-table td{padding:5px 4px !important}
   .print-customer-amount{min-width:48px;padding:1px 4px}
   .print-shop-bill .print-tailor-info-strip > div{padding:4px 6px !important}
-  .print-tailor-ledger-headcell{height:20px;font-size:7.2px;padding:2.5px 5px !important}
-  .print-tailor-ledger-cell{height:21px;padding:2.5px 5px !important}
+  .print-tailor-ledger-headcell{min-height:20px;height:auto;font-size:7.2px;padding:2.5px 5px !important}
+  .print-tailor-ledger-cell{min-height:21px;height:auto;padding:2.5px 5px !important}
   .print-tailor-fabric-grid > div{min-height:40px;padding:5px 6px !important}
 }
 
@@ -9734,6 +9739,92 @@ select.inp{
 }
 .wd-welcome__sep{opacity:.4}
 
+/* Admin-assigned pending accept/decline */
+.wd-assigned{
+  border:1px solid color-mix(in srgb,var(--border) 70%,transparent);
+  border-radius:16px;background:var(--surface);overflow:hidden;
+  box-shadow:0 1px 3px rgba(15,23,42,.04);
+}
+.wd-assigned__head{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+  padding:16px 18px;border-bottom:1px solid color-mix(in srgb,var(--border) 55%,transparent);
+  background:color-mix(in srgb,var(--surface2) 55%,var(--surface));
+}
+.wd-assigned__title-wrap{display:flex;align-items:flex-start;gap:12px;min-width:0}
+.wd-assigned__icon{
+  width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex-shrink:0;
+}
+.wd-assigned__titles{min-width:0}
+.wd-assigned__title{
+  margin:0;font-size:14px;font-weight:800;color:var(--text1);line-height:1.4;
+}
+.wd-assigned__subtitle{
+  margin:4px 0 0;font-size:12px;color:var(--text3);line-height:1.4;
+}
+.wd-assigned__count{
+  min-width:24px;height:24px;padding:0 8px;border-radius:999px;color:#fff;
+  font-size:12px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.wd-assigned__list{display:grid;gap:12px;padding:14px}
+.wd-assigned-card{
+  border:1px solid color-mix(in srgb,var(--border) 55%,transparent);
+  border-radius:14px;background:color-mix(in srgb,var(--surface2) 28%,var(--surface));
+  padding:14px;display:grid;gap:12px;
+}
+.wd-assigned-card__top{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+}
+.wd-assigned-card__identity{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.wd-assigned-card__bill{
+  font-size:15px;font-weight:850;color:var(--text1);direction:ltr;unicode-bidi:isolate;
+}
+.wd-assigned-badge{
+  display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;
+  font-size:11px;font-weight:750;line-height:1.3;white-space:nowrap;
+}
+.wd-assigned-badge--new{
+  color:var(--primary);background:color-mix(in srgb,var(--primary) 10%,var(--surface));
+  border:1px solid color-mix(in srgb,var(--primary) 24%,transparent);
+}
+.wd-assigned-badge--priority{
+  color:#be123c;background:#fff1f2;border:1px solid #fecdd3;
+}
+.wd-assigned-card__grid{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;
+}
+.wd-assigned-card__field{display:grid;gap:3px;min-width:0}
+.wd-assigned-card__label{
+  font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.03em;
+}
+.wd-assigned-card__value{
+  font-size:13px;font-weight:750;color:var(--text1);line-height:1.35;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.wd-assigned-card__note{
+  margin:0;padding:8px 10px;border-radius:10px;font-size:12px;line-height:1.45;color:var(--text2);
+  background:color-mix(in srgb,var(--surface2) 55%,var(--surface));
+  border:1px solid color-mix(in srgb,var(--border) 40%,transparent);
+}
+.wd-assigned-card__actions{display:flex;gap:8px;flex-wrap:wrap}
+.wd-assigned-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  min-height:36px;padding:8px 14px;border-radius:10px;border:1px solid transparent;
+  font-size:12.5px;font-weight:750;cursor:pointer;transition:opacity .14s ease,transform .14s ease;
+}
+.wd-assigned-btn:disabled{opacity:.65;cursor:wait}
+.wd-assigned-btn--accept{color:#fff}
+.wd-assigned-btn--accept:hover:not(:disabled){filter:brightness(.96);transform:translateY(-1px)}
+.wd-assigned-btn--decline{
+  color:#be123c;background:color-mix(in srgb,#fff1f2 80%,var(--surface));
+  border-color:#fecdd3;
+}
+.wd-assigned-btn--decline:hover:not(:disabled){background:#ffe4e6}
+
+[dir="rtl"] .wd-assigned__title,
+[dir="rtl"] .wd-assigned-card__label{letter-spacing:0;text-transform:none}
+[dir="rtl"] .wd-assigned-btn{flex-direction:row-reverse}
+
 .wd-stats{display:grid;gap:18px}
 .wd-stats__primary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
 .wd-stats__secondary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
@@ -9774,6 +9865,20 @@ select.inp{
 .wd-stat-card--warning .wd-stat-card__value{color:#b45309}
 .wd-stat-card--danger .wd-stat-card__value{color:#be123c}
 .wd-stat-card--orders .wd-stat-card__value{color:var(--text1)}
+
+@media (max-width:900px){
+  .wd-assigned-card__grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:640px){
+  .wd-assigned__head{padding:14px}
+  .wd-assigned__list{padding:12px}
+  .wd-assigned-card__grid{grid-template-columns:1fr 1fr}
+  .wd-assigned-card__actions{flex-direction:column}
+  .wd-assigned-btn{width:100%}
+}
+@media (max-width:480px){
+  .wd-assigned-card__grid{grid-template-columns:1fr}
+}
 
 .wd-activity{
   border-radius:14px;border:1px solid var(--border);background:var(--surface);overflow:hidden;

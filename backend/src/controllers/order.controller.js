@@ -21,8 +21,6 @@ import {
 const WORKER_ACCOUNT_TYPES = ["QICHIKAR", "DOKHT"];
 const SAME_ROLE_CLAIM_CONFLICT_MESSAGE =
   "this order already receive by someone else try another";
-const QICHIKAR_NOT_COMPLETED_MESSAGE =
-  "This order cannot be received yet. Waiting for the Qichikar (cutting) worker to complete their work first.";
 const COMPLETED_REASSIGN_BLOCK_MESSAGE =
   "This order completed, you can not assign it again";
 
@@ -115,11 +113,6 @@ const getRoleOrderValues = (order, accountType) => {
 
 function canWorkerSeeLookupOrder(order, user) {
   if (order.isCompleted) return false;
-
-  // Dokht can only see orders after Qichikar has completed their part.
-  if (user?.accountType === "DOKHT" && !order.qichikarCompletedAt) {
-    return false;
-  }
 
   const roleValues = getRoleOrderValues(order, user?.accountType);
 
@@ -302,18 +295,6 @@ export const lookup = async (req, res, next) => {
         return res
           .status(409)
           .json({ error: SAME_ROLE_CLAIM_CONFLICT_MESSAGE });
-      }
-
-      // Dokht-specific: Qichikar hasn't finished yet.
-      if (user?.accountType === "DOKHT") {
-        const qichikarPending = (result.orders || []).some(
-          (order) => !order.isCompleted && !order.qichikarCompletedAt,
-        );
-        if (qichikarPending) {
-          return res
-            .status(409)
-            .json({ error: QICHIKAR_NOT_COMPLETED_MESSAGE });
-        }
       }
 
       return res.status(404).json({
@@ -815,11 +796,6 @@ export const markReceived = async (req, res, next) => {
       if (!order) return { kind: "NOT_FOUND" };
       if (order.isCompleted) return { kind: "COMPLETED" };
 
-      // Sequential rule: Dokht can only receive after Qichikar completes.
-      if (user.accountType === "DOKHT" && !order.qichikarCompletedAt) {
-        return { kind: "QICHIKAR_NOT_COMPLETED" };
-      }
-
       const roleAssignedToId =
         order[roleKeys.assignedToId] ??
         (order.assignedTo?.accountType === user.accountType
@@ -934,9 +910,6 @@ export const markReceived = async (req, res, next) => {
         .status(400)
         .json({ error: "Completed orders cannot be received." });
     }
-    if (claim.kind === "QICHIKAR_NOT_COMPLETED") {
-      return res.status(409).json({ error: QICHIKAR_NOT_COMPLETED_MESSAGE });
-    }
     if (
       claim.kind === "SAME_ROLE_CONFLICT" ||
       claim.kind === "CONCURRENT_CONFLICT"
@@ -977,6 +950,141 @@ export const markReceived = async (req, res, next) => {
         ),
       );
     }
+
+    res.json(updated);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** PATCH /api/orders/:id/decline - Worker declines an admin assignment */
+export const declineAssignment = async (req, res, next) => {
+  try {
+    const user = req.user;
+    const orderId = req.params.id;
+    const roleKeys = getRoleFieldKeys(user.accountType);
+
+    if (!roleKeys) {
+      return res.status(400).json({ error: "Invalid worker role." });
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        customer: { select: { firstName: true, billNumber: true } },
+        assignedTo: { select: { id: true, name: true, accountType: true } },
+        receivedBy: { select: { id: true, name: true, accountType: true } },
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: "Order not found." });
+    }
+
+    if (order.isCompleted) {
+      return res
+        .status(400)
+        .json({ error: "Completed orders cannot be declined." });
+    }
+
+    const roleValues = getRoleOrderValues(order, user.accountType);
+
+    if (roleValues.assignedToId !== user.id) {
+      return res.status(403).json({
+        error: "You can only decline orders assigned to you.",
+      });
+    }
+
+    if (roleValues.receivedById) {
+      return res.status(400).json({
+        error: "Cannot decline an order that was already accepted.",
+      });
+    }
+
+    const clearLegacyAssignment = order.assignedToId === user.id;
+    const clearLegacyReceived = order.receivedById === user.id;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.order.update({
+        where: { id: orderId },
+        data: {
+          [roleKeys.assignedToId]: null,
+          [roleKeys.assignedAt]: null,
+          [roleKeys.receivedById]: null,
+          [roleKeys.receivedAt]: null,
+          [roleKeys.inProgress]: false,
+          ...(clearLegacyAssignment
+            ? {
+                assignedToId: null,
+                assignedById: null,
+                assignedAt: null,
+                assignmentNote: null,
+                assignmentPrice: null,
+              }
+            : {}),
+          ...(clearLegacyReceived
+            ? {
+                receivedById: null,
+                receivedAt: null,
+                inProgress: false,
+              }
+            : {}),
+        },
+        include: {
+          customer: {
+            select: {
+              id: true,
+              firstName: true,
+              billNumber: true,
+              phoneNumber: true,
+            },
+          },
+          assignedTo: { select: { id: true, name: true, accountType: true } },
+          assignedBy: { select: { id: true, name: true } },
+          receivedBy: { select: { id: true, name: true, accountType: true } },
+          qichikarAssignedTo: {
+            select: { id: true, name: true, accountType: true },
+          },
+          dokhtAssignedTo: {
+            select: { id: true, name: true, accountType: true },
+          },
+        },
+      });
+
+      await tx.userNotification.updateMany({
+        where: {
+          userId: user.id,
+          orderId,
+          isRead: false,
+          type: "ASSIGNMENT",
+        },
+        data: { isRead: true },
+      });
+
+      return result;
+    });
+
+    const admins = await prisma.user.findMany({
+      where: { accountType: "ADMIN" },
+      select: { id: true },
+    });
+    const workerRoleLabel = getWorkerNotificationRoleLabel(user.accountType);
+    const billNumber = order.billNumber ?? order.customer.billNumber;
+    const customerName = order.customer?.firstName || "-";
+    const msg = `${workerRoleLabel} Name: ${user.name} | Bill Number: ${billNumber} | Order Type: ${order.type} | Customer Name: ${customerName} | declined this order.`;
+
+    await Promise.all(
+      admins.map((admin) =>
+        prisma.userNotification.create({
+          data: {
+            userId: admin.id,
+            orderId,
+            message: msg,
+            type: "WORK_DECLINED",
+          },
+        }),
+      ),
+    );
 
     res.json(updated);
   } catch (error) {
@@ -1208,7 +1316,7 @@ export const getMonthlyReport = async (req, res, next) => {
 /** PATCH /api/orders/:id/assign - Admin assigns an order to a worker */
 export const assign = async (req, res, next) => {
   try {
-    const { assignedToId, assignmentNote, assignmentPrice } = req.body;
+    const { assignedToId, assignmentNote } = req.body;
     const orderId = req.params.id;
 
     const existingOrder = await prisma.order.findUnique({
@@ -1221,7 +1329,6 @@ export const assign = async (req, res, next) => {
         qichikarAssignedToId: true,
         dokhtAssignedToId: true,
         assignedToId: true,
-        assignmentPrice: true,
         qichikarReceivedById: true,
         dokhtReceivedById: true,
         qichikarInProgress: true,
@@ -1233,7 +1340,6 @@ export const assign = async (req, res, next) => {
       return res.status(404).json({ error: "Order not found." });
 
     let worker = null;
-    let normalizedAssignmentPrice = null;
 
     if (assignedToId) {
       worker = await prisma.user.findUnique({
@@ -1255,6 +1361,7 @@ export const assign = async (req, res, next) => {
 
       if (isRoleCompleted) {
         return res.status(409).json({
+          code: "ORDER_COMPLETED_REASSIGN_BLOCKED",
           error: COMPLETED_REASSIGN_BLOCK_MESSAGE,
         });
       }
@@ -1266,31 +1373,13 @@ export const assign = async (req, res, next) => {
 
       if (alreadyAssignedToRole) {
         return res.status(409).json({
+          code:
+            worker.accountType === "QICHIKAR"
+              ? "ORDER_ALREADY_ASSIGNED_QICHIKAR"
+              : "ORDER_ALREADY_ASSIGNED_DOKHT",
           error: `This order is already assigned to a ${worker.accountType === "QICHIKAR" ? "Qichikar" : "Dokht"} worker and cannot be assigned again.`,
         });
       }
-
-      if (
-        assignmentPrice === undefined ||
-        assignmentPrice === null ||
-        assignmentPrice === ""
-      ) {
-        return res.status(400).json({
-          error: "Assignment price is required when assigning an order.",
-        });
-      }
-
-      const parsedPrice =
-        typeof assignmentPrice === "number"
-          ? assignmentPrice
-          : parseNumberLocale(String(assignmentPrice));
-
-      if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
-        return res.status(400).json({
-          error: "Assignment price must be a valid non-negative number.",
-        });
-      }
-      normalizedAssignmentPrice = parsedPrice;
     }
 
     const storedAssignmentNote =
@@ -1329,7 +1418,7 @@ export const assign = async (req, res, next) => {
           assignedById: nextAssignedToId ? req.user.id : null,
           assignedAt: nextAssignedToId ? new Date() : null,
           assignmentNote: storedAssignmentNote,
-          assignmentPrice: nextAssignedToId ? normalizedAssignmentPrice : null,
+          assignmentPrice: null,
           // Deferred worker payment: assignment keeps payment pending until completion.
           workerPaymentStatus: "UNPAID",
           workerPaymentAmount: null,
@@ -1353,9 +1442,7 @@ export const assign = async (req, res, next) => {
             ? false
             : currentOrder.qichikarInProgress,
           qichikarPaymentStatus: isAssigningQichikar ? "UNPAID" : undefined,
-          qichikarPaymentAmount: isAssigningQichikar
-            ? normalizedAssignmentPrice
-            : undefined,
+          qichikarPaymentAmount: isAssigningQichikar ? null : undefined,
           qichikarPaidAt: isAssigningQichikar ? null : undefined,
           qichikarPaidById: isAssigningQichikar ? null : undefined,
           dokhtAssignedToId: isAssigningDokht
@@ -1374,9 +1461,7 @@ export const assign = async (req, res, next) => {
             ? false
             : currentOrder.dokhtInProgress,
           dokhtPaymentStatus: isAssigningDokht ? "UNPAID" : undefined,
-          dokhtPaymentAmount: isAssigningDokht
-            ? normalizedAssignmentPrice
-            : undefined,
+          dokhtPaymentAmount: isAssigningDokht ? null : undefined,
           dokhtPaidAt: isAssigningDokht ? null : undefined,
           dokhtPaidById: isAssigningDokht ? null : undefined,
         },
@@ -1403,7 +1488,7 @@ export const assign = async (req, res, next) => {
 
     if (assignedToId) {
       const billNumber = order.billNumber ?? order.customer.billNumber;
-      const msg = `New order assigned by ${req.user.name}: ${order.customer.firstName} - Bill #${billNumber} (${order.type}) - Price: ${Number(normalizedAssignmentPrice || 0).toLocaleString("en-US")} AF${normalizedOrder.assignmentNote ? `. Note: ${normalizedOrder.assignmentNote}` : ""}`;
+      const msg = `New order assigned by ${req.user.name}: ${order.customer.firstName} - Bill #${billNumber} (${order.type})${normalizedOrder.assignmentNote ? `. Note: ${normalizedOrder.assignmentNote}` : ""}`;
       await prisma.userNotification.create({
         data: {
           userId: assignedToId,

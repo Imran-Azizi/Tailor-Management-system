@@ -626,7 +626,6 @@
     "failedUpdateStatus": "Failed to update status",
     "orderCompletedAdminNotified": "Order completed — Admin notified",
     "failedCompleteOrder": "Failed to complete order",
-    "waitingForQichikar": "Waiting for Qichikar (cutting) to complete first",
     "sameRoleClaimConflict": "This order is already received by another worker",
     "allOrders": "All Orders",
     "receivedOn": "Received on",

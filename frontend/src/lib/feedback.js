@@ -5,6 +5,21 @@ import {
 } from "./validationLocalization.js";
 import { notifyError, notifyInfo, notifySuccess, notifyWarning } from "./toast.js";
 
+const API_ERROR_CODE_MESSAGES = {
+  ORDER_ALREADY_ASSIGNED_QICHIKAR:
+    "This order is already assigned to a Qichikar worker and cannot be assigned again.",
+  ORDER_ALREADY_ASSIGNED_DOKHT:
+    "This order is already assigned to a Dokht worker and cannot be assigned again.",
+  ORDER_COMPLETED_REASSIGN_BLOCKED:
+    "This order completed, you can not assign it again",
+  ORDER_CLAIMED_BY_ANOTHER_WORKER:
+    "this order already receive by someone else try another",
+  TENANT_SUSPENDED: "Tenant account is suspended.",
+  SUBSCRIPTION_EXPIRED: "Subscription expired.",
+  INVALID_CURRENT_PASSWORD: "Current password is incorrect.",
+  PHONE_IN_USE: "This phone number is already in use.",
+};
+
 export function getApiErrorMessage(
   error,
   fallback = i18n.t(
@@ -14,6 +29,14 @@ export function getApiErrorMessage(
 ) {
   const language = i18n.resolvedLanguage || i18n.language || "en";
   const status = error?.response?.status;
+  const responseCode = error?.response?.data?.code;
+
+  if (responseCode && API_ERROR_CODE_MESSAGES[responseCode]) {
+    return localizeValidationMessage(
+      API_ERROR_CODE_MESSAGES[responseCode],
+      language,
+    );
+  }
 
   if (!error?.response && error?.message) {
     const lowered = String(error.message).toLowerCase();

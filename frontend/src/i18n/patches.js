@@ -489,6 +489,8 @@ export const LOCALE_PATCHES = {
       readyForDokhtValue: "Hand over to Dokht",
       workReceivedTitle: "Order received",
       workReceivedShort: "Worker received the order.",
+      workDeclinedTitle: "Order declined",
+      workDeclinedShort: "{{worker}} did not accept the order for {{customer}}.",
       emergencyOrderTitle: "Emergency order alert",
       emergencyOrderShort: "This order needs priority attention.",
       emergencyOrderIntro: "Please prioritize and complete this order first.",
@@ -745,9 +747,6 @@ export const LOCALE_PATCHES = {
         "Select clothes type and search by bill number to start assignment.",
       customerInfo: "Customer & Order Selection",
       selectedOrderSummary: "Selected Order Summary",
-      priceForWorker: "Price for worker",
-      priceForWorkerHint:
-        "Enter the sewing or cutting price before sending this order.",
       sendTo: "Send to",
       send: "Send",
       quantity: "Quantity",
@@ -761,6 +760,9 @@ export const LOCALE_PATCHES = {
         "No pending orders found for the selected clothes type.",
       orderLabelWithNumber: "Order #{{number}}",
       selected: "Selected",
+      notSelected: "Not selected",
+      recordsFound: "orders",
+      rowNumber: "#",
       noOrderName: "No custom name",
       readyToAssign: "Ready to assign",
       dokhtLabel: "Dokht",
@@ -793,7 +795,6 @@ export const LOCALE_PATCHES = {
       orderReceivedAdminNotified: "Order received - Admin notified",
       sameRoleClaimConflict:
         "this order already receive by someone else try another",
-      waitingForQichikar: "Waiting for Qichikar (cutting) to complete first",
       failedCompleteOrder: "Failed to complete order",
       failedReceiveOrder: "Failed to receive order",
       dokhtLabel: "Dokht",
@@ -819,8 +820,6 @@ export const LOCALE_PATCHES = {
       notAssigned: "Not received",
       searchBillPlaceholder: "Search by bill number",
       noOrderFoundByBill: "No order found for this bill number.",
-      waitingForQichikar:
-        "Qichikar must finish the cutting work before Dokht can receive this order.",
       workflowAssignedHint:
         "This order is ready and waiting to be received.",
       workflowReceivedByYou: "This order is in your active workflow.",
@@ -861,6 +860,20 @@ export const LOCALE_PATCHES = {
       loadingOrders: "Loading orders...",
       noOrdersAssigned: "No orders received yet.",
       noOrdersInCategory: "No orders in this category.",
+      adminAssignedSectionTitle:
+        "These orders were assigned to you by admin",
+      adminAssignedSectionHint:
+        "Accept to start working, or decline to notify admin.",
+      statusNew: "New",
+      statusPendingReview: "Awaiting review",
+      assignedDate: "Assigned date",
+      accept: "Accept",
+      decline: "Decline",
+      declineOrder: "Decline Order",
+      declineOrderConfirmMsg:
+        "Decline this assignment? Admin will be notified that you did not accept this order.",
+      orderDeclinedAdminNotified: "Order declined - Admin notified",
+      failedDeclineOrder: "Failed to decline order",
       totalShort: "Total",
       discountShort: "Disc",
       remainingShort: "Remaining",
@@ -1044,6 +1057,7 @@ export const LOCALE_PATCHES = {
       foreignShort: "FOREIGN",
       sendToForeignCountry: "Send to Foreign Country",
       shipping: "SHIPPING",
+      draftSaveFailed: "Draft save failed",
     },
     completedWorkerOrders: {
       title: "Completed Worker Orders",
@@ -1618,6 +1632,8 @@ export const LOCALE_PATCHES = {
       readyForDokhtValue: "به دوخت سپرده شود",
       workReceivedTitle: "سفارش دریافت شد",
       workReceivedShort: "کارگر سفارش را دریافت کرد.",
+      workDeclinedTitle: "سفارش رد شد",
+      workDeclinedShort: "{{worker}} سفارش {{customer}} را قبول نکرد.",
       emergencyOrderTitle: "اعلان سفارش عاجل",
       emergencyOrderShort: "این سفارش به رسیدگی فوری نیاز دارد.",
       emergencyOrderIntro: "لطفاً این سفارش را در اولویت بگذارید و زودتر تکمیل کنید.",
@@ -1873,9 +1889,6 @@ export const LOCALE_PATCHES = {
         "برای شروع واگذاری، نوع لباس را انتخاب و با شماره بل جستجو کنید.",
       customerInfo: "مشتری و انتخاب سفارش",
       selectedOrderSummary: "خلاصه سفارش انتخاب‌شده",
-      priceForWorker: "قیمت برای کارمند",
-      priceForWorkerHint:
-        "قبل از ارسال سفارش، قیمت دوخت یا قیچی این سفارش را وارد کنید.",
       sendTo: "ارسال به",
       send: "ارسال",
       quantity: "تعداد",
@@ -1888,7 +1901,10 @@ export const LOCALE_PATCHES = {
       noMatchingPendingOrders:
         "برای نوع لباس انتخاب‌شده سفارش در انتظار یافت نشد.",
       orderLabelWithNumber: "سفارش #{{number}}",
-      selected: "انتخاب‌شده",
+      selected: "انتخاب شده",
+      notSelected: "انتخاب نشده",
+      recordsFound: "سفارش",
+      rowNumber: "شماره",
       noOrderName: "نام اختصاصی ندارد",
       readyToAssign: "آماده واگذاری",
       dokhtLabel: "دوخت",
@@ -1979,7 +1995,6 @@ export const LOCALE_PATCHES = {
       orderReceivedAdminNotified: "سفارش دریافت شد - ادمین مطلع شد",
       sameRoleClaimConflict:
         "این سفارش قبلاً توسط کاربر دیگری دریافت شده؛ لطفاً سفارش دیگری را امتحان کنید.",
-      waitingForQichikar: "در انتظار تکمیل کار توسط قیچی‌کار (برش)",
       failedCompleteOrder: "تکمیل سفارش ممکن نشد",
       failedReceiveOrder: "دریافت سفارش ممکن نشد",
       dokhtLabel: "دوخت",
@@ -2005,8 +2020,6 @@ export const LOCALE_PATCHES = {
       notAssigned: "دریافت نشده",
       searchBillPlaceholder: "جستجو با شماره بل",
       noOrderFoundByBill: "برای این شماره بل سفارشی پیدا نشد.",
-      waitingForQichikar:
-        "تا زمانی که قیچی‌کار کار برش را تمام نکند، دوخت نمی‌تواند این سفارش را دریافت کند.",
       workflowAssignedHint: "این سفارش آماده است و منتظر دریافت کارمند می‌باشد.",
       workflowReceivedByYou: "این سفارش در جریان کاری فعال شما قرار دارد.",
       workflowReceivedByOther: "کارمند دیگری در حال کار روی این سفارش است.",
@@ -2043,6 +2056,20 @@ export const LOCALE_PATCHES = {
       loadingOrders: "در حال بارگیری سفارش‌ها...",
       noOrdersAssigned: "هنوز سفارشی دریافت نشده است.",
       noOrdersInCategory: "در این بخش سفارشی وجود ندارد.",
+      adminAssignedSectionTitle:
+        "این سفارش از طرف ادمین به شما سپرده شده است",
+      adminAssignedSectionHint:
+        "برای شروع قبول کنید، یا رد کنید تا ادمین مطلع شود.",
+      statusNew: "جدید",
+      statusPendingReview: "منتظر بررسی",
+      assignedDate: "تاریخ دریافت",
+      accept: "قبول",
+      decline: "رد",
+      declineOrder: "رد سفارش",
+      declineOrderConfirmMsg:
+        "آیا این سپردن را رد می‌کنید؟ ادمین مطلع می‌شود که شما این سفارش را قبول نکردید.",
+      orderDeclinedAdminNotified: "سفارش رد شد - ادمین مطلع شد",
+      failedDeclineOrder: "رد سفارش ممکن نشد",
       totalShort: "مجموع",
       discountShort: "تخفیف",
       remainingShort: "باقی",
@@ -2763,6 +2790,8 @@ export const LOCALE_PATCHES = {
       readyForDokhtValue: "د دخت برخې ته وسپارئ",
       workReceivedTitle: "فرمایش ترلاسه شو",
       workReceivedShort: "کارګر فرمایش ترلاسه کړ.",
+      workDeclinedTitle: "فرمایش رد شو",
+      workDeclinedShort: "{{worker}} د {{customer}} فرمایش قبول نه کړ.",
       emergencyOrderTitle: "د بیړني فرمایش خبرتیا",
       emergencyOrderShort: "دا فرمایش بیړنۍ پاملرنې ته اړتیا لري.",
       emergencyOrderIntro: "مهرباني وکړئ دې فرمایش ته لومړیتوب ورکړئ او ژر یې بشپړ کړئ.",
@@ -3017,9 +3046,6 @@ export const LOCALE_PATCHES = {
         "د سپارنې د پیل لپاره د کالو ډول وټاکئ او د بل شمېرې له مخې لټون وکړئ.",
       customerInfo: "پیرودونکی او د فرمایش انتخاب",
       selectedOrderSummary: "د ټاکل شوي فرمایش لنډیز",
-      priceForWorker: "د کارکوونکي بیه",
-      priceForWorkerHint:
-        "د فرمایش له لېږلو مخکې د ګنډلو یا قیچي کولو بیه ولیکئ.",
       sendTo: "ولېږئ",
       send: "ولېږئ",
       quantity: "تعداد",
@@ -3032,6 +3058,9 @@ export const LOCALE_PATCHES = {
       noMatchingPendingOrders: "د ټاکل شوي کالو ډول لپاره پاتې فرمایش نشته.",
       orderLabelWithNumber: "فرمایش #{{number}}",
       selected: "ټاکل شوی",
+      notSelected: "نه دی ټاکل شوی",
+      recordsFound: "فرمایشونه",
+      rowNumber: "شمېره",
       noOrderName: "ځانګړی نوم نشته",
       readyToAssign: "سپارنې ته چمتو",
       dokhtLabel: "دخت",
@@ -3133,7 +3162,6 @@ export const LOCALE_PATCHES = {
       orderReceivedAdminNotified: "فرمایش ترلاسه شو - اډمین خبر شو",
       sameRoleClaimConflict:
         "دا فرمایش مخکې د بل کاروونکي له خوا اخیستل شوی؛ مهرباني وکړئ بل فرمایش وازمویئ.",
-      waitingForQichikar: "د قیچي‌کار (برش) د بشپړولو لپاره انتظار کول",
       failedCompleteOrder: "د فرمایش بشپړول ناکام شول",
       failedReceiveOrder: "د فرمایش ترلاسه کول ناکام شول",
       dokhtLabel: "دخت",
@@ -3159,8 +3187,6 @@ export const LOCALE_PATCHES = {
       notAssigned: "نه دی ترلاسه شوی",
       searchBillPlaceholder: "د بل نمبر له مخې لټون",
       noOrderFoundByBill: "د دې بل نمبر لپاره فرمایش ونه موندل شو.",
-      waitingForQichikar:
-        "تر څو چې قیچي‌کار د پرېکولو کار بشپړ نه کړي، دخت دا فرمایش نه شي ترلاسه کولای.",
       workflowAssignedHint: "دا فرمایش چمتو دی او د ترلاسه کولو په تمه دی.",
       workflowReceivedByYou: "دا فرمایش ستاسو په فعال کاري بهیر کې دی.",
       workflowReceivedByOther: "بل کارکوونکی دمخه پر دې فرمایش کار کوي.",
@@ -3198,6 +3224,20 @@ export const LOCALE_PATCHES = {
       loadingOrders: "فرمایشونه لوډېږي...",
       noOrdersAssigned: "تر اوسه هېڅ فرمایش نه دی ترلاسه شوی.",
       noOrdersInCategory: "په دې کټګورۍ کې فرمایش نشته.",
+      adminAssignedSectionTitle:
+        "دا فرمایشونه له اډمین لخوا تاسو ته سپارل شوي دي",
+      adminAssignedSectionHint:
+        "د پیل لپاره یې قبول کړئ، یا یې رد کړئ ترڅو اډمین خبر شي.",
+      statusNew: "نوی",
+      statusPendingReview: "د کتنې په تمه",
+      assignedDate: "د سپارنې نېټه",
+      accept: "قبول",
+      decline: "رد",
+      declineOrder: "فرمایش رد کړئ",
+      declineOrderConfirmMsg:
+        "آیا دا سپارنه رد کوئ؟ اډمین به خبر شي چې تاسو دا فرمایش قبول نه کړ.",
+      orderDeclinedAdminNotified: "فرمایش رد شو - اډمین خبر شو",
+      failedDeclineOrder: "د فرمایش ردول ناکام شول",
       totalShort: "ټول",
       discountShort: "تخفیف",
       remainingShort: "پاتې",
@@ -3687,8 +3727,6 @@ const LOCALIZATION_COMPLETION_PATCHES = {
     },
     assignment: {
       completedReassignBlocked: "This order is completed. You cannot assign it again.",
-      invalidPrice: "Enter a valid assignment price.",
-      pricePlaceholder: "Enter assignment price",
     },
     transaction: {
       resultsAcrossPages: "Across all pages",
@@ -4178,8 +4216,6 @@ const LOCALIZATION_COMPLETION_PATCHES = {
     assignment: {
       completedReassignBlocked:
         "این سفارش تکمیل شده است. دوباره سپردن آن مجاز نیست.",
-      invalidPrice: "قیمت معتبر برای سپردن وارد کنید.",
-      pricePlaceholder: "قیمت سپردن را وارد کنید",
     },
     transaction: {
       resultsAcrossPages: "در همه صفحه‌ها",
@@ -4670,8 +4706,6 @@ const LOCALIZATION_COMPLETION_PATCHES = {
     assignment: {
       completedReassignBlocked:
         "دا فرمایش بشپړ شوی دی. بیا سپارل یې اجازه نه لري.",
-      invalidPrice: "د سپارنې معتبره بیه ولیکئ.",
-      pricePlaceholder: "د سپارنې بیه ولیکئ",
     },
     transaction: {
       resultsAcrossPages: "په ټولو پاڼو کې",

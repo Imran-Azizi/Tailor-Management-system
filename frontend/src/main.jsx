@@ -6,6 +6,7 @@ import { Toaster } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 import App from "./App.jsx";
 import "./index.css";
+import "./styles/bill-print.css";
 import "./i18n/index.js";
 import {
   installEnglishDigitInputNormalizer,

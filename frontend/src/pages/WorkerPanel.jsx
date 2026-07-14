@@ -1583,6 +1583,50 @@ export default function WorkerPanel() {
     },
   });
 
+  const declineMut = useMutation({
+    mutationFn: (id) => api.patch(`/orders/${id}/decline`).then((r) => r.data),
+    onSuccess: (_data, orderId) => {
+      qc.setQueryData(
+        ["worker-panel-orders", ...workerScope, viewMonth, viewYear],
+        (prev) => {
+          if (!prev) return prev;
+          if (Array.isArray(prev)) {
+            return prev.filter((order) => order?.id !== orderId);
+          }
+          if (Array.isArray(prev?.data)) {
+            return {
+              ...prev,
+              data: prev.data.filter((order) => order?.id !== orderId),
+            };
+          }
+          return prev;
+        },
+      );
+      qc.invalidateQueries({ queryKey: ["worker-panel-orders"] });
+      qc.invalidateQueries({ queryKey: ["worker-notifs-count"] });
+      toast.success(
+        t(
+          "workerPanel.orderDeclinedAdminNotified",
+          "Order declined - Admin notified",
+        ),
+        feedbackToastOptions,
+      );
+      setConfirmAction(null);
+    },
+    onError: (error) => {
+      toast.error(
+        getWorkerFeedbackMessage(
+          error,
+          t,
+          language,
+          "workerPanel.failedDeclineOrder",
+          t("workerPanel.failedDeclineOrder", "Failed to decline order"),
+        ),
+        feedbackToastOptions,
+      );
+    },
+  });
+
   const progressMut = useMutation({
     mutationFn: (id) => api.patch(`/orders/${id}/progress`).then((r) => r.data),
     onSuccess: (updated, id) => {
@@ -1917,6 +1961,10 @@ export default function WorkerPanel() {
       receiveMut.mutate(confirmAction.order.id);
       return;
     }
+    if (confirmAction.type === "decline") {
+      declineMut.mutate(confirmAction.order.id);
+      return;
+    }
     if (confirmAction.type === "start") {
       const { order } = confirmAction;
       const receivedByCurrentUser =
@@ -1947,7 +1995,10 @@ export default function WorkerPanel() {
   };
 
   const pendingAction =
-    receiveMut.isPending || progressMut.isPending || completeMut.isPending;
+    receiveMut.isPending ||
+    declineMut.isPending ||
+    progressMut.isPending ||
+    completeMut.isPending;
 
   const confirmConfig = useMemo(() => {
     if (!confirmAction?.order) return null;
@@ -1960,9 +2011,22 @@ export default function WorkerPanel() {
           "workerPanel.receiveOrderConfirmMsg",
           "Receive this order to add it to your received orders list. Admin will be notified.",
         ),
-        confirmLabel: t("workerPanel.receive", "Receive"),
+        confirmLabel: t("workerPanel.accept", "Accept"),
         pendingLabel: t("workerPanel.processing", "Processing..."),
         cancelLabel: t("common.cancel", "Cancel"),
+      };
+    }
+    if (confirmAction.type === "decline") {
+      return {
+        title: t("workerPanel.declineOrder", "Decline Order"),
+        message: t(
+          "workerPanel.declineOrderConfirmMsg",
+          "Decline this assignment? Admin will be notified that you did not accept this order.",
+        ),
+        confirmLabel: t("workerPanel.decline", "Decline"),
+        pendingLabel: t("workerPanel.processing", "Processing..."),
+        cancelLabel: t("common.cancel", "Cancel"),
+        tone: "danger",
       };
     }
     if (confirmAction.type === "start") {
@@ -2367,27 +2431,42 @@ export default function WorkerPanel() {
                       )}
                     </div>
 
-                    <div className="w-full sm:w-40">
+                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[220px] sm:flex-row">
                       {showReceiveSuccess ? (
                         <ReceiveSuccessState t={t} isRtl={isRtl} />
                       ) : (
-                        <button
-                          className="btn btn-gold btn-sm w-full transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md"
-                          onClick={() => openConfirm("receive", order)}
-                          disabled={pendingAction || !canReceive}
-                          title={
-                            canReceive
-                              ? ""
-                              : getAssignmentBlockReason(order) ||
-                                t(
-                                  "workerPanel.cannotReceiveOrder",
-                                  "You cannot receive this order.",
-                                )
-                          }
-                        >
-                          <LuCheck size={13} />{" "}
-                          {t("workerPanel.receive", "Receive")}
-                        </button>
+                        <>
+                          <button
+                            className="btn btn-gold btn-sm w-full transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md sm:flex-1"
+                            onClick={() => openConfirm("receive", order)}
+                            disabled={pendingAction || !canReceive}
+                            title={
+                              canReceive
+                                ? ""
+                                : getAssignmentBlockReason(order) ||
+                                  t(
+                                    "workerPanel.cannotReceiveOrder",
+                                    "You cannot receive this order.",
+                                  )
+                            }
+                          >
+                            <LuCheck size={13} />{" "}
+                            {t("workerPanel.accept", "Accept")}
+                          </button>
+                          <button
+                            className="btn btn-outline btn-sm w-full transition-all duration-200 ease-out sm:flex-1"
+                            style={{
+                              color: "#be123c",
+                              borderColor: "#fecdd3",
+                              background: "#fff1f2",
+                            }}
+                            onClick={() => openConfirm("decline", order)}
+                            disabled={pendingAction || !canReceive}
+                          >
+                            <LuX size={13} />{" "}
+                            {t("workerPanel.decline", "Decline")}
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>

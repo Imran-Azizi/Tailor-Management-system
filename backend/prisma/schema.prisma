@@ -462,8 +462,7 @@ model Order {
   dokhtReceivedAt   DateTime?
   dokhtInProgress   Boolean   @default(false)
 
-  // Workflow tracking for Qichikar -> Dokht flow
-  // When Qichikar completes their task, we mark qichikarCompletedAt (not full completion)
+  // Track when Qichikar finishes cutting (independent of Dokht progress)
   qichikarCompletedAt DateTime?
   // When Dokht completes, order becomes fully completed
   dokhtCompletedAt    DateTime?

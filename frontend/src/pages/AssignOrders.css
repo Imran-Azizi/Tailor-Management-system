@@ -1,15 +1,15 @@
 /* =============================================
-   ASSIGN ORDERS – FOUND ORDER CARD & TABLE
-   Modern ERP-style, compact, production-ready
+   ASSIGN ORDERS – FOUND ORDER RECORDS
+   Professional SaaS table · RTL · light/dark
    ============================================= */
 
 /* ---------- Card Shell ---------- */
 .ao-card {
   border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
-  border-radius: 12px;
+  border-radius: 14px;
   background: var(--surface);
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.03);
 }
 
 /* ---------- Card Header ---------- */
@@ -17,9 +17,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 14px 18px;
-  background: color-mix(in srgb, var(--surface2) 50%, var(--surface));
+  gap: 14px;
+  padding: 16px 20px;
+  background: color-mix(in srgb, var(--surface2) 55%, var(--surface));
   border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
   flex-wrap: wrap;
 }
@@ -27,24 +27,24 @@
 .ao-head-left {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
   overflow: hidden;
 }
 
 .ao-head-label {
   color: var(--text3);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.45px;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .ao-head-name {
   color: var(--text1);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 800;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -54,146 +54,204 @@
 .ao-head-right {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 /* ---------- Pills ---------- */
 .ao-pill {
   display: inline-flex;
   align-items: center;
-  padding: 3px 9px;
-  font-size: 11px;
+  padding: 4px 10px;
+  font-size: 11.5px;
   font-weight: 700;
-  border-radius: 16px;
+  border-radius: 999px;
   white-space: nowrap;
-  line-height: 1.3;
+  line-height: 1.35;
 }
 
 .ao-pill--neutral {
   color: var(--text2);
-  background: color-mix(in srgb, var(--surface2) 65%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
+  background: color-mix(in srgb, var(--surface2) 70%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
 }
 
 .ao-pill--info {
   color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+  background: color-mix(in srgb, var(--primary) 9%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
 }
 
-/* ---------- Empty State ---------- */
+.ao-pill--count {
+  color: var(--text2);
+  background: color-mix(in srgb, var(--surface2) 40%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+}
+
+/* ---------- Empty / Loading ---------- */
 .ao-empty {
-  padding: 48px 20px;
+  padding: 52px 20px;
   text-align: center;
 }
 
-/* ---------- Loading ---------- */
 .ao-loading {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 56px 20px;
+  padding: 60px 20px;
   color: var(--text3);
   font-size: 13px;
 }
 
-/* ---------- Table Wrapper ---------- */
+/* ---------- Desktop Table ---------- */
 .ao-table-wrap {
   width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
   scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--primary) 40%, var(--border2))
+    transparent;
 }
 
-/* ---------- Table ---------- */
+.ao-table-wrap::-webkit-scrollbar {
+  height: 8px;
+}
+
+.ao-table-wrap::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 40%, var(--border2));
+}
+
+.ao-card-list {
+  display: none;
+}
+
 .ao-table {
   width: 100%;
-  min-width: 780px;
+  min-width: 820px;
   direction: inherit;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   table-layout: fixed;
-  font-size: 13px;
-}
-
-/* -- Column widths -- */
-.ao-th-num,
-.ao-td-num     { width: 48px; text-align: center; }
-.ao-th-customer { width: 22%; }
-.ao-th-type     { width: 18%; }
-.ao-th-qty      { width: 60px; text-align: center; }
-.ao-th-amount   { width: 16%; }
-.ao-th-status   { width: 12%; }
-.ao-th-action   { width: 110px; text-align: center; }
-
-/* -- Header -- */
-.ao-table thead th {
-  direction: inherit;
-  padding: 9px 12px;
-  text-align: start;
-  color: var(--text3);
-  font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  white-space: nowrap;
-  background: color-mix(in srgb, var(--surface2) 40%, var(--surface));
-  border-bottom: 2px solid color-mix(in srgb, var(--border) 50%, transparent);
-  user-select: none;
+  font-size: 13.5px;
 }
 
 .ao-th-num,
-.ao-th-qty,
-.ao-th-action {
+.ao-td-num {
+  width: 56px;
   text-align: center;
 }
 
-/* -- Body rows -- */
-.ao-table tbody td {
-  direction: inherit;
-  padding: 10px 12px;
-  text-align: start;
-  line-height: 1.35;
-  vertical-align: middle;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 35%, transparent);
+.ao-th-customer {
+  width: 22%;
 }
 
-.ao-table tbody tr {
-  transition: background 0.12s ease;
+.ao-th-type {
+  width: 18%;
+}
+
+.ao-th-qty {
+  width: 72px;
+  text-align: center;
+}
+
+.ao-th-amount {
+  width: 16%;
+}
+
+.ao-th-status {
+  width: 160px;
+}
+
+.ao-table thead th {
+  direction: inherit;
+  padding: 12px 16px;
+  text-align: start;
+  color: var(--text3);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.55px;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--surface2) 48%, var(--surface));
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  user-select: none;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.ao-th-num,
+.ao-th-qty {
+  text-align: center;
+}
+
+.ao-table tbody td {
+  direction: inherit;
+  padding: 14px 16px;
+  text-align: start;
+  line-height: 1.4;
+  vertical-align: middle;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 32%, transparent);
+  background: var(--surface);
 }
 
 .ao-table tbody tr:last-child td {
   border-bottom: none;
 }
 
-.ao-table tbody tr:hover td {
-  background: color-mix(in srgb, var(--primary) 3%, var(--surface));
+.ao-row {
+  cursor: pointer;
+  transition: background 0.14s ease;
 }
 
-/* -- Active (selected) row -- */
+.ao-row:hover td {
+  background: color-mix(in srgb, var(--primary) 4%, var(--surface));
+}
+
 .ao-row--active td {
-  background: color-mix(in srgb, var(--warning-soft) 50%, var(--surface));
+  background: color-mix(in srgb, var(--success-soft) 70%, var(--surface));
 }
 
 .ao-row--active:hover td {
-  background: color-mix(in srgb, var(--warning-soft) 65%, var(--surface));
+  background: color-mix(in srgb, var(--success-soft) 85%, var(--surface));
 }
 
-/* -- Cell: number -- */
+.ao-row--active td:first-child {
+  box-shadow: inset 3px 0 0 var(--success);
+}
+
+[dir="rtl"] .ao-row--active td:first-child {
+  box-shadow: inset -3px 0 0 var(--success);
+}
+
+/* -- Cells -- */
 .ao-td-num {
-  direction: ltr;
-  unicode-bidi: isolate;
-  font-weight: 700;
-  font-size: 12px;
-  color: var(--text3);
-  white-space: nowrap;
   text-align: center;
 }
 
-/* -- Cell: customer -- */
+.ao-num-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text2);
+  background: color-mix(in srgb, var(--surface2) 65%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
 .ao-td-customer {
   overflow: hidden;
 }
@@ -201,9 +259,9 @@
 .ao-customer-name {
   display: block;
   font-weight: 750;
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--text1);
-  line-height: 1.3;
+  line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -211,8 +269,8 @@
 
 .ao-customer-sub {
   display: block;
-  margin-top: 1px;
-  font-size: 11px;
+  margin-top: 2px;
+  font-size: 11.5px;
   color: var(--text3);
   font-weight: 500;
   overflow: hidden;
@@ -220,47 +278,53 @@
   white-space: nowrap;
 }
 
-/* -- Cell: type -- */
 .ao-td-type {
   overflow: hidden;
 }
 
 .ao-type-label {
   display: inline-block;
-  padding: 2px 8px;
-  font-size: 11.5px;
+  max-width: 100%;
+  padding: 4px 10px;
+  font-size: 12px;
   font-weight: 650;
   color: var(--text2);
-  background: color-mix(in srgb, var(--surface2) 55%, var(--surface));
-  border-radius: 6px;
+  background: color-mix(in srgb, var(--surface2) 60%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--border) 35%, transparent);
+  border-radius: 8px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* -- Cell: quantity -- */
 .ao-td-qty {
-  direction: ltr;
-  unicode-bidi: isolate;
   text-align: center;
-  font-weight: 700;
-  font-size: 13px;
-  color: var(--text1);
-  white-space: nowrap;
 }
 
-/* -- Cell: amount -- */
-.ao-td-amount {
+.ao-qty-value {
+  display: inline-block;
+  font-weight: 750;
+  font-size: 13.5px;
+  color: var(--text1);
   direction: ltr;
   unicode-bidi: isolate;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-weight: 750;
-  font-size: 13px;
-  color: var(--text1);
+}
+
+.ao-td-amount {
   white-space: nowrap;
 }
 
-/* -- Cell: status badge -- */
+.ao-amount {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 750;
+  font-size: 13.5px;
+  color: var(--text1);
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
 .ao-td-status {
   white-space: nowrap;
 }
@@ -268,105 +332,50 @@
 .ao-badge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
-  font-size: 11px;
-  font-weight: 700;
-  border-radius: 14px;
+  gap: 6px;
+  padding: 5px 11px;
+  font-size: 11.5px;
+  font-weight: 750;
+  border-radius: 999px;
   line-height: 1.3;
+  white-space: nowrap;
 }
 
 .ao-badge--selected {
-  color: #92400e;
-  background: color-mix(in srgb, var(--warning-soft) 100%, transparent);
-  border: 1px solid color-mix(in srgb, var(--warning) 30%, transparent);
+  color: var(--success-strong);
+  background: var(--success-soft);
+  border: 1px solid var(--success-soft-border);
 }
 
-.ao-badge-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #d97706;
-  flex-shrink: 0;
-  animation: ao-pulse 1.8s ease-in-out infinite;
-}
-
-@keyframes ao-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
-.ao-badge--ready {
+.ao-badge--idle {
   color: var(--text3);
-  background: color-mix(in srgb, var(--surface2) 50%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--border) 35%, transparent);
-}
-
-/* -- Cell: action button -- */
-.ao-td-action {
-  text-align: center;
-  white-space: nowrap;
-}
-
-.ao-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 5px 14px;
-  font-size: 11.5px;
-  font-weight: 700;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: all 0.12s ease;
-  white-space: nowrap;
-  line-height: 1.3;
-}
-
-.ao-btn--outline {
-  color: var(--text2);
-  background: var(--surface);
-  border-color: color-mix(in srgb, var(--border) 60%, transparent);
-}
-
-.ao-btn--outline:hover {
-  border-color: var(--primary);
-  color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 5%, var(--surface));
-}
-
-.ao-btn--active {
-  color: #fff;
-  background: var(--warning, #d97706);
-  border-color: var(--warning, #d97706);
-  cursor: default;
+  background: color-mix(in srgb, var(--surface2) 55%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
 }
 
 /* ============================
-   ASSIGN SECTION (below table)
+   ASSIGN SECTION
    ============================ */
 .ao-assign {
-  border-top: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+  background: color-mix(in srgb, var(--surface2) 22%, var(--surface));
 }
 
-.ao-assign-sep { display: none; }
-
 .ao-assign-head {
-  padding: 14px 18px 0;
+  padding: 16px 20px 0;
 }
 
 .ao-assign-title {
   margin: 0;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 800;
   color: var(--text1);
 }
 
 .ao-assign-body {
-  padding: 14px 18px;
+  padding: 14px 20px;
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 18px;
   align-items: start;
 }
@@ -374,187 +383,193 @@
 .ao-assign-cards {
   display: flex;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .ao-assign-card {
-  padding: 10px 14px;
-  background: color-mix(in srgb, var(--surface2) 35%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--border) 35%, transparent);
-  border-radius: 10px;
-  min-width: 150px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
+  border-radius: 12px;
+  min-width: 160px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 .ao-assign-card-label {
   display: block;
-  font-size: 9.5px;
+  font-size: 10px;
   font-weight: 750;
   color: var(--text3);
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  margin-bottom: 4px;
+  margin-bottom: 5px;
 }
 
 .ao-assign-card-value {
   display: block;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 800;
   color: var(--text1);
-  line-height: 1.3;
+  line-height: 1.35;
 }
 
 .ao-assign-card-sub {
-  margin: 3px 0 0;
-  font-size: 11px;
+  margin: 4px 0 0;
+  font-size: 11.5px;
   color: var(--text3);
   line-height: 1.3;
 }
 
 .ao-assign-fields {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  gap: 12px;
+  min-width: 0;
+}
+
+.ao-field--full {
+  min-width: 0;
 }
 
 .ao-field-label {
   display: block;
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 700;
   color: var(--text2);
-  margin-bottom: 5px;
+  margin-bottom: 6px;
 }
 
-.ao-required {
-  color: #dc2626;
-  margin-inline-start: 2px;
-}
-
-.ao-money-input {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.ao-money-input .inp {
-  flex: 1;
+.ao-field .inp {
+  width: 100%;
+  resize: vertical;
+  min-height: 64px;
 }
 
 .ao-assign-footer {
   display: flex;
   justify-content: flex-end;
-  padding: 0 18px 16px;
+  padding: 0 20px 18px;
 }
 
 /* =============================================
    RESPONSIVE
    ============================================= */
 
-/* -- Tablet -- */
 @media (max-width: 1024px) {
   .ao-table {
-    min-width: 740px;
-  }
-
-  .ao-table thead th,
-  .ao-table tbody td {
-    padding: 9px 10px;
+    min-width: 760px;
   }
 
   .ao-assign-body {
     grid-template-columns: 1fr;
   }
-
-  .ao-assign-cards {
-    flex-wrap: wrap;
-  }
 }
 
-/* -- Mobile landscape -- */
 @media (max-width: 768px) {
   .ao-card-head {
-    padding: 12px 14px;
+    padding: 14px 16px;
   }
 
   .ao-head-name {
+    font-size: 15px;
+  }
+
+  /* Prefer mobile cards under tablet width */
+  .ao-table-wrap {
+    display: none;
+  }
+
+  .ao-card-list {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .ao-mobile-card {
+    border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+    border-radius: 12px;
+    background: var(--surface);
+    padding: 12px;
+    display: grid;
+    gap: 12px;
+    cursor: pointer;
+    transition:
+      border-color 0.14s ease,
+      background 0.14s ease,
+      box-shadow 0.14s ease;
+  }
+
+  .ao-mobile-card--active {
+    border-color: color-mix(in srgb, var(--success) 35%, var(--border));
+    background: color-mix(in srgb, var(--success-soft) 55%, var(--surface));
+    box-shadow: inset 3px 0 0 var(--success);
+  }
+
+  [dir="rtl"] .ao-mobile-card--active {
+    box-shadow: inset -3px 0 0 var(--success);
+  }
+
+  .ao-mobile-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .ao-mobile-card-body {
+    display: grid;
+    gap: 10px;
+  }
+
+  .ao-mobile-meta {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .ao-mobile-row {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .ao-mobile-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .ao-mobile-value {
     font-size: 14px;
+    font-weight: 800;
+    color: var(--text1);
+    line-height: 1.3;
   }
 
-  .ao-table {
-    min-width: 680px;
-  }
-
-  .ao-table thead th {
-    font-size: 9.5px;
-    padding: 8px 10px;
-  }
-
-  .ao-table tbody td {
-    padding: 8px 10px;
-    font-size: 12px;
+  .ao-assign-head {
+    padding: 14px 16px 0;
   }
 
   .ao-assign-body {
-    padding: 12px 14px;
+    padding: 12px 16px;
     gap: 14px;
   }
 
-  .ao-assign-fields {
-    grid-template-columns: 1fr;
-  }
-
   .ao-assign-footer {
-    padding: 0 14px 14px;
+    padding: 0 16px 16px;
   }
 }
 
-/* -- Mobile portrait -- */
 @media (max-width: 480px) {
   .ao-card-head {
     flex-direction: column;
     align-items: flex-start;
-    gap: 8px;
+    gap: 10px;
     padding: 12px;
   }
 
-  .ao-head-right {
-    flex-wrap: wrap;
-  }
-
-  .ao-table {
-    min-width: 620px;
-  }
-
-  .ao-table thead th {
-    font-size: 9px;
-    padding: 7px 8px;
-    letter-spacing: 0.3px;
-  }
-
-  .ao-table tbody td {
-    padding: 7px 8px;
-    font-size: 11.5px;
-  }
-
-  .ao-type-label {
-    font-size: 10.5px;
-    padding: 2px 6px;
-  }
-
-  .ao-badge {
-    font-size: 10px;
-    padding: 2px 8px;
-  }
-
-  .ao-btn {
-    padding: 4px 10px;
-    font-size: 10.5px;
-  }
-
-  .ao-assign-head {
-    padding: 12px 12px 0;
-  }
-
-  .ao-assign-body {
-    padding: 10px 12px;
+  .ao-mobile-meta {
     grid-template-columns: 1fr;
   }
 
@@ -567,25 +582,37 @@
     width: 100%;
   }
 
-  .ao-assign-footer {
-    padding: 0 12px 12px;
+  .ao-card-list {
+    padding: 10px;
   }
 }
 
 /* =============================================
-   RTL-SPECIFIC ADJUSTMENTS
+   RTL
    ============================================= */
 [dir="rtl"] .ao-table {
   direction: rtl;
 }
 
-[dir="rtl"] .ao-td-amount {
+[dir="rtl"] .ao-table thead th {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+[dir="rtl"] .ao-head-label,
+[dir="rtl"] .ao-assign-card-label,
+[dir="rtl"] .ao-mobile-label {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+[dir="rtl"] .ao-amount,
+[dir="rtl"] .ao-qty-value,
+[dir="rtl"] .ao-num-chip {
   direction: ltr;
   unicode-bidi: isolate;
 }
 
-[dir="rtl"] .ao-td-num,
-[dir="rtl"] .ao-td-qty {
-  direction: ltr;
-  unicode-bidi: isolate;
+[dir="rtl"] .ao-badge {
+  flex-direction: row-reverse;
 }

@@ -1,0 +1,258 @@
+/* ── A6 Bill Print System (105mm × 148mm) ─────────────────────────────── */
+/* Customer Bill & Shop Bill — popup window and in-page print            */
+
+@page bill-a6 {
+  size: 105mm 148mm;
+  margin: 0;
+}
+
+/* Popup print document shell */
+html.print-bill-popup,
+html.print-bill-popup body {
+  margin: 0;
+  padding: 0;
+  width: 105mm;
+  height: 148mm;
+  min-height: 148mm;
+  max-height: 148mm;
+  overflow: hidden;
+  background: #fff;
+  box-sizing: border-box;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+html.print-bill-popup body {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 0.5mm;
+  box-sizing: border-box;
+}
+
+html.print-bill-popup .print-a6-sheet {
+  page: bill-a6;
+}
+
+/* Bill sheet — exact A6 dimensions with professional 4-side frame */
+.print-a6-sheet.print-bill-sheet,
+.print-a6-sheet.print-customer-bill,
+.print-a6-sheet.print-shop-bill {
+  position: relative;
+  box-sizing: border-box;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.print-a6-sheet.print-bill-sheet::after,
+.print-a6-sheet.print-customer-bill::after,
+.print-a6-sheet.print-shop-bill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: var(--bill-frame-border-width, 3px) solid var(--bill-frame-border-color, #b45309);
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 40;
+  box-sizing: border-box;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.print-a6-sheet.print-customer-bill > :not(.print-bill-header):not(.print-bill-footer),
+.print-a6-sheet.print-shop-bill > :not(.print-bill-header):not(.print-bill-footer) {
+  padding-inline: var(--bill-padding-x, 3mm);
+  box-sizing: border-box;
+}
+
+@media print {
+  /* Named A6 page for bill sheets */
+  .print-a6-sheet,
+  .print-bill-sheet {
+    page: bill-a6;
+  }
+
+  /* Popup and in-page print shells */
+  html.print-bill-popup,
+  html.print-bill-popup body,
+  body:has(> .print-a6-sheet),
+  body:has(.print-a6-sheet) {
+    width: 105mm !important;
+    height: 148mm !important;
+    min-height: 148mm !important;
+    max-height: 148mm !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    background: #fff !important;
+    box-sizing: border-box !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  html.print-bill-popup body {
+    padding: 0.5mm !important;
+  }
+
+  body:has(.print-a6-sheet) {
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    padding: 0.5mm !important;
+  }
+
+  /* Strip preview wrapper chrome when printing in-page */
+  [data-print-safe="true"] {
+    width: 105mm !important;
+    max-width: 105mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    overflow: visible !important;
+  }
+
+  /* Bill container — full A6 with bold 4-side frame */
+  .print-a6-sheet,
+  .print-bill-sheet {
+    width: 104mm !important;
+    max-width: 104mm !important;
+    min-height: 147mm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+    flex-shrink: 0;
+    display: flex !important;
+    flex-direction: column !important;
+    transform: scale(var(--print-a6-scale, 1));
+    transform-origin: top center;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    position: relative !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-a6-sheet::after,
+  .print-bill-sheet::after {
+    content: "" !important;
+    position: absolute !important;
+    inset: 0 !important;
+    border: var(--bill-frame-border-width-print, 0.8mm) solid var(--bill-frame-border-color, #b45309) !important;
+    border-radius: inherit !important;
+    pointer-events: none !important;
+    z-index: 40 !important;
+    box-sizing: border-box !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-a6-sheet.print-customer-bill > :not(.print-bill-header):not(.print-bill-footer),
+  .print-a6-sheet.print-shop-bill > :not(.print-bill-header):not(.print-bill-footer) {
+    padding-inline: var(--bill-padding-x, 2.5mm) !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Push footer to bottom on short receipts */
+  .print-bill-footer {
+    margin-top: auto !important;
+    flex-shrink: 0;
+  }
+
+  .print-bill-header {
+    flex-shrink: 0;
+  }
+
+  /* Hide dashboard UI — only bill content prints */
+  .no-print,
+  .sidebar,
+  .navbar,
+  .worker-sidebar,
+  .worker-navbar,
+  .app-toast-container,
+  .print-bills-page > h2,
+  .print-bills-page > p,
+  .print-bills-page form,
+  .print-bills-page .card,
+  .print-bills-page .btn-stack,
+  .print-bills-page button,
+  .order-document-pack,
+  .order-document-pack ~ * {
+    display: none !important;
+  }
+
+  .app-shell {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Table & content fit A6 */
+  .print-bill-table-wrap,
+  .print-customer-combined-wrap,
+  .print-tailor-ledger-wrap {
+    overflow: hidden !important;
+    max-width: 100% !important;
+  }
+
+  .print-reference-detail-table,
+  .print-customer-combined-table,
+  .print-customer-finance-table,
+  .print-tailor-ledger-table {
+    width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed !important;
+  }
+
+  .print-reference-detail-table th,
+  .print-reference-detail-table td,
+  .print-customer-combined-table th,
+  .print-customer-combined-table td,
+  .print-customer-finance-table th,
+  .print-customer-finance-table td {
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+  }
+
+  /* Allow ledger rows to grow instead of clipping */
+  .print-tailor-ledger-headcell {
+    min-height: 20px !important;
+    height: auto !important;
+  }
+
+  .print-tailor-ledger-cell {
+    min-height: 21px !important;
+    height: auto !important;
+  }
+
+  /* RTL print */
+  .print-a6-sheet[dir="rtl"] {
+    direction: rtl;
+    text-align: right;
+  }
+
+  .print-a6-sheet[dir="rtl"] .print-bill-header-name,
+  .print-a6-sheet[dir="rtl"] .print-bill-header-meta,
+  .print-a6-sheet[dir="rtl"] .print-bill-section-head,
+  .print-a6-sheet[dir="rtl"] .print-customer-combined-table th,
+  .print-a6-sheet[dir="rtl"] .print-customer-combined-table td,
+  .print-a6-sheet[dir="rtl"] .print-customer-finance-table th,
+  .print-a6-sheet[dir="rtl"] .print-customer-finance-table td,
+  .print-a6-sheet[dir="rtl"] .print-tailor-ledger-headcell,
+  .print-a6-sheet[dir="rtl"] .print-tailor-ledger-cell {
+    direction: rtl;
+    text-align: right;
+  }
+
+  .print-a6-sheet[dir="rtl"] .print-tailor-ledger-cell--measure,
+  .print-a6-sheet[dir="rtl"] [dir="ltr"] {
+    direction: ltr;
+    unicode-bidi: embed;
+  }
+}

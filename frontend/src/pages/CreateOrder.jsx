@@ -576,7 +576,9 @@ export default function CreateOrder() {
       });
       const saved = await upsertOrderDraft(payload);
       if (!saved?.id) {
-        throw new Error("Draft save failed");
+        throw new Error(
+          t("createOrder.draftSaveFailed", "Draft save failed"),
+        );
       }
 
       setDraftId(saved.id);

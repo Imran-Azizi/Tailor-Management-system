@@ -98,6 +98,11 @@ router.patch(
 );
 router.patch("/:id/receive", authorize("QICHIKAR", "DOKHT"), ctrl.markReceived);
 router.patch(
+  "/:id/decline",
+  authorize("QICHIKAR", "DOKHT"),
+  ctrl.declineAssignment,
+);
+router.patch(
   "/:id/assign",
   authorizePermission(PERMISSIONS.ORDERS_ASSIGN),
   ctrl.assign,

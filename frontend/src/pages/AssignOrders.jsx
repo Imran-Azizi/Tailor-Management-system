@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
-import { LuSearch, LuSend } from "react-icons/lu";
+import { LuCheck, LuCircle, LuSearch, LuSend } from "react-icons/lu";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
@@ -48,27 +48,6 @@ function formatMoney(value, language) {
   });
 }
 
-function getRoleAssignment(order, workerType) {
-  if (workerType === "QICHIKAR") {
-    return order?.qichikarAssignedTo || null;
-  }
-  if (workerType === "DOKHT") {
-    return order?.dokhtAssignedTo || null;
-  }
-  return null;
-}
-
-function formatOrderDate(value, language) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString(language || "en", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
 export default function AssignOrders() {
   const { t, i18n } = useTranslation();
   const qc = useQueryClient();
@@ -84,10 +63,11 @@ export default function AssignOrders() {
   const [lookupResult, setLookupResult] = useState(null);
 
   const [selectedOrderId, setSelectedOrderId] = useState("");
-  const [assignmentPrice, setAssignmentPrice] = useState("");
   const [assignmentNote, setAssignmentNote] = useState("");
-  const [searchFieldErrors, setSearchFieldErrors] = useState({ clothesType: "", billNumber: "" });
-  const [assignPriceError, setAssignPriceError] = useState("");
+  const [searchFieldErrors, setSearchFieldErrors] = useState({
+    clothesType: "",
+    billNumber: "",
+  });
 
   const { data: workers = [], isLoading: loadingWorkers } = useQuery({
     queryKey: ["assignable-workers"],
@@ -99,7 +79,6 @@ export default function AssignOrders() {
     [workers, workerType],
   );
 
-  // Remove READY_MADE_WASKAT from clothes type dropdown
   const orderTypeOptions = useMemo(
     () =>
       getOrderTypeOptions(language).filter(
@@ -155,7 +134,6 @@ export default function AssignOrders() {
   useEffect(() => {
     if (!matchedOrders.length) {
       setSelectedOrderId("");
-      setAssignmentPrice("");
       return;
     }
 
@@ -166,12 +144,6 @@ export default function AssignOrders() {
 
   useEffect(() => {
     if (!selectedOrder) return;
-
-    setAssignmentPrice(
-      selectedOrder.assignmentPrice != null
-        ? String(selectedOrder.assignmentPrice)
-        : "",
-    );
     setAssignmentNote(selectedOrder.assignmentNote || "");
   }, [selectedOrder?.id]);
 
@@ -179,8 +151,16 @@ export default function AssignOrders() {
     const parsedBill = parseNumberLocale(billNumber);
     const errors = { clothesType: "", billNumber: "" };
 
-    if (!clothesType) errors.clothesType = t("assignment.selectClothesTypeFirst", "Select clothes type first.");
-    if (!Number.isFinite(parsedBill) || parsedBill <= 0) errors.billNumber = t("assignment.invalidBillNumber", "Enter a valid bill number.");
+    if (!clothesType)
+      errors.clothesType = t(
+        "assignment.selectClothesTypeFirst",
+        "Select clothes type first.",
+      );
+    if (!Number.isFinite(parsedBill) || parsedBill <= 0)
+      errors.billNumber = t(
+        "assignment.invalidBillNumber",
+        "Enter a valid bill number.",
+      );
 
     if (errors.clothesType || errors.billNumber) {
       setSearchFieldErrors(errors);
@@ -257,13 +237,10 @@ export default function AssignOrders() {
         );
       }
 
-      const parsedPrice = parseNumberLocale(assignmentPrice);
-
       const { data: assigned } = await api.patch(
         `/orders/${selectedOrder.id}/assign`,
         {
           assignedToId: workerId,
-          assignmentPrice: parsedPrice,
           assignmentNote: assignmentNote.trim() || null,
         },
       );
@@ -283,8 +260,11 @@ export default function AssignOrders() {
                   assignedToId: assigned.assignedToId,
                   assignedTo: assigned.assignedTo,
                   assignedAt: assigned.assignedAt,
-                  assignmentPrice: assigned.assignmentPrice,
                   assignmentNote: assigned.assignmentNote,
+                  qichikarAssignedToId: assigned.qichikarAssignedToId,
+                  qichikarAssignedTo: assigned.qichikarAssignedTo,
+                  dokhtAssignedToId: assigned.dokhtAssignedToId,
+                  dokhtAssignedTo: assigned.dokhtAssignedTo,
                 }
               : order,
           ),
@@ -338,7 +318,11 @@ export default function AssignOrders() {
                   value={clothesType}
                   onChange={(e) => {
                     setClothesType(e.target.value);
-                    if (searchFieldErrors.clothesType) setSearchFieldErrors((prev) => ({ ...prev, clothesType: "" }));
+                    if (searchFieldErrors.clothesType)
+                      setSearchFieldErrors((prev) => ({
+                        ...prev,
+                        clothesType: "",
+                      }));
                   }}
                 >
                   <option value="">
@@ -409,7 +393,11 @@ export default function AssignOrders() {
                     value={billNumber}
                     onChange={(e) => {
                       setBillNumber(e.target.value);
-                      if (searchFieldErrors.billNumber) setSearchFieldErrors((prev) => ({ ...prev, billNumber: "" }));
+                      if (searchFieldErrors.billNumber)
+                        setSearchFieldErrors((prev) => ({
+                          ...prev,
+                          billNumber: "",
+                        }));
                     }}
                     placeholder={t(
                       "assignment.billSearchPlaceholder",
@@ -465,10 +453,15 @@ export default function AssignOrders() {
                   </div>
                   <div className="ao-head-right">
                     <span className="ao-pill ao-pill--neutral">
-                      {t("orders.billNumber", "Bill")} #{lookupResult.customer?.billNumber || "-"}
+                      {t("orders.billNumber", "Bill")} #
+                      {lookupResult.customer?.billNumber || "-"}
                     </span>
                     <span className="ao-pill ao-pill--info">
                       {selectedClothesTypeLabel}
+                    </span>
+                    <span className="ao-pill ao-pill--count">
+                      {matchedOrders.length}{" "}
+                      {t("assignment.recordsFound", "orders")}
                     </span>
                   </div>
                 </div>
@@ -483,88 +476,214 @@ export default function AssignOrders() {
                     />
                   </div>
                 ) : (
-                  <div className="ao-table-wrap">
-                    <table className="ao-table">
-                      <thead>
-                        <tr>
-                          <th className="ao-th-num">#</th>
-                          <th className="ao-th-customer">{t("common.customer", "Customer")}</th>
-                          <th className="ao-th-type">{t("assignment.clothesType", "Type")}</th>
-                          <th className="ao-th-qty">{t("assignment.quantity", "Qty")}</th>
-                          <th className="ao-th-amount">{t("common.amount", "Amount")}</th>
-                          <th className="ao-th-status">{t("assignment.status", "Status")}</th>
-                          <th className="ao-th-action">{t("assignment.actions", "Actions")}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {matchedOrders.map((order, idx) => {
-                          const orderLabel = getOrderLabelParts(order, language);
-                          const active = selectedOrderId === order.id;
-                          const orderName =
-                            orderLabel.customName ||
-                            order.customer?.firstName ||
-                            t("assignment.noOrderName", "No name");
+                  <>
+                    <div className="ao-table-wrap" role="region" aria-label={t("assignment.searchResult", "Search Result")}>
+                      <table className="ao-table">
+                        <thead>
+                          <tr>
+                            <th scope="col" className="ao-th-num">
+                              {t("assignment.rowNumber", "#")}
+                            </th>
+                            <th scope="col" className="ao-th-customer">
+                              {t("common.customer", "Customer")}
+                            </th>
+                            <th scope="col" className="ao-th-type">
+                              {t("assignment.clothesType", "Type")}
+                            </th>
+                            <th scope="col" className="ao-th-qty">
+                              {t("assignment.quantity", "Qty")}
+                            </th>
+                            <th scope="col" className="ao-th-amount">
+                              {t("common.amount", "Amount")}
+                            </th>
+                            <th scope="col" className="ao-th-status">
+                              {t("assignment.status", "Status")}
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {matchedOrders.map((order, idx) => {
+                            const orderLabel = getOrderLabelParts(
+                              order,
+                              language,
+                            );
+                            const active = selectedOrderId === order.id;
+                            const customerName =
+                              order.customer?.firstName ||
+                              lookupResult.customer?.firstName ||
+                              "-";
+                            const orderName =
+                              orderLabel.customName ||
+                              order.customer?.firstName ||
+                              t("assignment.noOrderName", "No name");
 
-                          return (
-                            <tr
-                              key={order.id}
-                              className={active ? "ao-row--active" : ""}
-                            >
-                              <td className="ao-td-num">{idx + 1}</td>
-                              <td className="ao-td-customer">
-                                <span className="ao-customer-name">
-                                  {order.customer?.firstName ||
-                                    lookupResult.customer?.firstName ||
-                                    "-"}
+                            return (
+                              <tr
+                                key={order.id}
+                                className={
+                                  active ? "ao-row ao-row--active" : "ao-row"
+                                }
+                                onClick={() => setSelectedOrderId(order.id)}
+                              >
+                                <td className="ao-td-num">
+                                  <span className="ao-num-chip">{idx + 1}</span>
+                                </td>
+                                <td className="ao-td-customer">
+                                  <span className="ao-customer-name">
+                                    {customerName}
+                                  </span>
+                                  {orderName !== customerName && (
+                                    <span className="ao-customer-sub">
+                                      {orderName}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="ao-td-type">
+                                  <span className="ao-type-label">
+                                    {orderLabel.typeWithSequenceLabel}
+                                  </span>
+                                </td>
+                                <td className="ao-td-qty">
+                                  <span className="ao-qty-value">
+                                    {order.quantity || 1}
+                                  </span>
+                                </td>
+                                <td className="ao-td-amount">
+                                  <span className="ao-amount">
+                                    <AfCurrencyIcon size={12} />
+                                    <span>
+                                      {formatMoney(
+                                        getOrderGrossTotal(order),
+                                        language,
+                                      )}
+                                    </span>
+                                  </span>
+                                </td>
+                                <td className="ao-td-status">
+                                  {active ? (
+                                    <span className="ao-badge ao-badge--selected">
+                                      <LuCheck
+                                        size={12}
+                                        strokeWidth={2.5}
+                                        aria-hidden
+                                      />
+                                      {t("assignment.selected", "Selected")}
+                                    </span>
+                                  ) : (
+                                    <span className="ao-badge ao-badge--idle">
+                                      <LuCircle
+                                        size={11}
+                                        strokeWidth={2}
+                                        aria-hidden
+                                      />
+                                      {t(
+                                        "assignment.notSelected",
+                                        "Not selected",
+                                      )}
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile card list */}
+                    <div className="ao-card-list">
+                      {matchedOrders.map((order, idx) => {
+                        const orderLabel = getOrderLabelParts(order, language);
+                        const active = selectedOrderId === order.id;
+                        const customerName =
+                          order.customer?.firstName ||
+                          lookupResult.customer?.firstName ||
+                          "-";
+                        const orderName =
+                          orderLabel.customName ||
+                          order.customer?.firstName ||
+                          t("assignment.noOrderName", "No name");
+
+                        return (
+                          <article
+                            key={order.id}
+                            className={
+                              active
+                                ? "ao-mobile-card ao-mobile-card--active"
+                                : "ao-mobile-card"
+                            }
+                            onClick={() => setSelectedOrderId(order.id)}
+                          >
+                            <div className="ao-mobile-card-top">
+                              <span className="ao-num-chip">{idx + 1}</span>
+                              {active ? (
+                                <span className="ao-badge ao-badge--selected">
+                                  <LuCheck size={12} strokeWidth={2.5} />
+                                  {t("assignment.selected", "Selected")}
                                 </span>
-                                {orderName !==
-                                  (order.customer?.firstName ||
-                                    lookupResult.customer?.firstName) && (
-                                  <span className="ao-customer-sub">{orderName}</span>
-                                )}
-                              </td>
-                              <td className="ao-td-type">
-                                <span className="ao-type-label">{orderLabel.typeWithSequenceLabel}</span>
-                              </td>
-                              <td className="ao-td-qty">{order.quantity || 1}</td>
-                              <td className="ao-td-amount">
-                                <AfCurrencyIcon size={12} />
-                                <span>{formatMoney(getOrderGrossTotal(order), language)}</span>
-                              </td>
-                              <td className="ao-td-status">
-                                {active ? (
-                                  <span className="ao-badge ao-badge--selected">
-                                    <span className="ao-badge-dot" />
-                                    {t("assignment.selected", "Selected")}
-                                  </span>
-                                ) : (
-                                  <span className="ao-badge ao-badge--ready">
-                                    {t("assignment.readyToAssign", "Ready")}
+                              ) : (
+                                <span className="ao-badge ao-badge--idle">
+                                  <LuCircle size={11} />
+                                  {t("assignment.notSelected", "Not selected")}
+                                </span>
+                              )}
+                            </div>
+                            <div className="ao-mobile-card-body">
+                              <div className="ao-mobile-row">
+                                <span className="ao-mobile-label">
+                                  {t("common.customer", "Customer")}
+                                </span>
+                                <strong className="ao-mobile-value">
+                                  {customerName}
+                                </strong>
+                                {orderName !== customerName && (
+                                  <span className="ao-customer-sub">
+                                    {orderName}
                                   </span>
                                 )}
-                              </td>
-                              <td className="ao-td-action">
-                                <button
-                                  type="button"
-                                  className={active ? "ao-btn ao-btn--active" : "ao-btn ao-btn--outline"}
-                                  onClick={() => setSelectedOrderId(order.id)}
-                                >
-                                  {active
-                                    ? t("assignment.selected", "Selected")
-                                    : t("common.select", "Select")}
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                              </div>
+                              <div className="ao-mobile-meta">
+                                <div className="ao-mobile-row">
+                                  <span className="ao-mobile-label">
+                                    {t("assignment.clothesType", "Type")}
+                                  </span>
+                                  <span className="ao-type-label">
+                                    {orderLabel.typeWithSequenceLabel}
+                                  </span>
+                                </div>
+                                <div className="ao-mobile-row">
+                                  <span className="ao-mobile-label">
+                                    {t("assignment.quantity", "Qty")}
+                                  </span>
+                                  <span className="ao-qty-value">
+                                    {order.quantity || 1}
+                                  </span>
+                                </div>
+                                <div className="ao-mobile-row">
+                                  <span className="ao-mobile-label">
+                                    {t("common.amount", "Amount")}
+                                  </span>
+                                  <span className="ao-amount">
+                                    <AfCurrencyIcon size={12} />
+                                    <span>
+                                      {formatMoney(
+                                        getOrderGrossTotal(order),
+                                        language,
+                                      )}
+                                    </span>
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  </>
                 )}
 
                 {selectedOrder && (
                   <div className="ao-assign">
-                    <div className="ao-assign-sep" />
                     <div className="ao-assign-head">
                       <h4 className="ao-assign-title">
                         {t("assignment.send", "Assign Order")}
@@ -573,17 +692,23 @@ export default function AssignOrders() {
                     <div className="ao-assign-body">
                       <div className="ao-assign-cards">
                         <div className="ao-assign-card">
-                          <span className="ao-assign-card-label">{selectedWorkerTypeLabel}</span>
+                          <span className="ao-assign-card-label">
+                            {selectedWorkerTypeLabel}
+                          </span>
                           <strong className="ao-assign-card-value">
                             {selectedWorker?.name ||
                               t("assignment.chooseAccount", "Choose account")}
                           </strong>
                           {selectedWorker?.phoneNumber && (
-                            <p className="ao-assign-card-sub">{selectedWorker.phoneNumber}</p>
+                            <p className="ao-assign-card-sub">
+                              {selectedWorker.phoneNumber}
+                            </p>
                           )}
                         </div>
                         <div className="ao-assign-card">
-                          <span className="ao-assign-card-label">{t("common.type", "Type")}</span>
+                          <span className="ao-assign-card-label">
+                            {t("common.type", "Type")}
+                          </span>
                           <strong className="ao-assign-card-value">
                             {selectedOrderLabel?.typeWithSequenceLabel}
                           </strong>
@@ -595,41 +720,20 @@ export default function AssignOrders() {
                         </div>
                       </div>
                       <div className="ao-assign-fields">
-                        <div className="ao-field">
-                          <label className="ao-field-label">
-                            {t("assignment.priceForWorker", "Price")}
-                            <span className="ao-required">*</span>
-                          </label>
-                          <div className="ao-money-input">
-                            <AfCurrencyIcon size={13} />
-                            <input
-                              className={`inp${assignPriceError ? " inp-err" : ""}`}
-                              value={assignmentPrice}
-                              onChange={(e) => {
-                                setAssignmentPrice(e.target.value);
-                                if (assignPriceError) setAssignPriceError("");
-                              }}
-                              placeholder={t("assignment.pricePlaceholder", "Enter price")}
-                              inputMode="decimal"
-                            />
-                          </div>
-                          {assignPriceError && (
-                            <p className="err-msg" role="alert" aria-live="polite">
-                              {assignPriceError}
-                            </p>
-                          )}
-                        </div>
-                        <div className="ao-field">
-                          <label className="ao-field-label">
+                        <div className="ao-field ao-field--full">
+                          <label className="ao-field-label" htmlFor="ao-note">
                             {t("assignment.note", "Note")}
                           </label>
                           <textarea
+                            id="ao-note"
                             className="inp"
                             rows={2}
                             value={assignmentNote}
                             onChange={(e) => setAssignmentNote(e.target.value)}
-                            placeholder={t("assignment.notePlaceholder", "Optional note")}
-                            style={{ resize: "vertical" }}
+                            placeholder={t(
+                              "assignment.notePlaceholder",
+                              "Optional note",
+                            )}
                           />
                         </div>
                       </div>
@@ -638,16 +742,10 @@ export default function AssignOrders() {
                       <button
                         type="button"
                         className="btn btn-gold"
-                        onClick={() => {
-                          const parsedPrice = parseNumberLocale(assignmentPrice);
-                          if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
-                            setAssignPriceError(t("assignment.invalidPrice", "Price must be a valid non-negative number."));
-                            return;
-                          }
-                          setAssignPriceError("");
-                          assignMutation.mutate();
-                        }}
-                        disabled={assignMutation.isPending || !workerType || !workerId}
+                        onClick={() => assignMutation.mutate()}
+                        disabled={
+                          assignMutation.isPending || !workerType || !workerId
+                        }
                       >
                         {assignMutation.isPending ? (
                           t("common.loading", "Loading...")
