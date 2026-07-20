@@ -127,7 +127,10 @@
     "allTransactions": "ټول پورونه",
     "damagedClothes": "خرابې جامې",
     "completedFromWorkers": "د کارکوونکو بشپړ شوي فرمایشونه",
-    "dailyTasks": "ورځني مصارف"
+    "dailyTasks": "ورځني مصارف",
+    "itemsDropdown": "نور اجناس",
+    "sellItem": "جنس پلورل",
+    "itemSalesRecords": "د اجناسو د پلور ریکارډونه"
   },
   "navbar": {
     "searchPlaceholder": "فرمایشونه او پیرودونکي ولټوئ...",

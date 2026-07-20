@@ -127,7 +127,10 @@
     "allTransactions": "همه قرض‌ها",
     "damagedClothes": "لباس‌های خراب",
     "completedFromWorkers": "تکمیل‌شده‌ها از کارگرها",
-    "dailyTasks": "مصارف روزانه"
+    "dailyTasks": "مصارف روزانه",
+    "itemsDropdown": "اجناس دیگر",
+    "sellItem": "فروش جنس",
+    "itemSalesRecords": "ریکارد فروش اجناس"
   },
   "navbar": {
     "searchPlaceholder": "جستجوی سفارش‌ها و مشتریان...",
