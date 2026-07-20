@@ -133,6 +133,8 @@
     "damagedClothes": "Damaged Clothes",
     "completedFromWorkers": "Completed From Workers",
     "dailyTasks": "Daily Expenses",
+    "itemsDropdown": "Other Items",
+    "sellItem": "Sell Item",
     "itemSalesRecords": "Sold Item Records"
   },
   "navbar": {

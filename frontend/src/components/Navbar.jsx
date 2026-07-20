@@ -691,7 +691,11 @@ function MonthDropdown({ onClose }) {
         <p className="month-dd-section-label">{t("navbar.selectYear", "Year")}</p>
         <div className="month-year-row">
           {years.map((y) => {
-            const yearEnabled = MONTHS.some((m) => isSelectableMonth(m.value, y));
+            const yearEnabled = MONTHS.some(
+              (m) =>
+                isSelectableMonth(m.value, y) &&
+                getMonthAccessMode(m.value, y) !== "disabled",
+            );
             const isCurrentYear = y === currentGregorianYear;
             const isSelectedYear = activeYear === y;
             return (
@@ -721,9 +725,10 @@ function MonthDropdown({ onClose }) {
         <p className="month-dd-section-label">{t("navbar.selectMonth", "Month")}</p>
         <div className="month-grid">
           {MONTHS.map((m) => {
-            const disabled = !isSelectableMonth(m.value, activeYear);
-            const reason = getMonthDisabledReason(m.value, activeYear);
+            const selectable = isSelectableMonth(m.value, activeYear);
             const accessMode = getMonthAccessMode(m.value, activeYear);
+            const disabled = !selectable || accessMode === "disabled";
+            const reason = getMonthDisabledReason(m.value, activeYear);
             const isCurrentMonth =
               m.value === currentGregorianMonth &&
               activeYear === currentGregorianYear;

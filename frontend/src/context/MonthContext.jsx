@@ -382,17 +382,13 @@ export function MonthProvider({ children }) {
 
         const maxYear = Number(data.allowedUntilYear) || CURRENT_YEAR;
 
-        const extMonth = maxMonth >= 12 ? 1 : maxMonth + 1;
-
-        const extYear = maxMonth >= 12 ? maxYear + 1 : maxYear;
-
 
 
         const isSelectedValid =
 
-          selectedYear < extYear ||
+          selectedYear < maxYear ||
 
-          (selectedYear === extYear && selectedMonth <= extMonth);
+          (selectedYear === maxYear && selectedMonth <= maxMonth);
 
 
 

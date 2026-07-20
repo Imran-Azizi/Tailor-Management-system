@@ -290,13 +290,13 @@ const ADMIN_SECTIONS = [
       {
         key: "itemsDropdown",
         label: "sidebar.itemsDropdown",
-        fallback: "اجناس دیگر",
+        fallback: "Other Items",
         icon: LuShoppingBag,
         children: [
           {
             key: "otherItems",
             label: "sidebar.sellItem",
-            fallback: "فروش جنس",
+            fallback: "Sell Item",
             path: "/other-items",
             icon: LuShoppingBag,
           },
@@ -533,13 +533,13 @@ const DOKAN_SECTIONS = [
       {
         key: "itemsDropdown",
         label: "sidebar.itemsDropdown",
-        fallback: "اجناس دیگر",
+        fallback: "Other Items",
         icon: LuShoppingBag,
         children: [
           {
             key: "otherItems",
             label: "sidebar.sellItem",
-            fallback: "فروش جنس",
+            fallback: "Sell Item",
             path: "/other-items",
             icon: LuShoppingBag,
           },
