@@ -11,8 +11,11 @@ import {
   LuX,
   LuRuler,
   LuPalette,
+  LuCopy,
+  LuClipboardPaste,
 } from "react-icons/lu";
 import api from "../../lib/api.js";
+import { notifyInfo, notifySuccess, notifyWarning } from "../../lib/toast.js";
 import { getOrderLabelParts, getOrderTypeLabel } from "../../lib/orderType.js";
 import {
   getMeasurementFieldLabel,
@@ -23,6 +26,10 @@ import {
   POCKET_FIELDS as POCKETS,
   STYLE_FIELDS as STYLES,
 } from "./measurementStepConfig.js";
+import {
+  applyMeasurementValues,
+  collectMeasurementValues,
+} from "./measurementCopyPaste.js";
 
 const REQUIRED_LABELS = {
   OUTFIT: {},
@@ -125,6 +132,11 @@ function MeasureBlock({
   defaultName = "",
   errors = {},
   setFieldError,
+  onCopy,
+  onPaste,
+  showCopyAction = false,
+  showPasteAction = false,
+  canPaste = false,
 }) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
@@ -249,6 +261,61 @@ function MeasureBlock({
                 onChange={(e) => onNameChange?.(e.target.value)}
                 placeholder={defaultName}
               />
+            </div>
+          )}
+
+          {(showCopyAction || showPasteAction) && (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 8,
+                marginBottom: 14,
+                flexWrap: "nowrap",
+                alignItems: "center",
+              }}
+            >
+              {showCopyAction && (
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={onCopy}
+                  style={{ whiteSpace: "nowrap" }}
+                >
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    <LuCopy size={14} />
+                    {t("createOrder.copyMeasurements")}
+                  </span>
+                </button>
+              )}
+              {showPasteAction && (
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={onPaste}
+                  disabled={!canPaste}
+                  style={{ whiteSpace: "nowrap" }}
+                >
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    <LuClipboardPaste size={14} />
+                    {t("createOrder.pasteMeasurements")}
+                  </span>
+                </button>
+              )}
             </div>
           )}
 
@@ -453,6 +520,11 @@ const Step3Measurements = forwardRef(function Step3Measurements({
 
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
+  const [copiedMeasurements, setCopiedMeasurements] = useState(null);
+
+  const hasCopiedMeasurements = Object.values(copiedMeasurements || {}).some(
+    (value) => String(value ?? "").trim() !== "",
+  );
 
   useImperativeHandle(ref, () => ({
     getDraftData: () => ({ measurements: data }),
@@ -478,6 +550,43 @@ const Step3Measurements = forwardRef(function Step3Measurements({
       };
       return { ...prev, [typeIdx]: nextSets };
     });
+  };
+
+  const copyMeasurementSet = (typeIdx, setIdx) => {
+    const currentSet = (data[typeIdx] || [{}])[setIdx] || {};
+    const measurementFields = FIELDS[orderTypeEntries[typeIdx]?.type] || [];
+    const nextCopiedValues = collectMeasurementValues(
+      currentSet,
+      measurementFields,
+    );
+
+    if (!Object.values(nextCopiedValues).some((value) => String(value ?? "").trim() !== "")) {
+      notifyInfo(t("createOrder.copyMeasurementsEmpty", "No measurement values to copy yet."));
+      return;
+    }
+
+    setCopiedMeasurements(nextCopiedValues);
+    notifySuccess(t("createOrder.measurementsCopied", "Measurements copied."));
+  };
+
+  const pasteMeasurementSet = (typeIdx, setIdx) => {
+    if (!hasCopiedMeasurements) {
+      notifyWarning(
+        t("createOrder.pasteMeasurementsDisabled", "Copy measurements first to paste them."),
+      );
+      return;
+    }
+
+    const currentSet = (data[typeIdx] || [{}])[setIdx] || {};
+    const measurementFields = FIELDS[orderTypeEntries[typeIdx]?.type] || [];
+    const nextSet = applyMeasurementValues(
+      currentSet,
+      copiedMeasurements,
+      measurementFields,
+    );
+
+    setMeasure(typeIdx, setIdx, nextSet);
+    notifySuccess(t("createOrder.measurementsPasted", "Measurements pasted."));
   };
 
   const clearFieldError = (typeIdx, setIdx, field) => {
@@ -713,6 +822,11 @@ const Step3Measurements = forwardRef(function Step3Measurements({
                     setFieldError={(field) =>
                       clearFieldError(typeIdx, setIdx, field)
                     }
+                    onCopy={() => copyMeasurementSet(typeIdx, setIdx)}
+                    onPaste={() => pasteMeasurementSet(typeIdx, setIdx)}
+                    showCopyAction={setIdx === 0}
+                    showPasteAction={setIdx > 0}
+                    canPaste={hasCopiedMeasurements}
                   />
                 );
               })}

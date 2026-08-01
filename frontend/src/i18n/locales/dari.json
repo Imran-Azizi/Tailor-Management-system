@@ -439,6 +439,12 @@
     "fixHighlightedOrderFields": "فیلدهای مشخص‌شده را اصلاح کنید.",
     "measurements": "اندازه‌ه گیری",
     "measurementsCopy": "هر سفارش را در یک کارت منظم تکمیل کنید. برای هر سفارش می‌توانید ست اضافی هم داشته باشید.",
+    "copyMeasurements": "Copy",
+    "pasteMeasurements": "Paste",
+    "copyMeasurementsEmpty": "هنوز هیچ مقدار اندازه‌ای برای کپی وجود ندارد.",
+    "measurementsCopied": "اندازه‌ها کپی شد.",
+    "measurementsPasted": "اندازه‌ها وارد شد.",
+    "pasteMeasurementsDisabled": "اول اندازه‌ها را کپی کنید تا بتوانید بچسبانید.",
     "fields": {
       "height": "قد",
       "shoulder": "شانه",

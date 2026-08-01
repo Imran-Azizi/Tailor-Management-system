@@ -372,6 +372,12 @@
     "fixHighlightedOrderFields": "مهرباني وکړئ نښه شوي فیلډونه سم کړئ.",
     "measurements": "اندازې",
     "measurementsCopy": "هر فرمایش په جلا او منظم کارت کې بشپړ کړئ. د هر فرمایش لپاره اضافي سېټ هم زیاتولی شئ.",
+    "copyMeasurements": "Copy",
+    "pasteMeasurements": "Paste",
+    "copyMeasurementsEmpty": "تر اوسه هیڅ د اندازه ارزښت برای کاپي شتون نه لری.",
+    "measurementsCopied": "اندازه‌وې کاپي شول.",
+    "measurementsPasted": "اندازه‌وې چپک شول.",
+    "pasteMeasurementsDisabled": "لومړی اندازه‌ها کاپي کړئ ترڅو چپکولی شي.",
     "fields": {
       "height": "قد",
       "shoulder": "شانه",

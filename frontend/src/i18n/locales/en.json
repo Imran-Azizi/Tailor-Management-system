@@ -448,6 +448,12 @@
     "fixHighlightedOrderFields": "Please fix the highlighted order type fields.",
     "measurements": "Measurements",
     "measurementsCopy": "Complete each order in a clean stack. Every selected order gets its own measurement card with optional extra sets.",
+    "copyMeasurements": "Copy",
+    "pasteMeasurements": "Paste",
+    "copyMeasurementsEmpty": "No measurement values to copy yet.",
+    "measurementsCopied": "Measurements copied.",
+    "measurementsPasted": "Measurements pasted.",
+    "pasteMeasurementsDisabled": "Copy measurements first to paste them.",
     "fields": {
       "height": "Height",
       "shoulder": "Shoulder",
