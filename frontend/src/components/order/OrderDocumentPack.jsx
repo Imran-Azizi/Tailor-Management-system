@@ -12,10 +12,7 @@ import {
   LuStore,
 } from "react-icons/lu";
 import AfCurrencyIcon from "../ui/AfCurrencyIcon.jsx";
-import {
-  SHOP_CONFIG,
-  getLocalizedShopValue,
-} from "../../config/shopConfig.js";
+import { SHOP_CONFIG, getLocalizedShopValue } from "../../config/shopConfig.js";
 import { assetUrl } from "../../lib/assets.js";
 import { toAsciiDigits } from "../../lib/normalize.js";
 import { formatCurrency } from "../../lib/currency.js";
@@ -37,6 +34,7 @@ import {
 import {
   getOrderDisplayName as getLocalizedOrderDisplayName,
   getOrderLabelParts as getLocalizedOrderLabelParts,
+  getOrderPrimaryDisplayName as getLocalizedOrderPrimaryDisplayName,
   getOrderTypeLabel as getLocalizedOrderTypeLabel,
 } from "../../lib/orderType.js";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -215,12 +213,35 @@ export function getOrderDisplayName(order, language, options) {
   return getLocalizedOrderDisplayName(order, language, options);
 }
 
+export function getOrderPrimaryDisplayName(
+  order,
+  customerName,
+  language,
+  options,
+) {
+  return getLocalizedOrderPrimaryDisplayName(
+    order,
+    customerName,
+    language,
+    options,
+  );
+}
+
 function getOrderLabelParts(order, language, options) {
   return getLocalizedOrderLabelParts(order, language, options);
 }
 
 function getCustomerDisplayName(customer) {
   return String(customer?.firstName || "").trim() || "-";
+}
+
+function getOrderSetDisplayName(order, customer, language, options = {}) {
+  return getLocalizedOrderPrimaryDisplayName(
+    order,
+    getCustomerDisplayName(customer),
+    language,
+    options,
+  );
 }
 
 function formatMoney(amount, language) {
@@ -273,6 +294,45 @@ function formatMetersWithUnit(value) {
   return formatted === "-" ? "-" : `${formatted}m`;
 }
 
+function extractTrailingOrderTypeNumber(label) {
+  const match = String(label || "")
+    .trim()
+    .match(/(\d+)\s*$/);
+  if (!match) return null;
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function compareCustomerBillOrderTypeLabels(leftLabel, rightLabel, locale = "fa") {
+  const left = String(leftLabel || "").trim();
+  const right = String(rightLabel || "").trim();
+  const leftNumber = extractTrailingOrderTypeNumber(left);
+  const rightNumber = extractTrailingOrderTypeNumber(right);
+
+  if (leftNumber != null && rightNumber != null && leftNumber !== rightNumber) {
+    return leftNumber - rightNumber;
+  }
+  if (leftNumber != null && rightNumber == null) return -1;
+  if (leftNumber == null && rightNumber != null) return 1;
+
+  return left.localeCompare(right, locale, {
+    numeric: true,
+    sensitivity: "base",
+  });
+}
+
+function sortCustomerBillRowsByOrderType(rows = [], locale = "fa") {
+  return [...(Array.isArray(rows) ? rows : [])].sort((left, right) => {
+    const byLabel = compareCustomerBillOrderTypeLabels(
+      left?.itemLabel,
+      right?.itemLabel,
+      locale,
+    );
+    if (byLabel !== 0) return byLabel;
+    return Number(left?.index || 0) - Number(right?.index || 0);
+  });
+}
+
 function formatDateWithEnglishDigits(dateInput, settings, timeZone) {
   const value = dateInput ? new Date(dateInput) : new Date();
   if (Number.isNaN(value.getTime())) return "-";
@@ -309,7 +369,8 @@ function formatTimeWithEnglishDigits(dateInput, settings, timeZone) {
 function hasBillFieldValue(value) {
   if (value === null || value === undefined || value === false) return false;
   if (typeof value === "string") return hasPrintableBillValue(value);
-  if (Array.isArray(value)) return value.some((item) => hasBillFieldValue(item));
+  if (Array.isArray(value))
+    return value.some((item) => hasBillFieldValue(item));
   return true;
 }
 
@@ -325,7 +386,8 @@ const EMPTY_BILL_TEXT_VALUES = new Set([
 
 export function hasPrintableBillValue(value) {
   if (value === null || value === undefined || value === false) return false;
-  if (Array.isArray(value)) return value.some((item) => hasPrintableBillValue(item));
+  if (Array.isArray(value))
+    return value.some((item) => hasPrintableBillValue(item));
   if (typeof value === "number") return Number.isFinite(value);
   if (typeof value === "boolean") return value;
   const text = String(value).trim();
@@ -401,7 +463,7 @@ function RakhtSummary({ details }) {
         </p>
       ) : null}
       {metaParts.length > 0 ? (
-        <p className="mt-0.5 text-[8px] text-slate-600 [direction:ltr] [unicode-bidi:embed]">
+        <p className="mt-0.5 text-[9px] text-slate-600 [direction:ltr] [unicode-bidi:embed]">
           {metaParts.join(" - ")}
         </p>
       ) : null}
@@ -462,17 +524,17 @@ function getPrintableText(value, settings, fallback = "-") {
 }
 
 function resolvePrintShop(...sources) {
-  return (
-    sources.find((source) => source && typeof source === "object") || null
-  );
+  return sources.find((source) => source && typeof source === "object") || null;
 }
 
 function PrintBillHeader({ settings, shop }) {
-  const shopName = shop?.systemName || shop?.businessName || PRINT_SHOP_HEADER_NAME;
+  const shopName =
+    shop?.systemName || shop?.businessName || PRINT_SHOP_HEADER_NAME;
   const tenantLogoUrl = String(shop?.logoUrl || "").trim();
   const defaultLogoUrl = SHOP_CONFIG.logoUrl || SHOP_CONFIG.logo || "";
   const logoUrl = assetUrl(tenantLogoUrl || defaultLogoUrl);
-  const shopAddress = shop?.address || getPrintableText(SHOP_CONFIG.address, settings, "");
+  const shopAddress =
+    shop?.address || getPrintableText(SHOP_CONFIG.address, settings, "");
   const shopPhones = [shop?.phone, shop?.mobile].filter(Boolean);
   const fallbackPhones = SHOP_CONFIG.phones || [];
   const phoneList = shopPhones.length ? shopPhones : fallbackPhones;
@@ -491,7 +553,11 @@ function PrintBillHeader({ settings, shop }) {
         <div className="print-bill-header-brand">
           <div className="print-bill-header-logo">
             {logoUrl ? (
-              <img src={logoUrl} alt={shopName} className="print-bill-header-logo-img" />
+              <img
+                src={logoUrl}
+                alt={shopName}
+                className="print-bill-header-logo-img"
+              />
             ) : (
               <div className="print-bill-header-logo-fallback">
                 {shopInitials || "KR"}
@@ -503,13 +569,21 @@ function PrintBillHeader({ settings, shop }) {
             dir={settings.isRtl ? "rtl" : "ltr"}
           >
             <p className="print-bill-header-name print-bill-header-info-row">
-              <LuStore className="print-bill-header-line-icon print-bill-header-line-icon--name" aria-hidden="true" />
+              <LuStore
+                className="print-bill-header-line-icon print-bill-header-line-icon--name"
+                aria-hidden="true"
+              />
               <span className="print-bill-header-info-text">{shopName}</span>
             </p>
             {shopAddress ? (
               <p className="print-bill-header-meta print-bill-header-address print-bill-header-info-row print-shop-meta">
-                <LuMapPin className="print-bill-header-line-icon print-bill-header-line-icon--address" aria-hidden="true" />
-                <span className="print-bill-header-info-text">{shopAddress}</span>
+                <LuMapPin
+                  className="print-bill-header-line-icon print-bill-header-line-icon--address"
+                  aria-hidden="true"
+                />
+                <span className="print-bill-header-info-text">
+                  {shopAddress}
+                </span>
               </p>
             ) : null}
             {phoneList.length ? (
@@ -518,9 +592,17 @@ function PrintBillHeader({ settings, shop }) {
                 dir="ltr"
               >
                 {phoneList.map((phone, index) => (
-                  <span className="print-bill-header-phone-item" key={`${phone}-${index}`}>
-                    <LuPhone className="print-bill-header-line-icon print-bill-header-line-icon--phone" aria-hidden="true" />
-                    <span className="print-bill-header-phone-text">{phone}</span>
+                  <span
+                    className="print-bill-header-phone-item"
+                    key={`${phone}-${index}`}
+                  >
+                    <LuPhone
+                      className="print-bill-header-line-icon print-bill-header-line-icon--phone"
+                      aria-hidden="true"
+                    />
+                    <span className="print-bill-header-phone-text">
+                      {phone}
+                    </span>
                   </span>
                 ))}
               </div>
@@ -614,7 +696,11 @@ export function CustomerBill({ customer, order, shop }) {
   const qty = order?.quantity || 1;
   const orderLabelParts = getOrderLabelParts(order, settings.langCode);
   const orderTypeLabel = orderLabelParts.typeWithSequenceLabel;
-  const customerNameLabel = getCustomerDisplayName(customer);
+  const customerNameLabel = getOrderSetDisplayName(
+    order,
+    customer,
+    settings.langCode,
+  );
   const { date, time } = getPrintDateTime(
     settings,
     order?.createdAt || Date.now(),
@@ -622,8 +708,7 @@ export function CustomerBill({ customer, order, shop }) {
   const txt = settings.text;
   const extraTxt = BILL_EXTRA_TEXT[settings.langCode] || BILL_EXTRA_TEXT.en;
   const safeTxt = (key) => getPrintableText(txt[key], settings, key);
-  const boxName =
-    order?.box?.boxName || order?.foreignBox?.boxName || "";
+  const boxName = order?.box?.boxName || order?.foreignBox?.boxName || "";
   const rakhtDetails = getRakhtDetails(order);
   const alignClass = settings.isRtl ? "text-right" : "text-left";
   const tableHeadClass = settings.isRtl
@@ -776,7 +861,9 @@ export function CustomerBill({ customer, order, shop }) {
       show: true,
       final: true,
       render: () =>
-        remaining > 0 ? formatMoney(remaining, settings.langCode) : txt.paidInFull,
+        remaining > 0
+          ? formatMoney(remaining, settings.langCode)
+          : txt.paidInFull,
     },
   ].filter((column) => column.show);
 
@@ -791,14 +878,14 @@ export function CustomerBill({ customer, order, shop }) {
 
       {isEmergency && (
         <div
-          className={`border-b border-slate-800 bg-rose-50 px-2 py-1.5 text-[10px] font-bold text-rose-700 ${alignClass}`}
+          className={`border-b border-slate-800 bg-rose-50 px-2 py-1.5 text-[11px] font-bold text-rose-700 ${alignClass}`}
         >
           {t("createOrder.emergencyOrder")}
         </div>
       )}
 
       <div className="print-customer-combined-wrap print-bill-table-wrap">
-        <table className="print-customer-combined-table print-reference-detail-table w-full border-collapse table-fixed text-[9px] text-slate-800">
+        <table className="print-customer-combined-table print-reference-detail-table w-full border-collapse table-fixed text-[10px] text-slate-800">
           <thead>
             <tr>
               {detailColumns.map((column, index) => (
@@ -841,7 +928,7 @@ export function CustomerBill({ customer, order, shop }) {
             })}
           </div>
           <div
-            className="print-customer-rakht-grid grid text-[9px] text-slate-800"
+            className="print-customer-rakht-grid grid text-[10px] text-slate-800"
             style={{
               gridTemplateColumns: `repeat(${rakhtInfoFields.length}, minmax(0, 1fr))`,
             }}
@@ -868,7 +955,7 @@ export function CustomerBill({ customer, order, shop }) {
       <div className={`print-bill-section-head ${alignClass}`}>
         {txt.financialSummary}
       </div>
-      <table className="print-customer-finance-table print-bill-closing-table w-full border-collapse table-fixed text-[9px] text-slate-800">
+      <table className="print-customer-finance-table print-bill-closing-table w-full border-collapse table-fixed text-[11px] text-slate-800">
         <thead>
           <tr>
             {financeColumns.map((column, index) => (
@@ -917,8 +1004,7 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
   let txt = settings.text;
   let extraTxt = BILL_EXTRA_TEXT[settings.langCode] || BILL_EXTRA_TEXT.en;
   const safeTxt = (key) => getPrintableText(txt[key], settings, key);
-  const safeExtraTxt = (key) =>
-    getPrintableText(extraTxt[key], settings, key);
+  const safeExtraTxt = (key) => getPrintableText(extraTxt[key], settings, key);
   const timestamp =
     orders?.[0]?.createdAt ||
     customer?.updatedAt ||
@@ -929,7 +1015,6 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
   const billNo = hasPrintableBillValue(customer?.billNumber)
     ? toEnglishDigits(customer.billNumber)
     : "";
-  const customerName = getCustomerDisplayName(customer);
   const customerPhone = hasPrintableBillValue(customer?.phoneNumber)
     ? toEnglishDigits(customer.phoneNumber)
     : "";
@@ -940,33 +1025,39 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
     return acc;
   }, {});
 
-  const rowItems = safeOrders.map((order, index) => {
-    const typeKey = order?.type || "ITEM";
-    typeIndex[typeKey] = (typeIndex[typeKey] || 0) + 1;
-    const { typeWithSequenceLabel } = getOrderLabelParts(
-      order,
-      settings.langCode,
-      {
+  const rowItems = sortCustomerBillRowsByOrderType(
+    safeOrders.map((order, index) => {
+      const typeKey = order?.type || "ITEM";
+      typeIndex[typeKey] = (typeIndex[typeKey] || 0) + 1;
+      const sequenceOptions = {
         totalByType: typeCountTotals[typeKey],
         sequenceByType: typeIndex[typeKey],
-      },
-    );
-    const grossTotal = getOrderGrossTotal(order);
-    return {
-      order,
-      index,
-      typeKey,
-      itemLabel: typeWithSequenceLabel,
-      customerNameLabel: customerName,
-      qty: Number(order?.quantity || 1),
-      amount: grossTotal,
-      boxName:
-        order?.box?.boxName ||
-        order?.foreignBox?.boxName ||
-        "",
-      rakhtDetails: getRakhtDetails(order),
-    };
-  });
+      };
+      const { typeWithSequenceLabel } = getOrderLabelParts(
+        order,
+        settings.langCode,
+        sequenceOptions,
+      );
+      const grossTotal = getOrderGrossTotal(order);
+      return {
+        order,
+        index,
+        typeKey,
+        itemLabel: typeWithSequenceLabel,
+        customerNameLabel: getOrderSetDisplayName(
+          order,
+          customer,
+          settings.langCode,
+          sequenceOptions,
+        ),
+        qty: Number(order?.quantity || 1),
+        amount: grossTotal,
+        boxName: order?.box?.boxName || order?.foreignBox?.boxName || "",
+        rakhtDetails: getRakhtDetails(order),
+      };
+    }),
+    settings.htmlLang || settings.locale || "fa",
+  );
 
   const totals = safeOrders.reduce(
     (acc, item) => {
@@ -1056,7 +1147,9 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
       header: safeTxt("customerName"),
       width: "14%",
       align: alignClass,
-      show: rowItems.some((row) => hasPrintableBillValue(row.customerNameLabel)),
+      show: rowItems.some((row) =>
+        hasPrintableBillValue(row.customerNameLabel),
+      ),
       className: "font-semibold",
       render: (row) => <div>{row.customerNameLabel}</div>,
     },
@@ -1152,14 +1245,14 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
 
       {billIsEmergency ? (
         <div
-          className={`border-b border-slate-800 bg-rose-50 px-2.5 py-1.5 text-[10px] font-bold text-rose-700 ${alignClass}`}
+          className={`border-b border-slate-800 bg-rose-50 px-2.5 py-1.5 text-[11px] font-bold text-rose-700 ${alignClass}`}
         >
           {t("createOrder.emergencyOrder")}
         </div>
       ) : null}
 
       <div className="print-customer-combined-wrap print-bill-table-wrap">
-        <table className="print-customer-combined-table print-reference-detail-table w-full border-collapse table-fixed text-[9px] text-slate-800">
+        <table className="print-customer-combined-table print-reference-detail-table w-full border-collapse table-fixed text-[10px] text-slate-800">
           <thead>
             <tr>
               {detailColumns.map((column, index) => (
@@ -1178,7 +1271,7 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
               <tr>
                 <td
                   colSpan={Math.max(detailColumns.length, 1)}
-                  className={`border-b border-slate-800 px-2 py-2 text-[10px] ${alignClass}`}
+                  className={`border-b border-slate-800 px-2 py-2 text-[11px] ${alignClass}`}
                 >
                   {t("common.noData")}
                 </td>
@@ -1219,13 +1312,13 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
               <div key={row.key} className="print-customer-rakht-row">
                 {rakhtInfoRows.length > 1 ? (
                   <div
-                    className={`border-b border-slate-800 bg-amber-50 px-2 py-1 text-[8px] font-bold text-amber-800 ${alignClass}`}
+                    className={`border-b border-slate-800 bg-amber-50 px-2 py-1 text-[9px] font-bold text-amber-800 ${alignClass}`}
                   >
                     {row.itemLabel}
                   </div>
                 ) : null}
                 <div
-                  className="print-customer-rakht-grid grid text-[9px] text-slate-800"
+                  className="print-customer-rakht-grid grid text-[10px] text-slate-800"
                   style={{
                     gridTemplateColumns: `repeat(${row.fields.length}, minmax(0, 1fr))`,
                   }}
@@ -1255,7 +1348,7 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
       <div className={`print-bill-section-head ${alignClass}`}>
         {safeTxt("financialSummary")}
       </div>
-      <table className="print-customer-finance-table print-bill-closing-table w-full border-collapse table-fixed text-[10px] text-slate-800">
+      <table className="print-customer-finance-table print-bill-closing-table w-full border-collapse table-fixed text-[11px] text-slate-800">
         <thead>
           <tr>
             {financeColumns.map((column, index) => (
@@ -1371,13 +1464,16 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
   let txt = settings.text;
   let extraTxt = BILL_EXTRA_TEXT[settings.langCode] || BILL_EXTRA_TEXT.en;
   const safeTxt = (key) => getPrintableText(txt[key], settings, key);
-  const safeExtraTxt = (key) =>
-    getPrintableText(extraTxt[key], settings, key);
+  const safeExtraTxt = (key) => getPrintableText(extraTxt[key], settings, key);
   const dateValue = order?.createdAt || Date.now();
   const { date, time } = getPrintDateTime(settings, dateValue);
   const orderLabelParts = getOrderLabelParts(order, settings.langCode);
   const orderTypeLabel = orderLabelParts.typeWithSequenceLabel;
-  const customerNameLabel = getCustomerDisplayName(customer);
+  const customerNameLabel = getOrderSetDisplayName(
+    order,
+    customer,
+    settings.langCode,
+  );
   const orderBoxName = order?.box?.boxName || order?.foreignBox?.boxName || "";
   const alignClass = settings.isRtl ? "text-right" : "text-left";
   const tableHeadClass = settings.isRtl
@@ -1551,7 +1647,8 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
       value: hasPrintableBillValue(customer?.billNumber)
         ? `#${toEnglishDigits(customer.billNumber)}`
         : "",
-      valueClass: "print-bill-number mt-0.5 [direction:ltr] [unicode-bidi:embed]",
+      valueClass:
+        "print-bill-number mt-0.5 [direction:ltr] [unicode-bidi:embed]",
     },
     {
       key: "name",
@@ -1578,7 +1675,10 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
       valueClass:
         "print-bill-kv-value print-bill-kv-value--qty mt-0.5 [direction:ltr] [unicode-bidi:embed]",
     },
-  ].filter((item) => hasPrintableBillValue(item.label) && hasPrintableBillValue(item.value));
+  ].filter(
+    (item) =>
+      hasPrintableBillValue(item.label) && hasPrintableBillValue(item.value),
+  );
 
   return (
     <div
@@ -1591,7 +1691,7 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
 
       {order?.isEmergency && (
         <div
-          className={`border-b border-slate-800 bg-rose-50 px-2 py-1.5 text-[10px] font-bold text-rose-700 ${alignClass}`}
+          className={`border-b border-slate-800 bg-rose-50 px-2 py-1.5 text-[11px] font-bold text-rose-700 ${alignClass}`}
         >
           {t("createOrder.emergencyOrder")}
         </div>
@@ -1599,7 +1699,7 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
 
       {tailorInfoItems.length > 0 ? (
         <div
-          className="print-tailor-info-strip print-bill-kv-strip grid text-[9px] text-slate-800"
+          className="print-tailor-info-strip print-bill-kv-strip grid text-[10px] text-slate-800"
           style={{
             gridTemplateColumns: `repeat(${tailorInfoItems.length}, minmax(0, 1fr))`,
           }}
@@ -1739,7 +1839,7 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
             })}
           </div>
           <div
-            className="print-tailor-fabric-grid text-[10px]"
+            className="print-tailor-fabric-grid text-[11px]"
             style={{
               gridTemplateColumns: `repeat(${rakhtFields.length}, minmax(0, 1fr))`,
             }}
@@ -1749,7 +1849,7 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
                 key={field.key}
                 className={`print-bill-kv-cell ${getBorderClass(index, rakhtFields)} px-2 py-1.5 ${alignClass}`}
               >
-                <p className="print-bill-th print-bill-th--upper text-[8px] text-slate-500">
+                <p className="print-bill-th print-bill-th--upper text-[9px] text-slate-500">
                   {field.label}
                 </p>
                 {field.render()}
@@ -2046,8 +2146,7 @@ export async function exportPdf(id, filename) {
     const pageHeight = pdf.internal.pageSize.getHeight();
     const renderWidth = pageWidth;
     const renderHeight = (canvas.height * renderWidth) / canvas.width;
-    const fitScale =
-      renderHeight > pageHeight ? pageHeight / renderHeight : 1;
+    const fitScale = renderHeight > pageHeight ? pageHeight / renderHeight : 1;
     const finalWidth = renderWidth * fitScale;
     const finalHeight = renderHeight * fitScale;
     const offsetX = (pageWidth - finalWidth) / 2;

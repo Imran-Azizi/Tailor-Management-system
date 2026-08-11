@@ -4,8 +4,8 @@ import { useTranslation } from "react-i18next";
 import { formatCurrency } from "../../lib/currency.js";
 import { isRtlLanguage } from "../../lib/locale.js";
 import {
-  getOrderDisplayName,
   getOrderTypeLabel,
+  resolveAssignedSetName,
   withOrderTypeSequenceMeta,
 } from "../../lib/orderType.js";
 
@@ -38,38 +38,33 @@ function sanitizeWholeInput(raw = "") {
   );
 }
 
-function cleanDuplicateOrderTypeLabel(label, type, language = "en") {
-  const cleanLabel = String(label || "").replace(/\s+/g, " ").trim();
-  const typeLabel = getOrderTypeLabel(type, language);
-  const cleanTypeLabel = String(typeLabel || "").replace(/\s+/g, " ").trim();
+function getDisplayLabel(entry, index, language = "en", customerName = "") {
+  const isPrimarySet =
+    Number(entry?.setIndex) === 0 ||
+    (entry?.setIndex == null && index === 0);
 
-  if (!cleanLabel) return cleanTypeLabel || "-";
-  if (!cleanTypeLabel || cleanTypeLabel === "-") return cleanLabel;
-
-  const repeatedTypeLabel = `${cleanTypeLabel} ${cleanTypeLabel}`;
-  if (cleanLabel === repeatedTypeLabel) return cleanTypeLabel;
-
-  return cleanLabel;
-}
-
-function getDisplayLabel(entry, index, language = "en") {
-  const label = entry?.displayName?.trim()
-    ? entry.displayName.trim()
-    : getOrderDisplayName(
-        {
-          ...entry,
-          orderName: entry?.name?.trim() || entry?.orderName?.trim() || "",
-          orderTypeSequence:
-            Number(entry?.orderTypeSequence ?? entry?.sequence) || index + 1,
-          orderTypeTotal: Number(entry?.orderTypeTotal) || 1,
-        },
-        language,
-      );
-
-  return cleanDuplicateOrderTypeLabel(
-    label,
-    entry?.type,
-    language,
+  return (
+    resolveAssignedSetName(
+      {
+        ...entry,
+        orderName:
+          entry?.displayName?.trim() ||
+          entry?.name?.trim() ||
+          entry?.orderName?.trim() ||
+          "",
+        orderTypeSequence:
+          Number(entry?.orderTypeSequence ?? entry?.sequence) || index + 1,
+        orderTypeTotal: Number(entry?.orderTypeTotal) || 1,
+      },
+      isPrimarySet ? customerName : "",
+      language,
+      {
+        isPrimarySet,
+        allowTypeFallback: false,
+      },
+    ) ||
+    getOrderTypeLabel(entry?.type, language) ||
+    "-"
   );
 }
 
@@ -77,6 +72,7 @@ function buildBillingEntries(
   orderTypes = [],
   orderItems = [],
   language = "en",
+  customerName = "",
 ) {
   if (Array.isArray(orderItems) && orderItems.length > 0) {
     return withOrderTypeSequenceMeta(orderItems).map((item, index) => ({
@@ -84,7 +80,7 @@ function buildBillingEntries(
       sequence:
         Number(item?.orderTypeSequence ?? item?.sequence ?? 0) || index + 1,
       billingKey: String(item?.billingKey ?? item?.key ?? index),
-      displayName: getDisplayLabel(item, index, language),
+      displayName: getDisplayLabel(item, index, language, customerName),
     }));
   }
 
@@ -93,7 +89,7 @@ function buildBillingEntries(
     sequence:
       Number(entry?.orderTypeSequence ?? entry?.sequence ?? 0) || index + 1,
     billingKey: String(index),
-    displayName: getDisplayLabel(entry, index, language),
+    displayName: getDisplayLabel(entry, index, language, customerName),
   }));
 }
 
@@ -162,11 +158,7 @@ function BillingCard({ entry, value, onChange, billingKey }) {
         }}
       >
         <span className="badge bg-gold" style={{ fontSize: 11 }}>
-          {cleanDuplicateOrderTypeLabel(
-            entry.displayName,
-            entry.type,
-            language,
-          )}
+          {entry.displayName}
         </span>
         {entry.isEmergency && (
           <span className="badge bg-red" style={{ fontSize: 10 }}>
@@ -328,19 +320,30 @@ function BillingCard({ entry, value, onChange, billingKey }) {
   );
 }
 
-const Step4Billing = forwardRef(function Step4Billing({
-  onNext,
-  onBack,
-  orderTypes = [],
-  orderItems = [],
-  initial = {},
-  loading = false,
-}, ref) {
+const Step4Billing = forwardRef(function Step4Billing(
+  {
+    onNext,
+    onBack,
+    orderTypes = [],
+    orderItems = [],
+    customerName = "",
+    initial = {},
+    loading = false,
+  },
+  ref,
+) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
+  const primaryCustomerName = String(customerName || "").trim();
   const billingEntries = useMemo(
-    () => buildBillingEntries(orderTypes, orderItems, language),
-    [orderItems, orderTypes, language],
+    () =>
+      buildBillingEntries(
+        orderTypes,
+        orderItems,
+        language,
+        primaryCustomerName,
+      ),
+    [orderItems, orderTypes, language, primaryCustomerName],
   );
   const [billing, setBilling] = useState(() =>
     normalizeInitial(billingEntries, initial),

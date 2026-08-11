@@ -1,4 +1,7 @@
-export function collectMeasurementValues(setValue = {}, measurementFields = []) {
+export function collectMeasurementValues(
+  setValue = {},
+  measurementFields = [],
+) {
   const copiedValues = {};
 
   for (const [fieldKey] of measurementFields) {
@@ -10,7 +13,11 @@ export function collectMeasurementValues(setValue = {}, measurementFields = []) 
   return copiedValues;
 }
 
-export function applyMeasurementValues(currentSet = {}, copiedValues = {}, measurementFields = []) {
+export function applyMeasurementValues(
+  currentSet = {},
+  copiedValues = {},
+  measurementFields = [],
+) {
   const nextSet = { ...currentSet };
 
   for (const [fieldKey] of measurementFields) {

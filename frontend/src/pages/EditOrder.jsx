@@ -8,7 +8,7 @@ import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { parseNumberLocale } from "../lib/normalize.js";
 import i18n from "../i18n/index.js";
-import { getOrderLabelParts, getOrderTypeLabel } from "../lib/orderType.js";
+import { getOrderLabelParts, getOrderTypeLabel, resolveAssignedSetName } from "../lib/orderType.js";
 import { Spinner } from "../components/ui/index.jsx";
 import Step1CustomerInfo from "../components/order/Step1CustomerInfo.jsx";
 import Step2RakhtSelection from "../components/order/Step2RakhtSelection.jsx";
@@ -186,11 +186,23 @@ export default function EditOrder() {
           totalByType: ordersForType.length,
           sequenceByType: setIdx + 1,
         }).typeWithSequenceLabel;
+        const assignedName = resolveAssignedSetName(
+          {
+            type: order.type,
+            orderName: order.orderName || "",
+            orderTypeSequence: setIdx + 1,
+            orderTypeTotal: ordersForType.length,
+          },
+          setIdx === 0 ? customer.firstName || "" : "",
+          i18n.resolvedLanguage || i18n.language,
+          {
+            isPrimarySet: setIdx === 0,
+            allowTypeFallback: true,
+          },
+        );
         return {
           ...safe,
-          __name:
-            order.orderName ||
-            defaultName,
+          __name: assignedName || order.orderName || defaultName,
           __orderId: order.id,
         };
       });
@@ -206,7 +218,11 @@ export default function EditOrder() {
       });
     });
 
-    const orderItems = buildOrderItems(orderTypes, measurements);
+    const orderItems = buildOrderItems(
+      orderTypes,
+      measurements,
+      customer.firstName || "",
+    );
     const orderById = new Map(
       editableOrders.map((order) => [order.id, order]),
     );
@@ -284,6 +300,7 @@ export default function EditOrder() {
     const orderItems = buildOrderItems(
       merged.orderTypes || [],
       merged.measurements || {},
+      merged.firstName || "",
     );
 
     const payload = {
@@ -312,7 +329,12 @@ export default function EditOrder() {
         return {
           id: item.orderId || undefined,
           type: item.type,
-          orderName: resolveOrderName(item.measurements),
+          orderName: resolveOrderName(
+            item.measurements,
+            item.type,
+            merged.firstName || "",
+            item.setIndex === 0,
+          ),
           isEmergency: billEmergency.isEmergency,
           emergencyExpiry: billEmergency.emergencyExpiry,
           measurements: meas,
@@ -491,11 +513,13 @@ export default function EditOrder() {
                 const orderItems = buildOrderItems(
                   form.orderTypes || [],
                   d.measurements || {},
+                  form.firstName || "",
                 );
                 next({ ...d, orderItems });
               }}
               onBack={back}
               orderTypes={form.orderTypes}
+              customerName={form.firstName || ""}
               initial={form.measurements}
             />
           )}
@@ -506,6 +530,7 @@ export default function EditOrder() {
               initial={form}
               orderTypes={form.orderTypes}
               orderItems={form.orderItems}
+              customerName={form.firstName || ""}
             />
           )}
           {step === 4 && (
@@ -518,6 +543,7 @@ export default function EditOrder() {
               onBack={back}
               orderTypes={form.orderTypes}
               orderItems={form.orderItems}
+              customerName={form.firstName || ""}
               initial={form.billing}
               loading={mutation.isPending}
             />
@@ -530,12 +556,31 @@ export default function EditOrder() {
   );
 }
 
-function resolveOrderName(measurementValue) {
+function resolveOrderName(
+  measurementValue,
+  type,
+  customerName = "",
+  isPrimarySet = false,
+) {
   const sets = Array.isArray(measurementValue)
     ? measurementValue
     : [measurementValue || {}];
   const namedSet = sets.find((set) => set?.__name?.trim());
-  return namedSet?.__name?.trim() || undefined;
+  const rawName = namedSet?.__name?.trim() || "";
+  const language = i18n.resolvedLanguage || i18n.language || "en";
+  const assigned = resolveAssignedSetName(
+    {
+      type,
+      orderName: rawName,
+    },
+    isPrimarySet ? customerName : "",
+    language,
+    {
+      isPrimarySet,
+      allowTypeFallback: false,
+    },
+  );
+  return assigned || undefined;
 }
 
 function resolveBillEmergency(orderTypes) {
@@ -630,24 +675,44 @@ function normalizeMeasurementSets(measurementValue) {
   return [{}];
 }
 
-function buildOrderItems(orderTypes, measurements) {
+function buildOrderItems(orderTypes, measurements, customerName = "") {
   const items = [];
   const typeCounter = {};
+  const language = i18n.resolvedLanguage || i18n.language || "en";
+  const primaryCustomerName = String(customerName || "").trim();
 
   (orderTypes || []).forEach((entry, typeIndex) => {
     const sets = normalizeMeasurementSets(measurements?.[typeIndex]);
     sets.forEach((setValue, setIndex) => {
       typeCounter[entry.type] = (typeCounter[entry.type] || 0) + 1;
       const sequence = typeCounter[entry.type];
+      const rawName = setValue?.__name?.trim() || "";
+      const assignedName = resolveAssignedSetName(
+        {
+          type: entry.type,
+          orderName: rawName,
+          orderTypeSequence: sequence,
+          orderTypeTotal: sets.length,
+        },
+        setIndex === 0 ? primaryCustomerName : "",
+        language,
+        {
+          isPrimarySet: setIndex === 0,
+          allowTypeFallback: false,
+        },
+      );
       const displayName =
-        setValue?.__name?.trim() ||
+        assignedName ||
+        rawName ||
         getOrderLabelParts(
           {
             type: entry.type,
             orderTypeSequence: sequence,
-            orderTypeTotal: (orderTypes || []).filter((item) => item?.type === entry.type).length,
+            orderTypeTotal: (orderTypes || []).filter(
+              (item) => item?.type === entry.type,
+            ).length,
           },
-          i18n.resolvedLanguage || i18n.language || "en",
+          language,
         ).typeWithSequenceLabel;
       items.push({
         billingKey: `${typeIndex}-${setIndex}`,
@@ -655,6 +720,8 @@ function buildOrderItems(orderTypes, measurements) {
         setIndex,
         sequence,
         type: entry.type,
+        name: displayName,
+        orderName: displayName,
         displayName,
         measurements: { ...setValue, __name: displayName },
         orderId: setValue?.__orderId || null,

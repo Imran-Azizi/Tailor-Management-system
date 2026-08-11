@@ -308,6 +308,45 @@ export function getOrderPrimaryDisplayName(
   return fallbackName || "-";
 }
 
+/**
+ * Resolves the assigned set/order name for wizard cards, persistence, and bills.
+ * Never falls back to the clothing/order-type label when a customer or custom
+ * set name is available.
+ */
+export function resolveAssignedSetName(
+  order = {},
+  customerName = "",
+  language = "en",
+  options = {},
+) {
+  const rawName = String(
+    order?.orderName ||
+      order?.name ||
+      order?.displayName ||
+      order?.orderDisplayName ||
+      "",
+  ).trim();
+
+  const normalizedOrder = {
+    ...order,
+    orderName: rawName,
+  };
+
+  const primary = getOrderPrimaryDisplayName(
+    normalizedOrder,
+    customerName,
+    language,
+    options,
+  );
+  if (primary && primary !== "-") return primary;
+
+  if (options.allowTypeFallback) {
+    return getOrderTypeWithSequenceLabel(normalizedOrder, language, options);
+  }
+
+  return "";
+}
+
 export function getOrderDisplayName(order, language = "en", options = {}) {
   if (!order || typeof order !== "object") return "-";
   return getOrderLabelParts(order, language, options).fullLabel;

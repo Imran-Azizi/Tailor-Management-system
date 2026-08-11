@@ -1,4 +1,10 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useState,
+} from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import Select from "react-select";
@@ -6,8 +12,8 @@ import { LuRuler } from "react-icons/lu";
 import api from "../../lib/api.js";
 import { Field } from "../ui/index.jsx";
 import {
-  getOrderDisplayName,
   getOrderTypeLabel,
+  resolveAssignedSetName,
   withOrderTypeSequenceMeta,
 } from "../../lib/orderType.js";
 import { isRtlLanguage as detectRtlLanguage } from "../../lib/locale.js";
@@ -110,18 +116,23 @@ const buildRakhtSelectStyles = () => ({
   }),
 });
 
-const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
-  onNext,
-  onBack,
-  initial = {},
-  orderTypes = [],
-  orderItems = [],
-}, ref) {
+const Step2RakhtSelection = forwardRef(function Step2RakhtSelection(
+  {
+    onNext,
+    onBack,
+    initial = {},
+    orderTypes = [],
+    orderItems = [],
+    customerName = "",
+  },
+  ref,
+) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
   const isRtlLanguage = detectRtlLanguage(language);
   const selectStyles = useMemo(() => buildRakhtSelectStyles(), []);
   const [validationError, setValidationError] = useState("");
+  const primaryCustomerName = String(customerName || "").trim();
 
   const { data: rakhtRows = [], isLoading } = useQuery({
     queryKey: ["rakht-list"],
@@ -137,15 +148,30 @@ const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
             item?.billingKey ?? `${item?.type || "ITEM"}-${index}`,
           );
           const type = item?.type;
-          const fallbackLabel = getOrderDisplayName(
+          const label = resolveAssignedSetName(
             {
               ...item,
-              orderName: item?.name?.trim() || item?.orderName?.trim() || "",
+              orderName:
+                item?.displayName?.trim() ||
+                item?.name?.trim() ||
+                item?.orderName?.trim() ||
+                "",
             },
+            index === 0 || Number(item?.setIndex) === 0
+              ? primaryCustomerName
+              : "",
             language,
+            {
+              isPrimarySet: index === 0 || Number(item?.setIndex) === 0,
+              allowTypeFallback: false,
+            },
           );
-          const label = item?.displayName?.trim() || fallbackLabel;
-          return { key, type, label, orderId: item?.orderId || "" };
+          return {
+            key,
+            type,
+            label: label || item?.displayName || getOrderTypeLabel(type, language),
+            orderId: item?.orderId || "",
+          };
         });
     }
 
@@ -154,16 +180,21 @@ const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
       .map((entry, index) => {
         const type = entry?.type;
         const key = `${type || "ITEM"}-${index}`;
-        const label = getOrderDisplayName(
+        const label = resolveAssignedSetName(
           {
             ...entry,
             orderName: entry?.name?.trim() || entry?.orderName?.trim() || "",
           },
+          index === 0 ? primaryCustomerName : "",
           language,
+          {
+            isPrimarySet: index === 0,
+            allowTypeFallback: true,
+          },
         );
         return { key, type, label, orderId: entry?.orderId || "" };
       });
-  }, [orderItems, orderTypes, language]);
+  }, [orderItems, orderTypes, language, primaryCustomerName]);
 
   const [selections, setSelections] = useState({});
 
@@ -359,15 +390,16 @@ const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
         rakhtBrandName: selectedRakht.brandName,
         rakhtColor: ton?.name || "",
         rakhtColorHex: ton?.colorHex || "",
-        requiredMeters: validate ? safeRequiredMeters : current.requiredMeters || "",
+        requiredMeters: validate
+          ? safeRequiredMeters
+          : current.requiredMeters || "",
         piecePrice: validate ? safePiecePrice : current.piecePrice || "",
         priceForCustomer: validate
           ? safePriceForCustomer
           : current.priceForCustomer || "",
-        totalPriceForCustomer:
-          validate
-            ? mulScaled(safePriceForCustomer, safeRequiredMeters, MONEY_SCALE)
-            : "",
+        totalPriceForCustomer: validate
+          ? mulScaled(safePriceForCustomer, safeRequiredMeters, MONEY_SCALE)
+          : "",
       });
     }
 
@@ -522,10 +554,7 @@ const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
             const typeLabel = item.label;
 
             return (
-              <div
-                key={item.key}
-                className="card rakht-step-card"
-              >
+              <div key={item.key} className="card rakht-step-card">
                 <div className="rakht-step-card__head">
                   <p className="rakht-step-card__title">{typeLabel}</p>
                   <span className="rakht-step-card__badge">
@@ -535,198 +564,202 @@ const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
 
                 <div className="rakht-step-card__body">
                   <div className="rakht-step-card__grid">
-                  <Field
-                    label={t("rakht.companyName", { defaultValue: "Company" })}
-                  >
-                    <Select
-                      classNamePrefix="rs"
-                      menuPortalTarget={
-                        typeof document !== "undefined" ? document.body : null
-                      }
-                      menuPosition="fixed"
-                      options={companyOptions}
-                      placeholder={t("common.select", {
-                        defaultValue: "Select",
+                    <Field
+                      label={t("rakht.companyName", {
+                        defaultValue: "Company",
                       })}
-                      value={
-                        companyOptions.find(
-                          (option) => option.value === companyName,
-                        ) || null
-                      }
-                      onChange={(option) => {
-                        updateSelection(item.key, {
-                          companyName: option?.value || "",
-                          brandName: "",
-                          rakhtTonId: "",
-                          piecePrice: "",
-                        });
-                      }}
-                      styles={selectStyles}
-                    />
-                  </Field>
+                    >
+                      <Select
+                        classNamePrefix="rs"
+                        menuPortalTarget={
+                          typeof document !== "undefined" ? document.body : null
+                        }
+                        menuPosition="fixed"
+                        options={companyOptions}
+                        placeholder={t("common.select", {
+                          defaultValue: "Select",
+                        })}
+                        value={
+                          companyOptions.find(
+                            (option) => option.value === companyName,
+                          ) || null
+                        }
+                        onChange={(option) => {
+                          updateSelection(item.key, {
+                            companyName: option?.value || "",
+                            brandName: "",
+                            rakhtTonId: "",
+                            piecePrice: "",
+                          });
+                        }}
+                        styles={selectStyles}
+                      />
+                    </Field>
 
-                  <Field
-                    label={t("rakht.brandName", { defaultValue: "Brand Name" })}
-                  >
-                    <Select
-                      classNamePrefix="rs"
-                      menuPortalTarget={
-                        typeof document !== "undefined" ? document.body : null
-                      }
-                      menuPosition="fixed"
-                      options={brandOptions}
-                      isDisabled={!companyName}
-                      placeholder={t("common.select", {
-                        defaultValue: "Select",
+                    <Field
+                      label={t("rakht.brandName", {
+                        defaultValue: "Brand Name",
                       })}
-                      value={
-                        brandOptions.find(
-                          (option) => option.value === brandName,
-                        ) || null
-                      }
-                      onChange={(option) => {
-                        updateSelection(item.key, {
-                          brandName: option?.value || "",
-                          rakhtTonId: "",
-                          piecePrice: "",
-                        });
-                      }}
-                      styles={selectStyles}
-                    />
-                  </Field>
+                    >
+                      <Select
+                        classNamePrefix="rs"
+                        menuPortalTarget={
+                          typeof document !== "undefined" ? document.body : null
+                        }
+                        menuPosition="fixed"
+                        options={brandOptions}
+                        isDisabled={!companyName}
+                        placeholder={t("common.select", {
+                          defaultValue: "Select",
+                        })}
+                        value={
+                          brandOptions.find(
+                            (option) => option.value === brandName,
+                          ) || null
+                        }
+                        onChange={(option) => {
+                          updateSelection(item.key, {
+                            brandName: option?.value || "",
+                            rakhtTonId: "",
+                            piecePrice: "",
+                          });
+                        }}
+                        styles={selectStyles}
+                      />
+                    </Field>
 
-                  <Field
-                    label={t("rakht.chooseColor", {
-                      defaultValue: "Choose Color",
-                    })}
-                  >
-                    <Select
-                      classNamePrefix="rs"
-                      menuPortalTarget={
-                        typeof document !== "undefined" ? document.body : null
-                      }
-                      menuPosition="fixed"
-                      options={tonOptions}
-                      isDisabled={!selectedRakht}
-                      placeholder={t("common.select", {
-                        defaultValue: "Select",
+                    <Field
+                      label={t("rakht.chooseColor", {
+                        defaultValue: "Choose Color",
                       })}
-                      value={
-                        tonOptions.find(
-                          (option) => option.value === rakhtTonId,
-                        ) || null
-                      }
-                      onChange={(option) => {
-                        updateSelection(item.key, {
-                          rakhtTonId: option?.value || "",
-                          piecePrice:
-                            current.piecePrice ||
-                            String(
-                              Number(option?.ton?.purchasePricePerMeter || 0),
+                    >
+                      <Select
+                        classNamePrefix="rs"
+                        menuPortalTarget={
+                          typeof document !== "undefined" ? document.body : null
+                        }
+                        menuPosition="fixed"
+                        options={tonOptions}
+                        isDisabled={!selectedRakht}
+                        placeholder={t("common.select", {
+                          defaultValue: "Select",
+                        })}
+                        value={
+                          tonOptions.find(
+                            (option) => option.value === rakhtTonId,
+                          ) || null
+                        }
+                        onChange={(option) => {
+                          updateSelection(item.key, {
+                            rakhtTonId: option?.value || "",
+                            piecePrice:
+                              current.piecePrice ||
+                              String(
+                                Number(option?.ton?.purchasePricePerMeter || 0),
+                              ),
+                          });
+                        }}
+                        formatOptionLabel={(opt) => {
+                          const tonDbAvail = opt.ton
+                            ? getTonRemainingMeters(opt.ton)
+                            : 0;
+                          const otherCommittedForOpt = opt.ton
+                            ? Object.entries(formTonMeters[opt.ton.id] || {})
+                                .filter(([key]) => key !== item.key)
+                                .reduce((sum, [, m]) => sum + m, 0)
+                            : 0;
+                          const tonEffectiveAvail = maxScaled(
+                            subScaled(
+                              tonDbAvail,
+                              otherCommittedForOpt,
+                              METER_SCALE,
                             ),
-                        });
-                      }}
-                      formatOptionLabel={(opt) => {
-                        const tonDbAvail = opt.ton
-                          ? getTonRemainingMeters(opt.ton)
-                          : 0;
-                        const otherCommittedForOpt = opt.ton
-                          ? Object.entries(formTonMeters[opt.ton.id] || {})
-                              .filter(([key]) => key !== item.key)
-                              .reduce((sum, [, m]) => sum + m, 0)
-                          : 0;
-                        const tonEffectiveAvail = maxScaled(
-                          subScaled(
-                            tonDbAvail,
-                            otherCommittedForOpt,
+                            0,
                             METER_SCALE,
-                          ),
-                          0,
-                          METER_SCALE,
-                        );
-                        return (
-                          <span className="rakht-ton-option">
-                            <span
-                              style={{
-                                width: 12,
-                                height: 12,
-                                borderRadius: "50%",
-                                background: opt.ton?.colorHex || "#94A3B8",
-                                border: "1px solid rgba(15,23,42,0.15)",
-                                flexShrink: 0,
-                              }}
-                            />
-                            <span>{opt.label}</span>
-                            {opt.ton && (
-                              <span className="rakht-ton-option__meta">
-                                {formatScaled(tonEffectiveAvail, {
-                                  scale: 2,
-                                })}
-                                m{" "}
-                                {t("rakht.remaining", {
-                                  defaultValue: "remaining",
-                                })}
-                              </span>
-                            )}
-                          </span>
-                        );
-                      }}
-                      styles={selectStyles}
-                    />
-                  </Field>
+                          );
+                          return (
+                            <span className="rakht-ton-option">
+                              <span
+                                style={{
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: "50%",
+                                  background: opt.ton?.colorHex || "#94A3B8",
+                                  border: "1px solid rgba(15,23,42,0.15)",
+                                  flexShrink: 0,
+                                }}
+                              />
+                              <span>{opt.label}</span>
+                              {opt.ton && (
+                                <span className="rakht-ton-option__meta">
+                                  {formatScaled(tonEffectiveAvail, {
+                                    scale: 2,
+                                  })}
+                                  m{" "}
+                                  {t("rakht.remaining", {
+                                    defaultValue: "remaining",
+                                  })}
+                                </span>
+                              )}
+                            </span>
+                          );
+                        }}
+                        styles={selectStyles}
+                      />
+                    </Field>
                   </div>
 
                   <div className="rakht-step-card__grid rakht-step-card__grid--compact">
-                  <Field
-                    label={t("rakht.requiredMeters", {
-                      defaultValue: "Required Meters",
-                    })}
-                  >
-                    <div className="iw">
-                      <LuRuler size={14} className="ico" />
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        className="inp"
-                        value={current.requiredMeters || ""}
-                        onChange={(event) => {
-                          const sanitized = sanitizeDecimalInput(
-                            event.target.value,
-                            { maxFractionDigits: METER_SCALE },
-                          );
-                          if (sanitized === "") {
-                            updateSelection(item.key, { requiredMeters: "" });
-                            return;
-                          }
-                          const displayValue = sanitized.startsWith(".")
-                            ? `0${sanitized}`
-                            : sanitized;
+                    <Field
+                      label={t("rakht.requiredMeters", {
+                        defaultValue: "Required Meters",
+                      })}
+                    >
+                      <div className="iw">
+                        <LuRuler size={14} className="ico" />
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          className="inp"
+                          value={current.requiredMeters || ""}
+                          onChange={(event) => {
+                            const sanitized = sanitizeDecimalInput(
+                              event.target.value,
+                              { maxFractionDigits: METER_SCALE },
+                            );
+                            if (sanitized === "") {
+                              updateSelection(item.key, { requiredMeters: "" });
+                              return;
+                            }
+                            const displayValue = sanitized.startsWith(".")
+                              ? `0${sanitized}`
+                              : sanitized;
 
-                          const parsedMeters = toScaledNumber(
-                            displayValue,
-                            METER_SCALE,
-                          );
-                          if (!Number.isFinite(parsedMeters)) {
-                            updateSelection(item.key, { requiredMeters: "" });
-                            return;
-                          }
+                            const parsedMeters = toScaledNumber(
+                              displayValue,
+                              METER_SCALE,
+                            );
+                            if (!Number.isFinite(parsedMeters)) {
+                              updateSelection(item.key, { requiredMeters: "" });
+                              return;
+                            }
 
-                          const clampedMeters = selectedTon
-                            ? Math.min(parsedMeters, availableMeters)
-                            : parsedMeters;
+                            const clampedMeters = selectedTon
+                              ? Math.min(parsedMeters, availableMeters)
+                              : parsedMeters;
 
-                          updateSelection(item.key, {
-                            requiredMeters:
-                              clampedMeters < parsedMeters
-                                ? formatScaled(clampedMeters, {
-                                    scale: METER_SCALE,
-                                  })
-                                : displayValue,
-                          });
-                        }}
-                      />
-                    </div>
-                  </Field>
+                            updateSelection(item.key, {
+                              requiredMeters:
+                                clampedMeters < parsedMeters
+                                  ? formatScaled(clampedMeters, {
+                                      scale: METER_SCALE,
+                                    })
+                                  : displayValue,
+                            });
+                          }}
+                        />
+                      </div>
+                    </Field>
                   </div>
 
                   {/* Selling Price per Meter (read-only) + Total Price (auto-calc) */}
@@ -871,7 +904,9 @@ const Step2RakhtSelection = forwardRef(function Step2RakhtSelection({
                                 })}
                               </span>
                               <strong className="rakht-step-summary-stat__value">
-                                {formatMoneyValue(computedTotalPriceForCustomer)}
+                                {formatMoneyValue(
+                                  computedTotalPriceForCustomer,
+                                )}
                               </strong>
                             </div>
                           )}

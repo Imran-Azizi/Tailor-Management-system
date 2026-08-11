@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { collectMeasurementValues, applyMeasurementValues } from "./measurementCopyPaste.js";
+import {
+  collectMeasurementValues,
+  applyMeasurementValues,
+} from "./measurementCopyPaste.js";
 
 test("collectMeasurementValues copies only measurement field values", () => {
   const setValue = {

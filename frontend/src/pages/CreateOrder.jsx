@@ -8,7 +8,10 @@ import toast from "react-hot-toast";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import i18n from "../i18n/index.js";
-import { getOrderTypeLabel } from "../lib/orderType.js";
+import {
+  getOrderTypeLabel,
+  resolveAssignedSetName,
+} from "../lib/orderType.js";
 import {
   deleteOrderDraft,
   getOrderDraft,
@@ -135,7 +138,11 @@ export default function CreateOrder() {
         ]
       : [];
 
-    const orderItems = buildOrderItems(orderTypes, measurementsForForm);
+    const orderItems = buildOrderItems(
+      orderTypes,
+      measurementsForForm,
+      pd.customer?.firstName || "",
+    );
     const primaryBillingKey = orderItems[0]?.billingKey || "0-0";
 
     const billing = orderTypes.length
@@ -219,7 +226,11 @@ export default function CreateOrder() {
           orderItems:
             draftData.orderItems?.length > 0
               ? draftData.orderItems
-              : buildOrderItems(restoredOrderTypes, restoredMeasurements),
+              : buildOrderItems(
+                  restoredOrderTypes,
+                  restoredMeasurements,
+                  draftData.customerInfo?.firstName || "",
+                ),
         });
         setStep(Math.max(0, Math.min(Number(draft.step || 0), 4)));
         setDraftId(draft.id);
@@ -275,6 +286,7 @@ export default function CreateOrder() {
       merged.orderItems = buildOrderItems(
         merged.orderTypes || [],
         merged.measurements || {},
+        merged.firstName || "",
       );
     }
 
@@ -414,7 +426,11 @@ export default function CreateOrder() {
     const nextForm = { ...merged };
     if (skipMeasurements) {
       nextForm.measurements = {};
-      nextForm.orderItems = buildOrderItems(mergedOrderTypes, {});
+      nextForm.orderItems = buildOrderItems(
+        mergedOrderTypes,
+        {},
+        merged.firstName || "",
+      );
     }
     setForm(nextForm);
 
@@ -576,9 +592,7 @@ export default function CreateOrder() {
       });
       const saved = await upsertOrderDraft(payload);
       if (!saved?.id) {
-        throw new Error(
-          t("createOrder.draftSaveFailed", "Draft save failed"),
-        );
+        throw new Error(t("createOrder.draftSaveFailed", "Draft save failed"));
       }
 
       setDraftId(saved.id);
@@ -672,6 +686,7 @@ export default function CreateOrder() {
     const orderItems = buildOrderItems(
       merged.orderTypes || [],
       merged.measurements || {},
+      merged.firstName || "",
     );
 
     const payload = {
@@ -702,7 +717,12 @@ export default function CreateOrder() {
         return {
           orderItemKey: item.billingKey,
           type: item.type,
-          orderName: resolveOrderName(item.measurements),
+          orderName: resolveOrderName(
+            item.measurements,
+            item.type,
+            merged.firstName || "",
+            item.setIndex === 0,
+          ),
           isEmergency: billEmergency.isEmergency,
           emergencyExpiry: billEmergency.emergencyExpiry,
           isForeignOrder: !!item.isForeignOrder,
@@ -933,11 +953,13 @@ export default function CreateOrder() {
                 const orderItems = buildOrderItems(
                   form.orderTypes || [],
                   d.measurements || {},
+                  form.firstName || "",
                 );
                 next({ ...d, orderItems });
               }}
               onBack={back}
               orderTypes={form.orderTypes}
+              customerName={form.firstName || ""}
               initial={form.measurements}
             />
           )}
@@ -949,6 +971,7 @@ export default function CreateOrder() {
               initial={form}
               orderTypes={form.orderTypes}
               orderItems={form.orderItems}
+              customerName={form.firstName || ""}
             />
           )}
           {step === 4 && (
@@ -962,6 +985,7 @@ export default function CreateOrder() {
               onBack={back}
               orderTypes={form.orderTypes}
               orderItems={form.orderItems}
+              customerName={form.firstName || ""}
               initial={form.billing}
               loading={isOrderSubmitting}
             />
@@ -974,12 +998,31 @@ export default function CreateOrder() {
   );
 }
 
-function resolveOrderName(measurementValue) {
+function resolveOrderName(
+  measurementValue,
+  type,
+  customerName = "",
+  isPrimarySet = false,
+) {
   const sets = Array.isArray(measurementValue)
     ? measurementValue
     : [measurementValue || {}];
   const namedSet = sets.find((set) => set?.__name?.trim());
-  return namedSet?.__name?.trim() || undefined;
+  const rawName = namedSet?.__name?.trim() || "";
+  const language = i18n.resolvedLanguage || i18n.language || "en";
+  const assigned = resolveAssignedSetName(
+    {
+      type,
+      orderName: rawName,
+    },
+    isPrimarySet ? customerName : "",
+    language,
+    {
+      isPrimarySet,
+      allowTypeFallback: false,
+    },
+  );
+  return assigned || undefined;
 }
 
 function resolveBillEmergency(orderTypes) {
@@ -1104,30 +1147,55 @@ function buildFullDraftPayload({
     orderItems:
       merged?.orderItems?.length > 0
         ? merged.orderItems
-        : buildOrderItems(orderTypes, measurements),
+        : buildOrderItems(
+            orderTypes,
+            measurements,
+            merged?.firstName || "",
+          ),
     entryMonth: Number(viewMonth) || null,
     entryYear: Number(viewYear) || null,
     prefillOrderId: prefillOrderId || undefined,
   };
 }
 
-function buildOrderItems(orderTypes, measurements) {
+function buildOrderItems(orderTypes, measurements, customerName = "") {
   const items = [];
   const typeCounter = {};
+  const language = i18n.resolvedLanguage || i18n.language || "en";
+  const primaryCustomerName = String(customerName || "").trim();
 
   (orderTypes || []).forEach((entry, typeIndex) => {
     const sets = normalizeMeasurementSets(measurements?.[typeIndex]);
     sets.forEach((setValue, setIndex) => {
       typeCounter[entry.type] = (typeCounter[entry.type] || 0) + 1;
       const sequence = typeCounter[entry.type];
+      const rawName = setValue?.__name?.trim() || "";
+      const assignedName = resolveAssignedSetName(
+        {
+          type: entry.type,
+          orderName: rawName,
+          orderTypeSequence: sequence,
+          orderTypeTotal: sets.length,
+        },
+        setIndex === 0 ? primaryCustomerName : "",
+        language,
+        {
+          isPrimarySet: setIndex === 0,
+          allowTypeFallback: false,
+        },
+      );
       const displayName =
-        setValue?.__name?.trim() || buildDefaultItemName(entry.type, sequence);
+        assignedName ||
+        rawName ||
+        buildDefaultItemName(entry.type, sequence);
       items.push({
         billingKey: `${typeIndex}-${setIndex}`,
         typeIndex,
         setIndex,
         sequence,
         type: entry.type,
+        name: displayName,
+        orderName: displayName,
         displayName,
         isForeignOrder: !!entry?.isForeignOrder,
         measurements: {

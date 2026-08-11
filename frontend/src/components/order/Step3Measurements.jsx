@@ -16,7 +16,12 @@ import {
 } from "react-icons/lu";
 import api from "../../lib/api.js";
 import { notifyInfo, notifySuccess, notifyWarning } from "../../lib/toast.js";
-import { getOrderLabelParts, getOrderTypeLabel } from "../../lib/orderType.js";
+import {
+  getOrderCustomName,
+  getOrderLabelParts,
+  getOrderTypeLabel,
+  resolveAssignedSetName,
+} from "../../lib/orderType.js";
 import {
   getMeasurementFieldLabel,
   getStyleFieldLabel,
@@ -95,17 +100,64 @@ function buildDefaultItemName(type, sequence, language = "en") {
   return getOrderTypeDisplayName(type, language);
 }
 
+function resolveInitialSetName({
+  setValue,
+  entry,
+  setIndex,
+  totalSets,
+  customerName,
+  language,
+}) {
+  const existingName = String(setValue?.__name || "").trim();
+  const entryName = String(entry?.name || "").trim();
+  const primaryCustomerName = String(customerName || entryName || "").trim();
+
+  if (existingName) {
+    const customName = getOrderCustomName(
+      {
+        ...entry,
+        orderName: existingName,
+        orderTypeSequence: setIndex + 1,
+        orderTypeTotal: totalSets,
+      },
+      language,
+    );
+    if (customName) return customName;
+    // Replace default type labels (e.g. "پیراهن تنبان") with the assigned set name.
+    if (setIndex === 0 && primaryCustomerName) return primaryCustomerName;
+    return existingName;
+  }
+
+  if (setIndex === 0 && primaryCustomerName) return primaryCustomerName;
+
+  return buildDefaultItemName(entry?.type, setIndex + 1, language);
+}
+
 function buildMeasurementEntryLabel(
   entry,
   setValue,
   setIdx,
   totalSets,
   language,
+  customerName = "",
 ) {
   return getOrderLabelParts(
     {
       ...entry,
-      orderName: setValue?.__name?.trim() || entry?.name?.trim() || "",
+      orderName: resolveAssignedSetName(
+        {
+          ...entry,
+          orderName: setValue?.__name?.trim() || entry?.name?.trim() || "",
+          orderTypeSequence: setIdx + 1,
+          orderTypeTotal: totalSets,
+        },
+        setIdx === 0 ? customerName : "",
+        language,
+        {
+          isPrimarySet: setIdx === 0,
+          allowTypeFallback: false,
+        },
+      ),
       orderTypeSequence: setIdx + 1,
       orderTypeTotal: totalSets,
     },
@@ -465,12 +517,10 @@ function MeasureBlock({
   );
 }
 
-const Step3Measurements = forwardRef(function Step3Measurements({
-  onNext,
-  onBack,
-  orderTypes = [],
-  initial = {},
-}, ref) {
+const Step3Measurements = forwardRef(function Step3Measurements(
+  { onNext, onBack, orderTypes = [], initial = {}, customerName = "" },
+  ref,
+) {
   const orderTypeEntries = Array.isArray(orderTypes) ? orderTypes : [];
   const typeList = orderTypeEntries.map((entry) => entry?.type);
   const hasReadyMadeClothes = typeList.some((type) =>
@@ -489,6 +539,7 @@ const Step3Measurements = forwardRef(function Step3Measurements({
     );
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language;
+  const primaryCustomerName = String(customerName || "").trim();
   const [data, setData] = useState(() => {
     const draft = {};
     visibleMeasurementEntries.forEach(({ entry, originalIndex }) => {
@@ -498,20 +549,21 @@ const Step3Measurements = forwardRef(function Step3Measurements({
           : [initial[originalIndex]]
         : [];
 
-      const normalized = (source.length ? source : [{}]).map(
-        (setValue, setIndex) => {
-          const safeSet =
-            setValue && typeof setValue === "object" ? setValue : {};
-          if (safeSet.__name?.trim()) return safeSet;
-          if (setIndex === 0 && entry.name?.trim()) {
-            return { ...safeSet, __name: entry.name.trim() };
-          }
-          return {
-            ...safeSet,
-            __name: buildDefaultItemName(entry.type, setIndex + 1, language),
-          };
-        },
-      );
+      const normalizedSource = source.length ? source : [{}];
+      const normalized = normalizedSource.map((setValue, setIndex) => {
+        const safeSet =
+          setValue && typeof setValue === "object" ? setValue : {};
+        const nextName = resolveInitialSetName({
+          setValue: safeSet,
+          entry,
+          setIndex,
+          totalSets: normalizedSource.length,
+          customerName: primaryCustomerName,
+          language,
+        });
+        if (safeSet.__name?.trim() === nextName) return safeSet;
+        return { ...safeSet, __name: nextName };
+      });
 
       draft[originalIndex] = normalized;
     });
@@ -560,8 +612,17 @@ const Step3Measurements = forwardRef(function Step3Measurements({
       measurementFields,
     );
 
-    if (!Object.values(nextCopiedValues).some((value) => String(value ?? "").trim() !== "")) {
-      notifyInfo(t("createOrder.copyMeasurementsEmpty", "No measurement values to copy yet."));
+    if (
+      !Object.values(nextCopiedValues).some(
+        (value) => String(value ?? "").trim() !== "",
+      )
+    ) {
+      notifyInfo(
+        t(
+          "createOrder.copyMeasurementsEmpty",
+          "No measurement values to copy yet.",
+        ),
+      );
       return;
     }
 
@@ -572,7 +633,10 @@ const Step3Measurements = forwardRef(function Step3Measurements({
   const pasteMeasurementSet = (typeIdx, setIdx) => {
     if (!hasCopiedMeasurements) {
       notifyWarning(
-        t("createOrder.pasteMeasurementsDisabled", "Copy measurements first to paste them."),
+        t(
+          "createOrder.pasteMeasurementsDisabled",
+          "Copy measurements first to paste them.",
+        ),
       );
       return;
     }
@@ -660,6 +724,7 @@ const Step3Measurements = forwardRef(function Step3Measurements({
             setIdx,
             sets.length,
             language,
+            primaryCustomerName,
           );
           const setLabel =
             labelParts.fullLabel ||
@@ -711,10 +776,11 @@ const Step3Measurements = forwardRef(function Step3Measurements({
               const totalSets = (data[typeIdx] || [{}]).length;
               const headerLabel = buildMeasurementEntryLabel(
                 entry,
-                { __name: entry.name || "" },
+                { __name: entry.name || primaryCustomerName || "" },
                 0,
                 totalSets,
                 language,
+                primaryCustomerName,
               );
 
               return (
@@ -786,6 +852,7 @@ const Step3Measurements = forwardRef(function Step3Measurements({
                   setIdx,
                   totalSets,
                   language,
+                  primaryCustomerName,
                 );
                 const blockErrors = Object.fromEntries(
                   Object.entries(fieldErrors)
@@ -796,16 +863,22 @@ const Step3Measurements = forwardRef(function Step3Measurements({
                     ]),
                 );
 
+                const assignedSetName =
+                  setValue.__name?.trim() ||
+                  (setIdx === 0 ? primaryCustomerName : "") ||
+                  entry.name ||
+                  "";
+
                 return (
                   <MeasureBlock
                     key={`${typeIdx}-${setIdx}`}
                     entry={{
                       ...entry,
-                      name: setValue.__name?.trim() || entry.name || "",
+                      name: assignedSetName,
                       orderTypeSequence: setIdx + 1,
                       orderTypeTotal: totalSets,
                       displayLabel: labelParts.typeWithSequenceLabel,
-                      customName: labelParts.customName,
+                      customName: labelParts.customName || assignedSetName,
                     }}
                     value={setValue}
                     errors={blockErrors}
