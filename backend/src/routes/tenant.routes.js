@@ -35,23 +35,23 @@ router.use(authenticate);
 router.get("/me/settings", authorizePermission(PERMISSIONS.SETTINGS_VIEW), getMyTenantSettings);
 router.put("/me/settings", authorizePermission(PERMISSIONS.SETTINGS_UPDATE), updateMyTenantSettings);
 
-router.get("/user-limits", authorize("SUPER_ADMIN"), listTenantUserLimits);
-router.get("/", authorize("SUPER_ADMIN"), listTenants);
-router.post("/", authorize("SUPER_ADMIN"), createTenant);
-router.get("/:id/user-limit/history", authorize("SUPER_ADMIN"), getTenantUserLimitHistory);
-router.put("/:id/user-limit", authorize("SUPER_ADMIN"), updateTenantUserLimit);
-router.get("/:id", authorize("SUPER_ADMIN"), getTenant);
-router.get("/:id/stats", authorize("SUPER_ADMIN"), tenantStats);
-router.put("/:id", authorize("SUPER_ADMIN"), updateTenant);
+router.get("/user-limits", authorize("SUPER_ADMIN", "ADMIN"), listTenantUserLimits);
+router.get("/", authorize("SUPER_ADMIN", "ADMIN"), listTenants);
+router.post("/", authorize("SUPER_ADMIN", "ADMIN"), createTenant);
+router.get("/:id/user-limit/history", authorize("SUPER_ADMIN", "ADMIN"), getTenantUserLimitHistory);
+router.put("/:id/user-limit", authorize("SUPER_ADMIN", "ADMIN"), updateTenantUserLimit);
+router.get("/:id", authorize("SUPER_ADMIN", "ADMIN"), getTenant);
+router.get("/:id/stats", authorize("SUPER_ADMIN", "ADMIN"), tenantStats);
+router.put("/:id", authorize("SUPER_ADMIN", "ADMIN"), updateTenant);
 router.post(
   "/:id/verify-deletion",
-  authorize("SUPER_ADMIN"),
+  authorize("SUPER_ADMIN", "ADMIN"),
   passwordVerificationLimiter,
   verifyTenantDeletionPassword,
 );
 router.delete(
   "/:id",
-  authorize("SUPER_ADMIN"),
+  authorize("SUPER_ADMIN", "ADMIN"),
   passwordVerificationLimiter,
   deleteTenant,
 );

@@ -21,6 +21,8 @@ const SALT_ROUNDS = 12;
 const DEFAULT_CURRENCY = "AFN";
 const DEFAULT_LANGUAGE = "fa";
 const DEFAULT_TIMEZONE = "Asia/Kabul";
+const BILL_TEXT_SIZE_MIN = 8;
+const BILL_TEXT_SIZE_MAX = 20;
 const LOGO_MAX_BYTES = 2 * 1024 * 1024;
 const LOGO_UPLOAD_DIR = path.join(process.cwd(), "uploads", "tenant-logos");
 const LOGO_PUBLIC_DIR = "/uploads/tenant-logos";
@@ -45,6 +47,9 @@ const tenantSelect = {
   currency: true,
   language: true,
   timezone: true,
+  billHeaderTextSize: true,
+  billBodyTextSize: true,
+  billAmountTextSize: true,
   subscriptionPlan: true,
   subscriptionStatus: true,
   subscriptionStart: true,
@@ -142,6 +147,15 @@ async function resolveTenantSlug(input, fallbackValue, excludeTenantId = null) {
   return normalized;
 }
 
+function normalizeBillTextSize(value, key) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  const clamped = Math.min(Math.max(parsed, BILL_TEXT_SIZE_MIN), BILL_TEXT_SIZE_MAX);
+  const rounded = Number(clamped.toFixed(1));
+  if (!Number.isFinite(rounded)) return null;
+  return rounded;
+}
+
 function tenantPayload(body) {
   const data = {};
   [
@@ -154,6 +168,21 @@ function tenantPayload(body) {
     "subscriptionStatus",
   ].forEach((key) => {
     if (body[key] !== undefined) data[key] = typeof body[key] === "string" ? body[key].trim() : body[key];
+  });
+
+  [
+    ["billHeaderTextSize", body.billHeaderTextSize],
+    ["billBodyTextSize", body.billBodyTextSize],
+    ["billAmountTextSize", body.billAmountTextSize],
+  ].forEach(([key, value]) => {
+    if (value === undefined) return;
+    const normalized = normalizeBillTextSize(value, key);
+    if (normalized === null) {
+      const error = new Error(`${key} must be a valid number between ${BILL_TEXT_SIZE_MIN} and ${BILL_TEXT_SIZE_MAX}.`);
+      error.status = 400;
+      throw error;
+    }
+    data[key] = normalized;
   });
   if (data.systemName && body.businessName === undefined) {
     data.businessName = data.systemName;

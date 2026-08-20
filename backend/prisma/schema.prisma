@@ -45,6 +45,9 @@ model Tenant {
   currency           String             @default("AFN")
   language           String             @default("fa")
   timezone           String             @default("Asia/Kabul")
+  billHeaderTextSize Float              @default(14)
+  billBodyTextSize   Float              @default(10.5)
+  billAmountTextSize Float              @default(11.5)
   subscriptionPlan   SubscriptionPlan   @default(TRIAL)
   subscriptionStatus SubscriptionStatus @default(TRIAL)
   subscriptionStart  DateTime?

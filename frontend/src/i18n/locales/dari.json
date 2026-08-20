@@ -23,6 +23,36 @@
       "gotIt": "متوجه شدم"
     }
   },
+  "billTextSize": {
+    "action": "اندازه متن بل",
+    "customerTitle": "تنظیمات بل مشتری",
+    "shopTitle": "تنظیمات بل فروشگاه",
+    "title": "اندازه متن بل",
+    "help": "نوع‌بندی متن بل مشتری و فروشگاه را تنظیم کنید تا ظاهر چاپ و خوانایی حفظ شود.",
+    "header": "اندازه سرصفحه",
+    "body": "اندازه متن اصلی",
+    "amount": "اندازه عدد / مبلغ",
+    "preview": "پیش‌نمایش زنده",
+    "previewCustomerBill": "پیش‌نمایش بل مشتری",
+    "previewShopBill": "پیش‌نمایش بل فروشگاه",
+    "previewBillNo": "شماره بل",
+    "previewCustomer": "مشتری",
+    "previewQty": "تعداد",
+    "previewTotal": "مجموع",
+    "previewOrderType": "نوع سفارش",
+    "previewSampleCustomer": "احمد",
+    "previewSampleOrderType": "پیراهن تنبان",
+    "previewSampleAmount": "AFN 2,400",
+    "previewAddress": "کوچه ۱۲۳",
+    "previewPhone": "+93700000000",
+    "previewShopName": "خیاطی",
+    "customerBillBadge": "بل مشتری",
+    "shopBillBadge": "بل فروشگاه",
+    "decrease": "کاهش {{label}}",
+    "increase": "افزایش {{label}}",
+    "saved": "تنظیمات متن بل ذخیره شد.",
+    "failed": "ذخیره تنظیمات متن بل انجام نشد."
+  },
   "common": {
     "dashboard": "داشبورد",
     "createOrder": "سفارش جدید",
@@ -963,6 +993,19 @@
       "logoType": "لوگو باید PNG، JPG، JPEG، WEBP یا SVG باشد.",
       "logoSize": "لوگو باید ۲MB یا کمتر باشد."
     },
+    "billTextSize": {
+      "action": "اندازه متن بل",
+      "customerTitle": "تنظیمات بل مشتری",
+      "shopTitle": "تنظیمات بل فروشگاه",
+      "title": "اندازه متن بل",
+      "help": "نوع‌بندی متن بل مشتری و فروشگاه را تنظیم کنید تا ظاهر چاپ و خوانایی حفظ شود.",
+      "header": "اندازه سرصفحه",
+      "body": "اندازه متن اصلی",
+      "amount": "اندازه عدد / مبلغ",
+      "preview": "پیش‌نمایش زنده",
+      "saved": "تنظیمات متن بل ذخیره شد.",
+      "failed": "ذخیره تنظیمات متن بل انجام نشد."
+    },
     "toast": {
       "created": "مشتری با موفقیت ایجاد شد.",
       "updated": "مشتری با موفقیت به‌روزرسانی شد.",
@@ -985,6 +1028,12 @@
     "hidePassword": "پنهان کردن رمز",
     "unsaved": "تغییرات ذخیره‌نشده دارید.",
     "upToDate": "تنظیمات به‌روز است.",
+    "billTypography": {
+      "title": "اندازه متن بل",
+      "subtitle": "نوع‌بندی بل مشتری و فروشگاه را برای چاپ و پیش‌نمایش تنظیم کنید.",
+      "customerPreview": "بل مشتری",
+      "shopPreview": "بل فروشگاه"
+    },
     "branding": {
       "title": "برندینگ",
       "subtitle": "لوگویی را آپلود کنید که در اسناد و صفحات سیستم نمایش داده می‌شود."

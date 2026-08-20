@@ -21,6 +21,10 @@ import {
   LuX,
 } from "react-icons/lu";
 import { Modal } from "../components/ui/index.jsx";
+import {
+  BillTextSizeActionButton,
+  BillTypographySettingsModal,
+} from "../components/bill/BillTypographyControls.jsx";
 import { assetUrl } from "../lib/assets.js";
 import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
@@ -597,6 +601,28 @@ export default function SuperAdminDashboard() {
   const [deletePasswordError, setDeletePasswordError] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
+  const [billTextSettings, setBillTextSettings] = useState(null);
+  const billTypographyMutation = useMutation({
+    mutationFn: ({ id, data }) => api.put(`/tenants/${id}`, data),
+    onSuccess: (_, variables) => {
+      toast.success(t("billTextSize.saved"));
+      qc.invalidateQueries({ queryKey: ["saas-tenants"] });
+      qc.invalidateQueries({ queryKey: ["tenant-settings"] });
+      setBillTextSettings((current) =>
+        current && current.tenant?.id === variables.id
+          ? { ...current, tenant: { ...current.tenant, ...variables.data } }
+          : current,
+      );
+      setBillTextSettings(null);
+    },
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, t("billTextSize.failed")));
+    },
+  });
+
+  const openBillTextSettings = (tenant, mode) => {
+    setBillTextSettings({ tenant, mode });
+  };
 
   const { data: tenants = [], isLoading } = useQuery({
     queryKey: ["saas-tenants", search],
@@ -896,42 +922,60 @@ export default function SuperAdminDashboard() {
                     </strong>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-3 gap-2">
-                    <button
-                      className="btn btn-outline btn-sm min-w-0 justify-center px-2"
-                      onClick={() => openEditModal(tenant)}
-                      disabled={isSaving || deleteMut.isPending}
-                    >
-                      <LuPencil size={13} />
-                      <span className="truncate">{t("common.edit")}</span>
-                    </button>
-                    <button
-                      className="btn btn-outline btn-sm min-w-0 justify-center px-2"
-                      disabled={updateMut.isPending}
-                      onClick={() =>
-                        updateMut.mutate({
-                          id: tenant.id,
-                          data: {
-                            isActive: !tenant.isActive,
-                            subscriptionStatus: tenant.isActive ? "SUSPENDED" : "ACTIVE",
-                          },
-                        })
-                      }
-                    >
-                      {tenant.isActive ? <LuBan size={13} /> : <LuCircleCheck size={13} />}
-                      <span className="truncate">
-                        {tenant.isActive ? t("superAdmin.suspend") : t("superAdmin.activate")}
-                      </span>
-                    </button>
-                    <button
-                      className="btn btn-outline btn-sm min-w-0 justify-center px-2"
-                      disabled={deleteMut.isPending}
-                      style={{ color: "var(--danger)" }}
-                      onClick={() => beginDeleteFlow(tenant)}
-                    >
-                      <LuTrash2 size={13} />
-                      <span className="truncate">{t("common.delete")}</span>
-                    </button>
+                  <div className="mt-4 space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        className="btn btn-outline btn-sm min-w-0 flex-1 justify-center px-2"
+                        onClick={() => openEditModal(tenant)}
+                        disabled={isSaving || deleteMut.isPending}
+                      >
+                        <LuPencil size={13} />
+                        <span className="truncate">{t("common.edit")}</span>
+                      </button>
+                      <BillTextSizeActionButton
+                        label={t("billTextSize.action")}
+                        title={t("billTextSize.customerTitle")}
+                        onClick={() => openBillTextSettings(tenant, "customer")}
+                        disabled={isSaving || deleteMut.isPending || billTypographyMutation.isPending}
+                        isRtl={isRtl}
+                      />
+                      <BillTextSizeActionButton
+                        label={t("billTextSize.action")}
+                        title={t("billTextSize.shopTitle")}
+                        onClick={() => openBillTextSettings(tenant, "shop")}
+                        disabled={isSaving || deleteMut.isPending || billTypographyMutation.isPending}
+                        isRtl={isRtl}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        className="btn btn-outline btn-sm min-w-0 justify-center px-2"
+                        disabled={updateMut.isPending}
+                        onClick={() =>
+                          updateMut.mutate({
+                            id: tenant.id,
+                            data: {
+                              isActive: !tenant.isActive,
+                              subscriptionStatus: tenant.isActive ? "SUSPENDED" : "ACTIVE",
+                            },
+                          })
+                        }
+                      >
+                        {tenant.isActive ? <LuBan size={13} /> : <LuCircleCheck size={13} />}
+                        <span className="truncate">
+                          {tenant.isActive ? t("superAdmin.suspend") : t("superAdmin.activate")}
+                        </span>
+                      </button>
+                      <button
+                        className="btn btn-outline btn-sm min-w-0 justify-center px-2"
+                        disabled={deleteMut.isPending}
+                        style={{ color: "var(--danger)" }}
+                        onClick={() => beginDeleteFlow(tenant)}
+                      >
+                        <LuTrash2 size={13} />
+                        <span className="truncate">{t("common.delete")}</span>
+                      </button>
+                    </div>
                   </div>
                 </article>
               ))
@@ -1022,40 +1066,58 @@ export default function SuperAdminDashboard() {
                       <td className="px-5 py-4 font-semibold text-[var(--text1)]">{tenant._count?.customers || 0}</td>
                       <td className="px-5 py-4 font-semibold text-[var(--text1)]">{tenant._count?.orders || 0}</td>
                       <td className="px-5 py-4">
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            className="btn btn-outline btn-sm"
-                            onClick={() => openEditModal(tenant)}
-                            disabled={isSaving || deleteMut.isPending}
-                          >
-                            <LuPencil size={13} />
-                            {t("common.edit")}
-                          </button>
-                          <button
-                            className="btn btn-outline btn-sm"
-                            disabled={updateMut.isPending}
-                            onClick={() =>
-                              updateMut.mutate({
-                                id: tenant.id,
-                                data: {
-                                  isActive: !tenant.isActive,
-                                  subscriptionStatus: tenant.isActive ? "SUSPENDED" : "ACTIVE",
-                                },
-                              })
-                            }
-                          >
-                            {tenant.isActive ? <LuBan size={13} /> : <LuCircleCheck size={13} />}
-                            {tenant.isActive ? t("superAdmin.suspend") : t("superAdmin.activate")}
-                          </button>
-                          <button
-                            className="btn btn-outline btn-sm"
-                            disabled={deleteMut.isPending}
-                            style={{ color: "var(--danger)" }}
-                            onClick={() => beginDeleteFlow(tenant)}
-                          >
-                            <LuTrash2 size={13} />
-                            {t("common.delete")}
-                          </button>
+                        <div className="flex min-w-[240px] flex-col gap-2">
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              className="btn btn-outline btn-sm"
+                              onClick={() => openEditModal(tenant)}
+                              disabled={isSaving || deleteMut.isPending}
+                            >
+                              <LuPencil size={13} />
+                              {t("common.edit")}
+                            </button>
+                            <BillTextSizeActionButton
+                              label={t("billTextSize.action")}
+                              title={t("billTextSize.customerTitle")}
+                              onClick={() => openBillTextSettings(tenant, "customer")}
+                              disabled={isSaving || deleteMut.isPending || billTypographyMutation.isPending}
+                              isRtl={isRtl}
+                            />
+                            <BillTextSizeActionButton
+                              label={t("billTextSize.action")}
+                              title={t("billTextSize.shopTitle")}
+                              onClick={() => openBillTextSettings(tenant, "shop")}
+                              disabled={isSaving || deleteMut.isPending || billTypographyMutation.isPending}
+                              isRtl={isRtl}
+                            />
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              className="btn btn-outline btn-sm"
+                              disabled={deleteMut.isPending}
+                              style={{ color: "var(--danger)" }}
+                              onClick={() => beginDeleteFlow(tenant)}
+                            >
+                              <LuTrash2 size={13} />
+                              {t("common.delete")}
+                            </button>
+                            <button
+                              className="btn btn-outline btn-sm"
+                              disabled={updateMut.isPending}
+                              onClick={() =>
+                                updateMut.mutate({
+                                  id: tenant.id,
+                                  data: {
+                                    isActive: !tenant.isActive,
+                                    subscriptionStatus: tenant.isActive ? "SUSPENDED" : "ACTIVE",
+                                  },
+                                })
+                              }
+                            >
+                              {tenant.isActive ? <LuBan size={13} /> : <LuCircleCheck size={13} />}
+                              {tenant.isActive ? t("superAdmin.suspend") : t("superAdmin.activate")}
+                            </button>
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -1083,6 +1145,22 @@ export default function SuperAdminDashboard() {
             });
           }}
           onSubmit={submit}
+        />
+
+        <BillTypographySettingsModal
+          open={Boolean(billTextSettings?.tenant)}
+          tenant={billTextSettings?.tenant}
+          mode={billTextSettings?.mode || "customer"}
+          onClose={() => setBillTextSettings(null)}
+          isSaving={billTypographyMutation.isPending}
+          isRtl={isRtl}
+          onSave={(payload) => {
+            if (!billTextSettings?.tenant?.id) return;
+            billTypographyMutation.mutate({
+              id: billTextSettings.tenant.id,
+              data: payload,
+            });
+          }}
         />
 
         <Modal

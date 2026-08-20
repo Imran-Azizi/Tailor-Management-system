@@ -19,7 +19,9 @@ import {
 } from "react-icons/lu";
 import api from "../lib/api.js";
 import { assetUrl } from "../lib/assets.js";
+import { getTenantBillTextSettings } from "../lib/billTypography.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
+import { BillTypographySettingsPanel } from "../components/bill/BillTypographyControls.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { isRtlLanguage } from "../lib/locale.js";
 import PwaInstallPanel from "../components/pwa/PwaInstallPanel.jsx";
@@ -265,6 +267,8 @@ export default function TenantSettings() {
     newPassword: false,
     confirmPassword: false,
   });
+  const [billPreviewMode, setBillPreviewMode] = useState("customer");
+  const [billTypography, setBillTypography] = useState(() => getTenantBillTextSettings());
 
   const {
     data: settings,
@@ -284,6 +288,7 @@ export default function TenantSettings() {
   useEffect(() => {
     if (settings) {
       setForm(normalizeForm(settings));
+      setBillTypography(getTenantBillTextSettings(settings));
       setErrors({});
     }
   }, [settings]);
@@ -302,6 +307,7 @@ export default function TenantSettings() {
   const hasChanges = useMemo(() => {
     if (!settings) return false;
     const base = normalizeForm(settings);
+    const baseBillTypography = getTenantBillTextSettings(settings);
     return (
       ["systemName", "address", "phone", "mobile"].some(
         (key) => (form[key] || "") !== (base[key] || ""),
@@ -309,9 +315,10 @@ export default function TenantSettings() {
       ["ownerName", "ownerPhone"].some((key) => (form[key] || "") !== (base[key] || "")) ||
       Boolean(form.currentPassword || form.newPassword || form.confirmPassword) ||
       Boolean(form.logoFile) ||
-      Boolean(form.removeLogo)
+      Boolean(form.removeLogo) ||
+      JSON.stringify(billTypography) !== JSON.stringify(baseBillTypography)
     );
-  }, [form, settings]);
+  }, [form, settings, billTypography]);
 
   const updateMut = useMutation({
     mutationFn: (payload) => api.put("/tenants/me/settings", payload),
@@ -377,6 +384,9 @@ export default function TenantSettings() {
       mobile: form.mobile.trim(),
       ownerName: form.ownerName.trim(),
       ownerPhone: form.ownerPhone.trim(),
+      billHeaderTextSize: billTypography.billHeaderTextSize,
+      billBodyTextSize: billTypography.billBodyTextSize,
+      billAmountTextSize: billTypography.billAmountTextSize,
     };
     if (form.currentPassword || form.newPassword || form.confirmPassword) {
       payload.currentPassword = form.currentPassword;
@@ -569,6 +579,48 @@ export default function TenantSettings() {
                 isRtl={isRtl}
                 placeholder={t("tenantSettings.fields.addressPlaceholder")}
               />
+            </div>
+
+            <div className="border-t border-[var(--border)] bg-[var(--surface)]">
+              <div className="tenant-settings-section-head border-b border-[var(--border)] bg-[var(--surface2)] px-5 py-4">
+                <h2 className="text-base font-bold text-[var(--text1)]">
+                  {t("tenantSettings.billTypography.title")}
+                </h2>
+                <p className="mt-1 text-xs leading-5 text-[var(--text3)]">
+                  {t("tenantSettings.billTypography.subtitle")}
+                </p>
+                <div className="mt-3 inline-flex flex-wrap gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1">
+                  {[
+                    ["customer", t("tenantSettings.billTypography.customerPreview")],
+                    ["shop", t("tenantSettings.billTypography.shopPreview")],
+                  ].map(([mode, label]) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      className={cn(
+                        "rounded-lg px-3 py-1.5 text-xs font-semibold transition",
+                        billPreviewMode === mode
+                          ? "bg-[var(--primary)] text-white shadow-[var(--sh-sm)]"
+                          : "text-[var(--text2)] hover:bg-[var(--surface2)]",
+                      )}
+                      onClick={() => setBillPreviewMode(mode)}
+                      disabled={updateMut.isPending}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="p-5">
+                <BillTypographySettingsPanel
+                  settings={billTypography}
+                  onChange={setBillTypography}
+                  tenant={settings}
+                  mode={billPreviewMode}
+                  isRtl={isRtl}
+                  disabled={updateMut.isPending}
+                />
+              </div>
             </div>
 
             <div className="border-t border-[var(--border)] bg-[var(--surface)]">

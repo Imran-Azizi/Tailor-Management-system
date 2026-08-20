@@ -23,6 +23,36 @@
       "gotIt": "Got it"
     }
   },
+  "billTextSize": {
+    "action": "Bill Text Size",
+    "customerTitle": "Customer bill typography",
+    "shopTitle": "Shop bill typography",
+    "title": "Bill Text Size",
+    "help": "Adjust typography for customer and shop bills while preserving print layout and readability.",
+    "header": "Header Text Size",
+    "body": "Main Body Text Size",
+    "amount": "Number / Amount Text Size",
+    "preview": "Live preview",
+    "previewCustomerBill": "Customer bill preview",
+    "previewShopBill": "Shop bill preview",
+    "previewBillNo": "Bill #",
+    "previewCustomer": "Customer",
+    "previewQty": "Qty",
+    "previewTotal": "Total",
+    "previewOrderType": "Order type",
+    "previewSampleCustomer": "Ahmad",
+    "previewSampleOrderType": "Shirt & Trouser",
+    "previewSampleAmount": "AFN 2,400",
+    "previewAddress": "123 Main Street",
+    "previewPhone": "+93700000000",
+    "previewShopName": "Tailor Shop",
+    "customerBillBadge": "Customer Bill",
+    "shopBillBadge": "Shop Bill",
+    "decrease": "Decrease {{label}}",
+    "increase": "Increase {{label}}",
+    "saved": "Bill typography saved.",
+    "failed": "Could not save bill typography."
+  },
   "common": {
     "dashboard": "Dashboard",
     "createOrder": "Create Order",
@@ -1267,6 +1297,19 @@
       "logoType": "Logo must be PNG, JPG, JPEG, WEBP, or SVG.",
       "logoSize": "Logo must be 2MB or smaller."
     },
+    "billTextSize": {
+      "action": "Bill Text Size",
+      "customerTitle": "Customer bill typography",
+      "shopTitle": "Shop bill typography",
+      "title": "Bill Text Size",
+      "help": "Adjust typography for customer and shop bills while preserving print layout and readability.",
+      "header": "Header Text Size",
+      "body": "Main Body Text Size",
+      "amount": "Number / Amount Text Size",
+      "preview": "Live preview",
+      "saved": "Bill typography saved.",
+      "failed": "Could not save bill typography."
+    },
     "toast": {
       "created": "Tenant created successfully.",
       "updated": "Tenant updated successfully.",
@@ -1289,6 +1332,12 @@
     "hidePassword": "Hide password",
     "unsaved": "You have unsaved changes.",
     "upToDate": "Settings are up to date.",
+    "billTypography": {
+      "title": "Bill Text Size",
+      "subtitle": "Adjust customer and shop bill typography for print and on-screen previews.",
+      "customerPreview": "Customer bill",
+      "shopPreview": "Shop bill"
+    },
     "branding": {
       "title": "Branding",
       "subtitle": "Upload the logo shown on documents and tenant screens."

@@ -38,6 +38,10 @@ import {
   getOrderTypeLabel as getLocalizedOrderTypeLabel,
 } from "../../lib/orderType.js";
 import { useAuth } from "../../context/AuthContext.jsx";
+import {
+  buildBillTypographyStyle,
+  mergePrintShopSources,
+} from "../../lib/billTypography.js";
 
 const SKIP_FIELDS = new Set(["id", "orderId", "__name"]);
 
@@ -524,7 +528,11 @@ function getPrintableText(value, settings, fallback = "-") {
 }
 
 function resolvePrintShop(...sources) {
-  return sources.find((source) => source && typeof source === "object") || null;
+  return mergePrintShopSources(...sources);
+}
+
+function buildBillSheetStyle(settings, shop) {
+  return buildBillTypographyStyle(shop, settings);
 }
 
 function PrintBillHeader({ settings, shop }) {
@@ -721,17 +729,7 @@ export function CustomerBill({ customer, order, shop }) {
     ? toEnglishDigits(customer.phoneNumber)
     : "";
   const isEmergency = order?.isEmergency;
-  const billTypographyStyle = {
-    fontFamily: settings.fontFamily,
-    ...(settings.isRtl
-      ? {
-          textAlign: "right",
-          letterSpacing: "0",
-          wordSpacing: "0",
-          fontFeatureSettings: '"rlig" 1, "liga" 1, "calt" 1',
-        }
-      : {}),
-  };
+  const billTypographyStyle = buildBillSheetStyle(settings, shop);
   const rakhtInfoFields = [
     {
       key: "color",
@@ -885,7 +883,10 @@ export function CustomerBill({ customer, order, shop }) {
       )}
 
       <div className="print-customer-combined-wrap print-bill-table-wrap">
-        <table className="print-customer-combined-table print-reference-detail-table w-full border-collapse table-fixed text-[10px] text-slate-800">
+        <table
+          className="print-customer-combined-table print-reference-detail-table w-full border-collapse table-fixed text-slate-800"
+          style={{ fontSize: "var(--bill-body-font-size, 10.5px)" }}
+        >
           <thead>
             <tr>
               {detailColumns.map((column, index) => (
@@ -905,6 +906,7 @@ export function CustomerBill({ customer, order, shop }) {
                 <td
                   key={column.key}
                   className={`${getBorderClass(index, detailColumns)} px-1.5 py-1 align-top ${column.align} ${column.className || ""}`}
+                  style={{ fontSize: "var(--bill-body-font-size, 10.5px)" }}
                 >
                   {column.render()}
                 </td>
@@ -955,7 +957,10 @@ export function CustomerBill({ customer, order, shop }) {
       <div className={`print-bill-section-head ${alignClass}`}>
         {txt.financialSummary}
       </div>
-      <table className="print-customer-finance-table print-bill-closing-table w-full border-collapse table-fixed text-[11px] text-slate-800">
+      <table
+        className="print-customer-finance-table print-bill-closing-table w-full border-collapse table-fixed text-slate-800"
+        style={{ fontSize: "var(--bill-body-font-size, 10.5px)" }}
+      >
         <thead>
           <tr>
             {financeColumns.map((column, index) => (
@@ -973,7 +978,8 @@ export function CustomerBill({ customer, order, shop }) {
             {financeColumns.map((column, index) => (
               <td
                 key={column.key}
-                className={`${getBorderClass(index, financeColumns)} px-2 py-3 text-center text-[11px] font-black ${column.colorClass} [direction:ltr] [unicode-bidi:embed]`}
+                className={`${getBorderClass(index, financeColumns)} px-2 py-3 text-center font-black ${column.colorClass} [direction:ltr] [unicode-bidi:embed]`}
+                style={{ fontSize: "var(--bill-amount-font-size, 11.5px)" }}
               >
                 <span
                   className={`print-customer-amount ${
@@ -1075,17 +1081,7 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
   const tableHeadClass = settings.isRtl
     ? "print-bill-th"
     : "print-bill-th print-bill-th--upper";
-  const billTypographyStyle = {
-    fontFamily: settings.fontFamily,
-    ...(settings.isRtl
-      ? {
-          textAlign: "right",
-          letterSpacing: "0",
-          wordSpacing: "0",
-          fontFeatureSettings: '"rlig" 1, "liga" 1, "calt" 1',
-        }
-      : {}),
-  };
+  const billTypographyStyle = buildBillSheetStyle(settings, shop);
   const rakhtInfoRows = rowItems
     .filter((row) => row.rakhtDetails?.hasData)
     .map((row) => {
@@ -1252,7 +1248,10 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
       ) : null}
 
       <div className="print-customer-combined-wrap print-bill-table-wrap">
-        <table className="print-customer-combined-table print-reference-detail-table w-full border-collapse table-fixed text-[10px] text-slate-800">
+        <table
+          className="print-customer-combined-table print-reference-detail-table w-full border-collapse table-fixed text-slate-800"
+          style={{ fontSize: "var(--bill-body-font-size, 10.5px)" }}
+        >
           <thead>
             <tr>
               {detailColumns.map((column, index) => (
@@ -1283,6 +1282,7 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
                     <td
                       key={column.key}
                       className={`${getBorderClass(index, detailColumns)} px-1.5 py-1 align-top ${column.align} ${column.className || ""}`}
+                      style={{ fontSize: "var(--bill-body-font-size, 10.5px)" }}
                     >
                       {column.render(row)}
                     </td>
@@ -1348,7 +1348,10 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
       <div className={`print-bill-section-head ${alignClass}`}>
         {safeTxt("financialSummary")}
       </div>
-      <table className="print-customer-finance-table print-bill-closing-table w-full border-collapse table-fixed text-[11px] text-slate-800">
+      <table
+        className="print-customer-finance-table print-bill-closing-table w-full border-collapse table-fixed text-slate-800"
+        style={{ fontSize: "var(--bill-body-font-size, 10.5px)" }}
+      >
         <thead>
           <tr>
             {financeColumns.map((column, index) => (
@@ -1367,6 +1370,7 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
               <td
                 key={column.key}
                 className={`${getBorderClass(index, financeColumns, false)} px-2 py-2 text-center font-black ${column.colorClass} [direction:ltr] [unicode-bidi:embed]`}
+                style={{ fontSize: "var(--bill-amount-font-size, 11.5px)" }}
               >
                 <span
                   className={`print-customer-amount ${
@@ -1629,17 +1633,7 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
   const sectionHeadClass = settings.isRtl
     ? "print-bill-section-head"
     : "print-bill-section-head print-bill-section-head--upper";
-  const billTypographyStyle = {
-    fontFamily: settings.fontFamily,
-    ...(settings.isRtl
-      ? {
-          textAlign: "right",
-          letterSpacing: "0",
-          wordSpacing: "0",
-          fontFeatureSettings: '"rlig" 1, "liga" 1, "calt" 1',
-        }
-      : {}),
-  };
+  const billTypographyStyle = buildBillSheetStyle(settings, shop);
   const tailorInfoItems = [
     {
       key: "billNo",
@@ -1699,9 +1693,10 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
 
       {tailorInfoItems.length > 0 ? (
         <div
-          className="print-tailor-info-strip print-bill-kv-strip grid text-[10px] text-slate-800"
+          className="print-tailor-info-strip print-bill-kv-strip grid text-slate-800"
           style={{
             gridTemplateColumns: `repeat(${tailorInfoItems.length}, minmax(0, 1fr))`,
+            fontSize: "var(--bill-body-font-size, 10.5px)",
           }}
         >
           {tailorInfoItems.map((item, index) => (
@@ -1760,7 +1755,10 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
                             {label}
                           </span>
                         </td>
-                        <td className="print-tailor-ledger-cell print-tailor-ledger-cell--measure text-center [direction:ltr] [unicode-bidi:embed]">
+                        <td
+                          className="print-tailor-ledger-cell print-tailor-ledger-cell--measure text-center [direction:ltr] [unicode-bidi:embed]"
+                          style={{ fontSize: "var(--bill-amount-font-size, 11.5px)" }}
+                        >
                           <span className="print-tailor-ledger-text">
                             {value}
                           </span>

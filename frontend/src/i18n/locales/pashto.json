@@ -23,6 +23,36 @@
       "gotIt": "پوه شوم"
     }
   },
+  "billTextSize": {
+    "action": "د بل متن اندازه",
+    "customerTitle": "د مشتری بل تنظیمات",
+    "shopTitle": "د پخواني فروشگاه بل تنظیمات",
+    "title": "د بل متن اندازه",
+    "help": "د مشتری او د فروشگاه بلونو متن تنظیم کړئ ترڅو د چاپ شکل او لوستلو کیفیت په یاد کې پاتې شي.",
+    "header": "د سرلیک اندازې",
+    "body": "د اصلی متن اندازې",
+    "amount": "د شمېره / مبلغ اندازې",
+    "preview": "مستقیم لید",
+    "previewCustomerBill": "د مشتری بل مخکتنه",
+    "previewShopBill": "د فروشگاه بل مخکتنه",
+    "previewBillNo": "د بل شمېره",
+    "previewCustomer": "مشتری",
+    "previewQty": "شمېره",
+    "previewTotal": "ټول",
+    "previewOrderType": "د فرمایش ډول",
+    "previewSampleCustomer": "احمد",
+    "previewSampleOrderType": "کرتی او تنبان",
+    "previewSampleAmount": "AFN 2,400",
+    "previewAddress": "کوڅه ۱۲۳",
+    "previewPhone": "+93700000000",
+    "previewShopName": "خیاطي",
+    "customerBillBadge": "د مشتری بل",
+    "shopBillBadge": "د فروشگاه بل",
+    "decrease": "{{label}} کمول",
+    "increase": "{{label}} زیاتول",
+    "saved": "د بل متن تنظیمات خوندي شول.",
+    "failed": "د بل متن تنظیمات ثبتولو کې پاتې راغی."
+  },
   "common": {
     "dashboard": "ډشبورډ",
     "createOrder": "نوی فرمایش",
@@ -963,6 +993,19 @@
       "logoType": "لوګو باید PNG، JPG، JPEG، WEBP یا SVG وي.",
       "logoSize": "لوګو باید ۲MB یا له هغې کم وي."
     },
+    "billTextSize": {
+      "action": "د بل متن اندازه",
+      "customerTitle": "د مشتری بل تنظیمات",
+      "shopTitle": "د پخواني فروشگاه بل تنظیمات",
+      "title": "د بل متن اندازه",
+      "help": "د مشتری او د فروشگاه بلونو متن تنظیم کړئ ترڅو د چاپ شکل او لوستلو کیفیت په یاد کې پاتې شي.",
+      "header": "د سرلیک اندازې",
+      "body": "د اصلی متن اندازې",
+      "amount": "د شمېره / مبلغ اندازې",
+      "preview": "مستقیم لید",
+      "saved": "د بل متن تنظیمات خوندي شول.",
+      "failed": "د بل متن تنظیمات ثبتولو کې پاتې راغی."
+    },
     "toast": {
       "created": "مشتری په بریالیتوب سره جوړ شو.",
       "updated": "مشتری په بریالیتوب سره تازه شو.",
@@ -985,6 +1028,12 @@
     "hidePassword": "رمز پټول",
     "unsaved": "ناسپمول شوي بدلونونه لرئ.",
     "upToDate": "تنظیمات تازه دي.",
+    "billTypography": {
+      "title": "د بل متن اندازه",
+      "subtitle": "د مشتری او د فروشگاه بلونو متن د چاپ او مخکتنې لپاره تنظیم کړئ.",
+      "customerPreview": "د مشتری بل",
+      "shopPreview": "د فروشگاه بل"
+    },
     "branding": {
       "title": "برانډینګ",
       "subtitle": "هغه لوګو اپلوډ کړئ چې په اسنادو او د سیستم په پاڼو کې ښکاري."

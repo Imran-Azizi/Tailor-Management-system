@@ -100,6 +100,9 @@ const PRINT_TENANT_SELECT = {
   currency: true,
   language: true,
   timezone: true,
+  billHeaderTextSize: true,
+  billBodyTextSize: true,
+  billAmountTextSize: true,
 };
 
 async function getBillTenantBranding({ customer, orders = [] } = {}, tx = prisma) {

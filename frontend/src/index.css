@@ -6239,14 +6239,14 @@ select.inp{
   height:9px;
 }
 .print-bill-header--rtl .print-bill-header-name{
-  font-size:14px;
+  font-size:var(--bill-header-font-size, 14px);
   font-weight:800;
   line-height:1.4;
   letter-spacing:0;
 }
 .print-bill-header-meta{
   margin:0;
-  font-size:9.5px;
+  font-size:var(--bill-body-font-size, 9.5px);
   font-weight:500;
   line-height:1.45;
   color:var(--bill-text-muted);
@@ -6492,7 +6492,7 @@ select.inp{
 }
 .print-bill-number{
   display:inline-block;
-  font-size:11px;
+  font-size:var(--bill-amount-font-size, 11px);
   font-weight:800;
   color:var(--bill-primary-darker);
   letter-spacing:.02em;
@@ -6507,6 +6507,7 @@ select.inp{
   word-break:break-word;
 }
 .print-bill-kv-value{
+  font-size:var(--bill-body-font-size, 10.5px);
   font-weight:700;
   color:var(--bill-text);
   line-height:1.3;
@@ -6571,6 +6572,7 @@ select.inp{
   border-radius:4px;
   background:var(--bill-surface-alt);
   box-shadow:inset 0 0 0 1px rgba(217,119,6,.1);
+  font-size:var(--bill-amount-font-size, 11.5px);
   line-height:1.35;
   white-space:normal;
   overflow-wrap:anywhere;
@@ -6673,10 +6675,10 @@ select.inp{
 .print-tailor-ledger-cell--measure{
   border-inline-end:2px solid #374151;
   font-weight:800;
-  font-size:11.5px;
+  font-size:var(--bill-amount-font-size, 11.5px);
 }
-.print-tailor-ledger-cell--label{font-weight:700;font-size:11px}
-.print-tailor-ledger-cell--value{font-weight:700;font-size:11px}
+.print-tailor-ledger-cell--label{font-weight:700;font-size:var(--bill-body-font-size, 10.5px)}
+.print-tailor-ledger-cell--value{font-weight:700;font-size:var(--bill-body-font-size, 10.5px)}
 .print-tailor-ledger-text{
   display:block;
   max-width:100%;
@@ -6915,10 +6917,10 @@ select.inp{
   max-height:44px !important;
 }
 .print-bill-header-name{
-  font-size:13.5px !important;
+  font-size:var(--bill-header-font-size, 13.5px) !important;
 }
 .print-bill-header--rtl .print-bill-header-name{
-  font-size:14px !important;
+  font-size:var(--bill-header-font-size, 14px) !important;
 }
 .print-bill-header .print-shop-meta{
   line-height:1.45;
@@ -7150,8 +7152,8 @@ select.inp{
     max-width:40px !important;
     max-height:40px !important;
   }
-  .print-bill-header-name{font-size:12.5px !important}
-  .print-bill-header--rtl .print-bill-header-name{font-size:13px !important}
+  .print-bill-header-name{font-size:var(--bill-header-font-size, 12.5px) !important}
+  .print-bill-header--rtl .print-bill-header-name{font-size:var(--bill-header-font-size, 13px) !important}
   .print-bill-header--ltr .print-bill-header-body{
     display:flex !important;
     justify-content:flex-start !important;
