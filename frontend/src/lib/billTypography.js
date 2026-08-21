@@ -25,10 +25,19 @@ export function getTenantBillTextSettings(tenant = {}) {
 
 export function getTenantBillTextStyle(tenant = {}) {
   const settings = getTenantBillTextSettings(tenant);
+  const header = settings.billHeaderTextSize;
+  const body = settings.billBodyTextSize;
+  const amount = settings.billAmountTextSize;
   return {
-    "--bill-header-font-size": `${settings.billHeaderTextSize}px`,
-    "--bill-body-font-size": `${settings.billBodyTextSize}px`,
-    "--bill-amount-font-size": `${settings.billAmountTextSize}px`,
+    "--bill-header-font-size": `${header}px`,
+    "--bill-body-font-size": `${body}px`,
+    "--bill-amount-font-size": `${amount}px`,
+    "--bill-header-meta-font-size": `${Number((header * 0.72).toFixed(2))}px`,
+    "--bill-header-phone-font-size": `${Number((header * 0.65).toFixed(2))}px`,
+    "--bill-header-badge-font-size": `${Number((header * 0.64).toFixed(2))}px`,
+    "--bill-header-logo-size": `${Math.min(56, Math.max(28, Number((header * 3).toFixed(1))))}px`,
+    "--bill-section-font-size": `${Number((body * 0.9).toFixed(2))}px`,
+    "--bill-th-font-size": `${Number((body * 0.88).toFixed(2))}px`,
   };
 }
 

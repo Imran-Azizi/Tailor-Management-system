@@ -1,17 +1,120 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LuPencil } from "react-icons/lu";
 import { Modal } from "../ui/index.jsx";
+import {
+  CustomerCombinedBill,
+  TailorBill,
+} from "../order/OrderDocumentPack.jsx";
 import {
   BILL_TEXT_SIZE_MAX,
   BILL_TEXT_SIZE_MIN,
   DEFAULT_TENANT_BILL_TEXT_SETTINGS,
   getTenantBillTextSettings,
-  getTenantBillTextStyle,
 } from "../../lib/billTypography.js";
 
 function cn(...classes) {
   return classes.filter(Boolean).join(" ");
+}
+
+function buildPreviewSample(tenant, t) {
+  const shopName = tenant?.systemName || tenant?.businessName || t("billTextSize.previewShopName");
+  const customerName = t("billTextSize.previewSampleCustomer");
+  const createdAt = "2026-08-19T10:30:00.000Z";
+  const orderTypeLabel = t("billTextSize.previewSampleOrderType");
+
+  const customer = {
+    id: "preview-customer",
+    firstName: customerName,
+    billNumber: 120,
+    phoneNumber: "0700123456",
+  };
+
+  const shopMeasurements = {
+    height: "150",
+    shoulder: "46",
+    sleeve: "62",
+    neck: "40",
+    chest: "52",
+    armpit: "24",
+    waist: "48",
+    skirt: "58",
+    tenban: "104",
+    pantLeg: "26",
+    arm: "34",
+    calf: "38",
+    neckStyle: t("billTextSize.previewSampleNeckStyle", { defaultValue: "Round" }),
+    sleeveStyle: t("billTextSize.previewSampleSleeveStyle", { defaultValue: "Standard" }),
+    sleeveSize: "14",
+    skirtStyle: t("billTextSize.previewSampleSkirtStyle", { defaultValue: "Straight" }),
+    outfitDesign: t("billTextSize.previewSampleDesign", { defaultValue: "Classic" }),
+    outfitStyle: orderTypeLabel,
+    buttonStyle: t("billTextSize.previewSampleButtonStyle", { defaultValue: "Metal" }),
+    pantStyle: t("billTextSize.previewSamplePantStyle", { defaultValue: "Normal" }),
+    frontPocket: true,
+    sidePocket: true,
+    doubleSidePocket: false,
+    underPocket: false,
+    additionalStyleInfo: t("billTextSize.previewSampleNote", {
+      defaultValue: "Please keep sleeve length exact.",
+    }),
+  };
+
+  const primaryOrder = {
+    id: "preview-order-1",
+    type: "OUTFIT",
+    orderName: customerName,
+    quantity: 2,
+    totalPrice: 2400,
+    discount: 100,
+    paidAmount: 1000,
+    remaining: 1300,
+    createdAt,
+    isEmergency: false,
+    box: { boxName: "A-12" },
+    rakhtColor: t("billTextSize.previewSampleColor", { defaultValue: "Navy" }),
+    rakhtColorHex: "#1e3a5f",
+    rakhtBrandName: t("billTextSize.previewSampleBrand", { defaultValue: "Premium" }),
+    rakhtCompanyName: t("billTextSize.previewSampleCompany", { defaultValue: "Textile Co" }),
+    rakhtRequiredMeters: 3.5,
+    outfit: shopMeasurements,
+    measurements: shopMeasurements,
+  };
+
+  const secondaryOrder = {
+    id: "preview-order-2",
+    type: "WASKAT",
+    orderName: t("billTextSize.previewSampleSecondName", { defaultValue: "Romel" }),
+    quantity: 1,
+    totalPrice: 900,
+    discount: 0,
+    paidAmount: 400,
+    remaining: 500,
+    createdAt,
+    isEmergency: false,
+    box: { boxName: "B-03" },
+    rakhtColor: t("billTextSize.previewSampleColor", { defaultValue: "Navy" }),
+    rakhtBrandName: t("billTextSize.previewSampleBrand", { defaultValue: "Premium" }),
+    rakhtRequiredMeters: 1.25,
+  };
+
+  const shop = {
+    ...tenant,
+    systemName: shopName,
+    businessName: shopName,
+    address: tenant?.address || t("billTextSize.previewAddress"),
+    phone: tenant?.phone || t("billTextSize.previewPhone"),
+    mobile: tenant?.mobile || tenant?.phone || t("billTextSize.previewPhone"),
+    logoUrl: tenant?.logoUrl || "",
+  };
+
+  return {
+    customer,
+    orders: [primaryOrder, secondaryOrder],
+    order: primaryOrder,
+    measurements: shopMeasurements,
+    shop,
+  };
 }
 
 export function BillTextSizeControl({ label, value, onChange, isRtl, disabled }) {
@@ -30,7 +133,7 @@ export function BillTextSizeControl({ label, value, onChange, isRtl, disabled })
             className="btn btn-outline btn-xs h-8 w-8 rounded-full p-0"
             onClick={() => onChange(Number((nextValue - 0.5).toFixed(1)))}
             disabled={disabled || nextValue <= BILL_TEXT_SIZE_MIN}
-            aria-label={t("billTextSize.decrease", { label, defaultValue: "Decrease {{label}}" })}
+            aria-label={t("billTextSize.decrease", { label })}
           >
             −
           </button>
@@ -42,7 +145,7 @@ export function BillTextSizeControl({ label, value, onChange, isRtl, disabled })
             className="btn btn-outline btn-xs h-8 w-8 rounded-full p-0"
             onClick={() => onChange(Number((nextValue + 0.5).toFixed(1)))}
             disabled={disabled || nextValue >= BILL_TEXT_SIZE_MAX}
-            aria-label={t("billTextSize.increase", { label, defaultValue: "Increase {{label}}" })}
+            aria-label={t("billTextSize.increase", { label })}
           >
             +
           </button>
@@ -73,139 +176,62 @@ export function BillTextSizeActionButton({ label, title, onClick, disabled, isRt
 
 function BillTypographyPreview({ settings, tenant, mode, isRtl }) {
   const { t } = useTranslation();
-  const shopName = tenant?.systemName || tenant?.businessName || t("billTextSize.previewShopName");
+  const sample = useMemo(() => buildPreviewSample(tenant, t), [tenant, t]);
+  const liveShop = useMemo(
+    () => ({
+      ...sample.shop,
+      billHeaderTextSize: settings.billHeaderTextSize,
+      billBodyTextSize: settings.billBodyTextSize,
+      billAmountTextSize: settings.billAmountTextSize,
+    }),
+    [sample.shop, settings],
+  );
   const isShop = mode === "shop";
-  const sheetClass = isShop
-    ? "print-a6-sheet print-bill-sheet print-shop-bill overflow-hidden bg-white"
-    : "print-a6-sheet print-bill-sheet print-customer-bill overflow-hidden bg-white";
-  const metaSize = `${Math.max(8, settings.billBodyTextSize - 1.5)}px`;
-  const thSize = `${Math.max(8, settings.billBodyTextSize - 1)}px`;
-  const footerSize = `${Math.max(8, settings.billBodyTextSize - 1)}px`;
-  const footerDateSize = `${Math.max(8, settings.billBodyTextSize - 1.5)}px`;
 
   return (
     <div
-      className={sheetClass}
+      className={cn(
+        "bill-typography-preview-frame overflow-auto rounded-xl border border-[var(--border)] bg-[var(--surface2)] p-3 sm:p-4",
+        isShop && "bill-typography-preview-frame--shop",
+      )}
       dir={isRtl ? "rtl" : "ltr"}
-      style={{
-        ...getTenantBillTextStyle(settings),
-        fontFamily: "'Inter','Noto Naskh Arabic','Noto Sans Arabic',sans-serif",
-      }}
     >
-      <div className={cn("print-bill-header", isRtl ? "print-bill-header--rtl" : "print-bill-header--ltr")}>
-        <div className="print-bill-header-body">
-          <div className="print-bill-header-brand">
-            <div className="print-bill-header-logo">
-              <div className="print-bill-header-logo-fallback">TS</div>
-            </div>
-            <div className="print-bill-header-shop">
-              <p
-                className="print-bill-header-name print-bill-header-info-row"
-                style={{ fontSize: `${settings.billHeaderTextSize}px` }}
-              >
-                <span className="print-bill-header-info-text">{shopName}</span>
-              </p>
-              <p className="print-bill-header-meta print-bill-header-address" style={{ fontSize: metaSize }}>
-                {t("billTextSize.previewAddress")} • {t("billTextSize.previewPhone")}
-              </p>
-            </div>
-          </div>
-        </div>
+      <div
+        className={cn(
+          "mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2",
+        )}
+      >
+        <p className="text-xs font-bold text-[var(--text2)]">
+          {isShop ? t("billTextSize.previewShopBill") : t("billTextSize.previewCustomerBill")}
+        </p>
+        <span className="rounded-full border border-[var(--border)] bg-[var(--surface2)] px-2.5 py-1 text-[10px] font-semibold text-[var(--text3)]">
+          {t("billTextSize.livePreviewHint", {
+            defaultValue: "Updates instantly with size controls",
+          })}
+        </span>
       </div>
 
-      {isShop ? (
-        <div className="print-bill-table-wrap px-2 py-2">
-          <table
-            className="w-full border-collapse table-fixed"
-            style={{ fontSize: `${settings.billBodyTextSize}px` }}
-          >
-            <thead>
-              <tr>
-                <th className="px-1.5 py-1 text-start" style={{ fontSize: thSize }}>
-                  {t("billTextSize.previewOrderType")}
-                </th>
-                <th className="px-1.5 py-1 text-start" style={{ fontSize: thSize }}>
-                  {t("billTextSize.previewQty")}
-                </th>
-                <th className="px-1.5 py-1 text-start" style={{ fontSize: thSize }}>
-                  {t("billTextSize.previewTotal")}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td className="px-1.5 py-1" style={{ fontSize: `${settings.billBodyTextSize}px` }}>
-                  {t("billTextSize.previewSampleOrderType")}
-                </td>
-                <td className="px-1.5 py-1 text-center" style={{ fontSize: `${settings.billBodyTextSize}px` }}>
-                  2
-                </td>
-                <td
-                  className="px-1.5 py-1 text-end"
-                  style={{ fontSize: `${settings.billAmountTextSize}px`, fontWeight: 800 }}
-                >
-                  {t("billTextSize.previewSampleAmount")}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="print-customer-combined-wrap print-bill-table-wrap">
-          <table
-            className="print-customer-combined-table print-reference-detail-table w-full border-collapse table-fixed"
-            style={{ fontSize: `${settings.billBodyTextSize}px` }}
-          >
-            <thead>
-              <tr>
-                <th className="px-1.5 py-1 text-start" style={{ fontSize: thSize }}>
-                  {t("billTextSize.previewBillNo")}
-                </th>
-                <th className="px-1.5 py-1 text-start" style={{ fontSize: thSize }}>
-                  {t("billTextSize.previewCustomer")}
-                </th>
-                <th className="px-1.5 py-1 text-start" style={{ fontSize: thSize }}>
-                  {t("billTextSize.previewQty")}
-                </th>
-                <th className="px-1.5 py-1 text-start" style={{ fontSize: thSize }}>
-                  {t("billTextSize.previewTotal")}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td className="px-1.5 py-1" style={{ fontSize: `${settings.billBodyTextSize}px` }}>
-                  #120
-                </td>
-                <td className="px-1.5 py-1" style={{ fontSize: `${settings.billBodyTextSize}px` }}>
-                  {t("billTextSize.previewSampleCustomer")}
-                </td>
-                <td className="px-1.5 py-1 text-center" style={{ fontSize: `${settings.billBodyTextSize}px` }}>
-                  2
-                </td>
-                <td
-                  className="px-1.5 py-1 text-end"
-                  style={{ fontSize: `${settings.billAmountTextSize}px`, fontWeight: 800 }}
-                >
-                  {t("billTextSize.previewSampleAmount")}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <div className={cn("print-bill-footer", isRtl ? "print-bill-footer--rtl" : "print-bill-footer--ltr")}>
-        <div className="print-bill-footer-body">
-          <span className="print-bill-footer-badge" style={{ fontSize: footerSize }}>
-            {isShop ? t("billTextSize.shopBillBadge") : t("billTextSize.customerBillBadge")}
-          </span>
-          <div className="print-bill-footer-datetime">
-            <span className="print-bill-footer-datetime-item" style={{ fontSize: footerDateSize }}>
-              2026/08/19
-            </span>
-          </div>
-        </div>
+      <div
+        className={cn(
+          "bill-typography-preview-scale mx-auto origin-top",
+          isShop && "bill-typography-preview-scale--shop",
+        )}
+      >
+        {isShop ? (
+          <TailorBill
+            customer={sample.customer}
+            order={sample.order}
+            measurements={sample.measurements}
+            shop={liveShop}
+            preview
+          />
+        ) : (
+          <CustomerCombinedBill
+            customer={sample.customer}
+            orders={sample.orders}
+            shop={liveShop}
+          />
+        )}
       </div>
     </div>
   );
@@ -257,14 +283,6 @@ export function BillTypographySettingsPanel({
 
       {showPreview ? (
         <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-3">
-          <p
-            className={cn(
-              "mb-2 text-xs font-bold text-[var(--text3)]",
-              !isRtl && "uppercase tracking-[0.12em]",
-            )}
-          >
-            {mode === "shop" ? t("billTextSize.previewShopBill") : t("billTextSize.previewCustomerBill")}
-          </p>
           <BillTypographyPreview settings={settings} tenant={tenant} mode={mode} isRtl={isRtl} />
         </div>
       ) : null}
@@ -321,7 +339,7 @@ export function BillTypographySettingsModal({
       open={open}
       onClose={isSaving ? () => {} : onClose}
       title={modalTitle}
-      maxW={620}
+      maxW={mode === "shop" ? 820 : 760}
       boxClassName="superadmin-modal"
       dir={isRtl ? "rtl" : "ltr"}
     >

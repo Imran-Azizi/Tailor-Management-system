@@ -9,6 +9,7 @@ const KNOWN_VIEWPORT_SELECTOR = [
   ".items-table-wrap",
   ".order-scroll-x",
   ".overflow-x-auto",
+  ".table-hscroll-viewport",
   ".assign-orders-records-table-wrap",
   ".contributor-list-desktop-wrap",
   ".payment-history-records-wrap",
@@ -20,6 +21,7 @@ const KNOWN_VIEWPORT_SELECTOR = [
 ].join(",");
 const MANAGED_ANCESTOR_SELECTOR = [
   ".orders-scroll-shell",
+  ".table-hscroll-shell",
   ".delivery-scroll-shell",
   ".rakht-manager-scroll-shell",
   "[data-system-scroll-ignore='true']",

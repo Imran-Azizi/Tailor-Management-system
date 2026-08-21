@@ -17,6 +17,7 @@ import {
   StatCard,
   LoadingState,
   EmptyState,
+  TableHorizontalScroll,
 } from "../components/ui/index.jsx";
 import MobileFilterPanel from "../components/ui/MobileFilterPanel.jsx";
 
@@ -201,7 +202,11 @@ export default function ItemSalesRecords() {
             message={t("common.loading", { defaultValue: "Loading..." })}
           />
         ) : sales.length ? (
-          <div className="items-table-wrap">
+          <TableHorizontalScroll
+            viewportClassName="items-table-wrap"
+            ariaLabel="Item sales records table horizontal scroll"
+            minWidth="900px"
+          >
             <table className="tbl items-table">
               <thead>
                 <tr>
@@ -262,7 +267,7 @@ export default function ItemSalesRecords() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableHorizontalScroll>
         ) : (
           <EmptyState
             message={t("items.records.empty", {

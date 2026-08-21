@@ -28,6 +28,7 @@ import {
   Spinner,
   EmptyState,
   Pagination,
+  TableHorizontalScroll,
 } from "../components/ui/index.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import OrderCreatorBadge from "../components/order/OrderCreatorBadge.jsx";
@@ -421,7 +422,11 @@ export default function GlobalOrderSearch() {
           </div>
 
           {/* Desktop table */}
-          <div className="card global-order-search__table-card order-scroll-x">
+          <div className="card global-order-search__table-card">
+            <TableHorizontalScroll
+              ariaLabel="Global order search table horizontal scroll"
+              minWidth="1100px"
+            >
             <table
               style={{
                 width: "100%",
@@ -583,6 +588,7 @@ export default function GlobalOrderSearch() {
                 })}
               </tbody>
             </table>
+            </TableHorizontalScroll>
           </div>
 
           {/* Mobile cards */}

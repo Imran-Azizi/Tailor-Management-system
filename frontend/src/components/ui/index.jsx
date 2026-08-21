@@ -3,6 +3,9 @@ import { createPortal } from "react-dom";
 import { LuInbox, LuSearch, LuTriangleAlert, LuTrash2 } from "react-icons/lu";
 import { useTranslation } from "react-i18next";
 import { isRtlLanguage } from "../../lib/locale.js";
+import TableHorizontalScroll from "./TableHorizontalScroll.jsx";
+
+export { default as TableHorizontalScroll } from "./TableHorizontalScroll.jsx";
 
 export const PageHeader = ({ title, subtitle, action }) => (
   <div className="page-hd">
@@ -355,7 +358,9 @@ export const Card = ({ title, action, children, noPad, style }) => (
         {action && <div>{action}</div>}
       </div>
     )}
-    <div className={noPad ? "" : "card-body"}>{children}</div>
+    <div className={noPad ? "card-body card-body--flush" : "card-body"}>
+      {children}
+    </div>
   </div>
 );
 
@@ -397,7 +402,10 @@ export const DataTable = ({
   if (!columns.length) return null;
 
   return (
-    <div className="tbl-wrap">
+    <TableHorizontalScroll
+      ariaLabel={t("common.tableScroll", "Table horizontal scroll")}
+      minWidth={columns.length >= 4 ? `${Math.min(1400, Math.max(640, columns.length * 140))}px` : undefined}
+    >
       <table className="tbl">
         <thead>
           <tr>
@@ -440,7 +448,7 @@ export const DataTable = ({
           )}
         </tbody>
       </table>
-    </div>
+    </TableHorizontalScroll>
   );
 };
 

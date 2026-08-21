@@ -21,7 +21,7 @@ import api from "../lib/api.js";
 import { getApiErrorMessage } from "../lib/feedback.js";
 import { PERMISSIONS } from "../lib/permissions.js";
 import { useAuth } from "../context/AuthContext.jsx";
-import { ConfirmDeleteModal } from "../components/ui/index.jsx";
+import { ConfirmDeleteModal, TableHorizontalScroll } from "../components/ui/index.jsx";
 
 const ROLE_COLORS = {
   ADMIN: "#2563EB",
@@ -670,7 +670,11 @@ export default function UserManagement() {
         </p>
       ) : (
         <div className="card user-management-card" style={{ overflow: "hidden" }}>
-          <div className="tbl-wrap user-management-table-wrap">
+          <TableHorizontalScroll
+            viewportClassName="user-management-table-wrap"
+            ariaLabel="Users table horizontal scroll"
+            minWidth="560px"
+          >
             <table className="tbl user-management-table" style={{ minWidth: 560 }}>
               <thead>
                 <tr className="" style={{ background: "var(--surface2)" }}>
@@ -831,7 +835,7 @@ export default function UserManagement() {
                 )}
               </tbody>
             </table>
-          </div>
+          </TableHorizontalScroll>
         </div>
       )}
 

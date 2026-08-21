@@ -19,6 +19,7 @@ import {
   Pagination,
   Spinner,
   StatCard,
+  TableHorizontalScroll,
 } from "../components/ui/index.jsx";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import MobileFilterPanel from "../components/ui/MobileFilterPanel.jsx";
@@ -402,7 +403,11 @@ export default function WorkerPaymentReceipts() {
               message={t("workerReceipts.empty", "No receipt records found.")}
             />
           ) : (
-            <div className="tbl-wrap professional-report-table-wrap order-scroll-x worker-receipts-table-wrap">
+            <TableHorizontalScroll
+              viewportClassName="professional-report-table-wrap worker-receipts-table-wrap"
+              ariaLabel="Worker receipts table horizontal scroll"
+              minWidth="1100px"
+            >
               <table className="tbl professional-report-table worker-receipts-table">
                 <thead>
                   <tr>
@@ -519,7 +524,7 @@ export default function WorkerPaymentReceipts() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableHorizontalScroll>
           )}
 
           <Pagination

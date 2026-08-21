@@ -20,7 +20,7 @@ import {
   LuTriangleAlert,
   LuX,
 } from "react-icons/lu";
-import { Modal } from "../components/ui/index.jsx";
+import { Modal, TableHorizontalScroll } from "../components/ui/index.jsx";
 import {
   BillTextSizeActionButton,
   BillTypographySettingsModal,
@@ -982,7 +982,12 @@ export default function SuperAdminDashboard() {
             )}
           </div>
 
-          <div className="superadmin-table-wrap hidden overflow-x-auto md:block">
+          <div className="hidden md:block">
+            <TableHorizontalScroll
+              viewportClassName="superadmin-table-wrap"
+              ariaLabel="Tenants table horizontal scroll"
+              minWidth="980px"
+            >
             <table className="superadmin-table w-full min-w-[980px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-[var(--border)] bg-[var(--surface2)]">
@@ -1125,6 +1130,7 @@ export default function SuperAdminDashboard() {
                 )}
               </tbody>
             </table>
+            </TableHorizontalScroll>
           </div>
         </section>
 

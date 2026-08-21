@@ -28,6 +28,7 @@ import {
   Pagination,
   Spinner,
   StatCard,
+  TableHorizontalScroll,
 } from "../components/ui/index.jsx";
 import {
   ReportKpiGrid,
@@ -448,7 +449,11 @@ export default function AllTransactions() {
               Icon={LuArrowRightLeft}
             />
           ) : (
-            <div className="tbl-wrap professional-report-table-wrap all-transactions-table-wrap">
+            <TableHorizontalScroll
+              viewportClassName="professional-report-table-wrap all-transactions-table-wrap"
+              ariaLabel="Transactions table horizontal scroll"
+              minWidth="980px"
+            >
               <table className="tbl professional-report-table all-transactions-table">
                 <colgroup>
                   {transactionColumns.map((column) => (
@@ -576,7 +581,7 @@ export default function AllTransactions() {
                   })}
                 </tbody>
               </table>
-            </div>
+            </TableHorizontalScroll>
           )}
 
           <div className="all-transactions-pagination">

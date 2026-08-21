@@ -21,6 +21,7 @@ import {
   Field,
   PageHeader,
   Spinner,
+  TableHorizontalScroll,
 } from "../components/ui/index.jsx";
 import "./AssignOrders.css";
 
@@ -477,7 +478,11 @@ export default function AssignOrders() {
                   </div>
                 ) : (
                   <>
-                    <div className="ao-table-wrap" role="region" aria-label={t("assignment.searchResult", "Search Result")}>
+                    <TableHorizontalScroll
+                      viewportClassName="ao-table-wrap"
+                      ariaLabel={t("assignment.searchResult", "Search Result")}
+                      minWidth="900px"
+                    >
                       <table className="ao-table">
                         <thead>
                           <tr>
@@ -588,7 +593,7 @@ export default function AssignOrders() {
                           })}
                         </tbody>
                       </table>
-                    </div>
+                    </TableHorizontalScroll>
 
                     {/* Mobile card list */}
                     <div className="ao-card-list">

@@ -100,7 +100,7 @@ export default function Layout() {
           onHamburger={toggleMobileSidebar}
           pageTitle={t(titleKey)}
         />
-        <main className="min-w-0" style={{ flex: 1 }}>
+        <main className="min-w-0 max-w-full overflow-x-hidden" style={{ flex: 1 }}>
           <Outlet key={loc.pathname} />
         </main>
       </div>

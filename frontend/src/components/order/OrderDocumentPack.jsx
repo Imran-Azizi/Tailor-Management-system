@@ -467,7 +467,7 @@ function RakhtSummary({ details }) {
         </p>
       ) : null}
       {metaParts.length > 0 ? (
-        <p className="mt-0.5 text-[9px] text-slate-600 [direction:ltr] [unicode-bidi:embed]">
+        <p className="mt-0.5 text-slate-600 print-bill-meta-secondary [direction:ltr] [unicode-bidi:embed]">
           {metaParts.join(" - ")}
         </p>
       ) : null}
@@ -809,7 +809,11 @@ export function CustomerBill({ customer, order, shop }) {
       align: "[direction:ltr]",
       show: hasPrintableBillValue(qty),
       className: "text-center font-bold [direction:ltr] [unicode-bidi:embed]",
-      render: () => formatNumber(qty),
+      render: () => (
+        <span className="print-bill-number [direction:ltr] [unicode-bidi:embed]">
+          {formatNumber(qty)}
+        </span>
+      ),
     },
     {
       key: "box",
@@ -827,7 +831,11 @@ export function CustomerBill({ customer, order, shop }) {
       show: hasPrintableBillValue(grossTotal),
       className:
         "text-center font-black text-slate-900 [direction:ltr] [unicode-bidi:embed]",
-      render: () => formatMoney(grossTotal, settings.langCode),
+      render: () => (
+        <span className="print-bill-number [direction:ltr] [unicode-bidi:embed]">
+          {formatMoney(grossTotal, settings.langCode)}
+        </span>
+      ),
     },
   ].filter((column) => column.show);
   const financeColumns = [
@@ -862,6 +870,7 @@ export function CustomerBill({ customer, order, shop }) {
         remaining > 0
           ? formatMoney(remaining, settings.langCode)
           : txt.paidInFull,
+      isText: remaining <= 0,
     },
   ].filter((column) => column.show);
 
@@ -876,7 +885,7 @@ export function CustomerBill({ customer, order, shop }) {
 
       {isEmergency && (
         <div
-          className={`border-b border-slate-800 bg-rose-50 px-2 py-1.5 text-[11px] font-bold text-rose-700 ${alignClass}`}
+          className={`print-bill-alert border-b border-slate-800 bg-rose-50 px-2 py-1.5 font-bold text-rose-700 ${alignClass}`}
         >
           {t("createOrder.emergencyOrder")}
         </div>
@@ -930,7 +939,7 @@ export function CustomerBill({ customer, order, shop }) {
             })}
           </div>
           <div
-            className="print-customer-rakht-grid grid text-[10px] text-slate-800"
+            className="print-customer-rakht-grid grid text-slate-800"
             style={{
               gridTemplateColumns: `repeat(${rakhtInfoFields.length}, minmax(0, 1fr))`,
             }}
@@ -984,7 +993,7 @@ export function CustomerBill({ customer, order, shop }) {
                 <span
                   className={`print-customer-amount ${
                     column.final ? "print-customer-amount--final" : ""
-                  }`}
+                  } ${column.isText ? "print-customer-amount--text" : ""}`}
                 >
                   {column.render()}
                 </span>
@@ -1174,7 +1183,11 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
       align: "[direction:ltr]",
       show: rowItems.some((row) => hasPrintableBillValue(row.qty)),
       className: "text-center font-bold [direction:ltr] [unicode-bidi:embed]",
-      render: (row) => formatNumber(row.qty),
+      render: (row) => (
+        <span className="print-bill-number [direction:ltr] [unicode-bidi:embed]">
+          {formatNumber(row.qty)}
+        </span>
+      ),
     },
     {
       key: "box",
@@ -1192,7 +1205,11 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
       show: rowItems.some((row) => hasPrintableBillValue(row.amount)),
       className:
         "text-center font-black text-slate-900 [direction:ltr] [unicode-bidi:embed]",
-      render: (row) => formatMoney(row.amount, settings.langCode),
+      render: (row) => (
+        <span className="print-bill-number [direction:ltr] [unicode-bidi:embed]">
+          {formatMoney(row.amount, settings.langCode)}
+        </span>
+      ),
     },
   ].filter((column) => column.show);
   const financeColumns = [
@@ -1227,6 +1244,7 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
         remaining > 0
           ? formatMoney(remaining, settings.langCode)
           : safeTxt("paidInFull"),
+      isText: remaining <= 0,
     },
   ].filter((column) => column.show);
 
@@ -1241,7 +1259,7 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
 
       {billIsEmergency ? (
         <div
-          className={`border-b border-slate-800 bg-rose-50 px-2.5 py-1.5 text-[11px] font-bold text-rose-700 ${alignClass}`}
+          className={`print-bill-alert border-b border-slate-800 bg-rose-50 px-2.5 py-1.5 font-bold text-rose-700 ${alignClass}`}
         >
           {t("createOrder.emergencyOrder")}
         </div>
@@ -1270,7 +1288,7 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
               <tr>
                 <td
                   colSpan={Math.max(detailColumns.length, 1)}
-                  className={`border-b border-slate-800 px-2 py-2 text-[11px] ${alignClass}`}
+                  className={`border-b border-slate-800 px-2 py-2 ${alignClass}`}
                 >
                   {t("common.noData")}
                 </td>
@@ -1312,13 +1330,13 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
               <div key={row.key} className="print-customer-rakht-row">
                 {rakhtInfoRows.length > 1 ? (
                   <div
-                    className={`border-b border-slate-800 bg-amber-50 px-2 py-1 text-[9px] font-bold text-amber-800 ${alignClass}`}
+                    className={`border-b border-slate-800 bg-amber-50 px-2 py-1 font-bold text-amber-800 print-bill-meta-secondary ${alignClass}`}
                   >
                     {row.itemLabel}
                   </div>
                 ) : null}
                 <div
-                  className="print-customer-rakht-grid grid text-[10px] text-slate-800"
+                  className="print-customer-rakht-grid grid text-slate-800"
                   style={{
                     gridTemplateColumns: `repeat(${row.fields.length}, minmax(0, 1fr))`,
                   }}
@@ -1375,7 +1393,7 @@ export function CustomerCombinedBill({ customer, orders = [], shop }) {
                 <span
                   className={`print-customer-amount ${
                     column.final ? "print-customer-amount--final" : ""
-                  }`}
+                  } ${column.isText ? "print-customer-amount--text" : ""}`}
                 >
                   {column.render()}
                 </span>
@@ -1460,7 +1478,14 @@ function FullWidthBillNote({ label, text, alignClass, className = "" }) {
   );
 }
 
-export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
+export function TailorBill({
+  customer,
+  order,
+  measurements,
+  itemLabel,
+  shop,
+  preview = false,
+}) {
   const { i18n, t } = useTranslation();
   const settings = getBillLanguageSettings(
     i18n.resolvedLanguage || i18n.language,
@@ -1678,14 +1703,16 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
     <div
       lang={settings.htmlLang}
       dir={settings.dir}
-      className="print-a6-sheet print-bill-sheet print-shop-bill overflow-hidden bg-white"
+      className={`print-a6-sheet print-bill-sheet print-shop-bill bg-white ${
+        preview ? "print-shop-bill--preview overflow-visible" : "overflow-hidden"
+      }`}
       style={billTypographyStyle}
     >
       <PrintBillHeader settings={settings} shop={shop} />
 
       {order?.isEmergency && (
         <div
-          className={`border-b border-slate-800 bg-rose-50 px-2 py-1.5 text-[11px] font-bold text-rose-700 ${alignClass}`}
+          className={`print-bill-alert border-b border-slate-800 bg-rose-50 px-2 py-1.5 font-bold text-rose-700 ${alignClass}`}
         >
           {t("createOrder.emergencyOrder")}
         </div>
@@ -1837,7 +1864,7 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
             })}
           </div>
           <div
-            className="print-tailor-fabric-grid text-[11px]"
+            className="print-tailor-fabric-grid"
             style={{
               gridTemplateColumns: `repeat(${rakhtFields.length}, minmax(0, 1fr))`,
             }}
@@ -1847,7 +1874,7 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
                 key={field.key}
                 className={`print-bill-kv-cell ${getBorderClass(index, rakhtFields)} px-2 py-1.5 ${alignClass}`}
               >
-                <p className="print-bill-th print-bill-th--upper text-[9px] text-slate-500">
+                <p className="print-bill-th print-bill-th--upper text-slate-500">
                   {field.label}
                 </p>
                 {field.render()}
@@ -1861,7 +1888,7 @@ export function TailorBill({ customer, order, measurements, itemLabel, shop }) {
         title={safeTxt("tailorCopy")}
         date={date}
         time={time}
-        showBadge={false}
+        showBadge={preview || false}
       />
     </div>
   );

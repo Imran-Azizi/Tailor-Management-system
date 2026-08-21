@@ -48,6 +48,7 @@ import {
   PageHeader,
   Pagination,
   Spinner,
+  TableHorizontalScroll,
 } from "../components/ui/index.jsx";
 
 function formatMoney(v, language = "en") {
@@ -1501,7 +1502,11 @@ export default function AllDailyTasks() {
           <EmptyTasksState t={t} />
         ) : (
           <>
-            <div className="tbl-wrap professional-report-table-wrap dt-table-scroll-wrap order-scroll-x">
+            <TableHorizontalScroll
+              viewportClassName="professional-report-table-wrap dt-table-scroll-wrap"
+              ariaLabel="Daily tasks table horizontal scroll"
+              minWidth="980px"
+            >
               <table className="tbl professional-report-table dt-table">
                 <thead>
                   <tr>
@@ -1590,7 +1595,7 @@ export default function AllDailyTasks() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableHorizontalScroll>
           </>
         )}
 

@@ -16,6 +16,7 @@ import {
   PageHeader,
   Spinner,
   StatCard,
+  TableHorizontalScroll,
 } from "../components/ui/index.jsx";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
@@ -356,7 +357,11 @@ export default function RakhtRevenue() {
           noPad
         >
         {summary.details?.length ? (
-          <div className="tbl-wrap professional-report-table-wrap rakht-revenue-records-wrap">
+          <TableHorizontalScroll
+            viewportClassName="professional-report-table-wrap rakht-revenue-records-wrap"
+            ariaLabel="Rakht revenue table horizontal scroll"
+            minWidth="980px"
+          >
             <table
               className="tbl professional-report-table rakht-revenue-records-table"
               data-language-direction={isRtl ? "rtl" : "ltr"}
@@ -410,7 +415,7 @@ export default function RakhtRevenue() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableHorizontalScroll>
         ) : (
           <EmptyState
             message={t("common.noData", { defaultValue: "No data found" })}

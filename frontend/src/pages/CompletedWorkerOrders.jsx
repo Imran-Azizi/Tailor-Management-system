@@ -32,6 +32,7 @@ import {
   Pagination,
   Spinner,
   StatCard,
+  TableHorizontalScroll,
 } from "../components/ui/index.jsx";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
 import MobileFilterPanel from "../components/ui/MobileFilterPanel.jsx";
@@ -916,7 +917,11 @@ export default function CompletedWorkerOrders() {
               </div>
             </div>
 
-            <div className="tbl-wrap completed-worker-orders-table-wrap order-scroll-x">
+            <TableHorizontalScroll
+              viewportClassName="completed-worker-orders-table-wrap"
+              ariaLabel="Completed worker orders table horizontal scroll"
+              minWidth="1100px"
+            >
               <table className="tbl completed-worker-orders-table">
                 <thead>
                   <tr>
@@ -1124,7 +1129,7 @@ export default function CompletedWorkerOrders() {
                   })}
                 </tbody>
               </table>
-            </div>
+            </TableHorizontalScroll>
             </>
           )}
 

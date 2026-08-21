@@ -26,6 +26,7 @@ import {
   PageHeader,
   Spinner,
   StatCard,
+  TableHorizontalScroll,
 } from "../components/ui/index.jsx";
 import {
   ReportKpiGrid,
@@ -601,7 +602,11 @@ export default function PaymentHistory() {
             })}
           />
         ) : (
-          <div className="professional-report-table-wrap payment-history-records-wrap">
+          <TableHorizontalScroll
+            viewportClassName="professional-report-table-wrap payment-history-records-wrap"
+            ariaLabel="Payment history table horizontal scroll"
+            minWidth="980px"
+          >
             <table className="tbl professional-report-table payment-history-records-table">
               <thead>
                 <tr>
@@ -686,7 +691,7 @@ export default function PaymentHistory() {
                 })}
               </tbody>
             </table>
-          </div>
+          </TableHorizontalScroll>
         )}
 
         {!isLoading && rows.length > 0 ? (

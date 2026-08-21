@@ -44,6 +44,7 @@ import {
   ConfirmDeleteModal,
 } from "../components/ui/index.jsx";
 import AfCurrencyIcon from "../components/ui/AfCurrencyIcon.jsx";
+import TableHorizontalScroll from "../components/ui/TableHorizontalScroll.jsx";
 import { TableSkeleton, StatCardsSkeleton } from "../components/ui/Skeleton.jsx";
 import OrderCreatorBadge from "../components/order/OrderCreatorBadge.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -62,259 +63,6 @@ import {
 } from "../lib/orderProtection.js";
 
 const ROLE_COLORS = { QICHIKAR: "#D97706", DOKHT: "#DB2777" };
-const ORDER_SCROLL_THUMB_MIN = 64;
-
-let cachedRtlScrollType = null;
-
-function detectRtlScrollType() {
-  if (typeof document === "undefined") return "negative";
-  if (cachedRtlScrollType) return cachedRtlScrollType;
-
-  const scroller = document.createElement("div");
-  const content = document.createElement("div");
-  scroller.dir = "rtl";
-  scroller.style.cssText =
-    "position:absolute;top:-9999px;width:4px;height:1px;overflow:scroll;visibility:hidden;";
-  content.style.cssText = "width:8px;height:1px;";
-  scroller.appendChild(content);
-  document.body.appendChild(scroller);
-
-  if (scroller.scrollLeft > 0) {
-    cachedRtlScrollType = "default";
-  } else {
-    scroller.scrollLeft = 1;
-    cachedRtlScrollType = scroller.scrollLeft === 0 ? "negative" : "reverse";
-  }
-
-  document.body.removeChild(scroller);
-  return cachedRtlScrollType;
-}
-
-function getNormalizedScrollLeft(element) {
-  const maxScroll = Math.max(0, element.scrollWidth - element.clientWidth);
-  const direction = window.getComputedStyle(element).direction;
-  const scrollLeft = element.scrollLeft;
-
-  if (direction !== "rtl") {
-    return Math.min(maxScroll, Math.max(0, scrollLeft));
-  }
-
-  switch (detectRtlScrollType()) {
-    case "negative":
-      return Math.min(maxScroll, Math.max(0, maxScroll + scrollLeft));
-    case "reverse":
-      return Math.min(maxScroll, Math.max(0, maxScroll - scrollLeft));
-    default:
-      return Math.min(maxScroll, Math.max(0, scrollLeft));
-  }
-}
-
-function setNormalizedScrollLeft(element, value) {
-  const maxScroll = Math.max(0, element.scrollWidth - element.clientWidth);
-  const nextValue = Math.min(maxScroll, Math.max(0, value));
-  const direction = window.getComputedStyle(element).direction;
-
-  if (direction !== "rtl") {
-    element.scrollLeft = nextValue;
-    return;
-  }
-
-  switch (detectRtlScrollType()) {
-    case "negative":
-      element.scrollLeft = nextValue - maxScroll;
-      break;
-    case "reverse":
-      element.scrollLeft = maxScroll - nextValue;
-      break;
-    default:
-      element.scrollLeft = nextValue;
-  }
-}
-
-function OrdersHorizontalScrollArea({ children }) {
-  const viewportRef = useRef(null);
-  const trackRef = useRef(null);
-  const metricsRef = useRef({
-    canScroll: false,
-    maxScroll: 0,
-    thumbLeft: 0,
-    thumbWidth: ORDER_SCROLL_THUMB_MIN,
-  });
-  const dragRef = useRef(null);
-  const rafRef = useRef(0);
-  const [metrics, setMetrics] = useState(metricsRef.current);
-
-  useEffect(() => {
-    metricsRef.current = metrics;
-  }, [metrics]);
-
-  useEffect(() => {
-    const viewport = viewportRef.current;
-    if (!viewport) return undefined;
-
-    const update = () => {
-      const trackWidth = trackRef.current?.clientWidth || viewport.clientWidth;
-      const maxScroll = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
-      const canScroll = maxScroll > 1 && trackWidth > 0;
-      const thumbWidth = canScroll
-        ? Math.max(
-            ORDER_SCROLL_THUMB_MIN,
-            Math.round((viewport.clientWidth / viewport.scrollWidth) * trackWidth),
-          )
-        : trackWidth;
-      const maxThumbLeft = Math.max(0, trackWidth - thumbWidth);
-      const normalizedScrollLeft = getNormalizedScrollLeft(viewport);
-      const thumbLeft =
-        canScroll && maxScroll > 0
-          ? Math.round((normalizedScrollLeft / maxScroll) * maxThumbLeft)
-          : 0;
-
-      setMetrics({ canScroll, maxScroll, thumbLeft, thumbWidth });
-    };
-
-    const scheduleUpdate = () => {
-      window.cancelAnimationFrame(rafRef.current);
-      rafRef.current = window.requestAnimationFrame(update);
-    };
-
-    scheduleUpdate();
-    viewport.addEventListener("scroll", scheduleUpdate, { passive: true });
-    window.addEventListener("resize", scheduleUpdate);
-
-    let resizeObserver = null;
-    if (typeof ResizeObserver !== "undefined") {
-      resizeObserver = new ResizeObserver(scheduleUpdate);
-      resizeObserver.observe(viewport);
-      if (viewport.firstElementChild) resizeObserver.observe(viewport.firstElementChild);
-    }
-
-    return () => {
-      viewport.removeEventListener("scroll", scheduleUpdate);
-      window.removeEventListener("resize", scheduleUpdate);
-      window.cancelAnimationFrame(rafRef.current);
-      resizeObserver?.disconnect();
-    };
-  }, []);
-
-  const scrollToThumbLeft = (thumbLeft) => {
-    const viewport = viewportRef.current;
-    const track = trackRef.current;
-    if (!viewport || !track) return;
-
-    const maxThumbLeft = Math.max(1, track.clientWidth - metricsRef.current.thumbWidth);
-    const ratio = Math.min(1, Math.max(0, thumbLeft / maxThumbLeft));
-    setNormalizedScrollLeft(viewport, ratio * metricsRef.current.maxScroll);
-  };
-
-  const handlePointerDown = (event) => {
-    if (event.button !== undefined && event.button !== 0) return;
-    const track = trackRef.current;
-    if (!track || !metricsRef.current.canScroll) return;
-
-    event.preventDefault();
-    const rect = track.getBoundingClientRect();
-    const onThumb = Boolean(event.target.closest(".orders-table-scrollbar__thumb"));
-    const nextThumbLeft = onThumb
-      ? metricsRef.current.thumbLeft
-      : event.clientX - rect.left - metricsRef.current.thumbWidth / 2;
-
-    if (!onThumb) scrollToThumbLeft(nextThumbLeft);
-
-    dragRef.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startThumbLeft: Math.min(
-        Math.max(0, nextThumbLeft),
-        Math.max(0, track.clientWidth - metricsRef.current.thumbWidth),
-      ),
-    };
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-  };
-
-  const handlePointerMove = (event) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-
-    event.preventDefault();
-    scrollToThumbLeft(drag.startThumbLeft + event.clientX - drag.startX);
-  };
-
-  const stopDragging = (event) => {
-    if (dragRef.current?.pointerId === event.pointerId) {
-      dragRef.current = null;
-      event.currentTarget.releasePointerCapture?.(event.pointerId);
-    }
-  };
-
-  const handleKeyDown = (event) => {
-    const viewport = viewportRef.current;
-    if (!viewport || !metricsRef.current.canScroll) return;
-
-    const current = getNormalizedScrollLeft(viewport);
-    const step = Math.max(48, Math.round(viewport.clientWidth * 0.18));
-    let next = current;
-
-    if (event.key === "ArrowLeft") next = current - step;
-    else if (event.key === "ArrowRight") next = current + step;
-    else if (event.key === "PageUp") next = current - viewport.clientWidth * 0.8;
-    else if (event.key === "PageDown") next = current + viewport.clientWidth * 0.8;
-    else if (event.key === "Home") next = 0;
-    else if (event.key === "End") next = metricsRef.current.maxScroll;
-    else return;
-
-    event.preventDefault();
-    setNormalizedScrollLeft(viewport, next);
-  };
-
-  return (
-    <div className="orders-scroll-shell">
-      <div
-        ref={viewportRef}
-        className="tbl-wrap all-orders-table-wrap order-scroll-x"
-        tabIndex={0}
-      >
-        {children}
-      </div>
-      {metrics.canScroll ? (
-        <div className="orders-table-scrollbar" aria-hidden={false}>
-          <div
-            ref={trackRef}
-            className="orders-table-scrollbar__track"
-            role="scrollbar"
-            aria-label="Orders table horizontal scroll"
-            aria-orientation="horizontal"
-            aria-valuemin={0}
-            aria-valuemax={Math.round(metrics.maxScroll)}
-            aria-valuenow={Math.round(
-              metrics.maxScroll > 0
-                ? (metrics.thumbLeft /
-                    Math.max(
-                      1,
-                      (trackRef.current?.clientWidth || 0) - metrics.thumbWidth,
-                    )) *
-                    metrics.maxScroll
-                : 0,
-            )}
-            tabIndex={0}
-            onKeyDown={handleKeyDown}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={stopDragging}
-            onPointerCancel={stopDragging}
-          >
-            <div
-              className="orders-table-scrollbar__thumb"
-              style={{
-                width: `${metrics.thumbWidth}px`,
-                transform: `translateX(${metrics.thumbLeft}px)`,
-              }}
-            />
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
-}
 
 function isCompletedForWorkerType(order, workerType) {
   if (!order || !workerType) return false;
@@ -1719,7 +1467,12 @@ export default function AllOrders({ filter, mode = "orders" }) {
         ) : (
           <>
             <div className="all-orders-desktop">
-              <OrdersHorizontalScrollArea>
+              <TableHorizontalScroll
+                viewportClassName="all-orders-table-wrap"
+                ariaLabel="Orders table horizontal scroll"
+                minWidth="1160px"
+                maxVisibleRows={5}
+              >
                 <table className="tbl all-orders-table">
                   <thead>
                     <tr>
@@ -1892,7 +1645,7 @@ export default function AllOrders({ filter, mode = "orders" }) {
                     )}
                   </tbody>
                 </table>
-              </OrdersHorizontalScrollArea>
+              </TableHorizontalScroll>
             </div>
 
             <div className="all-orders-mobile">

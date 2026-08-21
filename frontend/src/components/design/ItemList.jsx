@@ -1,7 +1,7 @@
 import { LuPencil, LuTrash2, LuTriangleAlert } from "react-icons/lu";
 import { useTranslation } from "react-i18next";
 import { formatCurrency } from "../../lib/currency.js";
-import { EmptyState } from "../ui/index.jsx";
+import { EmptyState, TableHorizontalScroll } from "../ui/index.jsx";
 
 const LOW_STOCK_LIMIT = 5;
 
@@ -108,9 +108,10 @@ export default function ItemList({ items, onEdit, onDelete }) {
   const visibleColumns = isRtl ? [...columns].reverse() : columns;
 
   return (
-    <div
-      className="items-table-wrap"
-      style={{ direction: "ltr", textAlign }}
+    <TableHorizontalScroll
+      viewportClassName="items-table-wrap"
+      ariaLabel="Items table horizontal scroll"
+      minWidth="720px"
     >
       <table
         className="tbl items-table"
@@ -141,6 +142,6 @@ export default function ItemList({ items, onEdit, onDelete }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </TableHorizontalScroll>
   );
 }
